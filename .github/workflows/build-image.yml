@@ -56,7 +56,6 @@ jobs:
           platforms: linux/amd64
           push: true
           build-args: |
-            VERSION=harbor-${{ github.sha }}
             COMMIT=${{ github.sha }}
           tags: |
             ${{ env.IMAGE_NAME }}:latest
