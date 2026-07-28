@@ -2816,7 +2816,7 @@ func TestGrokRateLimitResetAtUsesFutureWindowAfterRetryAfterExpires(t *testing.T
 		},
 	}
 
-	resetAt, limited := grokRateLimitResetAt(snapshot, now)
+	resetAt, limited := grokRateLimitResetAtWithFallback(snapshot, now, grokRateLimitFallbackCooldown, true)
 
 	require.True(t, limited)
 	require.WithinDuration(t, windowReset, resetAt, time.Second)
