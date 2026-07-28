@@ -977,7 +977,7 @@ export default {
         enabled: '启用 429 默认回避',
         enabledHint: '收到无重置时间的 429 时暂停该账号调度，冷却后自动恢复',
         cooldownSeconds: '回避时长（秒）',
-        cooldownSecondsHint: '默认回避持续时间（1-7200 秒）；上游返回明确 reset 时仍优先使用上游时间',
+        cooldownSecondsHint: '默认回避持续时间（1-604800 秒）；默认 86400 秒（24 小时）。上游返回明确 reset 时仍优先使用上游时间',
         saved: '429 默认回避设置保存成功',
         saveFailed: '保存 429 默认回避设置失败'
       },

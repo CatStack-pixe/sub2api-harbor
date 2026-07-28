@@ -358,7 +358,7 @@
                       v-model.number="rateLimit429CooldownForm.cooldown_seconds"
                       type="number"
                       min="1"
-                      max="7200"
+                      max="604800"
                       class="input w-32"
                     />
                     <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
@@ -8161,7 +8161,7 @@ const rateLimit429CooldownLoading = ref(true);
 const rateLimit429CooldownSaving = ref(false);
 const rateLimit429CooldownForm = reactive({
   enabled: true,
-  cooldown_seconds: 5,
+  cooldown_seconds: 86400,
 });
 
 // Panel API Rate Limit 状态
