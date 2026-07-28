@@ -644,8 +644,8 @@ func (s *SettingService) GetRateLimit429CooldownSettings(ctx context.Context) (*
 	if settings.CooldownSeconds < 1 {
 		settings.CooldownSeconds = 1
 	}
-	if settings.CooldownSeconds > maxRateLimit429CooldownSeconds {
-		settings.CooldownSeconds = maxRateLimit429CooldownSeconds
+	if settings.CooldownSeconds > 7200 {
+		settings.CooldownSeconds = 7200
 	}
 
 	return &settings, nil
@@ -657,11 +657,11 @@ func (s *SettingService) SetRateLimit429CooldownSettings(ctx context.Context, se
 		return fmt.Errorf("settings cannot be nil")
 	}
 
-	if settings.CooldownSeconds < 1 || settings.CooldownSeconds > maxRateLimit429CooldownSeconds {
+	if settings.CooldownSeconds < 1 || settings.CooldownSeconds > 7200 {
 		if settings.Enabled {
-			return fmt.Errorf("cooldown_seconds must be between 1-%d", maxRateLimit429CooldownSeconds)
+			return fmt.Errorf("cooldown_seconds must be between 1-7200")
 		}
-		settings.CooldownSeconds = defaultRateLimit429CooldownSeconds
+		settings.CooldownSeconds = 5
 	}
 
 	data, err := json.Marshal(settings)

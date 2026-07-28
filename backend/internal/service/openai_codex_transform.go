@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"net/http"
 	"strings"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/openai"
@@ -1280,8 +1279,8 @@ func ensureCodexReasoningInclude(reqBody map[string]any) bool {
 // applyCodexClientMetadata 在请求体补齐 client_metadata["x-codex-installation-id"]，
 // 取值为账号真实的 openai_device_id（最新 Codex 在请求体携带的安装标识）。
 //
-// 安装标识由上游账号拥有，因此仅覆盖这一键；其他 client_metadata（如 turn
-// metadata）保持不变。无 device_id 时不伪造该值。
+// 加法式、幂等：仅在账号存在 device_id 且该键缺失时注入，绝不覆盖既有 client_metadata
+// （如 turn metadata），也不伪造——无 device_id 时不写入。
 func applyCodexClientMetadata(reqBody map[string]any, account *Account) bool {
 	if account == nil {
 		return false
@@ -1293,14 +1292,14 @@ func applyCodexClientMetadata(reqBody map[string]any, account *Account) bool {
 	const key = "x-codex-installation-id"
 	switch existing := reqBody["client_metadata"].(type) {
 	case map[string]any:
-		if value, ok := existing[key].(string); ok && strings.TrimSpace(value) == deviceID {
+		if v, ok := existing[key].(string); ok && strings.TrimSpace(v) != "" {
 			return false
 		}
 		existing[key] = deviceID
 		reqBody["client_metadata"] = existing
 		return true
 	case map[string]string:
-		if strings.TrimSpace(existing[key]) == deviceID {
+		if strings.TrimSpace(existing[key]) != "" {
 			return false
 		}
 		next := make(map[string]any, len(existing)+1)
@@ -1316,23 +1315,6 @@ func applyCodexClientMetadata(reqBody map[string]any, account *Account) bool {
 	default:
 		return false
 	}
-}
-
-// applyCodexInstallationIDHeader keeps OAuth account identity server-owned.
-// The installation ID belongs to the selected upstream account, so a caller
-// cannot override it with a value from another local Codex installation.
-func applyCodexInstallationIDHeader(headers http.Header, account *Account) bool {
-	if headers == nil || account == nil {
-		return false
-	}
-
-	headers.Del("x-codex-installation-id")
-	installationID := strings.TrimSpace(account.GetOpenAIDeviceID())
-	if installationID == "" {
-		return false
-	}
-	headers.Set("x-codex-installation-id", installationID)
-	return true
 }
 
 // applyInstructions 处理 instructions 字段：仅在 instructions 为空时填充默认值。
