@@ -636,7 +636,7 @@ describe("admin SettingsView payment visible method controls", () => {
     });
     getRateLimit429CooldownSettings.mockResolvedValue({
       enabled: true,
-      cooldown_seconds: 86400,
+      cooldown_seconds: 5,
     });
     updateRateLimit429CooldownSettings.mockImplementation(async (payload) => payload);
     getStreamTimeoutSettings.mockResolvedValue({
@@ -1310,7 +1310,7 @@ describe("admin SettingsView wechat connect controls", () => {
     });
     getRateLimit429CooldownSettings.mockResolvedValue({
       enabled: true,
-      cooldown_seconds: 86400,
+      cooldown_seconds: 5,
     });
     updateRateLimit429CooldownSettings.mockImplementation(async (payload) => payload);
     getStreamTimeoutSettings.mockResolvedValue({

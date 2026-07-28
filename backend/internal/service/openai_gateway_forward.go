@@ -1046,19 +1046,9 @@ func (s *OpenAIGatewayService) buildUpstreamRequest(ctx context.Context, c *gin.
 	if account.Type == AccountTypeOAuth {
 		compatMessagesBridge := isOpenAICompatMessagesBridgeContext(c) || isOpenAICompatMessagesBridgeBody(body)
 		// 清除客户端透传的 session 头，后续用隔离后的值重新设置，防止跨用户会话碰撞。
-		clientConversationID := strings.TrimSpace(req.Header.Get(codexThreadIDHeader))
-		if clientConversationID == "" {
-			clientConversationID = strings.TrimSpace(req.Header.Get("conversation_id"))
-		}
-		clientSessionID := strings.TrimSpace(req.Header.Get(codexSessionIDHeader))
-		if clientSessionID == "" {
-			clientSessionID = strings.TrimSpace(req.Header.Get("session_id"))
-		}
-		req.Header.Del(codexThreadIDHeader)
-		req.Header.Del(codexSessionIDHeader)
+		clientConversationID := strings.TrimSpace(req.Header.Get("conversation_id"))
 		req.Header.Del("conversation_id")
 		req.Header.Del("session_id")
-		applyCodexInstallationIDHeader(req.Header, account)
 
 		if compatMessagesBridge {
 			req.Header.Del("OpenAI-Beta")
@@ -1074,32 +1064,15 @@ func (s *OpenAIGatewayService) buildUpstreamRequest(ctx context.Context, c *gin.
 				req.Header.Set("version", codexCLIVersion)
 			}
 			compactSession := resolveOpenAICompactSessionID(c)
-			compactSessionHeader := "session_id"
-			if isCodexCLI {
-				compactSessionHeader = codexSessionIDHeader
-			}
-			req.Header.Set(compactSessionHeader, isolateOpenAISessionID(apiKeyID, compactSession))
+			req.Header.Set("session_id", isolateOpenAISessionID(apiKeyID, compactSession))
 		} else {
 			req.Header.Set("accept", "text/event-stream")
 		}
-		if promptCacheKey == "" {
-			promptCacheKey = clientSessionID
-		}
 		if promptCacheKey != "" {
 			isolated := isolateOpenAISessionID(apiKeyID, promptCacheKey)
-			sessionHeader := "session_id"
-			conversationHeader := "conversation_id"
-			if isCodexCLI {
-				sessionHeader = codexSessionIDHeader
-				conversationHeader = codexThreadIDHeader
-			}
-			req.Header.Set(sessionHeader, isolated)
+			req.Header.Set("session_id", isolated)
 			if !compatMessagesBridge || clientConversationID != "" {
-				conversationID := clientConversationID
-				if conversationID == "" {
-					conversationID = promptCacheKey
-				}
-				req.Header.Set(conversationHeader, isolateOpenAISessionID(apiKeyID, conversationID))
+				req.Header.Set("conversation_id", isolated)
 			}
 		}
 	} else if isOpenAIResponsesCompactPath(c) {

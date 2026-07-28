@@ -2668,42 +2668,6 @@ func TestHandleGrokAccountUpstreamError429UsesFallbackReset(t *testing.T) {
 	require.Zero(t, repo.tempUnschedCalls)
 }
 
-func TestHandleGrokAccountUpstreamError429UsesConfiguredFallbackReset(t *testing.T) {
-	account := &Account{ID: 6301, Platform: PlatformGrok, Type: AccountTypeOAuth}
-	repo := &grokQuotaAccountRepo{}
-	settingRepo := newMockSettingRepo()
-	data, _ := json.Marshal(RateLimit429CooldownSettings{Enabled: true, CooldownSeconds: 5400})
-	settingRepo.data[SettingKeyRateLimit429CooldownSettings] = string(data)
-	settingSvc := NewSettingService(settingRepo, &config.Config{})
-	rateLimitSvc := NewRateLimitService(repo, nil, &config.Config{}, nil, nil)
-	rateLimitSvc.SetSettingService(settingSvc)
-	svc := &OpenAIGatewayService{accountRepo: repo, rateLimitService: rateLimitSvc}
-	before := time.Now()
-
-	svc.handleGrokAccountUpstreamError(context.Background(), account, http.StatusTooManyRequests, nil, nil)
-
-	require.Equal(t, 1, repo.rateLimitedCalls)
-	require.WithinDuration(t, before.Add(5400*time.Second), repo.lastRateLimitResetAt, time.Second)
-	require.Zero(t, repo.tempUnschedCalls)
-}
-
-func TestHandleGrokAccountUpstreamError429RespectsDisabledFallback(t *testing.T) {
-	account := &Account{ID: 6302, Platform: PlatformGrok, Type: AccountTypeOAuth}
-	repo := &grokQuotaAccountRepo{}
-	settingRepo := newMockSettingRepo()
-	data, _ := json.Marshal(RateLimit429CooldownSettings{Enabled: false, CooldownSeconds: 5400})
-	settingRepo.data[SettingKeyRateLimit429CooldownSettings] = string(data)
-	settingSvc := NewSettingService(settingRepo, &config.Config{})
-	rateLimitSvc := NewRateLimitService(repo, nil, &config.Config{}, nil, nil)
-	rateLimitSvc.SetSettingService(settingSvc)
-	svc := &OpenAIGatewayService{accountRepo: repo, rateLimitService: rateLimitSvc}
-
-	svc.handleGrokAccountUpstreamError(context.Background(), account, http.StatusTooManyRequests, nil, nil)
-
-	require.Zero(t, repo.rateLimitedCalls)
-	require.Zero(t, repo.tempUnschedCalls)
-}
-
 func TestGrokRateLimitResetAtForAccountEscalatesRepeated429s(t *testing.T) {
 	now := time.Now().UTC().Truncate(time.Second)
 	retryAfter := 45
@@ -2816,7 +2780,7 @@ func TestGrokRateLimitResetAtUsesFutureWindowAfterRetryAfterExpires(t *testing.T
 		},
 	}
 
-	resetAt, limited := grokRateLimitResetAtWithFallback(snapshot, now, grokRateLimitFallbackCooldown, true)
+	resetAt, limited := grokRateLimitResetAt(snapshot, now)
 
 	require.True(t, limited)
 	require.WithinDuration(t, windowReset, resetAt, time.Second)

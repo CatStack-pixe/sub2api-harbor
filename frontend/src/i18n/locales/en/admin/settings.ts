@@ -1000,7 +1000,7 @@ export default {
         enabled: 'Enable 429 Default Cooldown',
         enabledHint: 'Pause account scheduling when a 429 has no reset time, then auto-recover after cooldown',
         cooldownSeconds: 'Cooldown Duration (seconds)',
-        cooldownSecondsHint: 'Default cooldown duration (1-604800 seconds); default is 86400 seconds (24 hours). Explicit upstream reset times still take precedence',
+        cooldownSecondsHint: 'Default cooldown duration (1-7200 seconds); explicit upstream reset times still take precedence',
         saved: '429 default cooldown settings saved',
         saveFailed: 'Failed to save 429 default cooldown settings'
       },

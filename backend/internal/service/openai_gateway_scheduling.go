@@ -20,8 +20,6 @@ import (
 )
 
 const (
-	codexSessionIDHeader          = "session-id"
-	codexThreadIDHeader           = "thread-id"
 	openCodeSessionAffinityHeader = "X-Session-Affinity"
 	openCodeSessionIDHeader       = "X-Session-Id"
 	openCodeNativeSessionHeader   = "X-OpenCode-Session"
@@ -29,9 +27,7 @@ const (
 )
 
 var explicitOpenAIHeaderSessionNames = []string{
-	codexSessionIDHeader,
 	"session_id",
-	codexThreadIDHeader,
 	"conversation_id",
 	openCodeSessionAffinityHeader,
 	openCodeSessionIDHeader,
