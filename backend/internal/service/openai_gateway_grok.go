@@ -1198,10 +1198,6 @@ func normalizeGrokExhaustedWindowResets(snapshot *xai.QuotaSnapshot, resetAt, no
 	}
 }
 
-func grokRateLimitResetAt(snapshot *xai.QuotaSnapshot, now time.Time) (time.Time, bool) {
-	return grokRateLimitResetAtWithFallback(snapshot, now, grokRateLimitFallbackCooldown, true)
-}
-
 func grokRateLimitResetAtWithFallback(snapshot *xai.QuotaSnapshot, now time.Time, fallbackCooldown time.Duration, fallbackEnabled bool) (time.Time, bool) {
 	if snapshot == nil {
 		return time.Time{}, false
