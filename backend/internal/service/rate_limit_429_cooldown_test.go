@@ -34,7 +34,7 @@ func TestGetRateLimit429CooldownSettings_DefaultsWhenNotSet(t *testing.T) {
 	settings, err := svc.GetRateLimit429CooldownSettings(context.Background())
 	require.NoError(t, err)
 	require.True(t, settings.Enabled)
-	require.Equal(t, 5, settings.CooldownSeconds)
+	require.Equal(t, defaultRateLimit429CooldownSeconds, settings.CooldownSeconds)
 }
 
 func TestGetRateLimit429CooldownSettings_ReadsFromDB(t *testing.T) {
@@ -52,12 +52,12 @@ func TestGetRateLimit429CooldownSettings_ReadsFromDB(t *testing.T) {
 func TestSetRateLimit429CooldownSettings_EnabledRejectsOutOfRange(t *testing.T) {
 	svc := NewSettingService(newMockSettingRepo(), &config.Config{})
 
-	for _, seconds := range []int{0, -1, 7201, 99999} {
+	for _, seconds := range []int{0, -1, maxRateLimit429CooldownSeconds + 1} {
 		err := svc.SetRateLimit429CooldownSettings(context.Background(), &RateLimit429CooldownSettings{
 			Enabled: true, CooldownSeconds: seconds,
 		})
 		require.Error(t, err, "should reject enabled=true + cooldown_seconds=%d", seconds)
-		require.Contains(t, err.Error(), "cooldown_seconds must be between 1-7200")
+		require.Contains(t, err.Error(), "cooldown_seconds must be between 1-604800")
 	}
 }
 
@@ -148,5 +148,6 @@ func TestHandle429_FallbackUsesDefaultSecondsWhenSettingServiceMissing(t *testin
 
 	require.Equal(t, 1, accountRepo.rateLimitCalls)
 	require.Equal(t, int64(44), accountRepo.lastRateLimitID)
-	require.True(t, !accountRepo.lastRateLimitReset.Before(before.Add(5*time.Second)) && !accountRepo.lastRateLimitReset.After(after.Add(5*time.Second)))
+	defaultCooldown := time.Duration(defaultRateLimit429CooldownSeconds) * time.Second
+	require.True(t, !accountRepo.lastRateLimitReset.Before(before.Add(defaultCooldown)) && !accountRepo.lastRateLimitReset.After(after.Add(defaultCooldown)))
 }

@@ -25,7 +25,7 @@ const (
 	grokUpstreamUserAgent                  = "sub2api-grok/1.0"
 	grokCLIVersion                         = "0.2.93"
 	grokDefaultResponsesModel              = "grok-4.5"
-	grokRateLimitFallbackCooldown          = 2 * time.Minute
+	grokRateLimitFallbackCooldown          = 24 * time.Hour
 	grokRateLimitRepeatCooldown            = 10 * time.Minute
 	grokRateLimitSustainedCooldown         = 30 * time.Minute
 	grokRateLimitMaxAdaptiveCooldown       = time.Hour
@@ -1105,7 +1105,8 @@ func (s *OpenAIGatewayService) updateGrokUsageSnapshot(ctx context.Context, acco
 	}
 	accountID := account.ID
 	now := time.Now()
-	resetAt, hasActiveLimit := grokRateLimitResetAtForAccount(account, snapshot, now)
+	fallbackCooldown, fallbackEnabled := s.grokRateLimitFallbackCooldown(ctx, account)
+	resetAt, hasActiveLimit := grokRateLimitResetAtForAccountWithFallback(account, snapshot, now, fallbackCooldown, fallbackEnabled)
 	if hasActiveLimit {
 		normalizeGrokExhaustedWindowResets(snapshot, resetAt, now)
 	}
@@ -1167,6 +1168,13 @@ func parseGrokQuotaSnapshot(headers http.Header, statusCode int, now time.Time) 
 	return snapshot
 }
 
+func (s *OpenAIGatewayService) grokRateLimitFallbackCooldown(ctx context.Context, account *Account) (time.Duration, bool) {
+	if s != nil && s.rateLimitService != nil {
+		return s.rateLimitService.get429FallbackCooldown(ctx, account)
+	}
+	return grokRateLimitFallbackCooldown, true
+}
+
 func normalizeGrokExhaustedWindowResets(snapshot *xai.QuotaSnapshot, resetAt, now time.Time) {
 	if snapshot == nil || !resetAt.After(now) {
 		return
@@ -1190,7 +1198,7 @@ func normalizeGrokExhaustedWindowResets(snapshot *xai.QuotaSnapshot, resetAt, no
 	}
 }
 
-func grokRateLimitResetAt(snapshot *xai.QuotaSnapshot, now time.Time) (time.Time, bool) {
+func grokRateLimitResetAtWithFallback(snapshot *xai.QuotaSnapshot, now time.Time, fallbackCooldown time.Duration, fallbackEnabled bool) (time.Time, bool) {
 	if snapshot == nil {
 		return time.Time{}, false
 	}
@@ -1238,13 +1246,20 @@ func grokRateLimitResetAt(snapshot *xai.QuotaSnapshot, now time.Time) (time.Time
 		return time.Time{}, false
 	}
 	if exhausted || snapshot.StatusCode == http.StatusTooManyRequests {
-		return now.Add(grokRateLimitFallbackCooldown), true
+		if !fallbackEnabled || fallbackCooldown <= 0 {
+			return time.Time{}, false
+		}
+		return now.Add(fallbackCooldown), true
 	}
 	return time.Time{}, false
 }
 
 func grokRateLimitResetAtForAccount(account *Account, snapshot *xai.QuotaSnapshot, now time.Time) (time.Time, bool) {
-	resetAt, limited := grokRateLimitResetAt(snapshot, now)
+	return grokRateLimitResetAtForAccountWithFallback(account, snapshot, now, grokRateLimitFallbackCooldown, true)
+}
+
+func grokRateLimitResetAtForAccountWithFallback(account *Account, snapshot *xai.QuotaSnapshot, now time.Time, fallbackCooldown time.Duration, fallbackEnabled bool) (time.Time, bool) {
+	resetAt, limited := grokRateLimitResetAtWithFallback(snapshot, now, fallbackCooldown, fallbackEnabled)
 	if !limited || !isGrokOAuthAccount(account) || snapshot == nil || snapshot.StatusCode != http.StatusTooManyRequests {
 		return resetAt, limited
 	}
