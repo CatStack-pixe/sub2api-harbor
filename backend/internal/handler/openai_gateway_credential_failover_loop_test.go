@@ -576,7 +576,7 @@ func TestResponsesGrok429FailoverIsBounded(t *testing.T) {
 		require.Equal(t, []int64{801}, repo.rateLimitedAccountIDs())
 	})
 
-	t.Run("two rate limited accounts stop without sweeping the pool", func(t *testing.T) {
+	t.Run("two rate limited accounts continue to a healthy account", func(t *testing.T) {
 		_, repo, upstream, router, cleanup := newGrokCredentialFailoverHandler(t, "all_429")
 		defer cleanup()
 		recorder := httptest.NewRecorder()
@@ -585,11 +585,12 @@ func TestResponsesGrok429FailoverIsBounded(t *testing.T) {
 
 		router.ServeHTTP(recorder, req)
 
-		require.Equal(t, http.StatusTooManyRequests, recorder.Code, recorder.Body.String())
-		require.Equal(t, []int64{801, 802}, upstream.accountHits())
+		require.Equal(t, http.StatusOK, recorder.Code, recorder.Body.String())
+		require.Contains(t, recorder.Body.String(), "resp_healthy")
+		require.Equal(t, []int64{801, 802, 803}, upstream.accountHits())
 		require.Equal(t, []int64{801, 802}, repo.rateLimitedAccountIDs())
 		require.NotContains(t, recorder.Body.String(), "expired")
-		require.NotContains(t, recorder.Body.String(), "healthy-access")
+		require.NotContains(t, recorder.Body.String(), "untried-healthy-access")
 		require.NotContains(t, recorder.Body.String(), "rate limited")
 	})
 }
@@ -623,7 +624,7 @@ func TestResponsesGrok402FailoverCooldown(t *testing.T) {
 func TestResponsesGrok429FailoverHandlesMixedStatuses(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	t.Run("429 then 500 stops after the bounded followup", func(t *testing.T) {
+	t.Run("429 then 500 continues to a healthy account", func(t *testing.T) {
 		_, _, upstream, router, cleanup := newGrokCredentialFailoverHandler(t, "mixed_429_500")
 		defer cleanup()
 		recorder := httptest.NewRecorder()
@@ -632,8 +633,8 @@ func TestResponsesGrok429FailoverHandlesMixedStatuses(t *testing.T) {
 
 		router.ServeHTTP(recorder, req)
 
-		require.Equal(t, http.StatusBadGateway, recorder.Code, recorder.Body.String())
-		require.Equal(t, []int64{801, 802}, upstream.accountHits())
+		require.Equal(t, http.StatusOK, recorder.Code, recorder.Body.String())
+		require.Equal(t, []int64{801, 802, 803}, upstream.accountHits())
 		require.NotContains(t, recorder.Body.String(), "upstream unavailable")
 	})
 
@@ -650,7 +651,7 @@ func TestResponsesGrok429FailoverHandlesMixedStatuses(t *testing.T) {
 		require.Equal(t, []int64{801, 802, 803}, upstream.accountHits())
 	})
 
-	t.Run("OAuth 429 then API-key failure cannot bypass the bound", func(t *testing.T) {
+	t.Run("OAuth 429 then API-key failure continues to a healthy account", func(t *testing.T) {
 		_, _, upstream, router, cleanup := newGrokCredentialFailoverHandler(t, "oauth_429_apikey_500")
 		defer cleanup()
 		recorder := httptest.NewRecorder()
@@ -659,8 +660,8 @@ func TestResponsesGrok429FailoverHandlesMixedStatuses(t *testing.T) {
 
 		router.ServeHTTP(recorder, req)
 
-		require.Equal(t, http.StatusBadGateway, recorder.Code, recorder.Body.String())
-		require.Equal(t, []int64{801, 802}, upstream.accountHits())
+		require.Equal(t, http.StatusOK, recorder.Code, recorder.Body.String())
+		require.Equal(t, []int64{801, 802, 803}, upstream.accountHits())
 	})
 }
 
@@ -680,7 +681,7 @@ func TestGrokMedia429FailoverIsBounded(t *testing.T) {
 		require.Equal(t, []int64{801, 802}, upstream.accountHits())
 	})
 
-	t.Run("second 429 stops without sweeping a third account", func(t *testing.T) {
+	t.Run("second 429 continues to a healthy account", func(t *testing.T) {
 		_, _, upstream, router, cleanup := newGrokCredentialFailoverHandler(t, "all_429")
 		defer cleanup()
 		recorder := httptest.NewRecorder()
@@ -689,8 +690,8 @@ func TestGrokMedia429FailoverIsBounded(t *testing.T) {
 
 		router.ServeHTTP(recorder, req)
 
-		require.Equal(t, http.StatusTooManyRequests, recorder.Code, recorder.Body.String())
-		require.Equal(t, []int64{801, 802}, upstream.accountHits())
+		require.Equal(t, http.StatusOK, recorder.Code, recorder.Body.String())
+		require.Equal(t, []int64{801, 802, 803}, upstream.accountHits())
 		require.NotContains(t, recorder.Body.String(), "rate limited")
 	})
 }
