@@ -25,7 +25,7 @@ const (
 	grokUpstreamUserAgent                  = "sub2api-grok/1.0"
 	grokCLIVersion                         = "0.2.93"
 	grokDefaultResponsesModel              = "grok-4.5"
-	grokRateLimitFallbackCooldown          = 2 * time.Minute
+	grokRateLimitFallbackCooldown          = 12 * time.Hour
 	grokRateLimitRepeatCooldown            = 10 * time.Minute
 	grokRateLimitSustainedCooldown         = 30 * time.Minute
 	grokRateLimitMaxAdaptiveCooldown       = time.Hour

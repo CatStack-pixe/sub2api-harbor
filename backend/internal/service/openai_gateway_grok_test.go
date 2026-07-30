@@ -2664,7 +2664,8 @@ func TestHandleGrokAccountUpstreamError429UsesFallbackReset(t *testing.T) {
 	svc.handleGrokAccountUpstreamError(context.Background(), account, http.StatusTooManyRequests, nil, nil)
 
 	require.Equal(t, 1, repo.rateLimitedCalls)
-	require.WithinDuration(t, before.Add(grokRateLimitFallbackCooldown), repo.lastRateLimitResetAt, time.Second)
+	require.Equal(t, 12*time.Hour, grokRateLimitFallbackCooldown)
+	require.WithinDuration(t, before.Add(12*time.Hour), repo.lastRateLimitResetAt, time.Second)
 	require.Zero(t, repo.tempUnschedCalls)
 }
 
