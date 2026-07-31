@@ -54,9 +54,5 @@ func DefaultModelMapping() map[string]string {
 	mapping["composer-2.5"] = "grok-composer-2.5-fast"
 	mapping["grok-4.20-reasoning"] = "grok-4.20-0309-reasoning"
 	mapping["grok-4.20-non-reasoning"] = "grok-4.20-0309-non-reasoning"
-	// Keep the configured GPT-5.6 aliases usable for Grok-backed groups.
-	for _, alias := range []string{"gpt-5.6", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna"} {
-		mapping[alias] = "grok-4.5"
-	}
 	return mapping
 }
