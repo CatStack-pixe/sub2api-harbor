@@ -29,7 +29,7 @@ func TestGroupResolveRequestModelOnlyAppliesToEnabledAgnesGroups(t *testing.T) {
 		Platform: PlatformAgnes,
 		ModelsListConfig: GroupModelsListConfig{
 			ModelMappingEnabled: true,
-			ModelMapping: map[string]string{"deepseek-v4-pro": "agnes-2.5-pro-alpha", "deepseek-v4-*": "agnes-2.5-flash"},
+			ModelMapping:        map[string]string{"deepseek-v4-pro": "agnes-2.5-pro-alpha", "deepseek-v4-*": "agnes-2.5-flash"},
 		},
 	}
 
