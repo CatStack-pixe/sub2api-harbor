@@ -43,7 +43,10 @@ const (
 	PlatformGemini      = domain.PlatformGemini
 	PlatformAntigravity = domain.PlatformAntigravity
 	PlatformGrok        = domain.PlatformGrok
+	PlatformAgnes       = domain.PlatformAgnes
 	PlatformComposite   = domain.PlatformComposite
+	AgnesDefaultBaseURL = domain.AgnesDefaultBaseURL
+	AgnesDefaultModel   = domain.AgnesDefaultModel
 	// PlatformKiro is retained for unsupported-platform threshold tests and legacy
 	// account rows. Scheduling-threshold evaluation never pauses kiro accounts.
 	PlatformKiro = "kiro"
@@ -58,6 +61,7 @@ var AllowedQuotaPlatforms = []string{
 	PlatformGemini,
 	PlatformAntigravity,
 	PlatformGrok,
+	PlatformAgnes,
 }
 
 // AllowedSchedulingThresholdPlatforms 是允许设置账号自动停调阈值的平台列表。

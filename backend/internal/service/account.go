@@ -267,12 +267,23 @@ func (a *Account) IsGrok() bool {
 	return a.Platform == PlatformGrok
 }
 
+func (a *Account) IsAgnes() bool {
+	return a != nil && a.Platform == PlatformAgnes
+}
+
 func (a *Account) IsGrokOAuth() bool {
 	return a.IsGrok() && a.Type == AccountTypeOAuth
 }
 
 func (a *Account) IsOpenAICompatible() bool {
-	return a != nil && (a.Platform == PlatformOpenAI || a.Platform == PlatformGrok)
+	return a != nil && (a.Platform == PlatformOpenAI || a.Platform == PlatformGrok || a.Platform == PlatformAgnes)
+}
+
+// ShouldUseOpenAIResponsesAPI reports whether this OpenAI-compatible account
+// accepts native Responses requests. Agnes currently documents Chat
+// Completions only, so Responses and Messages requests must use the bridge.
+func (a *Account) ShouldUseOpenAIResponsesAPI() bool {
+	return a != nil && !a.IsAgnes() && openai_compat.ShouldUseResponsesAPI(a.Extra)
 }
 
 func (a *Account) GeminiOAuthType() string {
@@ -1282,7 +1293,7 @@ func (a *Account) IsOpenAIApiKey() bool {
 }
 
 func (a *Account) GetOpenAIBaseURL() string {
-	if !a.IsOpenAI() {
+	if !a.IsOpenAI() && !a.IsAgnes() {
 		return ""
 	}
 	if a.Type == AccountTypeAPIKey {
@@ -1290,6 +1301,9 @@ func (a *Account) GetOpenAIBaseURL() string {
 		if baseURL != "" {
 			return baseURL
 		}
+	}
+	if a.IsAgnes() {
+		return AgnesDefaultBaseURL
 	}
 	return "https://api.openai.com"
 }
@@ -1398,14 +1412,14 @@ func (a *Account) GetOpenAIIDToken() string {
 }
 
 func (a *Account) GetOpenAIApiKey() string {
-	if !a.IsOpenAIApiKey() {
+	if a == nil || a.Type != AccountTypeAPIKey || (!a.IsOpenAI() && !a.IsAgnes()) {
 		return ""
 	}
 	return a.GetCredential("api_key")
 }
 
 func (a *Account) GetOpenAIUserAgent() string {
-	if !a.IsOpenAI() {
+	if !a.IsOpenAI() && !a.IsAgnes() {
 		return ""
 	}
 	return a.GetCredential("user_agent")
@@ -1485,6 +1499,9 @@ func (a *Account) SupportsOpenAIEndpointCapability(capability OpenAIEndpointCapa
 			return false
 		}
 	}
+	if a.IsAgnes() {
+		return capability == OpenAIEndpointCapabilityChatCompletions
+	}
 	switch capability {
 	case OpenAIEndpointCapabilityChatCompletions:
 	case OpenAIEndpointCapabilityLive:
@@ -1497,7 +1514,7 @@ func (a *Account) SupportsOpenAIEndpointCapability(capability OpenAIEndpointCapa
 		// credentials 能力集。已探测确认不支持 /v1/responses 的 APIKey 上游
 		// 必须排除——否则会在 forward 阶段被静默降级为 Chat Completions，
 		// 无法完成生图（#4417）。未探测/OAuth 账号保留旧行为（不排除）。
-		if a.Type == AccountTypeAPIKey && !openai_compat.ShouldUseResponsesAPI(a.Extra) {
+		if a.Type == AccountTypeAPIKey && !a.ShouldUseOpenAIResponsesAPI() {
 			return false
 		}
 		// 支持 Responses 的上游同样需具备 chat 能力：复用下方 chat_completions

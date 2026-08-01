@@ -2611,6 +2611,23 @@ func (h *AccountHandler) GetAvailableModels(c *gin.Context) {
 		return
 	}
 
+	if account.IsAgnes() {
+		modelIDs := []string{service.AgnesDefaultModel}
+		if mapping := account.GetModelMapping(); len(mapping) > 0 {
+			modelIDs = modelIDs[:0]
+			for requestedModel := range mapping {
+				modelIDs = append(modelIDs, requestedModel)
+			}
+			sort.Strings(modelIDs)
+		}
+		models := make([]openai.Model, 0, len(modelIDs))
+		for _, modelID := range modelIDs {
+			models = append(models, openai.Model{ID: modelID, Object: "model", Type: "model", DisplayName: modelID})
+		}
+		response.Success(c, models)
+		return
+	}
+
 	// Handle Gemini accounts
 	if account.IsGemini() {
 		// For OAuth accounts: return default Gemini models

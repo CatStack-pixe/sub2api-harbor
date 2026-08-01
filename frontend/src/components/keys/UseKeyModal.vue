@@ -519,6 +519,8 @@ const currentFiles = computed((): FileConfig[] => {
         ]
       case 'grok':
         return [generateOpenCodeConfig('grok', apiBase, apiKey)]
+      case 'agnes':
+        return [generateOpenCodeConfig('agnes', apiBase, apiKey)]
       default:
         return [generateOpenCodeConfig('openai', apiBase, apiKey)]
     }
@@ -1501,6 +1503,13 @@ function generateOpenCodeConfig(platform: string, baseUrl: string, apiKey: strin
       limit: { context: 500000, output: 64000 }
     }
   }
+  const agnesModels = {
+    'agnes-2.0-flash': {
+      name: 'Agnes 2.0 Flash',
+      limit: { context: 524288, output: 65536 },
+      modalities: { input: ['text', 'image'], output: ['text'] }
+    }
+  }
 
   if (platform === 'gemini') {
     provider[platform].npm = '@ai-sdk/google'
@@ -1522,6 +1531,10 @@ function generateOpenCodeConfig(platform: string, baseUrl: string, apiKey: strin
     provider[platform].npm = '@ai-sdk/openai-compatible'
     provider[platform].name = 'Grok via Sub2API'
     provider[platform].models = grokModels
+  } else if (platform === 'agnes') {
+    provider[platform].npm = '@ai-sdk/openai'
+    provider[platform].name = 'Agnes'
+    provider[platform].models = agnesModels
   }
 
   const agent =
