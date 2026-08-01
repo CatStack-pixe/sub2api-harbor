@@ -866,6 +866,55 @@
         </div>
 
         <!-- 图片生成计费配置 -->
+        <div v-if="createForm.platform === 'agnes'" class="border-t pt-4">
+          <div class="mb-3 flex items-center justify-between gap-3">
+            <div>
+              <label class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                {{ t("admin.groups.modelMapping.title") }}
+              </label>
+              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                {{ t("admin.groups.modelMapping.hint") }}
+              </p>
+            </div>
+            <button
+              type="button"
+              :aria-label="t('admin.groups.modelMapping.toggle')"
+              @click="createModelsListState.modelMappingEnabled = !createModelsListState.modelMappingEnabled"
+              :class="[
+                'relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors',
+                createModelsListState.modelMappingEnabled ? 'bg-primary-500' : 'bg-gray-300 dark:bg-dark-600',
+              ]"
+            >
+              <span
+                :class="[
+                  'inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform',
+                  createModelsListState.modelMappingEnabled ? 'translate-x-6' : 'translate-x-1',
+                ]"
+              />
+            </button>
+          </div>
+          <div v-if="createModelsListState.modelMappingEnabled" class="space-y-2">
+            <div
+              v-for="row in createModelsListState.modelMappingRows"
+              :key="row.id"
+              class="grid grid-cols-1 items-center gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]"
+            >
+              <input v-model="row.requestedModel" type="text" class="input min-w-0" :placeholder="t('admin.groups.modelMapping.requestedModel')" />
+              <input v-model="row.upstreamModel" type="text" class="input min-w-0" :placeholder="t('admin.groups.modelMapping.upstreamModel')" />
+              <button type="button" class="justify-self-end rounded p-2 text-gray-400 hover:bg-gray-100 hover:text-red-600 dark:hover:bg-dark-600 dark:hover:text-red-400" :title="t('admin.groups.modelMapping.remove')" @click="removeModelMappingRow(createModelsListState, row.id)">
+                <Icon name="trash" size="sm" />
+              </button>
+            </div>
+            <p v-if="createModelsListState.modelMappingRows.length === 0" class="text-xs text-gray-500 dark:text-gray-400">
+              {{ t("admin.groups.modelMapping.empty") }}
+            </p>
+            <button type="button" class="inline-flex items-center gap-1.5 rounded px-2 py-1.5 text-sm font-medium text-primary-600 hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/20" @click="addModelMappingRow(createModelsListState)">
+              <Icon name="plus" size="sm" />
+              {{ t("admin.groups.modelMapping.add") }}
+            </button>
+          </div>
+        </div>
+
         <div
           v-if="supportsImagePricingPlatform(createForm.platform)"
           class="border-t pt-4"
@@ -2573,6 +2622,55 @@
         </div>
 
         <!-- 图片生成计费配置 -->
+        <div v-if="editForm.platform === 'agnes'" class="border-t pt-4">
+          <div class="mb-3 flex items-center justify-between gap-3">
+            <div>
+              <label class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                {{ t("admin.groups.modelMapping.title") }}
+              </label>
+              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                {{ t("admin.groups.modelMapping.hint") }}
+              </p>
+            </div>
+            <button
+              type="button"
+              :aria-label="t('admin.groups.modelMapping.toggle')"
+              @click="editModelsListState.modelMappingEnabled = !editModelsListState.modelMappingEnabled"
+              :class="[
+                'relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors',
+                editModelsListState.modelMappingEnabled ? 'bg-primary-500' : 'bg-gray-300 dark:bg-dark-600',
+              ]"
+            >
+              <span
+                :class="[
+                  'inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform',
+                  editModelsListState.modelMappingEnabled ? 'translate-x-6' : 'translate-x-1',
+                ]"
+              />
+            </button>
+          </div>
+          <div v-if="editModelsListState.modelMappingEnabled" class="space-y-2">
+            <div
+              v-for="row in editModelsListState.modelMappingRows"
+              :key="row.id"
+              class="grid grid-cols-1 items-center gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]"
+            >
+              <input v-model="row.requestedModel" type="text" class="input min-w-0" :placeholder="t('admin.groups.modelMapping.requestedModel')" />
+              <input v-model="row.upstreamModel" type="text" class="input min-w-0" :placeholder="t('admin.groups.modelMapping.upstreamModel')" />
+              <button type="button" class="justify-self-end rounded p-2 text-gray-400 hover:bg-gray-100 hover:text-red-600 dark:hover:bg-dark-600 dark:hover:text-red-400" :title="t('admin.groups.modelMapping.remove')" @click="removeModelMappingRow(editModelsListState, row.id)">
+                <Icon name="trash" size="sm" />
+              </button>
+            </div>
+            <p v-if="editModelsListState.modelMappingRows.length === 0" class="text-xs text-gray-500 dark:text-gray-400">
+              {{ t("admin.groups.modelMapping.empty") }}
+            </p>
+            <button type="button" class="inline-flex items-center gap-1.5 rounded px-2 py-1.5 text-sm font-medium text-primary-600 hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/20" @click="addModelMappingRow(editModelsListState)">
+              <Icon name="plus" size="sm" />
+              {{ t("admin.groups.modelMapping.add") }}
+            </button>
+          </div>
+        </div>
+
         <div
           v-if="supportsImagePricingPlatform(editForm.platform)"
           class="border-t pt-4"
@@ -4398,10 +4496,12 @@ import {
   type MessagesDispatchMappingRow,
 } from "./groupsMessagesDispatch";
 import {
+  addModelMappingRow,
   buildModelsListConfig,
   createModelsListState as createInitialModelsListState,
   invertModelsListSelection,
   moveModelsListItem,
+  removeModelMappingRow,
   selectAllModelsListItems,
   setModelsListCandidates,
 } from "./groupsModelsList";
@@ -5194,6 +5294,8 @@ const resetModelsListState = (
   state.enabled = fresh.enabled;
   state.savedModels = fresh.savedModels;
   state.items = fresh.items;
+  state.modelMappingEnabled = fresh.modelMappingEnabled;
+  state.modelMappingRows = fresh.modelMappingRows;
 };
 
 const loadModelsListCandidates = async (

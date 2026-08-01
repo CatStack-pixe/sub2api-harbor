@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  addModelMappingRow,
   buildModelsListConfig,
   createModelsListState,
   hydrateModelsListState,
   invertModelsListSelection,
   moveModelsListItem,
+  removeModelMappingRow,
   selectAllModelsListItems,
   setModelsListCandidates,
   toggleModelsListItem,
@@ -22,6 +24,45 @@ describe("groupsModelsList", () => {
       { id: "gpt-5.5", selected: true },
       { id: "gpt-5.4", selected: true },
     ]);
+  });
+
+  it("builds and preserves a disabled Agnes group model mapping", () => {
+    const state = createModelsListState({
+      enabled: true,
+      models: ["deepseek-v4-pro", "deepseek-v4-flash"],
+      model_mapping_enabled: false,
+      model_mapping: {
+        "deepseek-v4-pro": "agnes-2.5-pro-alpha",
+        "deepseek-v4-flash": "agnes-2.5-flash",
+      },
+    });
+
+    expect(buildModelsListConfig(state)).toEqual({
+      enabled: true,
+      models: ["deepseek-v4-pro", "deepseek-v4-flash"],
+      model_mapping_enabled: false,
+      model_mapping: {
+        "deepseek-v4-pro": "agnes-2.5-pro-alpha",
+        "deepseek-v4-flash": "agnes-2.5-flash",
+      },
+    });
+  });
+
+  it("adds, trims, and removes Agnes mapping rows", () => {
+    const state = createModelsListState();
+    state.modelMappingEnabled = true;
+    addModelMappingRow(state);
+    state.modelMappingRows[0].requestedModel = " deepseek-v4-pro ";
+    state.modelMappingRows[0].upstreamModel = " agnes-2.5-pro-alpha ";
+    addModelMappingRow(state);
+    const emptyRowID = state.modelMappingRows[1].id;
+
+    expect(buildModelsListConfig(state).model_mapping).toEqual({
+      "deepseek-v4-pro": "agnes-2.5-pro-alpha",
+    });
+
+    removeModelMappingRow(state, emptyRowID);
+    expect(state.modelMappingRows).toHaveLength(1);
   });
 
   it("keeps saved selections and marks new candidates as unselected when editing", () => {

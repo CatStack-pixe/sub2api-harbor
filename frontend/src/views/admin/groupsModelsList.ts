@@ -1,6 +1,8 @@
 export interface ModelsListConfig {
   enabled: boolean
   models: string[]
+  model_mapping_enabled?: boolean
+  model_mapping?: Record<string, string>
 }
 
 export interface ModelsListItem {
@@ -12,7 +14,26 @@ export interface ModelsListState {
   enabled: boolean
   savedModels: string[]
   items: ModelsListItem[]
+  modelMappingEnabled: boolean
+  modelMappingRows: ModelMappingRow[]
 }
+
+export interface ModelMappingRow {
+  id: string
+  requestedModel: string
+  upstreamModel: string
+}
+
+let nextModelMappingRowID = 0
+
+const createModelMappingRow = (
+  requestedModel = "",
+  upstreamModel = "",
+): ModelMappingRow => ({
+  id: `model-mapping-${++nextModelMappingRowID}`,
+  requestedModel,
+  upstreamModel,
+})
 
 export const createModelsListState = (
   config?: Partial<ModelsListConfig> | null,
@@ -20,6 +41,11 @@ export const createModelsListState = (
   enabled: config?.enabled ?? false,
   savedModels: normalizeModels(config?.models ?? []),
   items: [],
+  modelMappingEnabled: config?.model_mapping_enabled ?? false,
+  modelMappingRows: Object.entries(config?.model_mapping ?? {}).map(
+    ([requestedModel, upstreamModel]) =>
+      createModelMappingRow(requestedModel, upstreamModel),
+  ),
 })
 
 export const hydrateModelsListState = (
@@ -99,12 +125,48 @@ export const moveModelsListItem = (
   state.items.splice(toIndex, 0, item)
 }
 
-export const buildModelsListConfig = (state: ModelsListState): ModelsListConfig => ({
-  enabled: state.enabled,
-  models: state.items.length > 0
-    ? state.items.filter(item => item.selected).map(item => item.id)
-    : [...state.savedModels],
-})
+export const buildModelsListConfig = (state: ModelsListState): ModelsListConfig => {
+  const config: ModelsListConfig = {
+    enabled: state.enabled,
+    models: state.items.length > 0
+      ? state.items.filter(item => item.selected).map(item => item.id)
+      : [...state.savedModels],
+  }
+  const modelMapping = normalizeModelMappingRows(state.modelMappingRows)
+  if (state.modelMappingEnabled || Object.keys(modelMapping).length > 0) {
+    config.model_mapping_enabled = state.modelMappingEnabled
+    config.model_mapping = modelMapping
+  }
+  return config
+}
+
+export const addModelMappingRow = (state: ModelsListState) => {
+  state.modelMappingRows.push(createModelMappingRow())
+}
+
+export const removeModelMappingRow = (
+  state: ModelsListState,
+  rowID: string,
+) => {
+  const index = state.modelMappingRows.findIndex(row => row.id === rowID)
+  if (index !== -1) {
+    state.modelMappingRows.splice(index, 1)
+  }
+}
+
+const normalizeModelMappingRows = (
+  rows: ModelMappingRow[],
+): Record<string, string> => {
+  const mapping: Record<string, string> = {}
+  for (const row of rows) {
+    const requestedModel = row.requestedModel.trim()
+    const upstreamModel = row.upstreamModel.trim()
+    if (requestedModel && upstreamModel) {
+      mapping[requestedModel] = upstreamModel
+    }
+  }
+  return mapping
+}
 
 const normalizeModels = (models: string[]): string[] => {
   const seen = new Set<string>()
