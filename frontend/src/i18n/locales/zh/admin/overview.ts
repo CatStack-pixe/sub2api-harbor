@@ -877,6 +877,7 @@ export default {
         gemini: 'Gemini',
         antigravity: 'Antigravity',
         grok: 'Grok',
+        agnes: 'Agnes',
         composite: 'Composite',
       },
       saving: '保存中...',

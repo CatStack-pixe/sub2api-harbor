@@ -260,6 +260,7 @@ func TestGatewayHandlerKeyBillingInfoSharesBillingResolverCacheByPlatform(t *tes
 		{name: "anthropic", platform: service.PlatformAnthropic},
 		{name: "openai", platform: service.PlatformOpenAI, openAI: true},
 		{name: "grok", platform: service.PlatformGrok, openAI: true},
+		{name: "agnes", platform: service.PlatformAgnes, openAI: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			groupID := int64(7)

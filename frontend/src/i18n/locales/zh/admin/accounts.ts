@@ -303,6 +303,7 @@ export default {
         gemini: 'Gemini',
         antigravity: 'Antigravity',
         grok: 'Grok',
+        agnes: 'Agnes',
       },
       types: {
         oauth: 'OAuth',
