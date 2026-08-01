@@ -59,6 +59,9 @@ func (s *OpenAIGatewayService) forwardResponsesViaRawChatCompletions(
 	}
 
 	billingModel := resolveOpenAIForwardModel(account, originalModel, "")
+	if fallbackModel, fallbackActive := s.resolveAgnesQuotaFallbackModel(account, billingModel, time.Now()); fallbackActive {
+		billingModel = fallbackModel
+	}
 	upstreamModel := normalizeOpenAIModelForUpstream(account, billingModel)
 	reasoningEffort := extractOpenAIReasoningEffortFromBody(body, upstreamModel, billingModel, originalModel)
 	// 国产模型默认 effort 补充：需要 mappedModel 判定，推迟到 billingModel 算出之后。
@@ -105,6 +108,9 @@ func (s *OpenAIGatewayService) forwardResponsesViaRawChatCompletions(
 
 	if resp.StatusCode >= 400 {
 		respBody, upstreamMsg := s.readOpenAIUpstreamError(resp)
+		if s.activateAgnesQuotaFallback(account, upstreamModel, resp.StatusCode, respBody, time.Now()) {
+			return s.forwardResponsesViaRawChatCompletions(ctx, c, account, body)
+		}
 		if foErr := s.failoverOpenAIUpstreamHTTPError(ctx, c, account, resp, respBody, upstreamMsg, upstreamModel); foErr != nil {
 			return nil, foErr
 		}

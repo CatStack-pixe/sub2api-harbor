@@ -74,6 +74,9 @@ func (s *OpenAIGatewayService) forwardAsRawChatCompletions(
 
 	// 2. Resolve model mapping (same as ForwardAsChatCompletions)
 	billingModel := resolveOpenAIForwardModel(account, originalModel, defaultMappedModel)
+	if fallbackModel, fallbackActive := s.resolveAgnesQuotaFallbackModel(account, billingModel, time.Now()); fallbackActive {
+		billingModel = fallbackModel
+	}
 	upstreamModel := normalizeOpenAIModelForUpstream(account, billingModel)
 	grokCacheIdentity := ""
 	if account.Platform == PlatformGrok {
@@ -177,6 +180,9 @@ func (s *OpenAIGatewayService) forwardAsRawChatCompletions(
 	// 7. Handle error response with failover
 	if resp.StatusCode >= 400 {
 		respBody, upstreamMsg := s.readOpenAIUpstreamError(resp)
+		if s.activateAgnesQuotaFallback(account, upstreamModel, resp.StatusCode, respBody, time.Now()) {
+			return s.forwardAsRawChatCompletions(ctx, c, account, body, defaultMappedModel)
+		}
 		if account.Platform == PlatformGrok {
 			kind := "http_error"
 			if s.shouldFailoverGrokUpstreamError(resp.StatusCode, respBody) {

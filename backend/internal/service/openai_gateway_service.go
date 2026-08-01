@@ -462,6 +462,7 @@ type OpenAIGatewayService struct {
 	codexModelsManifestCache            codexModelsManifestCache
 	openaiCompatSessionResponses        sync.Map
 	openaiCompatAnthropicDigestSessions sync.Map
+	agnesQuotaFallbackUntil             sync.Map // key: agnesQuotaFallbackKey, value: time.Time
 }
 
 // NewOpenAIGatewayService creates a new OpenAIGatewayService
