@@ -65,6 +65,13 @@ func (s *OpenAIGatewayService) handleOpenAIAccountUpstreamError(ctx context.Cont
 	if s == nil || account == nil {
 		return false
 	}
+	// Agnes reports daily free-credit exhaustion as 403. It is neither an
+	// authentication failure nor a permanent account fault; the forwarding
+	// path falls back to agnes-2.0-flash and probes the primary model again
+	// after the daily reset.
+	if isAgnesInsufficientQuotaResponse(account, statusCode, responseBody) {
+		return false
+	}
 	stateCtx = withTempUnschedulableModel(stateCtx, canonicalModel)
 	if s.rateLimitService != nil && len(canonicalModel) > 0 && s.rateLimitService.HandleUpstreamModelNotFound(stateCtx, account, canonicalModel[0], statusCode, responseBody) {
 		return true
