@@ -126,13 +126,26 @@ func cloneGroupForDuplicate(source *Group, operationID string) *Group {
 		DefaultMappedModel:              source.DefaultMappedModel,
 		MessagesDispatchModelConfig:     cloneGroupMessagesDispatchModelConfig(source.MessagesDispatchModelConfig),
 		ModelsListConfig: GroupModelsListConfig{
-			Enabled: source.ModelsListConfig.Enabled,
-			Models:  append([]string(nil), source.ModelsListConfig.Models...),
+			Enabled:             source.ModelsListConfig.Enabled,
+			Models:              append([]string(nil), source.ModelsListConfig.Models...),
+			ModelMappingEnabled: source.ModelsListConfig.ModelMappingEnabled,
+			ModelMapping:        cloneGroupStringMap(source.ModelsListConfig.ModelMapping),
 		},
 		RPMLimit:                source.RPMLimit,
 		MaxReasoningEffort:      source.MaxReasoningEffort,
 		ReasoningEffortMappings: append([]ReasoningEffortMapping(nil), source.ReasoningEffortMappings...),
 	}
+}
+
+func cloneGroupStringMap(source map[string]string) map[string]string {
+	if len(source) == 0 {
+		return nil
+	}
+	cloned := make(map[string]string, len(source))
+	for key, value := range source {
+		cloned[key] = value
+	}
+	return cloned
 }
 
 // RecoverDuplicateGroup performs a read-only lookup for a copy that was already
