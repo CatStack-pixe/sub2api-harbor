@@ -1401,9 +1401,11 @@ func (s *AccountRepoSuite) TestClearError_SyncSchedulerSnapshotOnRecovery() {
 	s.Require().NoError(err)
 	s.Require().Equal(service.StatusActive, got.Status)
 	s.Require().Empty(got.ErrorMessage)
+	s.Require().True(got.Schedulable)
 	s.Require().Len(cacheRecorder.setAccounts, 1)
 	s.Require().Equal(account.ID, cacheRecorder.setAccounts[0].ID)
 	s.Require().Equal(service.StatusActive, cacheRecorder.setAccounts[0].Status)
+	s.Require().True(cacheRecorder.setAccounts[0].Schedulable)
 }
 
 // --- UpdateSessionWindow ---
