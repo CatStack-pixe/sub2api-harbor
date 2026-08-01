@@ -38,6 +38,17 @@ func TestGroupResolveMessagesDispatchModel_GrokMapsClaudeFamilyToGrok(t *testing
 	require.Empty(t, group.ResolveMessagesDispatchModel("gpt-5.3-codex"))
 }
 
+func TestGroupResolveMessagesDispatchModel_AgnesMapsClaudeFamilyToDefaultModel(t *testing.T) {
+	t.Parallel()
+
+	group := &Group{Platform: PlatformAgnes}
+
+	require.Equal(t, AgnesDefaultModel, group.ResolveMessagesDispatchModel("claude-sonnet-4-5"))
+	require.Equal(t, AgnesDefaultModel, group.ResolveMessagesDispatchModel("claude-opus-4-6"))
+	require.Equal(t, AgnesDefaultModel, group.ResolveMessagesDispatchModel("claude-haiku-4-5"))
+	require.Empty(t, group.ResolveMessagesDispatchModel(AgnesDefaultModel))
+}
+
 func TestSanitizeGroupMessagesDispatchFields_ClearsNonOpenAIPlatform(t *testing.T) {
 	t.Parallel()
 

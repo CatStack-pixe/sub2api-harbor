@@ -23,7 +23,13 @@ const (
 	PlatformGemini      = "gemini"
 	PlatformAntigravity = "antigravity"
 	PlatformGrok        = "grok"
+	PlatformAgnes       = "agnes"
 	PlatformComposite   = "composite"
+)
+
+const (
+	AgnesDefaultBaseURL = "https://apihub.agnes-ai.com/v1"
+	AgnesDefaultModel   = "agnes-2.0-flash"
 )
 
 // Account type constants

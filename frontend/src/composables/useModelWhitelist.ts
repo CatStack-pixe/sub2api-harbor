@@ -160,6 +160,8 @@ const xaiModels = [
   'grok-imagine-video-1.5'
 ]
 
+export const agnesModels = ['agnes-2.0-flash']
+
 // Cohere
 const cohereModels = [
   'command-a-03-2025',
@@ -423,6 +425,7 @@ export function getModelsByPlatform(platform: string): string[] {
     case 'meta': return metaModels
     case 'xai':
     case 'grok': return xaiModels
+    case 'agnes': return agnesModels
     case 'cohere': return cohereModels
     case 'yi': return yiModels
     case 'moonshot': return moonshotModels
@@ -438,6 +441,7 @@ export function getModelsByPlatform(platform: string): string[] {
 
 // 按平台获取预设映射
 export function getPresetMappingsByPlatform(platform: string) {
+  if (platform === 'agnes') return []
   if (platform === 'openai') return openaiPresetMappings
   if (platform === 'gemini') return geminiPresetMappings
   if (platform === 'grok' || platform === 'xai') return grokPresetMappings

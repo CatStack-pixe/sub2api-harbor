@@ -7,6 +7,10 @@ vi.mock('@/api/admin/accounts', () => ({
 import { buildModelMappingObject, getModelsByPlatform, splitModelMappingObject } from '../useModelWhitelist'
 
 describe('useModelWhitelist', () => {
+  it('exposes only the documented Agnes model', () => {
+    expect(getModelsByPlatform('agnes')).toEqual(['agnes-2.0-flash'])
+  })
+
   it('openai 模型列表包含 GPT-5.4 官方快照', () => {
     const models = getModelsByPlatform('openai')
 
