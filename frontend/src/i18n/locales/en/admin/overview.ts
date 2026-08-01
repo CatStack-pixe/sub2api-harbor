@@ -1016,6 +1016,16 @@ export default {
         selectAll: 'Select all',
         invertSelection: 'Invert'
       },
+      modelMapping: {
+        title: 'Agnes request model mapping',
+        hint: 'Map public model names to Agnes upstream models for every account in this group. Wildcard aliases are supported.',
+        toggle: 'Toggle Agnes request model mapping',
+        requestedModel: 'Public model, e.g. deepseek-v4-pro',
+        upstreamModel: 'Agnes model, e.g. agnes-2.5-pro-alpha',
+        empty: 'No mappings configured',
+        add: 'Add mapping',
+        remove: 'Remove mapping'
+      },
       compositeRoutes: {
         action: 'Routes',
         title: 'Composite Routes',

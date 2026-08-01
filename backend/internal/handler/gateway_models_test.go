@@ -703,3 +703,35 @@ func modelIDsForTest(models []gatewayModelItemForTest) []string {
 	}
 	return ids
 }
+
+func TestGatewayModels_AgnesGroupMappingExposesOnlyConfiguredAliases(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	groupID := int64(81)
+	h := newGatewayModelsHandlerForTest(&gatewayModelsAccountRepoStub{})
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Request = httptest.NewRequest(http.MethodGet, "/v1/models", nil)
+	c.Set(string(middleware2.ContextKeyAPIKey), &service.APIKey{
+		Group: &service.Group{
+			ID:       groupID,
+			Platform: service.PlatformAgnes,
+			ModelsListConfig: service.GroupModelsListConfig{
+				Enabled:             true,
+				Models:              []string{"deepseek-v4-pro", "deepseek-v4-flash"},
+				ModelMappingEnabled: true,
+				ModelMapping: map[string]string{
+					"deepseek-v4-pro":   "agnes-2.5-pro-alpha",
+					"deepseek-v4-flash": "agnes-2.5-flash",
+				},
+			},
+		},
+	})
+
+	h.Models(c)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	var got gatewayModelsResponseForTest
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &got))
+	require.Equal(t, []string{"deepseek-v4-pro", "deepseek-v4-flash"}, modelIDsForTest(got.Data))
+}

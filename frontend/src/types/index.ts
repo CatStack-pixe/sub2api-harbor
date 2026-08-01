@@ -592,6 +592,8 @@ export interface AdminGroup extends Group {
 export interface ModelsListConfig {
   enabled: boolean
   models: string[]
+  model_mapping_enabled?: boolean
+  model_mapping?: Record<string, string>
 }
 
 export type CompositeRouteMatchType = 'exact' | 'prefix'

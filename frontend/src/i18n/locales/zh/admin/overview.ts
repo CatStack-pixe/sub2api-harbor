@@ -1013,6 +1013,16 @@ export default {
         selectAll: '全选',
         invertSelection: '反选'
       },
+      modelMapping: {
+        title: 'Agnes 请求模型映射',
+        hint: '将公开模型名映射为 Agnes 上游模型，并应用到本分组的所有账户；支持通配符别名。',
+        toggle: '开关 Agnes 请求模型映射',
+        requestedModel: '公开模型，例如 deepseek-v4-pro',
+        upstreamModel: 'Agnes 模型，例如 agnes-2.5-pro-alpha',
+        empty: '暂未配置映射',
+        add: '添加映射',
+        remove: '删除映射'
+      },
       compositeRoutes: {
         action: '路由',
         title: 'Composite 路由',
