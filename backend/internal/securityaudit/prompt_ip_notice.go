@@ -22,8 +22,8 @@ type IPNotice struct {
 	SourceEventID      *int64     `json:"source_event_id,omitempty"`
 	ClientIP           string     `json:"client_ip"`
 	Message            string     `json:"message"`
-	CreatedBy           int64      `json:"created_by"`
-	Status              string     `json:"status"`
+	CreatedBy          int64      `json:"created_by"`
+	Status             string     `json:"status"`
 	DeliveredRequestID string     `json:"delivered_request_id,omitempty"`
 	ExpiresAt          time.Time  `json:"expires_at"`
 	DeliveredAt        *time.Time `json:"delivered_at,omitempty"`

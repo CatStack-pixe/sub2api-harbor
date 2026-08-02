@@ -32,8 +32,8 @@ type fakePromptEngine struct {
 
 type noticePromptEngine struct {
 	*fakePromptEngine
-	notice      *IPNotice
-	noticeErr   error
+	notice       *IPNotice
+	noticeErr    error
 	consumptions atomic.Int64
 }
 
