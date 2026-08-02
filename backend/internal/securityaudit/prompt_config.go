@@ -273,9 +273,6 @@ func validateStorageConfig(cfg storageConfig) error {
 	if cfg.QueueCapacity < 1 || cfg.QueueCapacity > MaxQueueCapacity {
 		return infraerrors.BadRequest("prompt_audit_invalid_queue_capacity", "队列容量超出允许范围")
 	}
-	if !cfg.AllGroups && len(cfg.GroupIDs) == 0 {
-		return infraerrors.BadRequest("prompt_audit_groups_required", "指定分组模式至少需要选择一个分组")
-	}
 	if len(cfg.Scanners) == 0 {
 		return infraerrors.BadRequest("prompt_audit_scanners_required", "至少需要启用一个风险分类")
 	}
@@ -336,9 +333,6 @@ func validateUpdateConfigRequest(req UpdateConfigRequest) error {
 		}
 	}
 	if !req.AllGroups {
-		if len(req.GroupIDs) == 0 {
-			return infraerrors.BadRequest("prompt_audit_groups_required", "指定分组模式至少需要选择一个分组")
-		}
 		for _, groupID := range req.GroupIDs {
 			if groupID <= 0 {
 				return infraerrors.BadRequest("prompt_audit_invalid_group", "提示词审计分组 ID 无效")

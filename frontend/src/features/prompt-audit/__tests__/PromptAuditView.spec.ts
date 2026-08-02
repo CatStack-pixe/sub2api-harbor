@@ -130,6 +130,10 @@ describe('PromptAuditView', () => {
     expect(wrapper.get('[data-test="enabled-toggle"]').attributes('aria-checked')).toBe('false')
     expect(wrapper.get('[data-test="blocking-toggle"]').attributes('aria-checked')).toBe('false')
     expect(wrapper.get('[data-test="blocking-toggle"]').attributes()).toHaveProperty('disabled')
+
+    await wrapper.get('[data-test="save-config"]').trigger('click')
+    await flushPromises()
+    expect(mocks.updateConfig).toHaveBeenCalledWith(expect.objectContaining({ enabled: false, blocking_enabled: false }))
   })
 
   it('uses capture-only mode without an audit endpoint and forces safe event storage', async () => {

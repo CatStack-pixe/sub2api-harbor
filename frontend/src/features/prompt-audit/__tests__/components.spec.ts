@@ -84,6 +84,24 @@ describe('Prompt Audit components', () => {
     expect(emitted.worker_count).toBe(6)
   })
 
+  it('allows clearing the final selected group and makes the no-scope state explicit', async () => {
+    const draft: PromptAuditDraft = {
+      enabled: false, blocking_enabled: false, store_pass_events: false, capture_only: false, effective_mode: 'off', strategy: 'priority',
+      worker_count: 4, queue_capacity: 100, scanners: SCANNER_CATALOG.map((item) => item.id), all_groups: false, group_ids: [1],
+      endpoints: [endpoint()], config_version: 1, updated_at: '', updated_by: 0, change_summary: '',
+    }
+    const wrapper = mount(PolicyPanel, {
+      props: { draft, groups: [{ id: 1, name: 'Alpha', platform: 'openai', status: 'active' }] },
+    })
+
+    await wrapper.get('[data-test="group-toggle-1"]').setValue(false)
+
+    const emitted = wrapper.emitted('update:draft')?.at(-1)?.[0] as PromptAuditDraft
+    expect(emitted).toMatchObject({ all_groups: false, group_ids: [] })
+    await wrapper.setProps({ draft: emitted })
+    expect(wrapper.get('[data-test="empty-group-selection"]').exists()).toBe(true)
+  })
+
   it('keeps identity fields separate, supports selection, and opens filter deletion from the toolbar', async () => {
     const event: PromptAuditEvent = {
       id: 1, job_id: 1, decision: 'critical', risk_level: 'critical', action: 'Block', categories: ['pii'], matched_scanners: ['pii'], scanner_scores: { pii: 1 }, scanner_evidence: { pii: 'redacted' }, scanner_backend: 'qwen3guard-openai', scanner_version: '1', guard_endpoint_id: 'guard-1', policy_id: 'priority', policy_version: 1, config_version: 1, chunk_total: 1, latency_ms: 10, issue_summaries: [], created_at: '2026-07-16T00:00:00Z',
