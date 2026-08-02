@@ -19,6 +19,7 @@ type PromptAdminService interface {
 	Runtime(context.Context) RuntimeSnapshot
 	ListEvents(context.Context, EventFilter, int, int) (*EventPage, error)
 	GetEvent(context.Context, int64) (*Event, error)
+	QueueIPNotice(context.Context, int64, int64, string) (*IPNotice, error)
 	DeleteEvent(context.Context, int64) (*DeleteResult, error)
 	DeleteEventsByIDs(context.Context, []int64) (*DeleteResult, error)
 	PreviewDelete(context.Context, EventFilter, int64) (*DeletePreview, error)
@@ -120,6 +121,46 @@ func (h *PromptAdminHandler) GetEvent(c *gin.Context) {
 		return
 	}
 	response.Success(c, event)
+}
+
+func (h *PromptAdminHandler) QueueIPNotice(c *gin.Context) {
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil || id <= 0 {
+		setPromptAdminAudit(c, "failed", "prompt_audit_invalid_event_id", nil)
+		response.ErrorFrom(c, infraerrors.BadRequest("prompt_audit_invalid_event_id", "事件 ID 无效"))
+		return
+	}
+	var request QueueIPNoticeRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
+		setPromptAdminAudit(c, "failed", "prompt_audit_ip_notice_invalid_message", map[string]any{"event_id": id})
+		response.ErrorFrom(c, infraerrors.BadRequest("prompt_audit_ip_notice_invalid_message", "通知内容必须为 1-1000 个字符"))
+		return
+	}
+	if _, err := normalizeNoticeMessage(request.Message); err != nil {
+		setPromptAdminAudit(c, "failed", "prompt_audit_ip_notice_invalid_message", map[string]any{"event_id": id})
+		response.ErrorFrom(c, infraerrors.BadRequest("prompt_audit_ip_notice_invalid_message", "通知内容必须为 1-1000 个字符"))
+		return
+	}
+	notice, err := h.service.QueueIPNotice(c.Request.Context(), id, adminID(c), request.Message)
+	if errors.Is(err, ErrEventNotFound) {
+		setPromptAdminAudit(c, "failed", "prompt_audit_event_not_found", map[string]any{"event_id": id})
+		response.ErrorFrom(c, infraerrors.NotFound("prompt_audit_event_not_found", "提示词审计事件不存在"))
+		return
+	}
+	if errors.Is(err, ErrEventIPUnavailable) {
+		setPromptAdminAudit(c, "failed", "prompt_audit_event_ip_unavailable", map[string]any{"event_id": id})
+		response.ErrorFrom(c, infraerrors.Conflict("prompt_audit_event_ip_unavailable", "该历史事件没有可用的来源 IP"))
+		return
+	}
+	if err != nil {
+		setPromptAdminAudit(c, "failed", infraerrors.Reason(err), map[string]any{"event_id": id})
+		response.ErrorFrom(c, err)
+		return
+	}
+	setPromptAdminAudit(c, "success", "", map[string]any{
+		"event_id": id, "notice_id": notice.ID, "client_ip": notice.ClientIP, "status": notice.Status,
+	})
+	response.Success(c, notice)
 }
 
 func (h *PromptAdminHandler) DeleteEvent(c *gin.Context) {

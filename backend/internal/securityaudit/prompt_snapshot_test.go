@@ -26,12 +26,13 @@ func TestExtractPromptSnapshotProtocols(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.protocol, func(t *testing.T) {
-			snapshot, err := ExtractPromptSnapshot(Request{Protocol: tt.protocol, Body: []byte(tt.body), Stage: "http"})
+			snapshot, err := ExtractPromptSnapshot(Request{ClientIP: "203.0.113.10", Protocol: tt.protocol, Body: []byte(tt.body), Stage: "http"})
 			require.NoError(t, err)
 			require.True(t, strings.HasPrefix(snapshot.ScanText, tt.first))
 			require.Equal(t, tt.count, snapshot.MessageCount)
 			require.Equal(t, utf8.RuneCountInString(metadataTextForTest(snapshot.ScanText)), snapshot.PromptLength)
 			require.NotEmpty(t, snapshot.PromptHash)
+			require.Equal(t, "203.0.113.10", snapshot.ClientIP)
 			require.NotContains(t, snapshot.ScanText, "BASE64SECRET")
 		})
 	}
