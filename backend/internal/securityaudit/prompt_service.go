@@ -390,6 +390,19 @@ func (s *PromptService) GetEvent(ctx context.Context, id int64) (*Event, error) 
 	return s.repo.GetEvent(ctx, id)
 }
 
+func (s *PromptService) QueueIPNotice(ctx context.Context, eventID, adminID int64, message string) (*IPNotice, error) {
+	return s.repo.QueueIPNotice(ctx, eventID, adminID, message)
+}
+
+func (s *PromptService) ConsumeIPNotice(ctx context.Context, clientIP, requestID string) (*IPNotice, error) {
+	if s == nil || s.repo == nil {
+		return nil, nil
+	}
+	lookupCtx, cancel := context.WithTimeout(ctx, 250*time.Millisecond)
+	defer cancel()
+	return s.repo.ConsumeIPNotice(lookupCtx, clientIP, requestID)
+}
+
 func (s *PromptService) DeleteEvent(ctx context.Context, id int64) (*DeleteResult, error) {
 	result, err := s.repo.DeleteEvent(ctx, id)
 	if err == nil {

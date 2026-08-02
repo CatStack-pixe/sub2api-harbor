@@ -89,10 +89,18 @@ func TestPromptAuditAdminOperationsUseOmittedBodiesAndAllowlistedDetails(t *test
 		})
 		c.JSON(http.StatusOK, gin.H{"ok": true})
 	})
+	router.POST("/api/v1/admin/prompt-audit/events/:id/ip-notice", func(c *gin.Context) {
+		SetAuditExtra(c, map[string]any{
+			"result": "success", "event_id": int64(9), "notice_id": int64(11),
+			"client_ip": "203.0.113.10", "status": "pending", "message": "audit-canary-message",
+		})
+		c.JSON(http.StatusOK, gin.H{"ok": true})
+	})
 
 	for _, request := range []*http.Request{
 		httptest.NewRequest(http.MethodPut, "/api/v1/admin/prompt-audit/config", bytes.NewBufferString(`{"expected_config_version":8,"token":"audit-canary-secret"}`)),
 		httptest.NewRequest(http.MethodPost, "/api/v1/admin/prompt-audit/endpoints/probe", bytes.NewBufferString(`{"endpoint":{"token":"audit-canary-secret"}}`)),
+		httptest.NewRequest(http.MethodPost, "/api/v1/admin/prompt-audit/events/9/ip-notice", bytes.NewBufferString(`{"message":"audit-canary-message"}`)),
 	} {
 		request.Header.Set("Content-Type", "application/json")
 		recorder := httptest.NewRecorder()
@@ -103,7 +111,7 @@ func TestPromptAuditAdminOperationsUseOmittedBodiesAndAllowlistedDetails(t *test
 	repository.mu.Lock()
 	logs := append([]*service.AuditLog(nil), repository.logs...)
 	repository.mu.Unlock()
-	require.Len(t, logs, 2)
+	require.Len(t, logs, 3)
 
 	byAction := make(map[string]*service.AuditLog, len(logs))
 	for _, entry := range logs {
@@ -128,6 +136,13 @@ func TestPromptAuditAdminOperationsUseOmittedBodiesAndAllowlistedDetails(t *test
 	require.Equal(t, "success", probe.Extra["result"])
 	require.Equal(t, "guard-1", probe.Extra["guard_endpoint_id"])
 	require.Equal(t, true, probe.Extra["token_applied"])
+
+	notice := byAction["admin.prompt_audit.ip_notice.queue"]
+	require.NotNil(t, notice)
+	require.EqualValues(t, 9, notice.Extra["event_id"])
+	require.EqualValues(t, 11, notice.Extra["notice_id"])
+	require.Equal(t, "203.0.113.10", notice.Extra["client_ip"])
+	require.NotContains(t, notice.Extra, "message")
 }
 
 func TestPromptAuditMutationAuditRoutesHaveStableActionsAndOmitBodies(t *testing.T) {
@@ -135,6 +150,7 @@ func TestPromptAuditMutationAuditRoutesHaveStableActionsAndOmitBodies(t *testing
 		"PUT /api/v1/admin/prompt-audit/config":                   "admin.prompt_audit.config.update",
 		"POST /api/v1/admin/prompt-audit/endpoints/probe":         "admin.prompt_audit.endpoint.probe",
 		"DELETE /api/v1/admin/prompt-audit/events/:id":            "admin.prompt_audit.event.delete",
+		"POST /api/v1/admin/prompt-audit/events/:id/ip-notice":   "admin.prompt_audit.ip_notice.queue",
 		"POST /api/v1/admin/prompt-audit/events/batch-delete":     "admin.prompt_audit.events.batch_delete",
 		"POST /api/v1/admin/prompt-audit/events/delete-preview":   "admin.prompt_audit.events.delete_preview",
 		"POST /api/v1/admin/prompt-audit/events/delete-by-filter": "admin.prompt_audit.events.filter_delete",

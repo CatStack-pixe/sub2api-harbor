@@ -45,7 +45,7 @@ func ExtractPromptSnapshot(req Request) (PromptSnapshot, error) {
 		stage = "http"
 	}
 	return PromptSnapshot{
-		RequestID: req.RequestID, UserID: req.UserID, UsernameSnapshot: req.Username,
+		RequestID: req.RequestID, ClientIP: req.ClientIP, UserID: req.UserID, UsernameSnapshot: req.Username,
 		UserEmailSnapshot: req.UserEmail, APIKeyID: req.APIKeyID, APIKeyNameSnapshot: req.APIKeyName,
 		GroupID: cloneInt64Ptr(req.GroupID), GroupName: req.GroupName, Provider: req.Provider,
 		Endpoint: req.Endpoint, Protocol: req.Protocol, Model: req.Model,

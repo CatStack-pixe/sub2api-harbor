@@ -147,7 +147,15 @@
       @confirm="confirmFilterDelete"
       @criteria-change="clearDeletePreview"
     />
-    <EventDetailDialog :show="showEventDetail" :event="activeEvent" :loading="loading.detail" @close="closeEventDetail" />
+	<EventDetailDialog
+	  :show="showEventDetail"
+	  :event="activeEvent"
+	  :loading="loading.detail"
+	  :notice-sending="loading.notice"
+	  :notice-version="noticeVersion"
+	  @queue-notice="queueEventIPNotice"
+	  @close="closeEventDetail"
+	/>
   </AppLayout>
 </template>
 
@@ -197,6 +205,7 @@ const appliedFilters = ref<PromptEventFilters>(emptyEventFilters())
 const selectedEventIds = ref<number[]>([])
 const activeEvent = ref<PromptAuditEvent | null>(null)
 const showEventDetail = ref(false)
+const noticeVersion = ref(0)
 const probeResults = reactive<Record<string, PromptProbeResult>>({})
 const probingIds = ref<string[]>([])
 const showFilterDelete = ref(false)
@@ -204,7 +213,7 @@ const deletePreview = ref<PromptDeletePreview | null>(null)
 const deletePreviewFilters = ref<PromptEventFilters | null>(null)
 const showBlockingConfirmation = ref(false)
 const deleteRequest = reactive<{ mode: '' | 'single' | 'batch'; ids: number[] }>({ mode: '', ids: [] })
-const loading = reactive({ config: false, runtime: false, groups: false, events: false, saving: false, detail: false, deleting: false, previewing: false })
+const loading = reactive({ config: false, runtime: false, groups: false, events: false, saving: false, detail: false, notice: false, deleting: false, previewing: false })
 const loadErrors = reactive<PromptLoadErrors>({ config: '', runtime: '', groups: '', events: '' })
 const dirty = computed(() => draftFingerprint(draft.value) !== draftFingerprint(serverConfig.value))
 
@@ -380,6 +389,19 @@ async function openEvent(id: number) {
   finally { loading.detail = false }
 }
 function closeEventDetail() { showEventDetail.value = false; activeEvent.value = null }
+async function queueEventIPNotice(message: string) {
+  if (!activeEvent.value || loading.notice) return
+  loading.notice = true
+  try {
+    const notice = await promptAuditAPI.queueIPNotice(activeEvent.value.id, message)
+    noticeVersion.value++
+    appStore.showSuccess(t('admin.promptAudit.messages.ipNoticeQueued', { ip: notice.client_ip }))
+  } catch (error) {
+    appStore.showError(errorMessage(error, 'admin.promptAudit.errors.ipNotice'))
+  } finally {
+    loading.notice = false
+  }
+}
 function requestSingleDelete(id: number) { deleteRequest.mode = 'single'; deleteRequest.ids = [id] }
 function requestBatchDelete() { if (selectedEventIds.value.length) { deleteRequest.mode = 'batch'; deleteRequest.ids = [...selectedEventIds.value] } }
 function clearDeleteRequest() { deleteRequest.mode = ''; deleteRequest.ids = [] }
