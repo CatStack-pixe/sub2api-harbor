@@ -242,6 +242,12 @@ describe('CreateAccountModal OpenAI long-context billing', () => {
     expect(createAccountMock.mock.calls[0]?.[0]?.upstream_billing_probe_enabled).toBeUndefined()
   })
 
+  it('enables native Anthropic Messages forwarding for new API key accounts', async () => {
+    await submitApiKeyAccount('anthropic')
+
+    expect(createAccountMock.mock.calls[0]?.[0]?.extra?.anthropic_passthrough).toBe(true)
+  })
+
   it('leaves Codex session import billing ownership to the backend', async () => {
     const wrapper = await openCodexImportStep()
     await wrapper.get('[data-testid="import-codex-session"]').trigger('click')
