@@ -14,6 +14,7 @@ const config = (): PromptAuditConfig => ({
   enabled: true,
   blocking_enabled: false,
   store_pass_events: false,
+  capture_only: false,
   effective_mode: 'async_audit',
   strategy: 'priority',
   worker_count: 4,
