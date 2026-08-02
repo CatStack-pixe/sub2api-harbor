@@ -1,0 +1,11 @@
+[Unit]
+Description=Hourly Sub2API prompt audit retention
+
+[Timer]
+OnCalendar=hourly
+Persistent=true
+RandomizedDelaySec=5m
+Unit=sub2api-prompt-audit-retention.service
+
+[Install]
+WantedBy=timers.target
