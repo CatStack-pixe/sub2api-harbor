@@ -53,7 +53,7 @@ export default {
     },
     policy: {
       title: 'Audit policy', description: 'Configure group scope, nine input-risk categories, workers, and queue bounds.', scope: 'Scope', allGroups: 'All groups', selectedGroups: 'Selected groups',
-      searchGroups: 'Search groups', noGroups: 'No matching groups', missingGroups: 'Configured IDs for groups that no longer exist', selectedCount: '{count} groups selected',
+      searchGroups: 'Search groups', noGroups: 'No matching groups', missingGroups: 'Configured IDs for groups that no longer exist', noGroupsSelected: 'No groups are selected; Prompt Audit will not process requests from any group.', selectedCount: '{count} groups selected',
       scanners: 'Qwen3Guard input-risk categories', workerCount: 'Worker count', queueCapacity: 'Persistent queue capacity', strategy: 'Node strategy', strategyHint: 'Try nodes in configuration order and fail over when allowed.',
     },
     saveBar: { enabled: 'Enable prompt audit', captureOnly: 'Capture only', blocking: 'Synchronous blocking', storePass: 'Store safe events', dirty: 'Unsaved changes', synced: 'Configuration synced' },
