@@ -35,7 +35,7 @@ func (e *Enqueuer) Enqueue(ctx context.Context, req Request) error {
 		LogInfo(EventEnqueueSkipped, mergeLogFields(baseFields, map[string]any{"status": "skipped", "error_code": "group_out_of_scope"}))
 		return nil
 	}
-	if len(cfg.EnabledEndpoints()) == 0 {
+	if !cfg.CaptureOnly && len(cfg.EnabledEndpoints()) == 0 {
 		e.recordDropped()
 		LogWarn(EventEnqueueDropped, mergeLogFields(baseFields, map[string]any{"status": "dropped", "error_code": "no_enabled_endpoint"}))
 		return nil

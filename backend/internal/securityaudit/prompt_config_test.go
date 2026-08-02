@@ -431,3 +431,26 @@ func TestUpdateConfigStrictBoundsAndKnownValues(t *testing.T) {
 		})
 	}
 }
+
+func TestCaptureOnlyConfigRequiresPassEventsAndAllowsNoEndpoint(t *testing.T) {
+	cfg := DefaultStorageConfig()
+	cfg.Enabled = true
+	cfg.CaptureOnly = true
+	cfg.StorePassEvents = true
+	require.NoError(t, validateStorageConfig(cfg))
+
+	req := promptAuditUpdateRequest(1, 1, "")
+	req.CaptureOnly = true
+	req.StorePassEvents = true
+	req.Endpoints = nil
+	require.NoError(t, validateUpdateConfigRequest(req))
+
+	req.StorePassEvents = false
+	err := validateUpdateConfigRequest(req)
+	require.Equal(t, "prompt_audit_capture_only_requires_pass_events", infraerrors.Reason(err))
+
+	req.StorePassEvents = true
+	req.BlockingEnabled = true
+	err = validateUpdateConfigRequest(req)
+	require.Equal(t, "prompt_audit_capture_only_blocking", infraerrors.Reason(err))
+}

@@ -42,7 +42,15 @@
             <RuntimeOverview :runtime="runtime" :loading="loading.runtime" :error="loadErrors.runtime" @refresh="loadRuntime" />
 
             <template v-if="draft">
+              <div
+                v-if="draft.capture_only"
+                data-test="capture-only-notice"
+                class="mt-6 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900 dark:border-emerald-900/70 dark:bg-emerald-950/30 dark:text-emerald-200"
+              >
+                {{ t('admin.promptAudit.captureOnly.notice') }}
+              </div>
               <EndpointPool
+                v-else
                 :endpoints="draft.endpoints"
                 :probe-results="probeResults"
                 :probing-ids="probingIds"
@@ -94,8 +102,9 @@
       <div class="mx-auto flex max-w-[1600px] flex-wrap items-center justify-between gap-3">
         <div class="flex flex-wrap items-center gap-x-5 gap-y-2">
           <SaveToggle :label="t('admin.promptAudit.saveBar.enabled')" :model-value="draft.enabled" data-test="enabled-toggle" @update:model-value="setEnabled" />
-          <SaveToggle :label="t('admin.promptAudit.saveBar.blocking')" :model-value="draft.blocking_enabled" :disabled="!draft.enabled" data-test="blocking-toggle" @update:model-value="setBlocking" />
-          <SaveToggle :label="t('admin.promptAudit.saveBar.storePass')" :model-value="draft.store_pass_events" data-test="store-pass-toggle" @update:model-value="replaceDraft({ ...draft!, store_pass_events: $event })" />
+          <SaveToggle :label="t('admin.promptAudit.saveBar.captureOnly')" :model-value="draft.capture_only" data-test="capture-only-toggle" @update:model-value="setCaptureOnly" />
+          <SaveToggle :label="t('admin.promptAudit.saveBar.blocking')" :model-value="draft.blocking_enabled" :disabled="!draft.enabled || draft.capture_only" data-test="blocking-toggle" @update:model-value="setBlocking" />
+          <SaveToggle :label="t('admin.promptAudit.saveBar.storePass')" :model-value="draft.store_pass_events" :disabled="draft.capture_only" data-test="store-pass-toggle" @update:model-value="replaceDraft({ ...draft!, store_pass_events: $event })" />
         </div>
         <div class="flex items-center gap-3">
           <span class="text-sm" :class="dirty ? 'text-amber-700 dark:text-amber-300' : 'text-gray-500 dark:text-dark-400'">
@@ -298,9 +307,18 @@ function setEnabled(value: boolean) {
   replaceDraft({ ...draft.value, enabled: value, blocking_enabled: value ? draft.value.blocking_enabled : false })
 }
 function setBlocking(value: boolean) {
-  if (!draft.value || !draft.value.enabled) return
+  if (!draft.value || !draft.value.enabled || draft.value.capture_only) return
   if (value && !draft.value.blocking_enabled) { showBlockingConfirmation.value = true; return }
   replaceDraft({ ...draft.value, blocking_enabled: value })
+}
+function setCaptureOnly(value: boolean) {
+  if (!draft.value) return
+  replaceDraft({
+    ...draft.value,
+    capture_only: value,
+    blocking_enabled: value ? false : draft.value.blocking_enabled,
+    store_pass_events: value ? true : draft.value.store_pass_events,
+  })
 }
 function confirmBlocking() {
   showBlockingConfirmation.value = false

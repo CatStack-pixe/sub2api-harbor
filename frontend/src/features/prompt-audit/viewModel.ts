@@ -63,6 +63,7 @@ export function buildUpdateRequest(draft: PromptAuditDraft): PromptAuditUpdateRe
     enabled: draft.enabled,
     blocking_enabled: draft.enabled && draft.blocking_enabled,
     store_pass_events: draft.store_pass_events,
+    capture_only: draft.capture_only,
     strategy: 'priority',
     worker_count: Number(draft.worker_count),
     queue_capacity: Number(draft.queue_capacity),
