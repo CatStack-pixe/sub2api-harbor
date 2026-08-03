@@ -118,13 +118,11 @@ func TestAdaptResponsesClientTools_LowersClientToolHistoryWithoutCurrentDeclarat
 }
 
 func TestResponsesClientToolStreamRestorer_RestoresResponseDoneSnapshot(t *testing.T) {
-	restorer := NewResponsesClientToolStreamRestorer(ResponsesClientToolMapping{
-		CustomTools:    map[string]bool{"exec": true},
-		ToolSearch:     true,
-		NamespaceTools: map[string]ResponsesNamespaceName{
-			"team__send": {Namespace: "team", Name: "send"},
-		},
-	})
+	mapping := ResponsesClientToolMapping{
+		CustomTools: map[string]bool{"exec": true}, ToolSearch: true,
+		NamespaceTools: map[string]ResponsesNamespaceName{"team__send": {Namespace: "team", Name: "send"}},
+	}
+	restorer := NewResponsesClientToolStreamRestorer(mapping)
 	payload := []byte(`{"type":"response.done","sequence_number":8,"response":{"output":[{"type":"function_call","name":"exec","arguments":"{\"input\":\"dir\"}"},{"type":"function_call","name":"tool_search","arguments":"{\"query\":\"git\"}"},{"type":"function_call","name":"team__send","arguments":"{}"}]}}`)
 
 	restored, changed, err := restorer.RestoreEvent(payload)
