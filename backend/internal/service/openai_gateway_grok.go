@@ -805,6 +805,7 @@ func normalizeGrokSimpleFunctionToolInput(body []byte) ([]byte, error) {
 
 	userText := ""
 	userMessages := 0
+	seenUser := false
 	for _, item := range items {
 		if !item.IsObject() || strings.TrimSpace(item.Get("type").String()) != "message" {
 			return body, nil
@@ -815,10 +816,14 @@ func normalizeGrokSimpleFunctionToolInput(body []byte) ([]byte, error) {
 		}
 		switch strings.TrimSpace(item.Get("role").String()) {
 		case "developer", "system":
+			if seenUser {
+				return body, nil
+			}
 			if strings.TrimSpace(text) != "" {
 				instructionParts = append(instructionParts, text)
 			}
 		case "user":
+			seenUser = true
 			userMessages++
 			userText = text
 		default:

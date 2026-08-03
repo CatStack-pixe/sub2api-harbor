@@ -113,16 +113,21 @@ func convertAnthropicToolChoiceToResponses(raw json.RawMessage, tools []Anthropi
 		choice, err := json.Marshal("none")
 		return choice, tc.DisableParallelToolUse, err
 	case "tool":
+		matched := false
 		for _, tool := range tools {
 			if tool.Name != tc.Name {
 				continue
 			}
+			matched = true
 			converted := convertAnthropicToolToResponses(tool)
 			if converted.Type != "function" {
 				choice, err := json.Marshal(map[string]any{"type": converted.Type})
 				return choice, tc.DisableParallelToolUse, err
 			}
 			break
+		}
+		if !matched {
+			return nil, false, fmt.Errorf("tool_choice references undeclared tool %q", tc.Name)
 		}
 		choice, err := json.Marshal(map[string]any{
 			"type": "function",

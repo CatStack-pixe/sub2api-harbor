@@ -303,6 +303,10 @@ func TestPatchGrokResponsesBodyKeepsStructuredAndMultiTurnToolInput(t *testing.T
 			body: `{"model":"grok","input":[{"type":"message","role":"user","content":[{"type":"input_text","text":"first"}]},{"type":"message","role":"assistant","content":[{"type":"output_text","text":"answer"}]},{"type":"message","role":"user","content":[{"type":"input_text","text":"second"}]}],"tools":[{"type":"function","name":"lookup","parameters":{"type":"object"}}]}`,
 		},
 		{
+			name: "instructions after user",
+			body: `{"model":"grok","input":[{"type":"message","role":"user","content":[{"type":"input_text","text":"first"}]},{"type":"message","role":"developer","content":[{"type":"input_text","text":"late instruction"}]}],"tools":[{"type":"function","name":"lookup","parameters":{"type":"object"}}]}`,
+		},
+		{
 			name: "tool continuation",
 			body: `{"model":"grok","input":[{"type":"function_call","call_id":"call_1","name":"lookup","arguments":"{}"},{"type":"function_call_output","call_id":"call_1","output":"done"},{"type":"message","role":"user","content":[{"type":"input_text","text":"continue"}]}],"tools":[{"type":"function","name":"lookup","parameters":{"type":"object"}}],"tool_choice":"auto"}`,
 		},

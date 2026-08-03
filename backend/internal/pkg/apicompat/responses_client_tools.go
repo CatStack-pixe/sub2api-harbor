@@ -147,6 +147,14 @@ func rewriteClientToolHistory(value any) bool {
 		case map[string]any:
 			typ := strings.TrimSpace(stringValue(typed["type"]))
 			switch typ {
+			case "function_call":
+				namespace := strings.TrimSpace(stringValue(typed["namespace"]))
+				name := strings.TrimSpace(stringValue(typed["name"]))
+				if namespace != "" && name != "" {
+					typed["name"] = flattenNamespaceToolName(namespace, name)
+					delete(typed, "namespace")
+					changed = true
+				}
 			case "custom_tool_call":
 				typed["type"] = "function_call"
 				typed["arguments"] = customToolCallArguments(stringValue(typed["input"]))
@@ -421,7 +429,7 @@ func (r *ResponsesClientToolStreamRestorer) RestoreEvent(payload []byte) ([][]by
 	if err := json.Unmarshal(payload, &wire); err != nil {
 		return nil, false, err
 	}
-	if wire.Type == "response.completed" || wire.Type == "response.incomplete" || wire.Type == "response.failed" {
+	if wire.Type == "response.completed" || wire.Type == "response.done" || wire.Type == "response.incomplete" || wire.Type == "response.failed" {
 		restored, changed, err := RestoreResponsesClientToolPayload(payload, r.adapter)
 		if err != nil {
 			return nil, false, err

@@ -1348,6 +1348,19 @@ func TestAnthropicToResponses_ToolChoiceSpecificBuiltIn(t *testing.T) {
 	assert.NotContains(t, tc, "name")
 }
 
+func TestAnthropicToResponses_RejectsUndeclaredToolChoice(t *testing.T) {
+	req := &AnthropicRequest{
+		Model:      "gpt-5.2",
+		MaxTokens:  1024,
+		Messages:   []AnthropicMessage{{Role: "user", Content: json.RawMessage(`"Hello"`)}},
+		Tools:      []AnthropicTool{{Name: "get_weather", InputSchema: json.RawMessage(`{"type":"object"}`)}},
+		ToolChoice: json.RawMessage(`{"type":"tool","name":"missing"}`),
+	}
+
+	_, err := AnthropicToResponses(req)
+	require.ErrorContains(t, err, `tool_choice references undeclared tool "missing"`)
+}
+
 func TestResponsesToAnthropicRequest_ToolChoiceFunctionName(t *testing.T) {
 	req := &ResponsesRequest{
 		Model:      "gpt-5.2",

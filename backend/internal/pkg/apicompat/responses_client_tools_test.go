@@ -88,6 +88,7 @@ func TestAdaptResponsesClientTools_LowersClientToolHistoryWithoutCurrentDeclarat
 			map[string]any{"type": "custom_tool_call_output", "call_id": "c1", "output": map[string]any{"ok": true}},
 			map[string]any{"type": "tool_search_call", "call_id": "s1", "execution": "client", "arguments": map[string]any{"query": "git"}},
 			map[string]any{"type": "tool_search_output", "call_id": "s1", "output": map[string]any{"groups": []string{"git"}}},
+			map[string]any{"type": "function_call", "call_id": "n1", "namespace": "team", "name": "send", "arguments": "{}"},
 		},
 	}
 
@@ -110,6 +111,31 @@ func TestAdaptResponsesClientTools_LowersClientToolHistoryWithoutCurrentDeclarat
 	require.NotContains(t, searchCall, "execution")
 	searchOutput := requireResponsesClientToolValue[map[string]any](t, input[3])
 	require.Equal(t, "function_call_output", searchOutput["type"])
+	namespaceCall := requireResponsesClientToolValue[map[string]any](t, input[4])
+	require.Equal(t, "function_call", namespaceCall["type"])
+	require.Equal(t, "team__send", namespaceCall["name"])
+	require.NotContains(t, namespaceCall, "namespace")
+}
+
+func TestResponsesClientToolStreamRestorer_RestoresResponseDoneSnapshot(t *testing.T) {
+	restorer := NewResponsesClientToolStreamRestorer(ResponsesClientToolMapping{
+		CustomTools:    map[string]bool{"exec": true},
+		ToolSearch:     true,
+		NamespaceTools: map[string]ResponsesNamespaceName{
+			"team__send": {Namespace: "team", Name: "send"},
+		},
+	})
+	payload := []byte(`{"type":"response.done","sequence_number":8,"response":{"output":[{"type":"function_call","name":"exec","arguments":"{\"input\":\"dir\"}"},{"type":"function_call","name":"tool_search","arguments":"{\"query\":\"git\"}"},{"type":"function_call","name":"team__send","arguments":"{}"}]}}`)
+
+	restored, changed, err := restorer.RestoreEvent(payload)
+
+	require.NoError(t, err)
+	require.True(t, changed)
+	require.Len(t, restored, 1)
+	require.Equal(t, "custom_tool_call", gjson.GetBytes(restored[0], "response.output.0.type").String())
+	require.Equal(t, "tool_search_call", gjson.GetBytes(restored[0], "response.output.1.type").String())
+	require.Equal(t, "team", gjson.GetBytes(restored[0], "response.output.2.namespace").String())
+	require.Equal(t, "send", gjson.GetBytes(restored[0], "response.output.2.name").String())
 }
 
 func TestRestoreResponsesClientToolPayload_RestoresClientAndNamespaceCalls(t *testing.T) {
