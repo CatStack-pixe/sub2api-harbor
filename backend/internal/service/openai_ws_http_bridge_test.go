@@ -462,14 +462,22 @@ func TestProxyOpenAIWSHTTPBridgeTurnForGrokRestoresCodexClientToolRoundTrip(t *t
 			upstream := &httpUpstreamRecorder{resp: &http.Response{
 				StatusCode: http.StatusOK,
 				Header:     http.Header{"Content-Type": []string{"text/event-stream"}},
-				Body:       io.NopCloser(strings.NewReader(grokProtocolUpstreamSSE())),
+				Body:       io.NopCloser(strings.NewReader(grokWSClientToolProtocolUpstreamSSE())),
 			}}
 			svc := &OpenAIGatewayService{
 				cfg:          &config.Config{Gateway: config.GatewayConfig{MaxLineSize: defaultMaxLineSize}},
 				httpUpstream: upstream,
 			}
-			account := grokProtocolAPIKeyAccount(7401)
-			payload := grokClientToolProtocolRequest(tt.stream)
+			account := &Account{
+				ID:          7401,
+				Platform:    PlatformGrok,
+				Type:        AccountTypeAPIKey,
+				Status:      StatusActive,
+				Schedulable: true,
+				Concurrency: 1,
+				Credentials: map[string]any{"api_key": "xai-protocol-key", "base_url": "https://api.x.ai/v1"},
+			}
+			payload := grokWSClientToolProtocolRequest(tt.stream)
 			recorder := httptest.NewRecorder()
 			c, _ := gin.CreateTestContext(recorder)
 			c.Request = httptest.NewRequest(http.MethodGet, "/v1/responses", nil)
@@ -488,7 +496,7 @@ func TestProxyOpenAIWSHTTPBridgeTurnForGrokRestoresCodexClientToolRoundTrip(t *t
 			require.NotNil(t, result)
 			require.Equal(t, "resp_protocol_stream", result.RequestID)
 			require.True(t, gjson.GetBytes(upstream.lastBody, "stream").Bool(), "the HTTP bridge always requests an SSE response")
-			assertGrokProtocolRequestLowered(t, upstream.lastBody)
+			assertGrokWSClientToolProtocolRequestLowered(t, upstream.lastBody)
 
 			mapping, ok := grokResponsesClientToolMapping(c)
 			require.True(t, ok)
@@ -548,6 +556,64 @@ func TestProxyOpenAIWSHTTPBridgeTurnForGrokRestoresCodexClientToolRoundTrip(t *t
 			require.Equal(t, "send_message", gjson.GetBytes(completed, "response.output.2.name").String())
 		})
 	}
+}
+
+func grokWSClientToolProtocolRequest(stream bool) []byte {
+	return []byte(fmt.Sprintf(`{
+		"model":"grok","stream":%t,
+		"tools":[
+			{"type":"custom","name":"apply_patch","description":"apply a patch","format":{"type":"grammar","syntax":"lark","definition":"start: /.+/"}},
+			{"type":"tool_search"},
+			{"type":"namespace","name":"collaboration","tools":[{"type":"function","name":"send_message","parameters":{"type":"object","properties":{"target":{"type":"string"}}}}]}
+		],
+		"tool_choice":{"type":"custom","name":"apply_patch"},
+		"input":"continue"
+	}`, stream))
+}
+
+func assertGrokWSClientToolProtocolRequestLowered(t *testing.T, body []byte) {
+	t.Helper()
+	require.False(t, gjson.GetBytes(body, `tools.#(type=="custom")`).Exists())
+	require.False(t, gjson.GetBytes(body, `tools.#(type=="namespace")`).Exists())
+	require.False(t, gjson.GetBytes(body, `tools.#(type=="tool_search")`).Exists())
+	require.True(t, gjson.GetBytes(body, `tools.#(name=="apply_patch")`).Exists())
+	require.True(t, gjson.GetBytes(body, `tools.#(name=="tool_search")`).Exists())
+	require.True(t, gjson.GetBytes(body, `tools.#(name=="collaboration__send_message")`).Exists())
+	require.Equal(t, "function", gjson.GetBytes(body, "tool_choice.type").String())
+	require.Equal(t, "apply_patch", gjson.GetBytes(body, "tool_choice.name").String())
+}
+
+func grokWSClientToolProtocolUpstreamSSE() string {
+	return strings.Join([]string{
+		`data: {"type":"response.created","sequence_number":40,"response":{"id":"resp_protocol_stream","model":"grok-4.5"},"upstream_extension":{"preserved":true}}`,
+		"",
+		`data: {"type":"response.output_item.added","sequence_number":41,"output_index":0,"item":{"type":"function_call","id":"item_custom","call_id":"call_custom","name":"apply_patch","arguments":"","status":"in_progress"}}`,
+		"",
+		`data: {"type":"response.function_call_arguments.delta","sequence_number":42,"output_index":0,"item_id":"item_custom","delta":"{\"input\":\"*** Begin"}`,
+		"",
+		`data: {"type":"response.function_call_arguments.delta","sequence_number":43,"output_index":0,"item_id":"item_custom","delta":" Patch\"}"}`,
+		"",
+		`data: {"type":"response.function_call_arguments.done","sequence_number":44,"output_index":0,"item_id":"item_custom","call_id":"call_custom","name":"apply_patch","arguments":"{\"input\":\"*** Begin Patch\"}"}`,
+		"",
+		`data: {"type":"response.output_item.done","sequence_number":45,"output_index":0,"item":{"type":"function_call","id":"item_custom","call_id":"call_custom","name":"apply_patch","arguments":"{\"input\":\"*** Begin Patch\"}","status":"completed"}}`,
+		"",
+		`data: {"type":"response.output_item.added","sequence_number":46,"output_index":1,"item":{"type":"function_call","id":"item_namespace","call_id":"call_namespace","name":"collaboration__send_message","arguments":"","status":"in_progress"}}`,
+		"",
+		`data: {"type":"response.function_call_arguments.done","sequence_number":47,"output_index":1,"item_id":"item_namespace","call_id":"call_namespace","name":"collaboration__send_message","arguments":"{\"target\":\"root\"}"}`,
+		"",
+		`data: {"type":"response.output_item.done","sequence_number":48,"output_index":1,"item":{"type":"function_call","id":"item_namespace","call_id":"call_namespace","name":"collaboration__send_message","arguments":"{\"target\":\"root\"}","status":"completed"}}`,
+		"",
+		`data: {"type":"response.output_item.added","sequence_number":49,"output_index":2,"item":{"type":"function_call","id":"item_search","call_id":"call_search","name":"tool_search","arguments":"","status":"in_progress"}}`,
+		"",
+		`data: {"type":"response.function_call_arguments.delta","sequence_number":50,"output_index":2,"item_id":"item_search","delta":"{\"query\":\"github\"}"}`,
+		"",
+		`data: {"type":"response.function_call_arguments.done","sequence_number":51,"output_index":2,"item_id":"item_search","call_id":"call_search","name":"tool_search","arguments":"{\"query\":\"github\"}"}`,
+		"",
+		`data: {"type":"response.output_item.done","sequence_number":52,"output_index":2,"item":{"type":"function_call","id":"item_search","call_id":"call_search","name":"tool_search","arguments":"{\"query\":\"github\"}","status":"completed"}}`,
+		"",
+		`data: {"type":"response.completed","sequence_number":53,"response":{"id":"resp_protocol_stream","object":"response","model":"grok-4.5","status":"completed","output":[{"type":"function_call","id":"item_custom","call_id":"call_custom","name":"apply_patch","arguments":"{\"input\":\"*** Begin Patch\"}"},{"type":"function_call","id":"item_search","call_id":"call_search","name":"tool_search","arguments":"{\"query\":\"github\"}"},{"type":"function_call","id":"item_namespace","call_id":"call_namespace","name":"collaboration__send_message","arguments":"{\"target\":\"root\"}"}],"usage":{"input_tokens":11,"output_tokens":4,"total_tokens":15}}}`,
+		"",
+	}, "\n")
 }
 
 func TestProxyOpenAIWSHTTPBridgeTurnPromotesCodexAdditionalToolsForMixedCache(t *testing.T) {
