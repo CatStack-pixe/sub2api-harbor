@@ -81,6 +81,37 @@ func TestAdaptResponsesClientTools_RejectsAmbiguousNames(t *testing.T) {
 	}
 }
 
+func TestAdaptResponsesClientTools_LowersClientToolHistoryWithoutCurrentDeclarations(t *testing.T) {
+	req := map[string]any{
+		"input": []any{
+			map[string]any{"type": "custom_tool_call", "call_id": "c1", "name": "exec", "input": "dir"},
+			map[string]any{"type": "custom_tool_call_output", "call_id": "c1", "output": map[string]any{"ok": true}},
+			map[string]any{"type": "tool_search_call", "call_id": "s1", "execution": "client", "arguments": map[string]any{"query": "git"}},
+			map[string]any{"type": "tool_search_output", "call_id": "s1", "output": map[string]any{"groups": []string{"git"}}},
+		},
+	}
+
+	mapping, changed, err := AdaptResponsesClientTools(req)
+	require.NoError(t, err)
+	require.True(t, changed)
+	require.Empty(t, mapping.CustomTools)
+	require.False(t, mapping.ToolSearch)
+
+	input := requireResponsesClientToolValue[[]any](t, req["input"])
+	customCall := requireResponsesClientToolValue[map[string]any](t, input[0])
+	require.Equal(t, "function_call", customCall["type"])
+	require.JSONEq(t, `{"input":"dir"}`, requireResponsesClientToolValue[string](t, customCall["arguments"]))
+	customOutput := requireResponsesClientToolValue[map[string]any](t, input[1])
+	require.Equal(t, "function_call_output", customOutput["type"])
+	require.JSONEq(t, `{"ok":true}`, requireResponsesClientToolValue[string](t, customOutput["output"]))
+	searchCall := requireResponsesClientToolValue[map[string]any](t, input[2])
+	require.Equal(t, "function_call", searchCall["type"])
+	require.Equal(t, toolSearchProxyName, searchCall["name"])
+	require.NotContains(t, searchCall, "execution")
+	searchOutput := requireResponsesClientToolValue[map[string]any](t, input[3])
+	require.Equal(t, "function_call_output", searchOutput["type"])
+}
+
 func TestRestoreResponsesClientToolPayload_RestoresClientAndNamespaceCalls(t *testing.T) {
 	mapping := ResponsesClientToolMapping{
 		CustomTools: map[string]bool{"exec": true}, ToolSearch: true,

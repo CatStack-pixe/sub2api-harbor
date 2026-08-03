@@ -185,6 +185,46 @@ func TestValidateFunctionCallOutputContextBytesMatchesMapValidation(t *testing.T
 	}
 }
 
+func TestValidateFunctionCallOutputContextRequiresCoverageForEveryOutput(t *testing.T) {
+	cases := []struct {
+		name        string
+		body        map[string]any
+		wantCovered bool
+	}{
+		{
+			name: "partial_tool_context",
+			body: map[string]any{"input": []any{
+				map[string]any{"type": "function_call", "call_id": "call_a"},
+				map[string]any{"type": "function_call_output", "call_id": "call_a"},
+				map[string]any{"type": "custom_tool_call_output", "call_id": "call_b"},
+			}},
+			wantCovered: false,
+		},
+		{
+			name: "mixed_context_and_reference",
+			body: map[string]any{"input": []any{
+				map[string]any{"type": "function_call", "call_id": "call_a"},
+				map[string]any{"type": "function_call_output", "call_id": "call_a"},
+				map[string]any{"type": "tool_search_output", "call_id": "call_b"},
+				map[string]any{"type": "item_reference", "id": "call_b"},
+			}},
+			wantCovered: true,
+		},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			bodyBytes, err := json.Marshal(tt.body)
+			require.NoError(t, err)
+
+			mapResult := ValidateFunctionCallOutputContext(tt.body)
+			rawResult := ValidateFunctionCallOutputContextBytes(bodyBytes)
+			require.Equal(t, tt.wantCovered, mapResult.ContextCoversAllCallIDs)
+			require.Equal(t, mapResult, rawResult)
+		})
+	}
+}
+
 func TestAnalyzeToolCallOutputContextCoverageBytes(t *testing.T) {
 	cases := []struct {
 		name         string

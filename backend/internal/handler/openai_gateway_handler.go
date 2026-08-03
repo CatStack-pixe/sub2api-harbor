@@ -1339,17 +1339,13 @@ func (h *OpenAIGatewayHandler) ensureAnthropicErrorResponse(c *gin.Context, stre
 }
 
 func (h *OpenAIGatewayHandler) validateFunctionCallOutputRequest(c *gin.Context, body []byte, reqLog *zap.Logger) bool {
-	if !gjson.GetBytes(body, `input.#(type=="function_call_output")`).Exists() {
-		return true
-	}
-
 	validation := service.ValidateFunctionCallOutputContextBytes(body)
 	if !validation.HasFunctionCallOutput {
 		return true
 	}
 
 	previousResponseID := gjson.GetBytes(body, "previous_response_id").String()
-	if strings.TrimSpace(previousResponseID) != "" || validation.HasToolCallContext {
+	if strings.TrimSpace(previousResponseID) != "" {
 		return true
 	}
 
@@ -1360,7 +1356,7 @@ func (h *OpenAIGatewayHandler) validateFunctionCallOutputRequest(c *gin.Context,
 		h.errorResponse(c, http.StatusBadRequest, "invalid_request_error", "function_call_output requires call_id on HTTP requests; continuation via previous_response_id is only supported on Responses WebSocket v2")
 		return false
 	}
-	if validation.HasItemReferenceForAllCallIDs {
+	if validation.ContextCoversAllCallIDs {
 		return true
 	}
 

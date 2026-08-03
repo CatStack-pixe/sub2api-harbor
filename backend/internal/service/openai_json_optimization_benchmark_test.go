@@ -154,7 +154,7 @@ func optimizedValidateFunctionCallOutputContext(reqBody map[string]any) bool {
 	if strings.TrimSpace(previousResponseID) != "" {
 		return true
 	}
-	if validation.HasToolCallContext {
+	if validation.ContextCoversAllCallIDs {
 		return true
 	}
 	if validation.HasFunctionCallOutputMissingCallID {
