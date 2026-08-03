@@ -88,6 +88,7 @@ func AnthropicToResponses(req *AnthropicRequest) (*ResponsesRequest, error) {
 //	{"type":"auto"}            → "auto"
 //	{"type":"any"}             → "required"
 //	{"type":"none"}            → "none"
+//
 // A named tool maps to its converted built-in type when applicable; otherwise
 // it remains a named function. The bool result preserves
 // disable_parallel_tool_use for the top-level parallel_tool_calls setting.
