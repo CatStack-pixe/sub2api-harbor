@@ -456,6 +456,10 @@ func patchGrokResponsesBodyBase(body []byte, upstreamModel string) ([]byte, erro
 	if err != nil {
 		return nil, err
 	}
+	out, err = normalizeGrokForcedFunctionToolChoice(out)
+	if err != nil {
+		return nil, err
+	}
 	out, err = normalizeGrokSimpleFunctionToolInput(out)
 	if err != nil {
 		return nil, err
@@ -761,6 +765,50 @@ func shouldDropGrokToolChoice(toolChoice gjson.Result, tools []json.RawMessage) 
 		return true
 	}
 	return false
+}
+
+// normalizeGrokForcedFunctionToolChoice avoids an xAI CLI Responses failure
+// mode where a named function choice is accepted but ignored. Restricting the
+// declaration set to the selected function and using required preserves the
+// forced-choice semantics while taking the reliable upstream path.
+func normalizeGrokForcedFunctionToolChoice(body []byte) ([]byte, error) {
+	toolChoice := gjson.GetBytes(body, "tool_choice")
+	if !toolChoice.IsObject() || strings.TrimSpace(toolChoice.Get("type").String()) != "function" {
+		return body, nil
+	}
+	choiceName := strings.TrimSpace(toolChoice.Get("name").String())
+	if choiceName == "" {
+		choiceName = strings.TrimSpace(toolChoice.Get("function.name").String())
+	}
+	if choiceName == "" {
+		return body, nil
+	}
+
+	tools := gjson.GetBytes(body, "tools")
+	if !tools.IsArray() {
+		return body, nil
+	}
+	selected := make([]json.RawMessage, 0, 1)
+	for _, tool := range tools.Array() {
+		if strings.TrimSpace(tool.Get("type").String()) != "function" || strings.TrimSpace(tool.Get("name").String()) != choiceName {
+			continue
+		}
+		selected = append(selected, json.RawMessage(tool.Raw))
+		break
+	}
+	if len(selected) == 0 {
+		return body, nil
+	}
+
+	encoded, err := json.Marshal(selected)
+	if err != nil {
+		return nil, err
+	}
+	out, err := sjson.SetRawBytes(body, "tools", encoded)
+	if err != nil {
+		return nil, err
+	}
+	return sjson.SetBytes(out, "tool_choice", "required")
 }
 
 // normalizeGrokSimpleFunctionToolInput works around an xAI CLI Responses

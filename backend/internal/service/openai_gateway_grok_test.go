@@ -180,13 +180,11 @@ func TestPatchGrokResponsesBodyFlattensNamespaceTools(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, json.Valid(patched))
 	require.Equal(t, "grok-4.3", gjson.GetBytes(patched, "model").String())
-	require.Len(t, gjson.GetBytes(patched, "tools").Array(), 3)
+	require.Len(t, gjson.GetBytes(patched, "tools").Array(), 1)
 	require.False(t, gjson.GetBytes(patched, `tools.#(type=="namespace")`).Exists())
 	require.True(t, gjson.GetBytes(patched, `tools.#(type=="function")`).Exists())
-	require.True(t, gjson.GetBytes(patched, `tools.#(type=="shell")`).Exists())
 	require.Equal(t, "functions__inner", gjson.GetBytes(patched, "tools.0.name").String())
-	require.Equal(t, "functions__inner", gjson.GetBytes(patched, "tool_choice.name").String())
-	require.False(t, gjson.GetBytes(patched, "tool_choice.namespace").Exists())
+	require.Equal(t, "required", gjson.GetBytes(patched, "tool_choice").String())
 }
 
 func TestPatchGrokResponsesBodyDropsToolChoiceWhenNoSupportedToolsRemain(t *testing.T) {
@@ -242,6 +240,11 @@ func TestSanitizeGrokResponsesToolsKeepsToolChoiceOnlyWithSupportedTools(t *test
 			wantToolChoice: true,
 		},
 		{
+			name:      "named choice without matching tool",
+			body:      `{"input":"hello","tools":[{"type":"function","name":"lookup"}],"tool_choice":{"type":"function","name":"missing"}}`,
+			wantTools: true,
+		},
+		{
 			name:           "malformed non-array tools remain untouched",
 			body:           `{"input":"hello","tools":{"type":"function","name":"lookup"},"tool_choice":"auto"}`,
 			wantTools:      true,
@@ -263,6 +266,32 @@ func TestSanitizeGrokResponsesToolsKeepsToolChoiceOnlyWithSupportedTools(t *test
 	}
 }
 
+func TestNormalizeGrokForcedFunctionToolChoiceLeavesNonNamedChoices(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		choice string
+	}{
+		{name: "auto", choice: `"auto"`},
+		{name: "required", choice: `"required"`},
+		{name: "none", choice: `"none"`},
+		{name: "built-in tool", choice: `{"type":"web_search"}`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			body := []byte(`{"input":"hello","tools":[{"type":"function","name":"lookup"},{"type":"web_search"}],"tool_choice":` + tt.choice + `}`)
+
+			patched, err := normalizeGrokForcedFunctionToolChoice(body)
+
+			require.NoError(t, err)
+			require.Len(t, gjson.GetBytes(patched, "tools").Array(), 2)
+			require.JSONEq(t, tt.choice, gjson.GetBytes(patched, "tool_choice").Raw)
+		})
+	}
+}
+
 func TestPatchGrokResponsesBodyNormalizesSimpleFunctionToolTurn(t *testing.T) {
 	t.Parallel()
 
@@ -274,7 +303,11 @@ func TestPatchGrokResponsesBodyNormalizesSimpleFunctionToolTurn(t *testing.T) {
 			{"type":"message","role":"system","content":[{"type":"input_text","text":"system instructions"}]},
 			{"type":"message","role":"user","content":[{"type":"input_text","text":"call "},{"type":"input_text","text":"lookup"}]}
 		],
-		"tools":[{"type":"function","name":"lookup","parameters":{"type":"object"}}],
+		"tools":[
+			{"type":"function","name":"lookup","parameters":{"type":"object"}},
+			{"type":"function","name":"other","parameters":{"type":"object"}},
+			{"type":"web_search"}
+		],
 		"tool_choice":{"type":"function","name":"lookup"}
 	}`)
 
@@ -283,8 +316,31 @@ func TestPatchGrokResponsesBodyNormalizesSimpleFunctionToolTurn(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "call lookup", gjson.GetBytes(patched, "input").String())
 	require.Equal(t, "existing instructions\n\ndeveloper instructions\n\nsystem instructions", gjson.GetBytes(patched, "instructions").String())
-	require.Equal(t, "lookup", gjson.GetBytes(patched, "tool_choice.name").String())
+	require.Equal(t, "required", gjson.GetBytes(patched, "tool_choice").String())
+	require.Len(t, gjson.GetBytes(patched, "tools").Array(), 1)
 	require.Equal(t, "lookup", gjson.GetBytes(patched, "tools.0.name").String())
+}
+
+func TestPatchGrokResponsesBodyNormalizesNestedForcedFunctionChoice(t *testing.T) {
+	t.Parallel()
+
+	body := []byte(`{
+		"model":"grok","input":"call lookup",
+		"tools":[
+			{"type":"function","name":"other","parameters":{"type":"object"}},
+			{"type":"function","name":"lookup","description":"selected","parameters":{"type":"object"}},
+			{"type":"function","name":"lookup","description":"duplicate","parameters":{"type":"object"}}
+		],
+		"tool_choice":{"type":"function","function":{"name":"lookup"}}
+	}`)
+
+	patched, err := patchGrokResponsesBody(body, "grok-4.5")
+
+	require.NoError(t, err)
+	require.Equal(t, "required", gjson.GetBytes(patched, "tool_choice").String())
+	require.Len(t, gjson.GetBytes(patched, "tools").Array(), 1)
+	require.Equal(t, "lookup", gjson.GetBytes(patched, "tools.0.name").String())
+	require.Equal(t, "selected", gjson.GetBytes(patched, "tools.0.description").String())
 }
 
 func TestPatchGrokResponsesBodyKeepsStructuredAndMultiTurnToolInput(t *testing.T) {
@@ -2511,6 +2567,64 @@ func TestForwardAsAnthropicForGrokFunctionToolUsesCacheCapableMixedRoute(t *test
 	require.Equal(t, "tool_use", gjson.Get(clientBody, "stop_reason").String())
 	require.Equal(t, int64(856), gjson.Get(clientBody, "usage.input_tokens").Int())
 	require.Equal(t, int64(6144), gjson.Get(clientBody, "usage.cache_read_input_tokens").Int())
+}
+
+func TestForwardAsAnthropicForGrokForcedToolUsesRequiredSingleFunction(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	body := []byte(`{
+		"model":"grok","max_tokens":32,"stream":false,
+		"messages":[{"role":"user","content":"look up alpha"}],
+		"tools":[
+			{"name":"lookup","description":"look up a key","input_schema":{"type":"object","properties":{"key":{"type":"string"}},"required":["key"]}},
+			{"name":"other","description":"another tool","input_schema":{"type":"object"}}
+		],
+		"tool_choice":{"type":"tool","name":"lookup","disable_parallel_tool_use":true}
+	}`)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/messages", bytes.NewReader(body))
+	c.Set("api_key", &APIKey{ID: 5404})
+
+	account := healthyGrokOAuthGatewayTestAccount(59, "access-token")
+	account.Credentials["subscription_tier"] = "free"
+	repo := &grokQuotaAccountRepo{
+		mockAccountRepoForPlatform: &mockAccountRepoForPlatform{
+			accountsByID: map[int64]*Account{59: account},
+		},
+	}
+	responseBody := strings.Join([]string{
+		`data: {"type":"response.completed","response":{"id":"resp_grok_forced_function","object":"response","model":"grok-4.5","status":"completed","output":[{"type":"function_call","id":"fc_lookup","call_id":"call_lookup","name":"lookup","arguments":"{\"key\":\"alpha\"}","status":"completed"}],"usage":{"input_tokens":8,"output_tokens":2,"total_tokens":10}}}`,
+		"",
+		"data: [DONE]",
+		"",
+	}, "\n")
+	upstream := &httpUpstreamRecorder{resp: &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     http.Header{"Content-Type": []string{"text/event-stream"}},
+		Body:       io.NopCloser(strings.NewReader(responseBody)),
+	}}
+	svc := &OpenAIGatewayService{
+		httpUpstream:      upstream,
+		grokTokenProvider: NewGrokTokenProvider(repo, nil),
+		accountRepo:       repo,
+	}
+
+	result, err := svc.ForwardAsAnthropic(context.Background(), c, account, body, "", "")
+
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	tools := gjson.GetBytes(upstream.lastBody, "tools").Array()
+	require.Len(t, tools, 1)
+	require.Equal(t, "function", tools[0].Get("type").String())
+	require.Equal(t, "lookup", tools[0].Get("name").String())
+	require.Equal(t, "required", gjson.GetBytes(upstream.lastBody, "tool_choice").String())
+	require.True(t, gjson.GetBytes(upstream.lastBody, "parallel_tool_calls").Exists())
+	require.False(t, gjson.GetBytes(upstream.lastBody, "parallel_tool_calls").Bool())
+	require.Equal(t, "look up alpha", gjson.GetBytes(upstream.lastBody, "input").String())
+	require.Equal(t, "tool_use", gjson.Get(recorder.Body.String(), "content.0.type").String())
+	require.Equal(t, "lookup", gjson.Get(recorder.Body.String(), "content.0.name").String())
+	require.Equal(t, "tool_use", gjson.Get(recorder.Body.String(), "stop_reason").String())
 }
 
 func TestForwardAsAnthropicForGrokStreamingPreservesCacheUsage(t *testing.T) {

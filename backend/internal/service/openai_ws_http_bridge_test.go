@@ -448,6 +448,70 @@ func TestProxyOpenAIWSHTTPBridgeTurnForGrokDefaultsEmptyModelTo45(t *testing.T) 
 	require.Len(t, events, 2)
 }
 
+func TestProxyOpenAIWSHTTPBridgeTurnForGrokForcedCustomUsesRequiredSingleFunction(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	upstream := &httpUpstreamRecorder{resp: &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     http.Header{"Content-Type": []string{"text/event-stream"}},
+		Body: io.NopCloser(strings.NewReader(strings.Join([]string{
+			`data: {"type":"response.created","sequence_number":1,"response":{"id":"resp_grok_forced_custom","model":"grok-4.5"}}`,
+			"",
+			`data: {"type":"response.completed","sequence_number":2,"response":{"id":"resp_grok_forced_custom","object":"response","model":"grok-4.5","status":"completed","output":[{"type":"function_call","id":"item_custom","call_id":"call_custom","name":"apply_patch","arguments":"{\"input\":\"*** Begin Patch\"}","status":"completed"}],"usage":{"input_tokens":5,"output_tokens":2,"total_tokens":7}}}`,
+			"",
+		}, "\n"))),
+	}}
+	svc := &OpenAIGatewayService{
+		cfg:          &config.Config{Gateway: config.GatewayConfig{MaxLineSize: defaultMaxLineSize}},
+		httpUpstream: upstream,
+	}
+	account := &Account{
+		ID: 7402, Platform: PlatformGrok, Type: AccountTypeOAuth,
+		Status: StatusActive, Schedulable: true, Concurrency: 1,
+		Credentials: map[string]any{
+			"base_url": xai.DefaultCLIBaseURL, "subscription_tier": "free",
+		},
+	}
+	payload := []byte(`{
+		"type":"response.create","generate":true,"model":"grok","stream":true,
+		"input":[{"type":"message","role":"user","content":[{"type":"input_text","text":"apply this patch"}]}],
+		"tools":[
+			{"type":"custom","name":"apply_patch","description":"Apply a patch","format":{"type":"text"}},
+			{"type":"function","name":"lookup","parameters":{"type":"object"}},
+			{"type":"tool_search"}
+		],
+		"tool_choice":{"type":"custom","name":"apply_patch"}
+	}`)
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest(http.MethodGet, "/v1/responses", nil)
+	c.Set("api_key", &APIKey{ID: 7402})
+	var events [][]byte
+
+	result, err := svc.proxyOpenAIWSHTTPBridgeTurn(
+		context.Background(), c, account, "access-token", payload, len(payload),
+		"grok", "", "", "", "isolated-forced-custom-cache-id", 1,
+		func(message []byte) error {
+			events = append(events, append([]byte(nil), message...))
+			return nil
+		},
+	)
+
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	require.Equal(t, "apply this patch", gjson.GetBytes(upstream.lastBody, "input").String())
+	require.Equal(t, "required", gjson.GetBytes(upstream.lastBody, "tool_choice").String())
+	tools := gjson.GetBytes(upstream.lastBody, "tools").Array()
+	require.Len(t, tools, 1)
+	require.Equal(t, "function", tools[0].Get("type").String())
+	require.Equal(t, "apply_patch", tools[0].Get("name").String())
+	require.Equal(t, "isolated-forced-custom-cache-id", gjson.GetBytes(upstream.lastBody, "prompt_cache_key").String())
+	require.Equal(t, "isolated-forced-custom-cache-id", upstream.lastReq.Header.Get(grokConversationIDHeader))
+	require.Len(t, events, 2)
+	require.Equal(t, "custom_tool_call", gjson.GetBytes(events[1], "response.output.0.type").String())
+	require.Equal(t, "apply_patch", gjson.GetBytes(events[1], "response.output.0.name").String())
+}
+
 func TestProxyOpenAIWSHTTPBridgeTurnForGrokRestoresCodexClientToolRoundTrip(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
@@ -566,7 +630,7 @@ func grokWSClientToolProtocolRequest(stream bool) []byte {
 			{"type":"tool_search"},
 			{"type":"namespace","name":"collaboration","tools":[{"type":"function","name":"send_message","parameters":{"type":"object","properties":{"target":{"type":"string"}}}}]}
 		],
-		"tool_choice":{"type":"custom","name":"apply_patch"},
+		"tool_choice":"auto",
 		"input":"continue"
 	}`, stream))
 }
@@ -579,8 +643,7 @@ func assertGrokWSClientToolProtocolRequestLowered(t *testing.T, body []byte) {
 	require.True(t, gjson.GetBytes(body, `tools.#(name=="apply_patch")`).Exists())
 	require.True(t, gjson.GetBytes(body, `tools.#(name=="tool_search")`).Exists())
 	require.True(t, gjson.GetBytes(body, `tools.#(name=="collaboration__send_message")`).Exists())
-	require.Equal(t, "function", gjson.GetBytes(body, "tool_choice.type").String())
-	require.Equal(t, "apply_patch", gjson.GetBytes(body, "tool_choice.name").String())
+	require.Equal(t, "auto", gjson.GetBytes(body, "tool_choice").String())
 }
 
 func grokWSClientToolProtocolUpstreamSSE() string {
