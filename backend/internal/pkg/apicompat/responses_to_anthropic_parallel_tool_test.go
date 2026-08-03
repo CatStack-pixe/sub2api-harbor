@@ -393,7 +393,7 @@ func assertIndependentToolLifecycles(t *testing.T, events []AnthropicStreamEvent
 			lifecycle := byBlock[*event.Index]
 			require.NotNilf(t, lifecycle, "delta emitted before tool_use start on block %d", *event.Index)
 			require.Falsef(t, lifecycle.stopped, "delta emitted after tool_use stop on block %d", *event.Index)
-			lifecycle.args.WriteString(event.Delta.PartialJSON)
+			_, _ = lifecycle.args.WriteString(event.Delta.PartialJSON)
 
 		case "content_block_stop":
 			require.NotNil(t, event.Index)

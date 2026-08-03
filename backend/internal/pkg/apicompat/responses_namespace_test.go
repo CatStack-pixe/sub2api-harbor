@@ -97,8 +97,12 @@ func TestFlattenResponsesNamespaces_NamespaceGroupChoiceRequiresOnlySelectedName
 	tools, ok := req["tools"].([]any)
 	require.True(t, ok)
 	require.Len(t, tools, 2)
-	require.Equal(t, "collaboration__spawn_agent", tools[0].(map[string]any)["name"])
-	require.Equal(t, "collaboration__send_message", tools[1].(map[string]any)["name"])
+	spawnTool, ok := tools[0].(map[string]any)
+	require.True(t, ok)
+	require.Equal(t, "collaboration__spawn_agent", spawnTool["name"])
+	sendTool, ok := tools[1].(map[string]any)
+	require.True(t, ok)
+	require.Equal(t, "collaboration__send_message", sendTool["name"])
 }
 
 func TestFlattenResponsesNamespaces_RejectsUnknownNamespaceChoice(t *testing.T) {

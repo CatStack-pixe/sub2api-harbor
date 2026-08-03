@@ -206,8 +206,8 @@ type ResponsesEventToAnthropicState struct {
 	OutputIndexToBlockIdx map[int]int
 	// Tool state is kept independently because Responses can interleave calls
 	// before their arguments.done events arrive.
-	toolBlocksByOutput    map[int]*responsesAnthropicToolBlockState
-	toolOutputByCallID    map[string]int
+	toolBlocksByOutput map[int]*responsesAnthropicToolBlockState
+	toolOutputByCallID map[string]int
 
 	InputTokens              int
 	OutputTokens             int
