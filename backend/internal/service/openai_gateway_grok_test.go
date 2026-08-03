@@ -180,13 +180,11 @@ func TestPatchGrokResponsesBodyFlattensNamespaceTools(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, json.Valid(patched))
 	require.Equal(t, "grok-4.3", gjson.GetBytes(patched, "model").String())
-	require.Len(t, gjson.GetBytes(patched, "tools").Array(), 3)
+	require.Len(t, gjson.GetBytes(patched, "tools").Array(), 1)
 	require.False(t, gjson.GetBytes(patched, `tools.#(type=="namespace")`).Exists())
 	require.True(t, gjson.GetBytes(patched, `tools.#(type=="function")`).Exists())
-	require.True(t, gjson.GetBytes(patched, `tools.#(type=="shell")`).Exists())
 	require.Equal(t, "functions__inner", gjson.GetBytes(patched, "tools.0.name").String())
-	require.Equal(t, "functions__inner", gjson.GetBytes(patched, "tool_choice.name").String())
-	require.False(t, gjson.GetBytes(patched, "tool_choice.namespace").Exists())
+	require.Equal(t, "required", gjson.GetBytes(patched, "tool_choice").String())
 }
 
 func TestPatchGrokResponsesBodyDropsToolChoiceWhenNoSupportedToolsRemain(t *testing.T) {
@@ -274,7 +272,11 @@ func TestPatchGrokResponsesBodyNormalizesSimpleFunctionToolTurn(t *testing.T) {
 			{"type":"message","role":"system","content":[{"type":"input_text","text":"system instructions"}]},
 			{"type":"message","role":"user","content":[{"type":"input_text","text":"call "},{"type":"input_text","text":"lookup"}]}
 		],
-		"tools":[{"type":"function","name":"lookup","parameters":{"type":"object"}}],
+		"tools":[
+			{"type":"function","name":"lookup","parameters":{"type":"object"}},
+			{"type":"function","name":"other","parameters":{"type":"object"}},
+			{"type":"web_search"}
+		],
 		"tool_choice":{"type":"function","name":"lookup"}
 	}`)
 
@@ -283,7 +285,28 @@ func TestPatchGrokResponsesBodyNormalizesSimpleFunctionToolTurn(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "call lookup", gjson.GetBytes(patched, "input").String())
 	require.Equal(t, "existing instructions\n\ndeveloper instructions\n\nsystem instructions", gjson.GetBytes(patched, "instructions").String())
-	require.Equal(t, "lookup", gjson.GetBytes(patched, "tool_choice.name").String())
+	require.Equal(t, "required", gjson.GetBytes(patched, "tool_choice").String())
+	require.Len(t, gjson.GetBytes(patched, "tools").Array(), 1)
+	require.Equal(t, "lookup", gjson.GetBytes(patched, "tools.0.name").String())
+}
+
+func TestPatchGrokResponsesBodyNormalizesNestedForcedFunctionChoice(t *testing.T) {
+	t.Parallel()
+
+	body := []byte(`{
+		"model":"grok","input":"call lookup",
+		"tools":[
+			{"type":"function","name":"other","parameters":{"type":"object"}},
+			{"type":"function","name":"lookup","parameters":{"type":"object"}}
+		],
+		"tool_choice":{"type":"function","function":{"name":"lookup"}}
+	}`)
+
+	patched, err := patchGrokResponsesBody(body, "grok-4.5")
+
+	require.NoError(t, err)
+	require.Equal(t, "required", gjson.GetBytes(patched, "tool_choice").String())
+	require.Len(t, gjson.GetBytes(patched, "tools").Array(), 1)
 	require.Equal(t, "lookup", gjson.GetBytes(patched, "tools.0.name").String())
 }
 

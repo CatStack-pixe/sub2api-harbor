@@ -566,7 +566,7 @@ func grokWSClientToolProtocolRequest(stream bool) []byte {
 			{"type":"tool_search"},
 			{"type":"namespace","name":"collaboration","tools":[{"type":"function","name":"send_message","parameters":{"type":"object","properties":{"target":{"type":"string"}}}}]}
 		],
-		"tool_choice":{"type":"custom","name":"apply_patch"},
+		"tool_choice":"auto",
 		"input":"continue"
 	}`, stream))
 }
@@ -579,8 +579,7 @@ func assertGrokWSClientToolProtocolRequestLowered(t *testing.T, body []byte) {
 	require.True(t, gjson.GetBytes(body, `tools.#(name=="apply_patch")`).Exists())
 	require.True(t, gjson.GetBytes(body, `tools.#(name=="tool_search")`).Exists())
 	require.True(t, gjson.GetBytes(body, `tools.#(name=="collaboration__send_message")`).Exists())
-	require.Equal(t, "function", gjson.GetBytes(body, "tool_choice.type").String())
-	require.Equal(t, "apply_patch", gjson.GetBytes(body, "tool_choice.name").String())
+	require.Equal(t, "auto", gjson.GetBytes(body, "tool_choice").String())
 }
 
 func grokWSClientToolProtocolUpstreamSSE() string {
