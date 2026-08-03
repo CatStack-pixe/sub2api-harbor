@@ -448,6 +448,108 @@ func TestProxyOpenAIWSHTTPBridgeTurnForGrokDefaultsEmptyModelTo45(t *testing.T) 
 	require.Len(t, events, 2)
 }
 
+func TestProxyOpenAIWSHTTPBridgeTurnForGrokRestoresCodexClientToolRoundTrip(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	for _, tt := range []struct {
+		name   string
+		stream bool
+	}{
+		{name: "streaming client turn", stream: true},
+		{name: "non-streaming client turn", stream: false},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			upstream := &httpUpstreamRecorder{resp: &http.Response{
+				StatusCode: http.StatusOK,
+				Header:     http.Header{"Content-Type": []string{"text/event-stream"}},
+				Body:       io.NopCloser(strings.NewReader(grokProtocolUpstreamSSE())),
+			}}
+			svc := &OpenAIGatewayService{
+				cfg:          &config.Config{Gateway: config.GatewayConfig{MaxLineSize: defaultMaxLineSize}},
+				httpUpstream: upstream,
+			}
+			account := grokProtocolAPIKeyAccount(7401)
+			payload := grokClientToolProtocolRequest(tt.stream)
+			recorder := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(recorder)
+			c.Request = httptest.NewRequest(http.MethodGet, "/v1/responses", nil)
+			var events [][]byte
+
+			result, err := svc.proxyOpenAIWSHTTPBridgeTurn(
+				context.Background(), c, account, "xai-protocol-key", payload, len(payload),
+				"grok", "", "", "", "", 1,
+				func(message []byte) error {
+					events = append(events, append([]byte(nil), message...))
+					return nil
+				},
+			)
+
+			require.NoError(t, err)
+			require.NotNil(t, result)
+			require.Equal(t, "resp_protocol_stream", result.RequestID)
+			require.True(t, gjson.GetBytes(upstream.lastBody, "stream").Bool(), "the HTTP bridge always requests an SSE response")
+			assertGrokProtocolRequestLowered(t, upstream.lastBody)
+
+			mapping, ok := grokResponsesClientToolMapping(c)
+			require.True(t, ok)
+			require.True(t, mapping.CustomTools["apply_patch"])
+			require.True(t, mapping.ToolSearch)
+			require.Equal(t, "collaboration", mapping.NamespaceTools["collaboration__send_message"].Namespace)
+
+			require.Len(t, events, 11)
+			for index, event := range events {
+				require.Equal(t, 40+index, int(gjson.GetBytes(event, "sequence_number").Int()))
+			}
+			findEvent := func(eventType, path, value string) []byte {
+				t.Helper()
+				for _, event := range events {
+					if gjson.GetBytes(event, "type").String() != eventType {
+						continue
+					}
+					if path == "" || gjson.GetBytes(event, path).String() == value {
+						return event
+					}
+				}
+				t.Fatalf("missing restored event type=%q %s=%q", eventType, path, value)
+				return nil
+			}
+
+			customAdded := findEvent("response.output_item.added", "item.type", "custom_tool_call")
+			require.Equal(t, "apply_patch", gjson.GetBytes(customAdded, "item.name").String())
+			customInputDelta := findEvent("response.custom_tool_call_input.delta", "", "")
+			require.Equal(t, "*** Begin Patch", gjson.GetBytes(customInputDelta, "delta").String())
+			customInputDone := findEvent("response.custom_tool_call_input.done", "", "")
+			require.Equal(t, "*** Begin Patch", gjson.GetBytes(customInputDone, "input").String())
+			customDone := findEvent("response.output_item.done", "item.type", "custom_tool_call")
+			require.Equal(t, "*** Begin Patch", gjson.GetBytes(customDone, "item.input").String())
+
+			searchAdded := findEvent("response.output_item.added", "item.type", "tool_search_call")
+			require.Equal(t, "client", gjson.GetBytes(searchAdded, "item.execution").String())
+			searchDone := findEvent("response.output_item.done", "item.type", "tool_search_call")
+			require.Equal(t, "github", gjson.GetBytes(searchDone, "item.arguments.query").String())
+
+			namespaceAdded := findEvent("response.output_item.added", "item.namespace", "collaboration")
+			require.Equal(t, "send_message", gjson.GetBytes(namespaceAdded, "item.name").String())
+			namespaceArgumentsDone := findEvent("response.function_call_arguments.done", "name", "send_message")
+			require.False(t, gjson.GetBytes(namespaceArgumentsDone, "namespace").Exists())
+			namespaceDone := findEvent("response.output_item.done", "item.namespace", "collaboration")
+			require.Equal(t, "send_message", gjson.GetBytes(namespaceDone, "item.name").String())
+
+			for _, event := range events {
+				itemID := gjson.GetBytes(event, "item_id").String()
+				if itemID == "item_custom" || itemID == "item_search" {
+					require.NotContains(t, gjson.GetBytes(event, "type").String(), "function_call_arguments")
+				}
+			}
+			completed := findEvent("response.completed", "", "")
+			require.Equal(t, "custom_tool_call", gjson.GetBytes(completed, "response.output.0.type").String())
+			require.Equal(t, "tool_search_call", gjson.GetBytes(completed, "response.output.1.type").String())
+			require.Equal(t, "collaboration", gjson.GetBytes(completed, "response.output.2.namespace").String())
+			require.Equal(t, "send_message", gjson.GetBytes(completed, "response.output.2.name").String())
+		})
+	}
+}
+
 func TestProxyOpenAIWSHTTPBridgeTurnPromotesCodexAdditionalToolsForMixedCache(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
