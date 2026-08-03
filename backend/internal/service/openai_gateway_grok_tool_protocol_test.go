@@ -133,6 +133,36 @@ func TestPatchGrokResponsesBodyWithClientToolsNormalizesForcedCustomToolTurn(t *
 	require.Equal(t, "required", gjson.GetBytes(patched, "tool_choice").String())
 }
 
+func TestPatchGrokResponsesBodyWithClientToolsForcedCustomPreservesOtherToolHistory(t *testing.T) {
+	t.Parallel()
+
+	body := []byte(`{
+		"model":"grok",
+		"input":[
+			{"type":"function_call","call_id":"old_lookup","name":"lookup","arguments":"{\"key\":\"alpha\"}"},
+			{"type":"function_call_output","call_id":"old_lookup","output":"done"},
+			{"type":"message","role":"user","content":"apply the next patch"}
+		],
+		"tools":[
+			{"type":"custom","name":"apply_patch","format":{"type":"text"}},
+			{"type":"function","name":"lookup","parameters":{"type":"object"}}
+		],
+		"tool_choice":{"type":"custom","name":"apply_patch"}
+	}`)
+
+	patched, mapping, err := patchGrokResponsesBodyWithClientTools(body, "grok-4.5")
+
+	require.NoError(t, err)
+	require.True(t, mapping.CustomTools["apply_patch"])
+	require.Equal(t, "required", gjson.GetBytes(patched, "tool_choice").String())
+	require.Len(t, gjson.GetBytes(patched, "tools").Array(), 1)
+	require.Equal(t, "apply_patch", gjson.GetBytes(patched, "tools.0.name").String())
+	require.True(t, gjson.GetBytes(patched, "input").IsArray())
+	require.Equal(t, "function_call", gjson.GetBytes(patched, "input.0.type").String())
+	require.Equal(t, "lookup", gjson.GetBytes(patched, "input.0.name").String())
+	require.Equal(t, "function_call_output", gjson.GetBytes(patched, "input.1.type").String())
+}
+
 func TestPatchGrokResponsesBodyWithClientToolsRejectsTrailingJSONDocument(t *testing.T) {
 	t.Parallel()
 

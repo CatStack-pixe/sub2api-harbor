@@ -794,6 +794,7 @@ func normalizeGrokForcedFunctionToolChoice(body []byte) ([]byte, error) {
 			continue
 		}
 		selected = append(selected, json.RawMessage(tool.Raw))
+		break
 	}
 	if len(selected) == 0 {
 		return body, nil

@@ -448,6 +448,68 @@ func TestProxyOpenAIWSHTTPBridgeTurnForGrokDefaultsEmptyModelTo45(t *testing.T) 
 	require.Len(t, events, 2)
 }
 
+func TestProxyOpenAIWSHTTPBridgeTurnForGrokForcedCustomUsesRequiredSingleFunction(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	upstream := &httpUpstreamRecorder{resp: &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     http.Header{"Content-Type": []string{"text/event-stream"}},
+		Body: io.NopCloser(strings.NewReader(strings.Join([]string{
+			`data: {"type":"response.created","sequence_number":1,"response":{"id":"resp_grok_forced_custom","model":"grok-4.5"}}`,
+			"",
+			`data: {"type":"response.completed","sequence_number":2,"response":{"id":"resp_grok_forced_custom","object":"response","model":"grok-4.5","status":"completed","output":[{"type":"function_call","id":"item_custom","call_id":"call_custom","name":"apply_patch","arguments":"{\"input\":\"*** Begin Patch\"}","status":"completed"}],"usage":{"input_tokens":5,"output_tokens":2,"total_tokens":7}}}`,
+			"",
+		}, "\n"))),
+	}}
+	svc := &OpenAIGatewayService{
+		cfg:          &config.Config{Gateway: config.GatewayConfig{MaxLineSize: defaultMaxLineSize}},
+		httpUpstream: upstream,
+	}
+	account := &Account{
+		ID: 7402, Platform: PlatformGrok, Type: AccountTypeOAuth,
+		Status: StatusActive, Schedulable: true, Concurrency: 1,
+		Credentials: map[string]any{
+			"base_url": xai.DefaultCLIBaseURL, "subscription_tier": "free",
+		},
+	}
+	payload := []byte(`{
+		"type":"response.create","generate":true,"model":"grok","stream":true,
+		"input":[{"type":"message","role":"user","content":[{"type":"input_text","text":"apply this patch"}]}],
+		"tools":[
+			{"type":"custom","name":"apply_patch","description":"Apply a patch","format":{"type":"text"}},
+			{"type":"function","name":"lookup","parameters":{"type":"object"}},
+			{"type":"tool_search"}
+		],
+		"tool_choice":{"type":"custom","name":"apply_patch"}
+	}`)
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest(http.MethodGet, "/v1/responses", nil)
+	c.Set("api_key", &APIKey{ID: 7402})
+	var events [][]byte
+
+	result, err := svc.proxyOpenAIWSHTTPBridgeTurn(
+		context.Background(), c, account, "access-token", payload, len(payload),
+		"grok", "", "", "", "", 1,
+		func(message []byte) error {
+			events = append(events, append([]byte(nil), message...))
+			return nil
+		},
+	)
+
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	require.Equal(t, "apply this patch", gjson.GetBytes(upstream.lastBody, "input").String())
+	require.Equal(t, "required", gjson.GetBytes(upstream.lastBody, "tool_choice").String())
+	tools := gjson.GetBytes(upstream.lastBody, "tools").Array()
+	require.Len(t, tools, 1)
+	require.Equal(t, "function", tools[0].Get("type").String())
+	require.Equal(t, "apply_patch", tools[0].Get("name").String())
+	require.Len(t, events, 2)
+	require.Equal(t, "custom_tool_call", gjson.GetBytes(events[1], "response.output.0.type").String())
+	require.Equal(t, "apply_patch", gjson.GetBytes(events[1], "response.output.0.name").String())
+}
+
 func TestProxyOpenAIWSHTTPBridgeTurnForGrokRestoresCodexClientToolRoundTrip(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
