@@ -490,7 +490,7 @@ func TestProxyOpenAIWSHTTPBridgeTurnForGrokForcedCustomUsesRequiredSingleFunctio
 
 	result, err := svc.proxyOpenAIWSHTTPBridgeTurn(
 		context.Background(), c, account, "access-token", payload, len(payload),
-		"grok", "", "", "", "", 1,
+		"grok", "", "", "", "isolated-forced-custom-cache-id", 1,
 		func(message []byte) error {
 			events = append(events, append([]byte(nil), message...))
 			return nil
@@ -505,6 +505,8 @@ func TestProxyOpenAIWSHTTPBridgeTurnForGrokForcedCustomUsesRequiredSingleFunctio
 	require.Len(t, tools, 1)
 	require.Equal(t, "function", tools[0].Get("type").String())
 	require.Equal(t, "apply_patch", tools[0].Get("name").String())
+	require.Equal(t, "isolated-forced-custom-cache-id", gjson.GetBytes(upstream.lastBody, "prompt_cache_key").String())
+	require.Equal(t, "isolated-forced-custom-cache-id", upstream.lastReq.Header.Get(grokConversationIDHeader))
 	require.Len(t, events, 2)
 	require.Equal(t, "custom_tool_call", gjson.GetBytes(events[1], "response.output.0.type").String())
 	require.Equal(t, "apply_patch", gjson.GetBytes(events[1], "response.output.0.name").String())
