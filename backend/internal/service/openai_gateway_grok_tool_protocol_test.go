@@ -120,6 +120,27 @@ func TestPatchGrokResponsesBodyWithClientToolsRewritesEveryToolChoice(t *testing
 	}
 }
 
+func TestPatchGrokResponsesBodyWithClientToolsNormalizesForcedCustomToolTurn(t *testing.T) {
+	t.Parallel()
+
+	body := []byte(`{
+		"model":"grok",
+		"input":[{"type":"message","role":"user","content":[{"type":"input_text","text":"apply this patch"}]}],
+		"tools":[{"type":"custom","name":"apply_patch","description":"Apply a patch","format":{"type":"text"}}],
+		"tool_choice":{"type":"custom","name":"apply_patch"}
+	}`)
+
+	patched, mapping, err := patchGrokResponsesBodyWithClientTools(body, "grok-4.5")
+
+	require.NoError(t, err)
+	require.True(t, mapping.CustomTools["apply_patch"])
+	require.Equal(t, "apply this patch", gjson.GetBytes(patched, "input").String())
+	require.Equal(t, "function", gjson.GetBytes(patched, "tools.0.type").String())
+	require.Equal(t, "apply_patch", gjson.GetBytes(patched, "tools.0.name").String())
+	require.Equal(t, "function", gjson.GetBytes(patched, "tool_choice.type").String())
+	require.Equal(t, "apply_patch", gjson.GetBytes(patched, "tool_choice.name").String())
+}
+
 func TestPatchGrokResponsesBodyWithClientToolsRejectsTrailingJSONDocument(t *testing.T) {
 	t.Parallel()
 

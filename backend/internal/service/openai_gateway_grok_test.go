@@ -263,6 +263,68 @@ func TestSanitizeGrokResponsesToolsKeepsToolChoiceOnlyWithSupportedTools(t *test
 	}
 }
 
+func TestPatchGrokResponsesBodyNormalizesSimpleFunctionToolTurn(t *testing.T) {
+	t.Parallel()
+
+	body := []byte(`{
+		"model":"grok",
+		"instructions":"existing instructions",
+		"input":[
+			{"type":"message","role":"developer","content":[{"type":"input_text","text":"developer instructions"}]},
+			{"type":"message","role":"system","content":[{"type":"input_text","text":"system instructions"}]},
+			{"type":"message","role":"user","content":[{"type":"input_text","text":"call "},{"type":"input_text","text":"lookup"}]}
+		],
+		"tools":[{"type":"function","name":"lookup","parameters":{"type":"object"}}],
+		"tool_choice":{"type":"function","name":"lookup"}
+	}`)
+
+	patched, err := patchGrokResponsesBody(body, "grok-4.5")
+
+	require.NoError(t, err)
+	require.Equal(t, "call lookup", gjson.GetBytes(patched, "input").String())
+	require.Equal(t, "existing instructions\n\ndeveloper instructions\n\nsystem instructions", gjson.GetBytes(patched, "instructions").String())
+	require.Equal(t, "lookup", gjson.GetBytes(patched, "tool_choice.name").String())
+	require.Equal(t, "lookup", gjson.GetBytes(patched, "tools.0.name").String())
+}
+
+func TestPatchGrokResponsesBodyKeepsStructuredAndMultiTurnToolInput(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		body string
+	}{
+		{
+			name: "image input",
+			body: `{"model":"grok","input":[{"type":"message","role":"user","content":[{"type":"input_text","text":"inspect"},{"type":"input_image","image_url":"data:image/png;base64,AA=="}]}],"tools":[{"type":"function","name":"inspect","parameters":{"type":"object"}}],"tool_choice":"required"}`,
+		},
+		{
+			name: "assistant history",
+			body: `{"model":"grok","input":[{"type":"message","role":"user","content":[{"type":"input_text","text":"first"}]},{"type":"message","role":"assistant","content":[{"type":"output_text","text":"answer"}]},{"type":"message","role":"user","content":[{"type":"input_text","text":"second"}]}],"tools":[{"type":"function","name":"lookup","parameters":{"type":"object"}}]}`,
+		},
+		{
+			name: "instructions after user",
+			body: `{"model":"grok","input":[{"type":"message","role":"user","content":[{"type":"input_text","text":"first"}]},{"type":"message","role":"developer","content":[{"type":"input_text","text":"late instruction"}]}],"tools":[{"type":"function","name":"lookup","parameters":{"type":"object"}}]}`,
+		},
+		{
+			name: "tool continuation",
+			body: `{"model":"grok","input":[{"type":"function_call","call_id":"call_1","name":"lookup","arguments":"{}"},{"type":"function_call_output","call_id":"call_1","output":"done"},{"type":"message","role":"user","content":[{"type":"input_text","text":"continue"}]}],"tools":[{"type":"function","name":"lookup","parameters":{"type":"object"}}],"tool_choice":"auto"}`,
+		},
+		{
+			name: "tools disabled",
+			body: `{"model":"grok","input":[{"type":"message","role":"user","content":[{"type":"input_text","text":"answer directly"}]}],"tools":[{"type":"function","name":"lookup","parameters":{"type":"object"}}],"tool_choice":"none"}`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			patched, err := patchGrokResponsesBody([]byte(tt.body), "grok-4.5")
+			require.NoError(t, err)
+			require.True(t, gjson.GetBytes(patched, "input").IsArray())
+		})
+	}
+}
+
 func TestPatchGrokResponsesBodyPromotesCodexAdditionalTools(t *testing.T) {
 	t.Parallel()
 
@@ -303,8 +365,8 @@ func TestPatchGrokResponsesBodyPromotesCodexAdditionalTools(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, json.Valid(patched))
 	require.Equal(t, "grok-4.5", gjson.GetBytes(patched, "model").String())
-	require.Equal(t, 2, len(gjson.GetBytes(patched, "input").Array()))
-	require.False(t, gjson.GetBytes(patched, `input.#(type=="additional_tools")`).Exists())
+	require.Equal(t, "hello", gjson.GetBytes(patched, "input").String())
+	require.Equal(t, "system prompt", gjson.GetBytes(patched, "instructions").String())
 	tools := gjson.GetBytes(patched, "tools").Array()
 	require.Len(t, tools, 5)
 	require.Equal(t, "existing", tools[0].Get("name").String())
@@ -318,10 +380,6 @@ func TestPatchGrokResponsesBodyPromotesCodexAdditionalTools(t *testing.T) {
 	require.False(t, gjson.GetBytes(patched, `tools.#(type=="custom")`).Exists())
 	require.False(t, gjson.GetBytes(patched, `tools.#(type=="namespace")`).Exists())
 	require.Equal(t, "auto", gjson.GetBytes(patched, "tool_choice").String())
-	require.Equal(t, "developer", gjson.GetBytes(patched, "input.0.role").String())
-	require.Equal(t, "system prompt", gjson.GetBytes(patched, "input.0.content.0.text").String())
-	require.Equal(t, "user", gjson.GetBytes(patched, "input.1.role").String())
-	require.Equal(t, "hello", gjson.GetBytes(patched, "input.1.content.0.text").String())
 }
 
 func TestForwardGrokResponsesCodexAdditionalToolsUsesMixedCacheIntent(t *testing.T) {
@@ -373,7 +431,7 @@ func TestForwardGrokResponsesCodexAdditionalToolsUsesMixedCacheIntent(t *testing
 	require.NoError(t, err)
 	require.NotNil(t, result)
 	require.Equal(t, "resp_codex_lite", result.ResponseID)
-	require.False(t, gjson.GetBytes(upstream.lastBody, `input.#(type=="additional_tools")`).Exists())
+	require.Equal(t, "hello", gjson.GetBytes(upstream.lastBody, "input").String())
 	tools := gjson.GetBytes(upstream.lastBody, "tools").Array()
 	require.Len(t, tools, 4)
 	require.Equal(t, "function", tools[0].Get("type").String())
@@ -2441,6 +2499,7 @@ func TestForwardAsAnthropicForGrokFunctionToolUsesCacheCapableMixedRoute(t *test
 	require.Equal(t, "web_search", tools[1].Get("type").String())
 	require.Equal(t, "x_search", tools[2].Get("type").String())
 	require.Equal(t, "auto", gjson.GetBytes(upstream.lastBody, "tool_choice").String())
+	require.Equal(t, "look up alpha", gjson.GetBytes(upstream.lastBody, "input").String())
 
 	require.Equal(t, 7000, result.Usage.InputTokens)
 	require.Equal(t, 6144, result.Usage.CacheReadInputTokens)

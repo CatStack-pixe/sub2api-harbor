@@ -73,21 +73,50 @@ func TestFlattenResponsesNamespaces_RejectsFlatNameCollision(t *testing.T) {
 	require.ErrorContains(t, err, "conflicts with a top-level tool")
 }
 
-func TestFlattenResponsesNamespaces_NamespaceGroupChoiceFallsBackToAuto(t *testing.T) {
+func TestFlattenResponsesNamespaces_NamespaceGroupChoiceRequiresOnlySelectedNamespace(t *testing.T) {
 	req := map[string]any{
-		"tools": []any{map[string]any{
-			"type": "namespace", "name": "collaboration", "tools": []any{
-				map[string]any{"type": "function", "name": "spawn_agent"},
-				map[string]any{"type": "function", "name": "send_message"},
+		"tools": []any{
+			map[string]any{"type": "function", "name": "plain"},
+			map[string]any{
+				"type": "namespace", "name": "collaboration", "tools": []any{
+					map[string]any{"type": "function", "name": "spawn_agent"},
+					map[string]any{"type": "function", "name": "send_message"},
+				},
 			},
-		}},
+			map[string]any{"type": "namespace", "name": "browser", "tools": []any{
+				map[string]any{"type": "function", "name": "open"},
+			}},
+		},
 		"tool_choice": map[string]any{"type": "namespace", "name": "collaboration"},
 	}
 
 	_, changed, err := FlattenResponsesNamespaces(req)
 	require.NoError(t, err)
 	require.True(t, changed)
-	require.Equal(t, "auto", req["tool_choice"])
+	require.Equal(t, "required", req["tool_choice"])
+	tools, ok := req["tools"].([]any)
+	require.True(t, ok)
+	require.Len(t, tools, 2)
+	spawnTool, ok := tools[0].(map[string]any)
+	require.True(t, ok)
+	require.Equal(t, "collaboration__spawn_agent", spawnTool["name"])
+	sendTool, ok := tools[1].(map[string]any)
+	require.True(t, ok)
+	require.Equal(t, "collaboration__send_message", sendTool["name"])
+}
+
+func TestFlattenResponsesNamespaces_RejectsUnknownNamespaceChoice(t *testing.T) {
+	req := map[string]any{
+		"tools": []any{map[string]any{
+			"type": "namespace", "name": "collaboration", "tools": []any{
+				map[string]any{"type": "function", "name": "spawn_agent"},
+			},
+		}},
+		"tool_choice": map[string]any{"type": "namespace", "name": "missing"},
+	}
+
+	_, _, err := FlattenResponsesNamespaces(req)
+	require.ErrorContains(t, err, "undeclared namespace")
 }
 
 func TestFlattenResponsesNamespacesExcept_PreservesBuiltInNamespaceAndChoice(t *testing.T) {

@@ -22,6 +22,7 @@ type FunctionCallOutputValidation struct {
 	HasToolCallContext                 bool
 	HasFunctionCallOutputMissingCallID bool
 	HasItemReferenceForAllCallIDs      bool
+	ContextCoversAllCallIDs            bool
 }
 
 func isCodexToolCallContextItemType(typ string) bool {
@@ -166,7 +167,8 @@ func ValidateFunctionCallOutputContextBytes(body []byte) FunctionCallOutputValid
 		return result
 	}
 
-	var callIDs map[string]struct{}
+	var outputCallIDs map[string]struct{}
+	var contextCallIDs map[string]struct{}
 	var referenceIDs map[string]struct{}
 	input.ForEach(func(_, item gjson.Result) bool {
 		if !item.IsObject() {
@@ -181,14 +183,20 @@ func ValidateFunctionCallOutputContextBytes(body []byte) FunctionCallOutputValid
 				result.HasFunctionCallOutputMissingCallID = true
 				return true
 			}
-			if callIDs == nil {
-				callIDs = make(map[string]struct{})
+			if outputCallIDs == nil {
+				outputCallIDs = make(map[string]struct{})
 			}
-			callIDs[callID] = struct{}{}
+			outputCallIDs[callID] = struct{}{}
 		case isCodexToolCallContextItemType(itemType):
-			if strings.TrimSpace(item.Get("call_id").String()) != "" {
-				result.HasToolCallContext = true
+			callID := strings.TrimSpace(item.Get("call_id").String())
+			if callID == "" {
+				return true
 			}
+			result.HasToolCallContext = true
+			if contextCallIDs == nil {
+				contextCallIDs = make(map[string]struct{})
+			}
+			contextCallIDs[callID] = struct{}{}
 		case itemType == "item_reference":
 			idValue := strings.TrimSpace(item.Get("id").String())
 			if idValue == "" {
@@ -199,19 +207,25 @@ func ValidateFunctionCallOutputContextBytes(body []byte) FunctionCallOutputValid
 			}
 			referenceIDs[idValue] = struct{}{}
 		}
-		return !result.HasFunctionCallOutput || !result.HasToolCallContext
+		return true
 	})
-	if !result.HasFunctionCallOutput || result.HasToolCallContext || len(callIDs) == 0 || len(referenceIDs) == 0 {
+	if !result.HasFunctionCallOutput || len(outputCallIDs) == 0 {
 		return result
 	}
-	allReferenced := true
-	for callID := range callIDs {
+	allReferenced := len(referenceIDs) > 0
+	allCovered := !result.HasFunctionCallOutputMissingCallID
+	for callID := range outputCallIDs {
 		if _, ok := referenceIDs[callID]; !ok {
 			allReferenced = false
-			break
+		}
+		if _, ok := contextCallIDs[callID]; !ok {
+			if _, referenced := referenceIDs[callID]; !referenced {
+				allCovered = false
+			}
 		}
 	}
 	result.HasItemReferenceForAllCallIDs = allReferenced
+	result.ContextCoversAllCallIDs = allCovered
 	return result
 }
 
@@ -293,10 +307,7 @@ func AnalyzeToolCallOutputContextCoverageBytes(body []byte) ToolCallOutputContex
 	return coverage
 }
 
-// ValidateFunctionCallOutputContext 为 handler 提供低开销校验结果：
-// 1) 无工具输出直接返回
-// 2) 若已存在工具调用上下文则提前返回
-// 3) 仅在无工具上下文时才构建 call_id / item_reference 集合
+// ValidateFunctionCallOutputContext 为 handler 提供工具输出与上下文的精确关联校验结果。
 // 字段名保留 FunctionCallOutput 是为了兼容既有调用点；语义覆盖所有 Codex 工具输出。
 func ValidateFunctionCallOutputContext(reqBody map[string]any) FunctionCallOutputValidation {
 	result := FunctionCallOutputValidation{}
@@ -308,31 +319,8 @@ func ValidateFunctionCallOutputContext(reqBody map[string]any) FunctionCallOutpu
 		return result
 	}
 
-	for _, item := range input {
-		itemMap, ok := item.(map[string]any)
-		if !ok {
-			continue
-		}
-		itemType, _ := itemMap["type"].(string)
-		switch {
-		case isCodexToolCallOutputItemType(itemType):
-			result.HasFunctionCallOutput = true
-		case isCodexToolCallContextItemType(itemType):
-			callID, _ := itemMap["call_id"].(string)
-			if strings.TrimSpace(callID) != "" {
-				result.HasToolCallContext = true
-			}
-		}
-		if result.HasFunctionCallOutput && result.HasToolCallContext {
-			return result
-		}
-	}
-
-	if !result.HasFunctionCallOutput || result.HasToolCallContext {
-		return result
-	}
-
-	callIDs := make(map[string]struct{})
+	outputCallIDs := make(map[string]struct{})
+	contextCallIDs := make(map[string]struct{})
 	referenceIDs := make(map[string]struct{})
 	for _, item := range input {
 		itemMap, ok := item.(map[string]any)
@@ -342,13 +330,22 @@ func ValidateFunctionCallOutputContext(reqBody map[string]any) FunctionCallOutpu
 		itemType, _ := itemMap["type"].(string)
 		switch {
 		case isCodexToolCallOutputItemType(itemType):
+			result.HasFunctionCallOutput = true
 			callID, _ := itemMap["call_id"].(string)
 			callID = strings.TrimSpace(callID)
 			if callID == "" {
 				result.HasFunctionCallOutputMissingCallID = true
 				continue
 			}
-			callIDs[callID] = struct{}{}
+			outputCallIDs[callID] = struct{}{}
+		case isCodexToolCallContextItemType(itemType):
+			callID, _ := itemMap["call_id"].(string)
+			callID = strings.TrimSpace(callID)
+			if callID == "" {
+				continue
+			}
+			result.HasToolCallContext = true
+			contextCallIDs[callID] = struct{}{}
 		case itemType == "item_reference":
 			idValue, _ := itemMap["id"].(string)
 			idValue = strings.TrimSpace(idValue)
@@ -359,17 +356,23 @@ func ValidateFunctionCallOutputContext(reqBody map[string]any) FunctionCallOutpu
 		}
 	}
 
-	if len(callIDs) == 0 || len(referenceIDs) == 0 {
+	if !result.HasFunctionCallOutput || len(outputCallIDs) == 0 {
 		return result
 	}
-	allReferenced := true
-	for callID := range callIDs {
+	allReferenced := len(referenceIDs) > 0
+	allCovered := !result.HasFunctionCallOutputMissingCallID
+	for callID := range outputCallIDs {
 		if _, ok := referenceIDs[callID]; !ok {
 			allReferenced = false
-			break
+		}
+		if _, ok := contextCallIDs[callID]; !ok {
+			if _, referenced := referenceIDs[callID]; !referenced {
+				allCovered = false
+			}
 		}
 	}
 	result.HasItemReferenceForAllCallIDs = allReferenced
+	result.ContextCoversAllCallIDs = allCovered
 	return result
 }
 
