@@ -17,10 +17,10 @@ import (
 const deepSeekBalanceBodyLimit int64 = 1 << 20
 
 type DeepSeekBalanceInfo struct {
-	Currency         string `json:"currency"`
-	TotalBalance     string `json:"total_balance"`
-	GrantedBalance   string `json:"granted_balance"`
-	ToppedUpBalance  string `json:"topped_up_balance"`
+	Currency        string `json:"currency"`
+	TotalBalance    string `json:"total_balance"`
+	GrantedBalance  string `json:"granted_balance"`
+	ToppedUpBalance string `json:"topped_up_balance"`
 }
 
 type DeepSeekBalanceResult struct {
