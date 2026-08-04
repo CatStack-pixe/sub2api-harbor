@@ -38,12 +38,12 @@ const (
 
 // Platform constants
 const (
-	PlatformAnthropic   = domain.PlatformAnthropic
-	PlatformOpenAI      = domain.PlatformOpenAI
-	PlatformGemini      = domain.PlatformGemini
-	PlatformAntigravity = domain.PlatformAntigravity
-	PlatformGrok        = domain.PlatformGrok
-	PlatformAgnes       = domain.PlatformAgnes
+	PlatformAnthropic      = domain.PlatformAnthropic
+	PlatformOpenAI         = domain.PlatformOpenAI
+	PlatformGemini         = domain.PlatformGemini
+	PlatformAntigravity    = domain.PlatformAntigravity
+	PlatformGrok           = domain.PlatformGrok
+	PlatformAgnes          = domain.PlatformAgnes
 	PlatformDeepSeek       = domain.PlatformDeepSeek
 	PlatformComposite      = domain.PlatformComposite
 	AgnesDefaultBaseURL    = domain.AgnesDefaultBaseURL
