@@ -11,8 +11,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// 探测资格：/v1/sub2api/billing 是 key 级端点，五个
-// 受支持平台的 API-key 账号都可开启探测；OAuth/Bedrock 无静态 Key 仍不合格。
+// 探测资格：/v1/sub2api/billing 是 sub2api 自有 key 级端点，五个
+// 受支持平台的 API-key 账号都可开启探测；DeepSeek 使用独立官方余额接口，
+// OAuth/Bedrock 无静态 Key 仍不合格。
 func TestUpstreamBillingProbeIdentityCoversAllAPIKeyPlatforms(t *testing.T) {
 	for _, platform := range []string{
 		PlatformOpenAI, PlatformGrok, PlatformAnthropic, PlatformGemini, PlatformAntigravity,
@@ -20,6 +21,8 @@ func TestUpstreamBillingProbeIdentityCoversAllAPIKeyPlatforms(t *testing.T) {
 		require.True(t, IsUpstreamBillingProbeIdentity(platform, AccountTypeAPIKey), platform)
 		require.True(t, isUpstreamBillingProbeAccount(&Account{Platform: platform, Type: AccountTypeAPIKey}), platform)
 	}
+	require.False(t, IsUpstreamBillingProbeIdentity(PlatformDeepSeek, AccountTypeAPIKey))
+	require.False(t, isUpstreamBillingProbeAccount(&Account{Platform: PlatformDeepSeek, Type: AccountTypeAPIKey}))
 	require.False(t, IsUpstreamBillingProbeIdentity(PlatformOpenAI, AccountTypeOAuth))
 	require.False(t, IsUpstreamBillingProbeIdentity(PlatformGrok, AccountTypeOAuth))
 	require.False(t, IsUpstreamBillingProbeIdentity(PlatformAnthropic, AccountTypeBedrock))

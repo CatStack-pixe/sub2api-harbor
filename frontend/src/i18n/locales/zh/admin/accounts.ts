@@ -308,6 +308,7 @@ export default {
         antigravity: 'Antigravity',
         grok: 'Grok',
         agnes: 'Agnes',
+        deepseek: 'DeepSeek',
       },
       types: {
         oauth: 'OAuth',
@@ -394,6 +395,10 @@ export default {
         statsTitleDaily: '每日用量统计',
         geminiProDaily: 'Pro',
         geminiFlashDaily: 'Flash',
+        deepseekProbe: '余额',
+        deepseekProbeTooltip: '查询 DeepSeek 账号余额',
+        deepseekUnavailable: '余额不可用',
+        deepseekNoBalance: '暂无余额数据',
         gemini3Pro: 'G3P',
         gemini3Flash: 'G3F',
         gemini3Image: 'G31FI',
@@ -656,6 +661,10 @@ export default {
         testModeDefault: '常规请求',
         testModeCompact: 'Compact 探测',
         modelRestrictionDisabledByPassthrough: '已开启自动透传：模型白名单/映射不会生效。',
+      },
+      deepseek: {
+        baseUrlHint: '留空使用官方 DeepSeek API',
+        apiKeyHint: '您的 DeepSeek API Key'
       },
       grok: {
         baseUrlHint: 'Grok OAuth 账号会转发到官方 xAI API Base URL。',

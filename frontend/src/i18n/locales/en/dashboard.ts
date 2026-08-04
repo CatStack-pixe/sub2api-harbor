@@ -180,6 +180,9 @@ export default {
         codexNote: 'Save config.toml under ~/.codex and set SUB2API_API_KEY before starting Codex.',
         codexNoteWindows: 'Save config.toml under %USERPROFILE%\\.codex and set SUB2API_API_KEY in PowerShell before starting Codex.',
       },
+      deepseek: {
+        description: 'Configure OpenCode to send DeepSeek Chat Completions traffic through your Sub2API DeepSeek group.',
+      },
       opencode: {
         title: 'OpenCode Example',
         subtitle: 'opencode.json',
@@ -418,7 +421,8 @@ export default {
       anthropic: 'Anthropic',
       gemini: 'Gemini',
       grok: 'Grok',
-      agnes: 'Agnes'
+      agnes: 'Agnes',
+      deepseek: 'DeepSeek'
     },
     extraModelsHeader: 'Extra Models',
     extraModelsEmpty: 'No extra models',

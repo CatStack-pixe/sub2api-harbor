@@ -133,6 +133,8 @@ func TestDeriveUpstreamEndpoint(t *testing.T) {
 		{"grok video status", EndpointVideos, "/videos/req_123", service.PlatformGrok, EndpointVideos},
 		{"agnes chat", EndpointChatCompletions, "/v1/chat/completions", service.PlatformAgnes, EndpointChatCompletions},
 		{"agnes responses bridge", EndpointResponses, "/v1/responses", service.PlatformAgnes, EndpointChatCompletions},
+		{"deepseek chat", EndpointChatCompletions, "/v1/chat/completions", service.PlatformDeepSeek, EndpointChatCompletions},
+		{"deepseek responses path stays chat", EndpointResponses, "/v1/responses", service.PlatformDeepSeek, EndpointChatCompletions},
 
 		// Antigravity — uses inbound to pick Claude vs Gemini upstream.
 		{"antigravity claude", EndpointMessages, "/antigravity/v1/messages", service.PlatformAntigravity, EndpointMessages},
