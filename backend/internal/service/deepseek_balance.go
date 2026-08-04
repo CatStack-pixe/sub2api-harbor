@@ -38,7 +38,7 @@ type deepSeekBalanceInfoWire struct {
 }
 
 type deepSeekBalanceResponseWire struct {
-	IsAvailable  bool                       `json:"is_available"`
+	IsAvailable  bool                      `json:"is_available"`
 	BalanceInfos []deepSeekBalanceInfoWire `json:"balance_infos"`
 }
 
