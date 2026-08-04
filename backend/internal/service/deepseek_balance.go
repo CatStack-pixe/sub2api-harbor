@@ -24,10 +24,10 @@ type DeepSeekBalanceInfo struct {
 }
 
 type DeepSeekBalanceResult struct {
-	IsAvailable  bool                   `json:"is_available"`
-	BalanceInfos []DeepSeekBalanceInfo  `json:"balance_infos"`
-	StatusCode   int                    `json:"status_code,omitempty"`
-	FetchedAt    int64                  `json:"fetched_at"`
+	IsAvailable  bool                  `json:"is_available"`
+	BalanceInfos []DeepSeekBalanceInfo `json:"balance_infos"`
+	StatusCode   int                   `json:"status_code,omitempty"`
+	FetchedAt    int64                 `json:"fetched_at"`
 }
 
 type deepSeekBalanceInfoWire struct {
