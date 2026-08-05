@@ -398,6 +398,34 @@ func TestFetchUpstreamSupportedModelsParsesDeepSeekResponse(t *testing.T) {
 	require.Equal(t, "Bearer sk-deepseek", upstream.lastReq.Header.Get("Authorization"))
 }
 
+func TestFetchUpstreamSupportedModelsParsesNvidiaResponse(t *testing.T) {
+	t.Parallel()
+
+	upstream := &httpUpstreamRecorder{resp: &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     http.Header{"Content-Type": []string{"application/json"}},
+		Body:       io.NopCloser(strings.NewReader(`{"data":[{"id":"nvidia/llama-3.1-nemotron-nano-8b-v1"},{"id":"meta/llama-3.3-70b-instruct"}]}`)),
+	}}
+	svc := &AccountTestService{
+		httpUpstream: upstream,
+		cfg:          upstreamModelSyncTestConfig(),
+	}
+
+	models, err := svc.FetchUpstreamSupportedModels(context.Background(), &Account{
+		ID:       12,
+		Platform: PlatformNvidia,
+		Type:     AccountTypeAPIKey,
+		Credentials: map[string]any{
+			"api_key":  "nvapi-test",
+			"base_url": "https://integrate.api.nvidia.com/v1",
+		},
+	})
+	require.NoError(t, err)
+	require.Equal(t, []string{"nvidia/llama-3.1-nemotron-nano-8b-v1", "meta/llama-3.3-70b-instruct"}, models)
+	require.Equal(t, "https://integrate.api.nvidia.com/v1/models", upstream.lastReq.URL.String())
+	require.Equal(t, "Bearer nvapi-test", upstream.lastReq.Header.Get("Authorization"))
+}
+
 func TestFetchUpstreamSupportedModelsParsesGrokOAuthResponse(t *testing.T) {
 	t.Parallel()
 

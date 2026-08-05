@@ -188,6 +188,20 @@
             <PlatformIcon platform="deepseek" size="sm" />
             DeepSeek
           </button>
+          <button
+            type="button"
+            data-testid="nvidia-platform"
+            @click="form.platform = 'nvidia'"
+            :class="[
+              'flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium transition-all',
+              form.platform === 'nvidia'
+                ? 'bg-white text-lime-700 shadow-sm dark:bg-dark-600 dark:text-lime-300'
+                : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200'
+            ]"
+          >
+            <PlatformIcon platform="nvidia" size="sm" />
+            NVIDIA
+          </button>
         </div>
       </div>
 
@@ -415,6 +429,26 @@
             <div>
               <span class="block text-sm font-medium text-gray-900 dark:text-white">API Key</span>
               <span class="text-xs text-gray-500 dark:text-gray-400">DeepSeek API</span>
+            </div>
+          </button>
+        </div>
+      </div>
+
+      <div v-if="form.platform === 'nvidia'">
+        <label class="input-label">{{ t('admin.accounts.accountType') }}</label>
+        <div class="mt-2 grid grid-cols-1 gap-3" data-tour="account-form-type">
+          <button
+            type="button"
+            data-testid="nvidia-account-type-api-key"
+            @click="accountCategory = 'apikey'"
+            class="flex items-center gap-3 rounded-lg border-2 border-lime-500 bg-lime-50 p-3 text-left dark:bg-lime-900/20"
+          >
+            <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-lime-600 text-white">
+              <Icon name="key" size="sm" />
+            </div>
+            <div>
+              <span class="block text-sm font-medium text-gray-900 dark:text-white">API Key</span>
+              <span class="text-xs text-gray-500 dark:text-gray-400">NVIDIA NIM API</span>
             </div>
           </button>
         </div>
@@ -1197,7 +1231,9 @@
                     ? 'https://api.x.ai/v1'
                     : form.platform === 'agnes'
                       ? 'https://apihub.agnes-ai.com/v1'
-                      : form.platform === 'deepseek'
+                      : form.platform === 'nvidia'
+                        ? 'https://integrate.api.nvidia.com/v1'
+                        : form.platform === 'deepseek'
                         ? 'https://api.deepseek.com'
                         : 'https://api.anthropic.com'
             "
@@ -1225,7 +1261,9 @@
                     ? 'xai-...'
                     : form.platform === 'agnes'
                       ? 'YOUR_API_KEY'
-                      : form.platform === 'deepseek'
+                      : form.platform === 'nvidia'
+                        ? 'nvapi-...'
+                        : form.platform === 'deepseek'
                         ? 'sk-...'
                         : 'sk-ant-...'
             "
@@ -3723,6 +3761,7 @@ const baseUrlHint = computed(() => {
   if (form.platform === 'grok') return ''
   if (form.platform === 'agnes') return ''
   if (form.platform === 'deepseek') return t('admin.accounts.deepseek.baseUrlHint')
+  if (form.platform === 'nvidia') return t('admin.accounts.nvidia.baseUrlHint')
   return t('admin.accounts.baseUrlHint')
 })
 
@@ -3732,6 +3771,7 @@ const apiKeyHint = computed(() => {
   if (form.platform === 'grok') return ''
   if (form.platform === 'agnes') return ''
   if (form.platform === 'deepseek') return t('admin.accounts.deepseek.apiKeyHint')
+  if (form.platform === 'nvidia') return t('admin.accounts.nvidia.apiKeyHint')
   return t('admin.accounts.apiKeyHint')
 })
 
@@ -4310,7 +4350,9 @@ watch(
             ? 'https://api.x.ai/v1'
             : newPlatform === 'agnes'
               ? 'https://apihub.agnes-ai.com/v1'
-              : newPlatform === 'deepseek'
+              : newPlatform === 'nvidia'
+                ? 'https://integrate.api.nvidia.com/v1'
+                : newPlatform === 'deepseek'
                 ? 'https://api.deepseek.com'
                 : 'https://api.anthropic.com'
     // Clear model-related settings
@@ -4347,6 +4389,13 @@ watch(
       form.load_factor = null
     }
     if (newPlatform === 'deepseek') {
+      accountCategory.value = 'apikey'
+      modelRestrictionMode.value = 'whitelist'
+      allowedModels.value = [...getModelsByPlatform(newPlatform)]
+      form.concurrency = 10
+      form.load_factor = null
+    }
+    if (newPlatform === 'nvidia') {
       accountCategory.value = 'apikey'
       modelRestrictionMode.value = 'whitelist'
       allowedModels.value = [...getModelsByPlatform(newPlatform)]
@@ -5213,11 +5262,13 @@ const handleSubmit = async () => {
         ? 'https://generativelanguage.googleapis.com'
         : form.platform === 'grok'
           ? 'https://api.x.ai/v1'
-          : form.platform === 'agnes'
-            ? 'https://apihub.agnes-ai.com/v1'
-            : form.platform === 'deepseek'
-              ? 'https://api.deepseek.com'
-              : 'https://api.anthropic.com'
+            : form.platform === 'agnes'
+              ? 'https://apihub.agnes-ai.com/v1'
+              : form.platform === 'nvidia'
+                ? 'https://integrate.api.nvidia.com/v1'
+                : form.platform === 'deepseek'
+                  ? 'https://api.deepseek.com'
+                  : 'https://api.anthropic.com'
 
   // Build credentials with optional model mapping
   const credentials: Record<string, unknown> = {

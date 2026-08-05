@@ -979,7 +979,7 @@ func IsUpstreamBillingProbeIdentity(platform, accountType string) bool {
 		return false
 	}
 	switch platform {
-	case PlatformOpenAI, PlatformAnthropic, PlatformGemini, PlatformAntigravity, PlatformGrok:
+	case PlatformOpenAI, PlatformAnthropic, PlatformGemini, PlatformAntigravity, PlatformGrok, PlatformNvidia:
 		return true
 	default:
 		return false
@@ -1010,6 +1010,7 @@ var upstreamBillingProbeOfficialAPIDomains = []string{
 	"grok.com",
 	"openai.com",
 	"ollama.com",
+	"nvidia.com",
 }
 
 func upstreamBillingProbeTargetIsOfficialAPI(baseURL string) bool {

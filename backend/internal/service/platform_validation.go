@@ -15,7 +15,7 @@ import (
 func ValidateAccountPlatform(platform string) error {
 	switch strings.TrimSpace(platform) {
 	case PlatformAnthropic, PlatformOpenAI, PlatformGemini, PlatformAntigravity,
-		PlatformGrok, PlatformAgnes, PlatformDeepSeek:
+		PlatformGrok, PlatformAgnes, PlatformDeepSeek, PlatformNvidia:
 		return nil
 	default:
 		return infraerrors.BadRequest("UNSUPPORTED_ACCOUNT_PLATFORM", "unsupported account platform")
@@ -25,7 +25,7 @@ func ValidateAccountPlatform(platform string) error {
 func ValidateGroupPlatform(platform string) error {
 	switch strings.TrimSpace(platform) {
 	case PlatformAnthropic, PlatformOpenAI, PlatformGemini, PlatformAntigravity,
-		PlatformGrok, PlatformAgnes, PlatformDeepSeek, PlatformComposite:
+		PlatformGrok, PlatformAgnes, PlatformDeepSeek, PlatformNvidia, PlatformComposite:
 		return nil
 	default:
 		return infraerrors.BadRequest("UNSUPPORTED_GROUP_PLATFORM", "unsupported group platform")
@@ -84,30 +84,36 @@ func validateAccountCredentials(platform, accountType string, credentials map[st
 	if err := ValidateAccountPlatform(platform); err != nil {
 		return err
 	}
-	if platform != PlatformDeepSeek {
+	if platform != PlatformDeepSeek && platform != PlatformNvidia {
 		return nil
 	}
+	platformName := "DeepSeek"
+	errorPrefix := "DEEPSEEK"
+	if platform == PlatformNvidia {
+		platformName = "NVIDIA"
+		errorPrefix = "NVIDIA"
+	}
 	if accountType != AccountTypeAPIKey {
-		return infraerrors.BadRequest("DEEPSEEK_ACCOUNT_TYPE_UNSUPPORTED", "DeepSeek accounts must use the apikey account type")
+		return infraerrors.BadRequest(errorPrefix+"_ACCOUNT_TYPE_UNSUPPORTED", platformName+" accounts must use the apikey account type")
 	}
 	apiKey, _ := credentials["api_key"].(string)
 	if strings.TrimSpace(apiKey) == "" {
-		return infraerrors.BadRequest("DEEPSEEK_API_KEY_REQUIRED", "DeepSeek api_key is required")
+		return infraerrors.BadRequest(errorPrefix+"_API_KEY_REQUIRED", platformName+" api_key is required")
 	}
 	if rawBaseURL, exists := credentials["base_url"]; exists && rawBaseURL != nil {
 		baseURL, ok := rawBaseURL.(string)
 		if !ok {
-			return infraerrors.BadRequest("DEEPSEEK_BASE_URL_INVALID", "DeepSeek base_url must be an absolute URL")
+			return infraerrors.BadRequest(errorPrefix+"_BASE_URL_INVALID", platformName+" base_url must be an absolute URL")
 		}
 		if strings.TrimSpace(baseURL) == "" {
 			return nil
 		}
 		parsed, err := url.ParseRequestURI(strings.TrimSpace(baseURL))
 		if err != nil || parsed.Scheme == "" || parsed.Host == "" {
-			return infraerrors.BadRequest("DEEPSEEK_BASE_URL_INVALID", "DeepSeek base_url must be an absolute URL")
+			return infraerrors.BadRequest(errorPrefix+"_BASE_URL_INVALID", platformName+" base_url must be an absolute URL")
 		}
 		if parsed.Scheme != "http" && parsed.Scheme != "https" {
-			return infraerrors.BadRequest("DEEPSEEK_BASE_URL_INVALID", "DeepSeek base_url must use http or https")
+			return infraerrors.BadRequest(errorPrefix+"_BASE_URL_INVALID", platformName+" base_url must use http or https")
 		}
 	}
 	return nil

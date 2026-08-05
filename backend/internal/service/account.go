@@ -273,19 +273,23 @@ func (a *Account) IsDeepSeek() bool {
 	return a != nil && a.Platform == PlatformDeepSeek
 }
 
+func (a *Account) IsNvidia() bool {
+	return a != nil && a.Platform == PlatformNvidia
+}
+
 func (a *Account) IsGrokOAuth() bool {
 	return a.IsGrok() && a.Type == AccountTypeOAuth
 }
 
 func (a *Account) IsOpenAICompatible() bool {
-	return a != nil && (a.Platform == PlatformOpenAI || a.Platform == PlatformGrok || a.Platform == PlatformAgnes || a.Platform == PlatformDeepSeek)
+	return a != nil && (a.Platform == PlatformOpenAI || a.Platform == PlatformGrok || a.Platform == PlatformAgnes || a.Platform == PlatformDeepSeek || a.Platform == PlatformNvidia)
 }
 
 // ShouldUseOpenAIResponsesAPI reports whether this OpenAI-compatible account
 // accepts native Responses requests. Agnes currently documents Chat
 // Completions only, so Responses and Messages requests must use the bridge.
 func (a *Account) ShouldUseOpenAIResponsesAPI() bool {
-	return a != nil && !a.IsAgnes() && !a.IsDeepSeek() && openai_compat.ShouldUseResponsesAPI(a.Extra)
+	return a != nil && !a.IsAgnes() && !a.IsDeepSeek() && !a.IsNvidia() && openai_compat.ShouldUseResponsesAPI(a.Extra)
 }
 
 func (a *Account) GeminiOAuthType() string {
@@ -1287,7 +1291,7 @@ func (a *Account) IsOpenAIApiKey() bool {
 }
 
 func (a *Account) GetOpenAIBaseURL() string {
-	if !a.IsOpenAI() && !a.IsAgnes() && !a.IsDeepSeek() {
+	if !a.IsOpenAI() && !a.IsAgnes() && !a.IsDeepSeek() && !a.IsNvidia() {
 		return ""
 	}
 	if a.Type == AccountTypeAPIKey {
@@ -1301,6 +1305,9 @@ func (a *Account) GetOpenAIBaseURL() string {
 	}
 	if a.IsDeepSeek() {
 		return DeepSeekDefaultBaseURL
+	}
+	if a.IsNvidia() {
+		return NvidiaDefaultBaseURL
 	}
 	return "https://api.openai.com"
 }
@@ -1387,14 +1394,14 @@ func (a *Account) GetOpenAIIDToken() string {
 }
 
 func (a *Account) GetOpenAIApiKey() string {
-	if a == nil || a.Type != AccountTypeAPIKey || (!a.IsOpenAI() && !a.IsAgnes() && !a.IsDeepSeek()) {
+	if a == nil || a.Type != AccountTypeAPIKey || (!a.IsOpenAI() && !a.IsAgnes() && !a.IsDeepSeek() && !a.IsNvidia()) {
 		return ""
 	}
 	return a.GetCredential("api_key")
 }
 
 func (a *Account) GetOpenAIUserAgent() string {
-	if !a.IsOpenAI() && !a.IsAgnes() && !a.IsDeepSeek() {
+	if !a.IsOpenAI() && !a.IsAgnes() && !a.IsDeepSeek() && !a.IsNvidia() {
 		return ""
 	}
 	return a.GetCredential("user_agent")
@@ -1478,6 +1485,9 @@ func (a *Account) SupportsOpenAIEndpointCapability(capability OpenAIEndpointCapa
 		return capability == OpenAIEndpointCapabilityChatCompletions
 	}
 	if a.IsDeepSeek() {
+		return capability == OpenAIEndpointCapabilityChatCompletions
+	}
+	if a.IsNvidia() {
 		return capability == OpenAIEndpointCapabilityChatCompletions
 	}
 	switch capability {

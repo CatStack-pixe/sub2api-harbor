@@ -946,6 +946,7 @@ export default {
         grok: 'Grok',
         agnes: 'Agnes',
         deepseek: 'DeepSeek',
+        nvidia: 'NVIDIA',
         composite: 'Composite',
       },
       deleteConfirm:

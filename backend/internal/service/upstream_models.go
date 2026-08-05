@@ -139,7 +139,7 @@ func (s *AccountTestService) buildUpstreamModelsRequest(ctx context.Context, acc
 		return s.buildGrokUpstreamModelsRequest(ctx, account)
 	case account.IsDeepSeek():
 		return s.buildDeepSeekUpstreamModelsRequest(ctx, account)
-	case account.IsOpenAI() || account.IsAgnes():
+	case account.IsOpenAI() || account.IsAgnes() || account.IsNvidia():
 		return s.buildOpenAIUpstreamModelsRequest(ctx, account)
 	case account.IsGemini():
 		return s.buildGeminiUpstreamModelsRequest(ctx, account)

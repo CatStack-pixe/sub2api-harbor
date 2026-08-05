@@ -187,6 +187,9 @@ export default {
       deepseek: {
         description: '配置 OpenCode，让 DeepSeek Chat Completions 请求通过当前 Sub2API DeepSeek 分组发送。'
       },
+      nvidia: {
+        description: '配置 OpenCode，让 NVIDIA NIM Chat Completions 请求通过当前 Sub2API NVIDIA 分组发送。'
+      },
       opencode: {
         title: 'OpenCode 配置示例',
         subtitle: 'opencode.json',
@@ -427,7 +430,8 @@ export default {
       gemini: 'Gemini',
       grok: 'Grok',
       agnes: 'Agnes',
-      deepseek: 'DeepSeek'
+      deepseek: 'DeepSeek',
+      nvidia: 'NVIDIA'
     },
     extraModelsHeader: '附加模型',
     extraModelsEmpty: '无附加模型',

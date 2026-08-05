@@ -45,10 +45,13 @@ const (
 	PlatformGrok           = domain.PlatformGrok
 	PlatformAgnes          = domain.PlatformAgnes
 	PlatformDeepSeek       = domain.PlatformDeepSeek
+	PlatformNvidia         = domain.PlatformNvidia
 	PlatformComposite      = domain.PlatformComposite
 	AgnesDefaultBaseURL    = domain.AgnesDefaultBaseURL
 	AgnesDefaultModel      = domain.AgnesDefaultModel
 	DeepSeekDefaultBaseURL = domain.DeepSeekDefaultBaseURL
+	NvidiaDefaultBaseURL   = domain.NvidiaDefaultBaseURL
+	NvidiaDefaultModel     = domain.NvidiaDefaultModel
 )
 
 // AllowedQuotaPlatforms 是允许设置 user × platform quota 的平台列表（单一权威来源）。
@@ -62,11 +65,24 @@ var AllowedQuotaPlatforms = []string{
 	PlatformGrok,
 	PlatformAgnes,
 	PlatformDeepSeek,
+	PlatformNvidia,
 }
 
 // DeepSeekDefaultModelIDs are the public DeepSeek V4 model IDs shown in default selections.
 func DeepSeekDefaultModelIDs() []string {
 	return []string{"deepseek-v4-pro", "deepseek-v4-flash"}
+}
+
+// NvidiaDefaultModelIDs are the current NVIDIA NIM model IDs used when an
+// account or group has no explicit model list yet. The account model sync
+// endpoint remains the source of truth for the full catalog.
+func NvidiaDefaultModelIDs() []string {
+	return []string{
+		NvidiaDefaultModel,
+		"meta/llama-3.1-8b-instruct",
+		"meta/llama-3.1-70b-instruct",
+		"meta/llama-3.3-70b-instruct",
+	}
 }
 
 // IsAllowedQuotaPlatform 报告 s 是否为合法的 quota platform 标识。
