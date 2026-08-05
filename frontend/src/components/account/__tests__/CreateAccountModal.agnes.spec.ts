@@ -23,6 +23,7 @@ describe('CreateAccountModal DeepSeek account type', () => {
     expect(source).toContain('data-testid="deepseek-account-type-api-key"')
     expect(source).toContain("newPlatform === 'deepseek'")
     expect(source).toContain("? 'https://api.deepseek.com'")
+    expect(source).toContain('allowedModels.value = [...getModelsByPlatform(newPlatform)]')
     expect(source).toContain("form.platform === 'deepseek' ? undefined")
   })
 })

@@ -67,10 +67,9 @@ var AllowedQuotaPlatforms = []string{
 	PlatformDeepSeek,
 }
 
-// DeepSeekDefaultModelIDs are the stable public aliases supported by the
-// DeepSeek Chat Completions API and the pricing catalog.
+// DeepSeekDefaultModelIDs are the public DeepSeek V4 model IDs shown in default selections.
 func DeepSeekDefaultModelIDs() []string {
-	return []string{"deepseek-chat", "deepseek-reasoner", "deepseek-v4-flash", "deepseek-v4-pro"}
+	return []string{"deepseek-v4-pro", "deepseek-v4-flash"}
 }
 
 // AllowedSchedulingThresholdPlatforms 是允许设置账号自动停调阈值的平台列表。

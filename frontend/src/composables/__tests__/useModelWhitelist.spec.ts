@@ -11,9 +11,8 @@ describe('useModelWhitelist', () => {
     expect(getModelsByPlatform('agnes')).toEqual(['agnes-2.0-flash'])
   })
 
-  it('exposes DeepSeek models without unrelated preset mappings', () => {
-    expect(getModelsByPlatform('deepseek')).toContain('deepseek-chat')
-    expect(getModelsByPlatform('deepseek')).toContain('deepseek-reasoner')
+  it('exposes only the DeepSeek V4 preset models', () => {
+    expect(getModelsByPlatform('deepseek')).toEqual(['deepseek-v4-pro', 'deepseek-v4-flash'])
     expect(getPresetMappingsByPlatform('deepseek')).toEqual([])
   })
 

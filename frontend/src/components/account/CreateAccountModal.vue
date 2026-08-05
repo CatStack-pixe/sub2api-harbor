@@ -4377,6 +4377,7 @@ watch(
     if (newPlatform === 'deepseek') {
       accountCategory.value = 'apikey'
       modelRestrictionMode.value = 'whitelist'
+      allowedModels.value = [...getModelsByPlatform(newPlatform)]
       form.concurrency = 10
       form.load_factor = null
     }

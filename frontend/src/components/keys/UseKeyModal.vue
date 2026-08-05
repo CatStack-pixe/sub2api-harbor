@@ -1521,13 +1521,13 @@ function generateOpenCodeConfig(platform: string, baseUrl: string, apiKey: strin
     }
   }
   const deepseekModels = {
-    'deepseek-chat': {
-      name: 'DeepSeek Chat',
-      limit: { context: 131072, output: 8192 }
+    'deepseek-v4-pro': {
+      name: 'DeepSeek V4 Pro',
+      limit: { context: 1000000, output: 384000 }
     },
-    'deepseek-reasoner': {
-      name: 'DeepSeek Reasoner',
-      limit: { context: 131072, output: 65536 }
+    'deepseek-v4-flash': {
+      name: 'DeepSeek V4 Flash',
+      limit: { context: 1000000, output: 384000 }
     }
   }
 
