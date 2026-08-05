@@ -526,6 +526,7 @@ const baseSettingsResponse = {
     grok:        { daily: null, weekly: null, monthly: null },
     agnes:       { daily: null, weekly: null, monthly: null },
     deepseek:    { daily: null, weekly: null, monthly: null },
+    nvidia:      { daily: null, weekly: null, monthly: null },
   },
 };
 
@@ -1577,7 +1578,7 @@ describe("admin SettingsView platform quota matrix", () => {
     getProviders.mockResolvedValue({ data: [] });
   });
 
-  it("从 baseSettings 加载默认平台配额数据并在 Users tab 渲染 7 平台行", async () => {
+  it("从 baseSettings 加载默认平台配额数据并在 Users tab 渲染 8 平台行", async () => {
     const wrapper = mountView();
     await flushPromises();
     await openUsersTab(wrapper);
@@ -1591,9 +1592,10 @@ describe("admin SettingsView platform quota matrix", () => {
     expect(html).toContain("gemini");
     expect(html).toContain("antigravity");
     expect(html).toContain("deepseek");
+    expect(html).toContain("nvidia");
   });
 
-  it("保存时 updateSettings payload 应包含嵌套 default_platform_quotas 对象（含全 7 平台）", async () => {
+  it("保存时 updateSettings payload 应包含嵌套 default_platform_quotas 对象（含全 8 平台）", async () => {
     const wrapper = mountView();
     await flushPromises();
     await openUsersTab(wrapper);
@@ -1609,7 +1611,7 @@ describe("admin SettingsView platform quota matrix", () => {
     // 应携带嵌套对象，而非扁平字段
     expect(payload).toHaveProperty("default_platform_quotas");
     const quotas = payload["default_platform_quotas"] as Record<string, unknown>;
-    const platforms = ["anthropic", "openai", "gemini", "antigravity", "grok", "agnes", "deepseek"];
+    const platforms = ["anthropic", "openai", "gemini", "antigravity", "grok", "agnes", "deepseek", "nvidia"];
     for (const p of platforms) {
       expect(quotas).toHaveProperty(p);
       const pq = quotas[p] as Record<string, unknown>;
@@ -1623,7 +1625,7 @@ describe("admin SettingsView platform quota matrix", () => {
     expect(payload).not.toHaveProperty("default_platform_quota_openai_weekly");
   });
 
-  it("加载后 form.default_platform_quotas 含全 7 平台，从嵌套 JSON 正确读取数值", async () => {
+  it("加载后 form.default_platform_quotas 含全 8 平台，从嵌套 JSON 正确读取数值", async () => {
     getSettings.mockResolvedValueOnce({
       ...baseSettingsResponse,
       default_platform_quotas: {
@@ -1650,6 +1652,7 @@ describe("admin SettingsView platform quota matrix", () => {
     expect(quotas["antigravity"]).toEqual({ daily: null, weekly: null, monthly: null });
     expect(quotas["agnes"]).toEqual({ daily: null, weekly: null, monthly: null });
     expect(quotas["deepseek"]).toEqual({ daily: null, weekly: null, monthly: null });
+    expect(quotas["nvidia"]).toEqual({ daily: null, weekly: null, monthly: null });
   });
 
   it("空输入（v-model.number 产出 \"\"）在提交时清洗为 null 而非空字符串", async () => {

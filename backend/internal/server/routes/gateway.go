@@ -57,7 +57,8 @@ func RegisterGatewayRoutes(
 		if isOpenAIResponsesCompatibleGatewayPlatform(c) {
 			return true
 		}
-		return getGroupPlatform(c) == service.PlatformDeepSeek
+		platform := getGroupPlatform(c)
+		return platform == service.PlatformDeepSeek || platform == service.PlatformNvidia
 	}
 	isOpenAIGatewayPlatform := func(c *gin.Context) bool {
 		return getGroupPlatform(c) == service.PlatformOpenAI
@@ -66,7 +67,7 @@ func RegisterGatewayRoutes(
 		switch getGroupPlatform(c) {
 		case service.PlatformOpenAI:
 			h.OpenAIGateway.CountTokens(c)
-		case service.PlatformGrok, service.PlatformAgnes:
+		case service.PlatformGrok, service.PlatformAgnes, service.PlatformNvidia:
 			h.OpenAIGateway.GrokCountTokens(c)
 		default:
 			h.Gateway.CountTokens(c)

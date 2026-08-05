@@ -262,6 +262,7 @@ func TestGatewayHandlerKeyBillingInfoSharesBillingResolverCacheByPlatform(t *tes
 		{name: "grok", platform: service.PlatformGrok, openAI: true},
 		{name: "agnes", platform: service.PlatformAgnes, openAI: true},
 		{name: "deepseek", platform: service.PlatformDeepSeek, openAI: true},
+		{name: "nvidia", platform: service.PlatformNvidia, openAI: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			groupID := int64(7)

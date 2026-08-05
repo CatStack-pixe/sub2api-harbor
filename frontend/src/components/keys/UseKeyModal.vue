@@ -253,6 +253,8 @@ const defaultClientTab = computed(() => {
       return 'claude'
     case 'deepseek':
       return 'opencode'
+    case 'nvidia':
+      return 'opencode'
     default:
       return 'claude'
   }
@@ -372,6 +374,8 @@ const clientTabs = computed((): TabConfig[] => {
       ]
     case 'deepseek':
       return [{ id: 'opencode', label: t('keys.useKeyModal.cliTabs.opencode'), icon: TerminalIcon }]
+    case 'nvidia':
+      return [{ id: 'opencode', label: t('keys.useKeyModal.cliTabs.opencode'), icon: TerminalIcon }]
     default:
       return [
         { id: 'claude', label: t('keys.useKeyModal.cliTabs.claudeCode'), icon: TerminalIcon },
@@ -429,6 +433,8 @@ const platformDescription = computed(() => {
       return t('keys.useKeyModal.grok.description')
     case 'deepseek':
       return t('keys.useKeyModal.deepseek.description')
+    case 'nvidia':
+      return t('keys.useKeyModal.nvidia.description')
     default:
       return t('keys.useKeyModal.description')
   }
@@ -524,6 +530,8 @@ const currentFiles = computed((): FileConfig[] => {
         return [generateOpenCodeConfig('agnes', apiBase, apiKey)]
       case 'deepseek':
         return [generateOpenCodeConfig('deepseek', apiBase, apiKey)]
+      case 'nvidia':
+        return [generateOpenCodeConfig('nvidia', apiBase, apiKey)]
       default:
         return [generateOpenCodeConfig('openai', apiBase, apiKey)]
     }
@@ -554,6 +562,8 @@ const currentFiles = computed((): FileConfig[] => {
       }
       return generateGrokFiles(apiBase, apiKey)
     case 'deepseek':
+      return generateOpenAIFiles(apiBase, apiKey)
+    case 'nvidia':
       return generateOpenAIFiles(apiBase, apiKey)
     default:
       return generateAnthropicFiles(baseUrl, apiKey)
@@ -1365,6 +1375,24 @@ function generateOpenCodeConfig(platform: string, baseUrl: string, apiKey: strin
       limit: { context: 1000000, output: 384000 }
     }
   }
+  const nvidiaModels = {
+    'nvidia/llama-3.1-nemotron-nano-8b-v1': {
+      name: 'NVIDIA Llama 3.1 Nemotron Nano',
+      limit: { context: 128000, output: 32768 }
+    },
+    'meta/llama-3.1-8b-instruct': {
+      name: 'Llama 3.1 8B Instruct',
+      limit: { context: 131072, output: 8192 }
+    },
+    'meta/llama-3.1-70b-instruct': {
+      name: 'Llama 3.1 70B Instruct',
+      limit: { context: 131072, output: 8192 }
+    },
+    'meta/llama-3.3-70b-instruct': {
+      name: 'Llama 3.3 70B Instruct',
+      limit: { context: 131072, output: 8192 }
+    }
+  }
 
   if (platform === 'gemini') {
     provider[platform].npm = '@ai-sdk/google'
@@ -1393,6 +1421,10 @@ function generateOpenCodeConfig(platform: string, baseUrl: string, apiKey: strin
     provider[platform].npm = '@ai-sdk/openai'
     provider[platform].name = 'DeepSeek'
     provider[platform].models = deepseekModels
+  } else if (platform === 'nvidia') {
+    provider[platform].npm = '@ai-sdk/openai'
+    provider[platform].name = 'NVIDIA NIM'
+    provider[platform].models = nvidiaModels
   }
 
   const agent =

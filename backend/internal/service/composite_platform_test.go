@@ -29,6 +29,8 @@ func TestDetectModelPlatform(t *testing.T) {
 		{name: "agnes prefix", model: "agnes/agnes-2.0-flash", platform: PlatformAgnes, ok: true},
 		{name: "deepseek", model: "deepseek-reasoner", platform: PlatformDeepSeek, ok: true},
 		{name: "deepseek prefix", model: "deepseek/deepseek-chat", platform: PlatformDeepSeek, ok: true},
+		{name: "nvidia model", model: "nvidia/llama-3.1-nemotron-nano-8b-v1", platform: PlatformNvidia, ok: true},
+		{name: "nvidia prefix", model: "nvidia/meta/llama-3.3-70b-instruct", platform: PlatformNvidia, ok: true},
 		{name: "unknown", model: "llama-4-maverick", ok: false},
 	}
 
@@ -63,7 +65,7 @@ func TestCompositeGroupSchedulerHasAllCanonicalPlatformBuckets(t *testing.T) {
 		platforms = append(platforms, platform)
 	}
 	require.ElementsMatch(t,
-		[]string{PlatformAnthropic, PlatformGemini, PlatformOpenAI, PlatformAntigravity, PlatformGrok, PlatformAgnes, PlatformDeepSeek},
+		[]string{PlatformAnthropic, PlatformGemini, PlatformOpenAI, PlatformAntigravity, PlatformGrok, PlatformAgnes, PlatformDeepSeek, PlatformNvidia},
 		platforms,
 	)
 }

@@ -492,7 +492,8 @@ const platformOptions = [
   { value: 'antigravity', label: 'Antigravity' },
   { value: 'grok', label: 'Grok' },
   { value: 'agnes', label: 'Agnes' },
-  { value: 'deepseek', label: 'DeepSeek' }
+  { value: 'deepseek', label: 'DeepSeek' },
+  { value: 'nvidia', label: 'NVIDIA' }
 ]
 
 // Load rules when dialog opens

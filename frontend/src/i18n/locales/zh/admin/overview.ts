@@ -879,6 +879,7 @@ export default {
         grok: 'Grok',
         agnes: 'Agnes',
         deepseek: 'DeepSeek',
+        nvidia: 'NVIDIA',
         composite: 'Composite',
       },
       saving: '保存中...',
