@@ -190,6 +190,24 @@ func (_u *APIKeyUpdate) ClearIPBlacklist() *APIKeyUpdate {
 	return _u
 }
 
+// SetModelWhitelist sets the "model_whitelist" field.
+func (_u *APIKeyUpdate) SetModelWhitelist(v []string) *APIKeyUpdate {
+	_u.mutation.SetModelWhitelist(v)
+	return _u
+}
+
+// AppendModelWhitelist appends value to the "model_whitelist" field.
+func (_u *APIKeyUpdate) AppendModelWhitelist(v []string) *APIKeyUpdate {
+	_u.mutation.AppendModelWhitelist(v)
+	return _u
+}
+
+// ClearModelWhitelist clears the value of the "model_whitelist" field.
+func (_u *APIKeyUpdate) ClearModelWhitelist() *APIKeyUpdate {
+	_u.mutation.ClearModelWhitelist()
+	return _u
+}
+
 // SetQuota sets the "quota" field.
 func (_u *APIKeyUpdate) SetQuota(v float64) *APIKeyUpdate {
 	_u.mutation.ResetQuota()
@@ -624,6 +642,17 @@ func (_u *APIKeyUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	if _u.mutation.IPBlacklistCleared() {
 		_spec.ClearField(apikey.FieldIPBlacklist, field.TypeJSON)
 	}
+	if value, ok := _u.mutation.ModelWhitelist(); ok {
+		_spec.SetField(apikey.FieldModelWhitelist, field.TypeJSON, value)
+	}
+	if value, ok := _u.mutation.AppendedModelWhitelist(); ok {
+		_spec.AddModifier(func(u *sql.UpdateBuilder) {
+			sqljson.Append(u, apikey.FieldModelWhitelist, value)
+		})
+	}
+	if _u.mutation.ModelWhitelistCleared() {
+		_spec.ClearField(apikey.FieldModelWhitelist, field.TypeJSON)
+	}
 	if value, ok := _u.mutation.Quota(); ok {
 		_spec.SetField(apikey.FieldQuota, field.TypeFloat64, value)
 	}
@@ -974,6 +1003,24 @@ func (_u *APIKeyUpdateOne) AppendIPBlacklist(v []string) *APIKeyUpdateOne {
 // ClearIPBlacklist clears the value of the "ip_blacklist" field.
 func (_u *APIKeyUpdateOne) ClearIPBlacklist() *APIKeyUpdateOne {
 	_u.mutation.ClearIPBlacklist()
+	return _u
+}
+
+// SetModelWhitelist sets the "model_whitelist" field.
+func (_u *APIKeyUpdateOne) SetModelWhitelist(v []string) *APIKeyUpdateOne {
+	_u.mutation.SetModelWhitelist(v)
+	return _u
+}
+
+// AppendModelWhitelist appends value to the "model_whitelist" field.
+func (_u *APIKeyUpdateOne) AppendModelWhitelist(v []string) *APIKeyUpdateOne {
+	_u.mutation.AppendModelWhitelist(v)
+	return _u
+}
+
+// ClearModelWhitelist clears the value of the "model_whitelist" field.
+func (_u *APIKeyUpdateOne) ClearModelWhitelist() *APIKeyUpdateOne {
+	_u.mutation.ClearModelWhitelist()
 	return _u
 }
 
@@ -1440,6 +1487,17 @@ func (_u *APIKeyUpdateOne) sqlSave(ctx context.Context) (_node *APIKey, err erro
 	}
 	if _u.mutation.IPBlacklistCleared() {
 		_spec.ClearField(apikey.FieldIPBlacklist, field.TypeJSON)
+	}
+	if value, ok := _u.mutation.ModelWhitelist(); ok {
+		_spec.SetField(apikey.FieldModelWhitelist, field.TypeJSON, value)
+	}
+	if value, ok := _u.mutation.AppendedModelWhitelist(); ok {
+		_spec.AddModifier(func(u *sql.UpdateBuilder) {
+			sqljson.Append(u, apikey.FieldModelWhitelist, value)
+		})
+	}
+	if _u.mutation.ModelWhitelistCleared() {
+		_spec.ClearField(apikey.FieldModelWhitelist, field.TypeJSON)
 	}
 	if value, ok := _u.mutation.Quota(); ok {
 		_spec.SetField(apikey.FieldQuota, field.TypeFloat64, value)

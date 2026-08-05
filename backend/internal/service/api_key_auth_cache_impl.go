@@ -14,7 +14,7 @@ import (
 	"github.com/dgraph-io/ristretto"
 )
 
-const apiKeyAuthSnapshotVersion = 18 // v18: include Agnes group mapping and group profit control fields
+const apiKeyAuthSnapshotVersion = 19 // v19: include API key model whitelist
 
 type apiKeyAuthCacheConfig struct {
 	l1Size        int
@@ -344,6 +344,7 @@ func (s *APIKeyService) snapshotFromAPIKey(ctx context.Context, apiKey *APIKey) 
 		Status:      apiKey.Status,
 		IPWhitelist: apiKey.IPWhitelist,
 		IPBlacklist: apiKey.IPBlacklist,
+		ModelWhitelist: apiKey.ModelWhitelist,
 		Quota:       apiKey.Quota,
 		QuotaUsed:   apiKey.QuotaUsed,
 		ExpiresAt:   apiKey.ExpiresAt,
@@ -441,6 +442,7 @@ func (s *APIKeyService) snapshotToAPIKey(key string, snapshot *APIKeyAuthSnapsho
 		Status:      snapshot.Status,
 		IPWhitelist: snapshot.IPWhitelist,
 		IPBlacklist: snapshot.IPBlacklist,
+		ModelWhitelist: snapshot.ModelWhitelist,
 		Quota:       snapshot.Quota,
 		QuotaUsed:   snapshot.QuotaUsed,
 		ExpiresAt:   snapshot.ExpiresAt,

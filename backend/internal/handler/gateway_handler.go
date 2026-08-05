@@ -1089,14 +1089,16 @@ func (h *GatewayHandler) Models(c *gin.Context) {
 		availableModels := h.compositeAvailableModels(c.Request.Context(), groupID)
 		if apiKey != nil && apiKey.Group != nil && apiKey.Group.CustomModelsListEnabled() {
 			availableModels = filterModelsByCustomList(availableModels, defaultModelIDsForPlatform(service.PlatformComposite), apiKey.Group.ModelsListConfig.Models)
+			availableModels = filterAPIKeyModels(apiKey, availableModels)
 			writeCustomModelsList(c, service.PlatformComposite, availableModels)
 			return
 		}
+		availableModels = filterAPIKeyModels(apiKey, availableModels)
 		if len(availableModels) > 0 {
 			writeModelsList(c, service.PlatformComposite, availableModels)
 			return
 		}
-		writeModelsList(c, service.PlatformComposite, defaultModelIDsForPlatform(service.PlatformComposite))
+		writeModelsList(c, service.PlatformComposite, filterAPIKeyModels(apiKey, defaultModelIDsForPlatform(service.PlatformComposite)))
 		return
 	}
 
@@ -1107,16 +1109,19 @@ func (h *GatewayHandler) Models(c *gin.Context) {
 		if apiKey.Group.CustomModelsListEnabled() {
 			availableModels = filterModelsByCustomList(availableModels, nil, apiKey.Group.ModelsListConfig.Models)
 		}
+		availableModels = filterAPIKeyModels(apiKey, availableModels)
 		writeCustomModelsList(c, platform, availableModels)
 		return
 	}
 	if apiKey != nil && apiKey.Group != nil && apiKey.Group.CustomModelsListEnabled() {
 		fallbackModels := defaultModelIDsForPlatform(platform)
 		availableModels = filterModelsByCustomList(customModelsListSource(platform, availableModels, fallbackModels), fallbackModels, apiKey.Group.ModelsListConfig.Models)
+		availableModels = filterAPIKeyModels(apiKey, availableModels)
 		writeCustomModelsList(c, platform, availableModels)
 		return
 	}
 
+	availableModels = filterAPIKeyModels(apiKey, availableModels)
 	if len(availableModels) > 0 {
 		writeModelsList(c, platform, availableModels)
 		return
@@ -1124,29 +1129,33 @@ func (h *GatewayHandler) Models(c *gin.Context) {
 
 	// Fallback to default models
 	if platform == service.PlatformOpenAI {
-		c.JSON(http.StatusOK, gin.H{
-			"object": "list",
-			"data":   openai.DefaultModels,
-		})
+		writeOpenAIModelsList(c, filterAPIKeyModels(apiKey, defaultModelIDsForPlatform(platform)))
 		return
 	}
 
 	if platform == service.PlatformGemini {
-		c.JSON(http.StatusOK, gin.H{
-			"object": "list",
-			"data":   geminicli.DefaultModels,
-		})
+		writeModelsList(c, platform, filterAPIKeyModels(apiKey, defaultModelIDsForPlatform(platform)))
 		return
 	}
 	if platform == service.PlatformGrok {
-		writeGrokModelsList(c, xai.DefaultModelIDs())
+		writeGrokModelsList(c, filterAPIKeyModels(apiKey, xai.DefaultModelIDs()))
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"object": "list",
-		"data":   claude.DefaultModels,
-	})
+	writeModelsList(c, platform, filterAPIKeyModels(apiKey, defaultModelIDsForPlatform(platform)))
+}
+
+func filterAPIKeyModels(apiKey *service.APIKey, modelIDs []string) []string {
+	if apiKey == nil || len(apiKey.ModelWhitelist) == 0 {
+		return modelIDs
+	}
+	filtered := make([]string, 0, len(modelIDs))
+	for _, modelID := range modelIDs {
+		if apiKey.AllowsModel(modelID) {
+			filtered = append(filtered, modelID)
+		}
+	}
+	return filtered
 }
 
 func groupRequestModelAliases(group *service.Group) []string {

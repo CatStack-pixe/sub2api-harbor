@@ -1499,6 +1499,78 @@ func TestAPIKeyAuthQuotaErrorKeepsLegacyFormatOutsideResponses(t *testing.T) {
 	requireAPIKeyAuthError(t, w, "API_KEY_QUOTA_EXHAUSTED", "API key 额度已用完")
 }
 
+func TestAPIKeyAuthEnforcesModelWhitelist(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	groupID := int64(42)
+	user := &service.User{
+		ID:          7,
+		Role:        service.RoleUser,
+		Status:      service.StatusActive,
+		Balance:     10,
+		Concurrency: 3,
+	}
+	apiKey := &service.APIKey{
+		ID:             100,
+		UserID:         user.ID,
+		Key:            "test-key",
+		Status:         service.StatusActive,
+		GroupID:        &groupID,
+		ModelWhitelist: []string{"deepseek-ai/*"},
+		User:           user,
+		Group: &service.Group{
+			ID:       groupID,
+			Name:     "nvidia",
+			Status:   service.StatusActive,
+			Platform: service.PlatformOpenAI,
+			Hydrated: true,
+		},
+	}
+
+	repo := &stubApiKeyRepo{
+		getByKey: func(_ context.Context, key string) (*service.APIKey, error) {
+			if key != apiKey.Key {
+				return nil, service.ErrAPIKeyNotFound
+			}
+			clone := *apiKey
+			return &clone, nil
+		},
+	}
+	cfg := &config.Config{RunMode: config.RunModeSimple}
+	apiKeyService := service.NewAPIKeyService(repo, nil, nil, nil, nil, nil, cfg)
+	router := gin.New()
+	router.Use(gin.HandlerFunc(NewAPIKeyAuthMiddleware(apiKeyService, nil, cfg)))
+	router.POST("/v1/messages", func(c *gin.Context) {
+		var request struct {
+			Model string `json:"model"`
+		}
+		require.NoError(t, c.ShouldBindJSON(&request))
+		c.JSON(http.StatusOK, gin.H{"model": request.Model})
+	})
+
+	t.Run("allowed model preserves request body", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodPost, "/v1/messages", strings.NewReader(`{"model":"deepseek-ai/deepseek-v4-flash"}`))
+		req.Header.Set("x-api-key", apiKey.Key)
+		req.Header.Set("content-type", "application/json")
+		router.ServeHTTP(w, req)
+
+		require.Equal(t, http.StatusOK, w.Code)
+		require.Contains(t, w.Body.String(), "deepseek-ai/deepseek-v4-flash")
+	})
+
+	t.Run("blocked model is rejected before handler", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodPost, "/v1/messages", strings.NewReader(`{"model":"meta/llama-3.1-8b"}`))
+		req.Header.Set("x-api-key", apiKey.Key)
+		req.Header.Set("content-type", "application/json")
+		router.ServeHTTP(w, req)
+
+		require.Equal(t, http.StatusForbidden, w.Code)
+		require.Contains(t, w.Body.String(), "MODEL_NOT_ALLOWED")
+	})
+}
+
 func newAuthTestRouter(apiKeyService *service.APIKeyService, subscriptionService *service.SubscriptionService, cfg *config.Config) *gin.Engine {
 	router := gin.New()
 	router.Use(gin.HandlerFunc(NewAPIKeyAuthMiddleware(apiKeyService, subscriptionService, cfg)))

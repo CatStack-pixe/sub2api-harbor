@@ -605,6 +605,16 @@ func IPBlacklistNotNil() predicate.APIKey {
 	return predicate.APIKey(sql.FieldNotNull(FieldIPBlacklist))
 }
 
+// ModelWhitelistIsNil applies the IsNil predicate on the "model_whitelist" field.
+func ModelWhitelistIsNil() predicate.APIKey {
+	return predicate.APIKey(sql.FieldIsNull(FieldModelWhitelist))
+}
+
+// ModelWhitelistNotNil applies the NotNil predicate on the "model_whitelist" field.
+func ModelWhitelistNotNil() predicate.APIKey {
+	return predicate.APIKey(sql.FieldNotNull(FieldModelWhitelist))
+}
+
 // QuotaEQ applies the EQ predicate on the "quota" field.
 func QuotaEQ(v float64) predicate.APIKey {
 	return predicate.APIKey(sql.FieldEQ(FieldQuota, v))

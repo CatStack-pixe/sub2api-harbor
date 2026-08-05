@@ -1,9 +1,13 @@
 package middleware
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"io"
+	"mime"
+	"mime/multipart"
 	"net/http"
 	"strings"
 
@@ -13,6 +17,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/service"
 
 	"github.com/gin-gonic/gin"
+	"github.com/tidwall/gjson"
 )
 
 const maxAPIKeyAuthorizationHeaderBytes = service.MaxAPIKeyCredentialBytes + 128
@@ -161,6 +166,9 @@ func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscripti
 			return
 		}
 		if abortIfAPIKeyGroupNotAllowed(c, apiKey) {
+			return
+		}
+		if !enforceAPIKeyModelRestriction(c, apiKey, false) {
 			return
 		}
 		ctx := context.WithValue(c.Request.Context(), ctxkey.UserID, apiKey.User.ID)
@@ -389,6 +397,101 @@ func setGroupContext(c *gin.Context, group *service.Group) {
 	}
 	ctx := context.WithValue(c.Request.Context(), ctxkey.Group, group)
 	c.Request = c.Request.WithContext(ctx)
+}
+
+// enforceAPIKeyModelRestriction checks the model before any gateway handler
+// or composite route mapping runs. This keeps the policy scoped to the model
+// supplied by the client rather than an upstream alias produced later.
+func enforceAPIKeyModelRestriction(c *gin.Context, apiKey *service.APIKey, googleStyle bool) bool {
+	if apiKey == nil || len(apiKey.ModelWhitelist) == 0 {
+		return true
+	}
+
+	model, err := requestModelForAPIKeyRestriction(c)
+	if err != nil {
+		status := http.StatusBadRequest
+		message := "Failed to read request body"
+		var maxErr *http.MaxBytesError
+		if errors.As(err, &maxErr) {
+			status = http.StatusRequestEntityTooLarge
+			message = "Request body is too large"
+		}
+		if googleStyle {
+			abortWithGoogleError(c, status, message)
+		} else {
+			AbortWithError(c, status, "INVALID_REQUEST", message)
+		}
+		return false
+	}
+	if model == "" || apiKey.AllowsModel(model) {
+		return true
+	}
+
+	message := fmt.Sprintf("API key is not allowed to access model: %s", model)
+	if googleStyle {
+		abortWithGoogleError(c, http.StatusForbidden, message)
+	} else {
+		AbortWithError(c, http.StatusForbidden, "MODEL_NOT_ALLOWED", message)
+	}
+	return false
+}
+
+func requestModelForAPIKeyRestriction(c *gin.Context) (string, error) {
+	if c == nil || c.Request == nil {
+		return "", nil
+	}
+	if model := strings.TrimSpace(c.Param("model")); model != "" {
+		return model, nil
+	}
+	if modelAction := strings.TrimPrefix(strings.TrimSpace(c.Param("modelAction")), "/"); modelAction != "" {
+		if index := strings.LastIndex(modelAction, ":"); index > 0 {
+			return strings.TrimSpace(modelAction[:index]), nil
+		}
+		return modelAction, nil
+	}
+	if c.Request.Method == http.MethodGet || c.Request.Method == http.MethodHead || c.Request.Body == nil {
+		return "", nil
+	}
+
+	body, err := io.ReadAll(c.Request.Body)
+	c.Request.Body = io.NopCloser(bytes.NewReader(body))
+	c.Request.ContentLength = int64(len(body))
+	if err != nil {
+		return "", err
+	}
+	if model := strings.TrimSpace(gjson.GetBytes(body, "model").String()); model != "" {
+		return model, nil
+	}
+	return multipartRequestModel(c.GetHeader("Content-Type"), body), nil
+}
+
+func multipartRequestModel(contentType string, body []byte) string {
+	mediaType, params, err := mime.ParseMediaType(strings.TrimSpace(contentType))
+	if err != nil || !strings.EqualFold(mediaType, "multipart/form-data") {
+		return ""
+	}
+	boundary := strings.TrimSpace(params["boundary"])
+	if boundary == "" {
+		return ""
+	}
+	reader := multipart.NewReader(bytes.NewReader(body), boundary)
+	for {
+		part, err := reader.NextPart()
+		if errors.Is(err, io.EOF) {
+			return ""
+		}
+		if err != nil {
+			return ""
+		}
+		if part.FormName() != "model" || part.FileName() != "" {
+			continue
+		}
+		value, err := io.ReadAll(part)
+		if err != nil {
+			return ""
+		}
+		return strings.TrimSpace(string(value))
+	}
 }
 
 // apiKeyBalanceBelowAuthThreshold 保持鉴权层的历史语义：仅在余额耗尽（<=0）时拒绝。
