@@ -226,7 +226,7 @@ func (s *AccountTestService) TestAccountConnection(c *gin.Context, accountID int
 func (s *AccountTestService) testDeepSeekAccountConnection(c *gin.Context, account *Account, modelID string, prompt string) error {
 	testModelID := strings.TrimSpace(modelID)
 	if testModelID == "" {
-		testModelID = "deepseek-chat"
+		testModelID = "deepseek-v4-flash"
 	}
 	testModelID = account.GetMappedModel(testModelID)
 	authToken := strings.TrimSpace(account.GetOpenAIApiKey())
