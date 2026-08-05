@@ -421,7 +421,7 @@ func TestFetchUpstreamSupportedModelsParsesNvidiaResponse(t *testing.T) {
 		},
 	})
 	require.NoError(t, err)
-	require.Equal(t, []string{"nvidia/llama-3.1-nemotron-nano-8b-v1", "meta/llama-3.3-70b-instruct"}, models)
+	require.Equal(t, []string{"meta/llama-3.3-70b-instruct", "nvidia/llama-3.1-nemotron-nano-8b-v1"}, models)
 	require.Equal(t, "https://integrate.api.nvidia.com/v1/models", upstream.lastReq.URL.String())
 	require.Equal(t, "Bearer nvapi-test", upstream.lastReq.Header.Get("Authorization"))
 }
