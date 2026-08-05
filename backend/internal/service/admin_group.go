@@ -249,6 +249,8 @@ func defaultModelsListCandidateIDs(platform string) []string {
 		return xai.DefaultModelIDs()
 	case PlatformAgnes:
 		return []string{AgnesDefaultModel}
+	case PlatformDeepSeek:
+		return DeepSeekDefaultModelIDs()
 	case PlatformComposite:
 		return compositeDefaultModelsListCandidateIDs()
 	default:
@@ -269,7 +271,7 @@ func defaultAllowImageGenerationForPlatform(platform string) bool {
 func compositeDefaultModelsListCandidateIDs() []string {
 	seen := make(map[string]struct{})
 	ids := make([]string, 0)
-	for _, platform := range []string{PlatformAnthropic, PlatformGemini, PlatformOpenAI, PlatformAntigravity, PlatformGrok, PlatformAgnes} {
+	for _, platform := range []string{PlatformAnthropic, PlatformGemini, PlatformOpenAI, PlatformAntigravity, PlatformGrok, PlatformAgnes, PlatformDeepSeek} {
 		for _, id := range defaultModelsListCandidateIDs(platform) {
 			if _, ok := seen[id]; ok {
 				continue
@@ -303,6 +305,9 @@ func (s *adminServiceImpl) CreateGroup(ctx context.Context, input *CreateGroupIn
 	}
 
 	platform := NormalizeGroupPlatform(input.Platform)
+	if err := ValidateGroupPlatform(platform); err != nil {
+		return nil, err
+	}
 	maxReasoningEffort, err := normalizeMaxReasoningEffortForPlatform(platform, input.MaxReasoningEffort)
 	if err != nil {
 		return nil, infraerrors.Newf(http.StatusBadRequest, "INVALID_MAX_REASONING_EFFORT", "%v", err)
@@ -635,7 +640,16 @@ func (s *adminServiceImpl) UpdateGroup(ctx context.Context, id int64, input *Upd
 		group.Description = *input.Description
 	}
 	if input.Platform != "" {
-		group.Platform = input.Platform
+		nextPlatform := strings.TrimSpace(input.Platform)
+		if err := ValidateGroupPlatform(nextPlatform); err != nil {
+			return nil, err
+		}
+		if nextPlatform == PlatformDeepSeek || group.Platform == PlatformDeepSeek {
+			if err := validateGroupAccountPlatforms(ctx, s.accountRepo, nextPlatform, id); err != nil {
+				return nil, err
+			}
+		}
+		group.Platform = nextPlatform
 	}
 	if input.RateMultiplier != nil {
 		if *input.RateMultiplier <= 0 {

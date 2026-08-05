@@ -164,12 +164,12 @@ func wrapUsageRecordTaskContext(parent context.Context, task service.UsageRecord
 
 func openAICompatibleRequestPlatform(ctx context.Context, apiKey *service.APIKey) string {
 	if platform, ok := service.ResolvedTargetPlatformFromContext(ctx); ok {
-		if platform == service.PlatformGrok || platform == service.PlatformAgnes {
+		if platform == service.PlatformGrok || platform == service.PlatformAgnes || platform == service.PlatformDeepSeek {
 			return platform
 		}
 		return service.PlatformOpenAI
 	}
-	if apiKey != nil && apiKey.Group != nil && (apiKey.Group.Platform == service.PlatformGrok || apiKey.Group.Platform == service.PlatformAgnes) {
+	if apiKey != nil && apiKey.Group != nil && (apiKey.Group.Platform == service.PlatformGrok || apiKey.Group.Platform == service.PlatformAgnes || apiKey.Group.Platform == service.PlatformDeepSeek) {
 		return apiKey.Group.Platform
 	}
 	return service.PlatformOpenAI
@@ -193,7 +193,7 @@ func allowOpenAICompatibleMessagesDispatch(apiKey *service.APIKey) bool {
 }
 
 func openAICompatibleTextTargetAllowed(c *gin.Context, apiKey *service.APIKey, model string) bool {
-	return compositeTargetPlatformAllowed(c, apiKey, model, service.PlatformOpenAI, service.PlatformGrok, service.PlatformAgnes)
+	return compositeTargetPlatformAllowed(c, apiKey, model, service.PlatformOpenAI, service.PlatformGrok, service.PlatformAgnes, service.PlatformDeepSeek)
 }
 
 // NewOpenAIGatewayHandler creates a new OpenAIGatewayHandler

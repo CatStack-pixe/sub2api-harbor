@@ -29,6 +29,10 @@
   <svg v-else-if="platform === 'agnes'" :class="sizeClass" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
     <path stroke-linecap="round" stroke-linejoin="round" d="M4 19 10.5 5h3L20 19M7 14h10" />
   </svg>
+  <!-- DeepSeek logo mark -->
+  <svg v-else-if="platform === 'deepseek'" :class="sizeClass" viewBox="0 0 24 24" fill="currentColor">
+    <path d="M4 5.5C6.9 3.1 11.4 3 14.7 5.2c1.5 1 2.6 2.5 3.1 4.3 1.6.1 2.8 1.4 2.8 3 0 1.7-1.4 3.1-3.1 3.1h-1.2c-.8 2.8-3.4 4.8-6.5 4.8-3.8 0-6.8-2.8-6.8-6.4 0-1.4.5-2.8 1.4-3.9C3.8 8.9 3.5 7 4 5.5Zm3.4 2.2c-.6 1.2-.2 2.7 1 3.5 1.2.8 2.8.5 3.6-.7.6-.8 1.6-1.2 2.6-.9-.4-1.2-1.2-2.2-2.3-2.8-1.6-.9-3.5-.8-4.9.1Zm-.8 5.7c-.5 1.2-.1 2.6 1 3.4 1.1.9 2.6 1 3.8.3-1.5-.5-2.6-1.8-2.8-3.4-.7-.2-1.4-.3-2 0Z" />
+  </svg>
   <!-- Composite group icon -->
   <svg v-else-if="platform === 'composite'" :class="sizeClass" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
     <circle cx="6" cy="12" r="3" />

@@ -4,11 +4,17 @@ vi.mock('@/api/admin/accounts', () => ({
   getAntigravityDefaultModelMapping: vi.fn()
 }))
 
-import { buildModelMappingObject, getModelsByPlatform, splitModelMappingObject } from '../useModelWhitelist'
+import { buildModelMappingObject, getModelsByPlatform, getPresetMappingsByPlatform, splitModelMappingObject } from '../useModelWhitelist'
 
 describe('useModelWhitelist', () => {
   it('exposes only the documented Agnes model', () => {
     expect(getModelsByPlatform('agnes')).toEqual(['agnes-2.0-flash'])
+  })
+
+  it('exposes DeepSeek models without unrelated preset mappings', () => {
+    expect(getModelsByPlatform('deepseek')).toContain('deepseek-chat')
+    expect(getModelsByPlatform('deepseek')).toContain('deepseek-reasoner')
+    expect(getPresetMappingsByPlatform('deepseek')).toEqual([])
   })
 
   it('openai 模型列表包含 GPT-5.4 官方快照', () => {

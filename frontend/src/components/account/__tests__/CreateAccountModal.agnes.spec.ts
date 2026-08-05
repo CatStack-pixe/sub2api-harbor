@@ -16,3 +16,13 @@ describe('CreateAccountModal Agnes account type', () => {
     expect(source).toContain("allowedModels.value = ['agnes-2.0-flash']")
   })
 })
+
+describe('CreateAccountModal DeepSeek account type', () => {
+  it('offers API-key setup with the official DeepSeek defaults and no shared probe', () => {
+    expect(source).toContain('data-testid="deepseek-platform"')
+    expect(source).toContain('data-testid="deepseek-account-type-api-key"')
+    expect(source).toContain("newPlatform === 'deepseek'")
+    expect(source).toContain("? 'https://api.deepseek.com'")
+    expect(source).toContain("form.platform === 'deepseek' ? undefined")
+  })
+})

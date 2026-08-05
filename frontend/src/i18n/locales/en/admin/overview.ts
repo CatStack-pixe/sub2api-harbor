@@ -945,6 +945,7 @@ export default {
         antigravity: 'Antigravity',
         grok: 'Grok',
         agnes: 'Agnes',
+        deepseek: 'DeepSeek',
         composite: 'Composite',
       },
       deleteConfirm:

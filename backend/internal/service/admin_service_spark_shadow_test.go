@@ -762,6 +762,13 @@ type sparkShadowValidatingGroupRepoStub struct {
 	existing map[int64]bool
 }
 
+func (s *sparkShadowValidatingGroupRepoStub) GetByID(_ context.Context, id int64) (*Group, error) {
+	if !s.existing[id] {
+		return nil, ErrGroupNotFound
+	}
+	return &Group{ID: id, Platform: PlatformOpenAI}, nil
+}
+
 func (s *sparkShadowValidatingGroupRepoStub) ExistsByIDs(_ context.Context, ids []int64) (map[int64]bool, error) {
 	out := make(map[int64]bool, len(ids))
 	for _, id := range ids {

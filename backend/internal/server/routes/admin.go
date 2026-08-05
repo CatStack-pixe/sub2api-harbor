@@ -57,6 +57,9 @@ func RegisterAdminRoutes(
 		// Grok OAuth
 		registerGrokOAuthRoutes(admin, h)
 
+		// DeepSeek API
+		registerDeepSeekRoutes(admin, h)
+
 		// 代理管理
 		registerProxyRoutes(admin, h, stepUpAuth)
 
@@ -119,6 +122,13 @@ func RegisterAdminRoutes(
 
 		// 操作审计日志
 		registerAuditLogRoutes(admin, h, stepUpAuth)
+	}
+}
+
+func registerDeepSeekRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
+	deepseek := admin.Group("/deepseek")
+	{
+		deepseek.GET("/accounts/:id/balance", h.Admin.Account.GetDeepSeekBalance)
 	}
 }
 

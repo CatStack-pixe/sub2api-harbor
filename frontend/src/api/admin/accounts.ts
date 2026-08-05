@@ -528,6 +528,25 @@ export interface SyncUpstreamModelsResult {
   models: string[]
 }
 
+export interface DeepSeekBalanceInfo {
+  currency: string
+  total_balance: string
+  granted_balance: string
+  topped_up_balance: string
+}
+
+export interface DeepSeekBalanceResult {
+  is_available: boolean
+  balance_infos: DeepSeekBalanceInfo[]
+  status_code?: number
+  fetched_at: number
+}
+
+export async function getDeepSeekBalance(id: number): Promise<DeepSeekBalanceResult> {
+  const { data } = await apiClient.get<DeepSeekBalanceResult>(`/admin/deepseek/accounts/${id}/balance`)
+  return data
+}
+
 /**
  * Sync live supported models from the account's upstream model-list endpoint
  * @param id - Account ID
@@ -965,6 +984,7 @@ export const accountsAPI = {
   resetTempUnschedulable,
   setSchedulable,
   getAvailableModels,
+  getDeepSeekBalance,
   syncUpstreamModels,
   syncUpstreamModelsPreview,
   generateAuthUrl,

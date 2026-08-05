@@ -965,7 +965,8 @@ func decodeUpstreamBillingProbeSnapshot(extra map[string]any) *UpstreamBillingPr
 
 // IsUpstreamBillingProbeIdentity reports whether an account identity may opt
 // in to the upstream billing probe. `/v1/sub2api/billing` is a key-scoped
-// sub2api convention shared by the five supported API-key platforms.
+// sub2api convention shared by the supported API-key platforms. DeepSeek is
+// intentionally excluded because it has a separate official balance endpoint.
 // Non-sub2api upstreams return 404 and the snapshot records "unsupported".
 // Only AccountTypeAPIKey is in scope. OAuth/Bedrock hold no static API key to
 // present at all; AccountTypeUpstream (antigravity relay accounts) does carry

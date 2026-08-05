@@ -38,15 +38,17 @@ const (
 
 // Platform constants
 const (
-	PlatformAnthropic   = domain.PlatformAnthropic
-	PlatformOpenAI      = domain.PlatformOpenAI
-	PlatformGemini      = domain.PlatformGemini
-	PlatformAntigravity = domain.PlatformAntigravity
-	PlatformGrok        = domain.PlatformGrok
-	PlatformAgnes       = domain.PlatformAgnes
-	PlatformComposite   = domain.PlatformComposite
-	AgnesDefaultBaseURL = domain.AgnesDefaultBaseURL
-	AgnesDefaultModel   = domain.AgnesDefaultModel
+	PlatformAnthropic      = domain.PlatformAnthropic
+	PlatformOpenAI         = domain.PlatformOpenAI
+	PlatformGemini         = domain.PlatformGemini
+	PlatformAntigravity    = domain.PlatformAntigravity
+	PlatformGrok           = domain.PlatformGrok
+	PlatformAgnes          = domain.PlatformAgnes
+	PlatformDeepSeek       = domain.PlatformDeepSeek
+	PlatformComposite      = domain.PlatformComposite
+	AgnesDefaultBaseURL    = domain.AgnesDefaultBaseURL
+	AgnesDefaultModel      = domain.AgnesDefaultModel
+	DeepSeekDefaultBaseURL = domain.DeepSeekDefaultBaseURL
 )
 
 // AllowedQuotaPlatforms 是允许设置 user × platform quota 的平台列表（单一权威来源）。
@@ -59,6 +61,13 @@ var AllowedQuotaPlatforms = []string{
 	PlatformAntigravity,
 	PlatformGrok,
 	PlatformAgnes,
+	PlatformDeepSeek,
+}
+
+// DeepSeekDefaultModelIDs are the stable public aliases supported by the
+// DeepSeek Chat Completions API and the pricing catalog.
+func DeepSeekDefaultModelIDs() []string {
+	return []string{"deepseek-chat", "deepseek-reasoner", "deepseek-v4-flash", "deepseek-v4-pro"}
 }
 
 // IsAllowedQuotaPlatform 报告 s 是否为合法的 quota platform 标识。

@@ -305,6 +305,12 @@ func (s *adminServiceImpl) DuplicateAccount(ctx context.Context, id int64, actor
 		SkipDefaultGroupBind:  true,
 		SkipMixedChannelCheck: true,
 	}
+	if err := validateAccountCredentials(input.Platform, input.Type, input.Credentials); err != nil {
+		return nil, err
+	}
+	if err := validateAccountGroupPlatforms(ctx, s.groupRepo, input.Platform, input.GroupIDs); err != nil {
+		return nil, err
+	}
 	accountExtra, err := normalizeOpenAILongContextBillingExtra(input.Platform, input.Extra)
 	if err != nil {
 		return nil, fmt.Errorf("normalize duplicate account extra: %w", err)
@@ -544,6 +550,12 @@ func buildAccountForCreate(input *CreateAccountInput, accountExtra map[string]an
 }
 
 func (s *adminServiceImpl) CreateAccount(ctx context.Context, input *CreateAccountInput) (*Account, error) {
+	if input == nil {
+		return nil, infraerrors.BadRequest("INVALID_ACCOUNT_INPUT", "account input is required")
+	}
+	if err := validateAccountCredentials(input.Platform, input.Type, input.Credentials); err != nil {
+		return nil, err
+	}
 	accountExtra, err := normalizeOpenAILongContextBillingExtra(input.Platform, input.Extra)
 	if err != nil {
 		return nil, err
@@ -578,6 +590,9 @@ func (s *adminServiceImpl) CreateAccount(ctx context.Context, input *CreateAccou
 		if err := s.checkMixedChannelRisk(ctx, 0, input.Platform, groupIDs); err != nil {
 			return nil, err
 		}
+	}
+	if err := validateAccountGroupPlatforms(ctx, s.groupRepo, input.Platform, groupIDs); err != nil {
+		return nil, err
 	}
 
 	// 校验并规范化请求头覆写配置（header 名小写化、格式检查）
@@ -629,6 +644,9 @@ func (s *adminServiceImpl) CreateAccount(ctx context.Context, input *CreateAccou
 }
 
 func (s *adminServiceImpl) UpdateAccount(ctx context.Context, id int64, input *UpdateAccountInput) (*Account, error) {
+	if input == nil {
+		return nil, infraerrors.BadRequest("INVALID_ACCOUNT_INPUT", "account input is required")
+	}
 	account, err := s.accountRepo.GetByID(ctx, id)
 	if err != nil {
 		return nil, err
@@ -697,6 +715,9 @@ func (s *adminServiceImpl) UpdateAccount(ctx context.Context, id int64, input *U
 	}
 	// Extra 使用 map：需要区分“未提供(nil)”与“显式清空({})”。
 	// 关闭配额限制时前端会删除 quota_* 键并提交 extra:{}，此时也必须落库。
+	if err := validateAccountCredentials(account.Platform, account.Type, account.Credentials); err != nil {
+		return nil, err
+	}
 	requestedProbeEnabledUpdate := input.ProbeEnabled
 	requestedRateSyncEnabledUpdate := input.RateSyncEnabled
 	if input.Extra != nil {
@@ -863,6 +884,9 @@ func (s *adminServiceImpl) UpdateAccount(ctx context.Context, id int64, input *U
 		if err := s.validateGroupIDsExist(ctx, *input.GroupIDs); err != nil {
 			return nil, err
 		}
+		if err := validateAccountGroupPlatforms(ctx, s.groupRepo, account.Platform, *input.GroupIDs); err != nil {
+			return nil, err
+		}
 
 		// 检查混合渠道风险（除非用户已确认）
 		if !input.SkipMixedChannelCheck {
@@ -986,6 +1010,7 @@ func (s *adminServiceImpl) BulkUpdateAccounts(ctx context.Context, input *BulkUp
 	if len(input.AccountIDs) == 0 {
 		return result, nil
 	}
+	hasGroupBindingUpdate := input.GroupIDs != nil && len(*input.GroupIDs) > 0
 	if input.GroupIDs != nil {
 		if err := s.validateGroupIDsExist(ctx, *input.GroupIDs); err != nil {
 			return nil, err
@@ -997,12 +1022,39 @@ func (s *adminServiceImpl) BulkUpdateAccounts(ctx context.Context, input *BulkUp
 
 	// 预取所有目标账号，供凭据守卫/代理守卫/混合渠道检查共用，避免多次 DB 查询。
 	var cachedTargets []*Account
-	if len(input.Credentials) > 0 || input.ProxyID != nil || needMixedChannelCheck || hasLongContextBillingUpdate || input.ProbeEnabled != nil || input.RateMultiplier != nil {
+	if len(input.Credentials) > 0 || input.ProxyID != nil || needMixedChannelCheck || hasGroupBindingUpdate || hasLongContextBillingUpdate || input.ProbeEnabled != nil || input.RateMultiplier != nil {
 		loaded, err := s.accountRepo.GetByIDs(ctx, input.AccountIDs)
 		if err != nil {
 			return nil, err
 		}
 		cachedTargets = loaded
+	}
+	if hasGroupBindingUpdate {
+		for _, account := range cachedTargets {
+			if account == nil {
+				continue
+			}
+			if err := validateAccountGroupPlatforms(ctx, s.groupRepo, account.Platform, *input.GroupIDs); err != nil {
+				return nil, err
+			}
+		}
+	}
+	if len(input.Credentials) > 0 {
+		for _, account := range cachedTargets {
+			if account == nil || !account.IsDeepSeek() {
+				continue
+			}
+			mergedCredentials := make(map[string]any, len(account.Credentials)+len(input.Credentials))
+			for key, value := range account.Credentials {
+				mergedCredentials[key] = value
+			}
+			for key, value := range input.Credentials {
+				mergedCredentials[key] = value
+			}
+			if err := validateAccountCredentials(account.Platform, account.Type, mergedCredentials); err != nil {
+				return nil, err
+			}
+		}
 	}
 	if input.ProbeEnabled != nil {
 		targetsByID := make(map[int64]*Account, len(cachedTargets))

@@ -491,7 +491,8 @@ const platformOptions = [
   { value: 'gemini', label: 'Gemini' },
   { value: 'antigravity', label: 'Antigravity' },
   { value: 'grok', label: 'Grok' },
-  { value: 'agnes', label: 'Agnes' }
+  { value: 'agnes', label: 'Agnes' },
+  { value: 'deepseek', label: 'DeepSeek' }
 ]
 
 // Load rules when dialog opens

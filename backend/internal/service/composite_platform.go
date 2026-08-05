@@ -108,6 +108,8 @@ func DetectModelPlatform(model string) (string, bool) {
 			return PlatformGrok, true
 		case "agnes":
 			return PlatformAgnes, true
+		case "deepseek":
+			return PlatformDeepSeek, true
 		}
 		if rest != "" {
 			normalized = strings.TrimPrefix(rest, "models/")
@@ -137,6 +139,8 @@ func DetectModelPlatform(model string) (string, bool) {
 		return PlatformGrok, true
 	case strings.HasPrefix(normalized, "agnes-"):
 		return PlatformAgnes, true
+	case strings.HasPrefix(normalized, "deepseek-"):
+		return PlatformDeepSeek, true
 	default:
 		return "", false
 	}
@@ -183,7 +187,7 @@ func (s *GatewayService) resolveCompositeRouteDecision(ctx context.Context, grou
 
 func isConcreteRequestPlatform(platform string) bool {
 	switch platform {
-	case PlatformAnthropic, PlatformOpenAI, PlatformGemini, PlatformAntigravity, PlatformGrok, PlatformAgnes:
+	case PlatformAnthropic, PlatformOpenAI, PlatformGemini, PlatformAntigravity, PlatformGrok, PlatformAgnes, PlatformDeepSeek:
 		return true
 	default:
 		return false
