@@ -140,6 +140,8 @@ func openAICompatibleSelectionErrorForLog(err error, platform string) error {
 		provider = "Grok"
 	case service.PlatformAgnes:
 		provider = "Agnes"
+	case service.PlatformDeepSeek:
+		provider = "DeepSeek"
 	default:
 		return err
 	}

@@ -45,7 +45,9 @@
                       ? 'https://api.x.ai/v1'
                       : account.platform === 'agnes'
                         ? 'https://apihub.agnes-ai.com/v1'
-                        : 'https://api.anthropic.com'
+                        : account.platform === 'deepseek'
+                          ? 'https://api.deepseek.com'
+                          : 'https://api.anthropic.com'
             "
           />
           <p v-if="baseUrlHint" class="input-hint">{{ baseUrlHint }}</p>
@@ -76,7 +78,9 @@
                       ? 'xai-...'
                       : account.platform === 'agnes'
                         ? 'YOUR_API_KEY'
-                        : 'sk-ant-...'
+                        : account.platform === 'deepseek'
+                          ? 'sk-...'
+                          : 'sk-ant-...'
             "
           />
           <p class="input-hint">{{ t('admin.accounts.leaveEmptyToKeep') }}</p>
@@ -1723,7 +1727,7 @@
       </div>
 
       <div
-        v-if="account?.type === 'apikey'"
+        v-if="account?.type === 'apikey' && account?.platform !== 'deepseek'"
         class="flex items-center justify-between gap-4 border-t border-gray-200 pt-4 dark:border-dark-600"
       >
         <div>
@@ -2811,6 +2815,7 @@ const baseUrlHint = computed(() => {
   if (props.account.platform === 'gemini') return t('admin.accounts.gemini.baseUrlHint')
   if (props.account.platform === 'grok') return ''
   if (props.account.platform === 'agnes') return ''
+  if (props.account.platform === 'deepseek') return t('admin.accounts.deepseek.baseUrlHint')
   return t('admin.accounts.baseUrlHint')
 })
 
@@ -3278,6 +3283,7 @@ const defaultBaseUrl = computed(() => {
   if (props.account?.platform === 'gemini') return 'https://generativelanguage.googleapis.com'
   if (props.account?.platform === 'grok') return 'https://api.x.ai/v1'
   if (props.account?.platform === 'agnes') return 'https://apihub.agnes-ai.com/v1'
+  if (props.account?.platform === 'deepseek') return 'https://api.deepseek.com'
   return 'https://api.anthropic.com'
 })
 
@@ -3429,7 +3435,7 @@ const syncFormFromAccount = (newAccount: Account | null) => {
 	autoPause7dThreshold.value = typeof extra?.auto_pause_7d_threshold === 'number' ? extra.auto_pause_7d_threshold * 100 : null
 	autoPause5hDisabled.value = extra?.auto_pause_5h_disabled === true
 	autoPause7dDisabled.value = extra?.auto_pause_7d_disabled === true
-	upstreamBillingAutoProbeEnabled.value = extra?.upstream_billing_probe_enabled === true
+	upstreamBillingAutoProbeEnabled.value = newAccount.platform !== 'deepseek' && extra?.upstream_billing_probe_enabled === true
   upstreamBillingRateSyncEnabled.value =
     upstreamBillingAutoProbeEnabled.value && extra?.upstream_billing_rate_sync_enabled === true
 
@@ -3636,7 +3642,9 @@ const syncFormFromAccount = (newAccount: Account | null) => {
             ? 'https://api.x.ai/v1'
             : newAccount.platform === 'agnes'
               ? 'https://apihub.agnes-ai.com/v1'
-              : 'https://api.anthropic.com'
+              : newAccount.platform === 'deepseek'
+                ? 'https://api.deepseek.com'
+                : 'https://api.anthropic.com'
     editBaseUrl.value = (credentials.base_url as string) || platformDefaultUrl
 
     // Load model mappings and detect mode
@@ -3709,7 +3717,9 @@ const syncFormFromAccount = (newAccount: Account | null) => {
             ? 'https://api.x.ai/v1'
             : newAccount.platform === 'agnes'
               ? 'https://apihub.agnes-ai.com/v1'
-              : 'https://api.anthropic.com'
+              : newAccount.platform === 'deepseek'
+                ? 'https://api.deepseek.com'
+                : 'https://api.anthropic.com'
     editBaseUrl.value = platformDefaultUrl
 
     // Load model mappings for OpenAI/Grok OAuth accounts
@@ -4287,7 +4297,7 @@ const handleSubmit = async () => {
       updatePayload.load_factor = 0
     }
     updatePayload.auto_pause_on_expired = autoPauseOnExpired.value
-    if (props.account.type === 'apikey') {
+    if (props.account.type === 'apikey' && props.account.platform !== 'deepseek') {
       updatePayload.upstream_billing_probe_enabled = upstreamBillingAutoProbeEnabled.value
       updatePayload.upstream_billing_rate_sync_enabled = upstreamBillingRateSyncEnabled.value
       if (upstreamBillingRateSyncEnabled.value) {
@@ -4870,7 +4880,7 @@ const handleSubmit = async () => {
       const currentExtra = (updatePayload.extra as Record<string, unknown>) ||
         (props.account.extra as Record<string, unknown>) || {}
       const newExtra: Record<string, unknown> = { ...currentExtra }
-      // 上游倍率自动探测对全部 API-key 平台开放（sub2api 上游即可应答），
+      // 上游倍率自动探测对支持的 API-key 平台开放（DeepSeek 使用独立余额探测），
       // Bedrock 凭证无静态 Key 不参与。
       if (props.account.type === 'apikey') {
         delete newExtra.upstream_billing_probe_enabled

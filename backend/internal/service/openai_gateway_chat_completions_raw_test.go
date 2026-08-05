@@ -349,6 +349,7 @@ func TestForwardAsRawChatCompletions_PreservesDeepSeekReasoningContentNonStreami
 		httpUpstream: upstream,
 	}
 	account := rawChatCompletionsTestAccount()
+	account.Platform = PlatformDeepSeek
 
 	result, err := svc.forwardAsRawChatCompletions(context.Background(), c, account, body, "")
 	require.NoError(t, err)
@@ -391,6 +392,7 @@ func TestForwardAsRawChatCompletions_PreservesDeepSeekReasoningContentStreaming(
 		httpUpstream: upstream,
 	}
 	account := rawChatCompletionsTestAccount()
+	account.Platform = PlatformDeepSeek
 
 	result, err := svc.forwardAsRawChatCompletions(context.Background(), c, account, body, "")
 	require.NoError(t, err)
@@ -422,6 +424,7 @@ func TestForwardAsRawChatCompletions_PreservesDeepSeekReasoningContentInRequest(
 		httpUpstream: upstream,
 	}
 	account := rawChatCompletionsTestAccount()
+	account.Platform = PlatformDeepSeek
 
 	result, err := svc.forwardAsRawChatCompletions(context.Background(), c, account, body, "")
 	require.NoError(t, err)

@@ -5,7 +5,7 @@
  * instead of defining their own color mappings.
  */
 
-export type Platform = 'anthropic' | 'openai' | 'antigravity' | 'gemini' | 'grok' | 'agnes' | 'composite'
+export type Platform = 'anthropic' | 'openai' | 'antigravity' | 'gemini' | 'grok' | 'agnes' | 'deepseek' | 'composite'
 
 // ── Badge (bg + text + border, for inline badges with border) ───────
 const BADGE: Record<Platform, string> = {
@@ -15,6 +15,7 @@ const BADGE: Record<Platform, string> = {
   gemini: 'bg-blue-500/10 text-blue-600 border-blue-500/30 dark:text-blue-400',
   grok: 'bg-zinc-800/10 text-zinc-800 border-zinc-800/30 dark:bg-zinc-500/10 dark:text-zinc-200 dark:border-zinc-500/30',
   agnes: 'bg-cyan-500/10 text-cyan-700 border-cyan-500/30 dark:text-cyan-300',
+  deepseek: 'bg-indigo-500/10 text-indigo-700 border-indigo-500/30 dark:text-indigo-300',
   composite: 'bg-cyan-500/10 text-cyan-700 border-cyan-500/30 dark:text-cyan-300',
 }
 const BADGE_DEFAULT = 'bg-slate-500/10 text-slate-600 border-slate-500/30 dark:text-slate-400'
@@ -27,6 +28,7 @@ const BADGE_LIGHT: Record<Platform, string> = {
   gemini: 'bg-blue-500/10 text-blue-600 dark:bg-blue-500/10 dark:text-blue-300',
   grok: 'bg-zinc-800/10 text-zinc-800 dark:bg-zinc-500/10 dark:text-zinc-200',
   agnes: 'bg-cyan-500/10 text-cyan-700 dark:bg-cyan-500/10 dark:text-cyan-300',
+  deepseek: 'bg-indigo-500/10 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-300',
   composite: 'bg-cyan-500/10 text-cyan-700 dark:bg-cyan-500/10 dark:text-cyan-300',
 }
 
@@ -38,6 +40,7 @@ const BORDER: Record<Platform, string> = {
   gemini: 'border-blue-500/20 dark:border-blue-500/20',
   grok: 'border-zinc-800/20 dark:border-zinc-500/20',
   agnes: 'border-cyan-500/20 dark:border-cyan-500/20',
+  deepseek: 'border-indigo-500/20 dark:border-indigo-500/20',
   composite: 'border-cyan-500/20 dark:border-cyan-500/20',
 }
 const BORDER_DEFAULT = 'border-gray-200 dark:border-dark-700'
@@ -50,6 +53,7 @@ const BORDER_STRONG: Record<Platform, string> = {
   gemini: 'border-blue-500/35 dark:border-blue-500/30',
   grok: 'border-zinc-800/35 dark:border-zinc-500/35',
   agnes: 'border-cyan-500/35 dark:border-cyan-500/30',
+  deepseek: 'border-indigo-500/35 dark:border-indigo-500/30',
   composite: 'border-cyan-500/35 dark:border-cyan-500/30',
 }
 const BORDER_STRONG_DEFAULT = 'border-gray-300 dark:border-dark-600'
@@ -63,6 +67,7 @@ const ACCENT: Record<Platform, string> = {
   gemini: '#3b82f6', // blue-500
   grok: '#71717a', // zinc-500
   agnes: '#0891b2', // cyan-600
+  deepseek: '#4f46e5', // indigo-600
   composite: '#06b6d4', // cyan-500
 }
 const ACCENT_DEFAULT = '#14b8a6' // primary-500 (teal)
@@ -75,6 +80,7 @@ const ACCENT_BAR: Record<Platform, string> = {
   gemini: 'bg-gradient-to-r from-blue-400 to-blue-500',
   grok: 'bg-gradient-to-r from-zinc-700 to-zinc-900',
   agnes: 'bg-gradient-to-r from-cyan-500 to-teal-600',
+  deepseek: 'bg-gradient-to-r from-indigo-500 to-blue-600',
   composite: 'bg-gradient-to-r from-slate-500 to-cyan-500',
 }
 const ACCENT_BAR_DEFAULT = 'bg-gradient-to-r from-primary-400 to-primary-500'
@@ -87,6 +93,7 @@ const TEXT: Record<Platform, string> = {
   gemini: 'text-blue-600 dark:text-blue-400',
   grok: 'text-zinc-800 dark:text-zinc-200',
   agnes: 'text-cyan-700 dark:text-cyan-300',
+  deepseek: 'text-indigo-700 dark:text-indigo-300',
   composite: 'text-cyan-700 dark:text-cyan-300',
 }
 const TEXT_DEFAULT = 'text-primary-600 dark:text-primary-400'
@@ -99,6 +106,7 @@ const ICON: Record<Platform, string> = {
   gemini: 'text-blue-500 dark:text-blue-400',
   grok: 'text-zinc-800 dark:text-zinc-200',
   agnes: 'text-cyan-600 dark:text-cyan-300',
+  deepseek: 'text-indigo-600 dark:text-indigo-300',
   composite: 'text-cyan-600 dark:text-cyan-300',
 }
 const ICON_DEFAULT = 'text-primary-500 dark:text-primary-400'
@@ -111,6 +119,7 @@ const BUTTON: Record<Platform, string> = {
   gemini: 'bg-blue-500 text-white hover:bg-blue-600 active:bg-blue-700 dark:bg-blue-500/80 dark:hover:bg-blue-500',
   grok: 'bg-zinc-800 text-white hover:bg-zinc-900 active:bg-black dark:bg-zinc-700 dark:hover:bg-zinc-600',
   agnes: 'bg-cyan-700 text-white hover:bg-cyan-800 active:bg-cyan-900 dark:bg-cyan-600 dark:hover:bg-cyan-500',
+  deepseek: 'bg-indigo-600 text-white hover:bg-indigo-700 active:bg-indigo-800 dark:bg-indigo-600/80 dark:hover:bg-indigo-600',
   composite: 'bg-cyan-700 text-white hover:bg-cyan-800 active:bg-cyan-900 dark:bg-cyan-600 dark:hover:bg-cyan-500',
 }
 const BUTTON_DEFAULT = 'bg-primary-500 text-white hover:bg-primary-600 dark:bg-primary-600 dark:hover:bg-primary-500'
@@ -123,6 +132,7 @@ const DISCOUNT: Record<Platform, string> = {
   gemini: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
   grok: 'bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200',
   agnes: 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/40 dark:text-cyan-300',
+  deepseek: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300',
   composite: 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/40 dark:text-cyan-300',
 }
 const DISCOUNT_DEFAULT = 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300'
@@ -135,6 +145,7 @@ const GRADIENT: Record<Platform, string> = {
   gemini: 'from-blue-500 to-blue-600',
   grok: 'from-zinc-700 to-zinc-900',
   agnes: 'from-cyan-600 to-teal-700',
+  deepseek: 'from-indigo-600 to-blue-700',
   composite: 'from-slate-600 to-cyan-600',
 }
 const GRADIENT_DEFAULT = 'from-primary-500 to-primary-600'
@@ -147,6 +158,7 @@ const GRADIENT_TEXT: Record<Platform, string> = {
   gemini: 'text-blue-100',
   grok: 'text-zinc-100',
   agnes: 'text-cyan-100',
+  deepseek: 'text-indigo-100',
   composite: 'text-cyan-100',
 }
 const GRADIENT_TEXT_DEFAULT = 'text-primary-100'
@@ -158,6 +170,7 @@ const GRADIENT_SUBTEXT: Record<Platform, string> = {
   gemini: 'text-blue-200',
   grok: 'text-zinc-300',
   agnes: 'text-cyan-200',
+  deepseek: 'text-indigo-200',
   composite: 'text-cyan-200',
 }
 const GRADIENT_SUBTEXT_DEFAULT = 'text-primary-200'
@@ -165,7 +178,7 @@ const GRADIENT_SUBTEXT_DEFAULT = 'text-primary-200'
 // ── Public API ──────────────────────────────────────────────────────
 
 function isPlatform(p: string): p is Platform {
-  return p === 'anthropic' || p === 'openai' || p === 'antigravity' || p === 'gemini' || p === 'grok' || p === 'agnes' || p === 'composite'
+  return p === 'anthropic' || p === 'openai' || p === 'antigravity' || p === 'gemini' || p === 'grok' || p === 'agnes' || p === 'deepseek' || p === 'composite'
 }
 
 export function platformBadgeClass(p: string): string {
@@ -228,6 +241,7 @@ export function platformLabel(p: string): string {
     case 'gemini': return 'Gemini'
     case 'grok': return 'Grok'
     case 'agnes': return 'Agnes'
+    case 'deepseek': return 'DeepSeek'
     case 'composite': return 'Composite'
     default: return p || 'API'
   }

@@ -174,6 +174,20 @@
             <PlatformIcon platform="agnes" size="sm" />
             Agnes
           </button>
+          <button
+            type="button"
+            data-testid="deepseek-platform"
+            @click="form.platform = 'deepseek'"
+            :class="[
+              'flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium transition-all',
+              form.platform === 'deepseek'
+                ? 'bg-white text-indigo-700 shadow-sm dark:bg-dark-600 dark:text-indigo-300'
+                : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200'
+            ]"
+          >
+            <PlatformIcon platform="deepseek" size="sm" />
+            DeepSeek
+          </button>
         </div>
       </div>
 
@@ -381,6 +395,26 @@
             <div>
               <span class="block text-sm font-medium text-gray-900 dark:text-white">API Key</span>
               <span class="text-xs text-gray-500 dark:text-gray-400">Agnes API</span>
+            </div>
+          </button>
+        </div>
+      </div>
+
+      <div v-if="form.platform === 'deepseek'">
+        <label class="input-label">{{ t('admin.accounts.accountType') }}</label>
+        <div class="mt-2 grid grid-cols-1 gap-3" data-tour="account-form-type">
+          <button
+            type="button"
+            data-testid="deepseek-account-type-api-key"
+            @click="accountCategory = 'apikey'"
+            class="flex items-center gap-3 rounded-lg border-2 border-indigo-500 bg-indigo-50 p-3 text-left dark:bg-indigo-900/20"
+          >
+            <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-600 text-white">
+              <Icon name="key" size="sm" />
+            </div>
+            <div>
+              <span class="block text-sm font-medium text-gray-900 dark:text-white">API Key</span>
+              <span class="text-xs text-gray-500 dark:text-gray-400">DeepSeek API</span>
             </div>
           </button>
         </div>
@@ -1163,7 +1197,9 @@
                     ? 'https://api.x.ai/v1'
                     : form.platform === 'agnes'
                       ? 'https://apihub.agnes-ai.com/v1'
-                      : 'https://api.anthropic.com'
+                      : form.platform === 'deepseek'
+                        ? 'https://api.deepseek.com'
+                        : 'https://api.anthropic.com'
             "
           />
           <p v-if="baseUrlHint" class="input-hint">{{ baseUrlHint }}</p>
@@ -1189,14 +1225,17 @@
                     ? 'xai-...'
                     : form.platform === 'agnes'
                       ? 'YOUR_API_KEY'
-                      : 'sk-ant-...'
+                      : form.platform === 'deepseek'
+                        ? 'sk-...'
+                        : 'sk-ant-...'
             "
           />
           <p v-if="apiKeyHint" class="input-hint">{{ apiKeyHint }}</p>
         </div>
 
-        <!-- 上游倍率自动探测：全部 API-key 平台可用（所在区块已限定 apikey 类型） -->
+        <!-- 上游倍率自动探测：支持的 API-key 平台可用，DeepSeek 使用独立余额探测。 -->
         <div
+          v-if="form.platform !== 'deepseek'"
           class="flex items-center justify-between gap-4 border-t border-gray-200 pt-4 dark:border-dark-600"
         >
           <div>
@@ -3703,6 +3742,7 @@ const baseUrlHint = computed(() => {
   if (form.platform === 'gemini') return t('admin.accounts.gemini.baseUrlHint')
   if (form.platform === 'grok') return ''
   if (form.platform === 'agnes') return ''
+  if (form.platform === 'deepseek') return t('admin.accounts.deepseek.baseUrlHint')
   return t('admin.accounts.baseUrlHint')
 })
 
@@ -3711,6 +3751,7 @@ const apiKeyHint = computed(() => {
   if (form.platform === 'gemini') return t('admin.accounts.gemini.apiKeyHint')
   if (form.platform === 'grok') return ''
   if (form.platform === 'agnes') return ''
+  if (form.platform === 'deepseek') return t('admin.accounts.deepseek.apiKeyHint')
   return t('admin.accounts.apiKeyHint')
 })
 
@@ -4297,7 +4338,9 @@ watch(
             ? 'https://api.x.ai/v1'
             : newPlatform === 'agnes'
               ? 'https://apihub.agnes-ai.com/v1'
-              : 'https://api.anthropic.com'
+              : newPlatform === 'deepseek'
+                ? 'https://api.deepseek.com'
+                : 'https://api.anthropic.com'
     // Clear model-related settings
     allowedModels.value = []
     modelMappings.value = []
@@ -4328,6 +4371,12 @@ watch(
       accountCategory.value = 'apikey'
       modelRestrictionMode.value = 'whitelist'
       allowedModels.value = ['agnes-2.0-flash']
+      form.concurrency = 10
+      form.load_factor = null
+    }
+    if (newPlatform === 'deepseek') {
+      accountCategory.value = 'apikey'
+      modelRestrictionMode.value = 'whitelist'
       form.concurrency = 10
       form.load_factor = null
     }
@@ -5196,7 +5245,9 @@ const handleSubmit = async () => {
           ? 'https://api.x.ai/v1'
           : form.platform === 'agnes'
             ? 'https://apihub.agnes-ai.com/v1'
-            : 'https://api.anthropic.com'
+            : form.platform === 'deepseek'
+              ? 'https://api.deepseek.com'
+              : 'https://api.anthropic.com'
 
   // Build credentials with optional model mapping
   const credentials: Record<string, unknown> = {
@@ -5262,7 +5313,7 @@ const handleSubmit = async () => {
     ...form,
     group_ids: form.group_ids,
     extra,
-    upstream_billing_probe_enabled: upstreamBillingAutoProbeEnabled.value,
+    upstream_billing_probe_enabled: form.platform === 'deepseek' ? undefined : upstreamBillingAutoProbeEnabled.value,
     auto_pause_on_expired: autoPauseOnExpired.value
   })
 }
@@ -5391,9 +5442,10 @@ const createAccountAndFinish = async (
     rate_multiplier: form.rate_multiplier,
     group_ids: form.group_ids,
     expires_at: form.expires_at,
-    // 上游倍率探测对全部 API-key 平台开放（antigravity upstream 走本 helper）；
-    // 非 apikey 类型（bedrock/oauth）不传，后端不动作。
-    upstream_billing_probe_enabled: type === 'apikey' ? upstreamBillingAutoProbeEnabled.value : undefined,
+    // 上游倍率探测对支持的 API-key 平台开放（antigravity upstream 走本 helper）；
+    // DeepSeek 使用独立余额探测，非 apikey 类型（bedrock/oauth）不传。
+    upstream_billing_probe_enabled:
+      type === 'apikey' && form.platform !== 'deepseek' ? upstreamBillingAutoProbeEnabled.value : undefined,
     auto_pause_on_expired: autoPauseOnExpired.value
   })
 }

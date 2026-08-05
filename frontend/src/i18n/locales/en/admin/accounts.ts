@@ -105,6 +105,7 @@ export default {
         antigravity: 'Antigravity',
         grok: 'Grok',
         agnes: 'Agnes',
+        deepseek: 'DeepSeek',
       },
       types: {
         oauth: 'OAuth',
@@ -613,6 +614,10 @@ export default {
         testModeDefault: 'Default request',
         testModeCompact: 'Compact probe',
         modelRestrictionDisabledByPassthrough: 'Automatic passthrough is enabled: model whitelist/mapping will not take effect.',
+      },
+      deepseek: {
+        baseUrlHint: 'Leave default for the official DeepSeek API',
+        apiKeyHint: 'Your DeepSeek API Key'
       },
       grok: {
         baseUrlHint: 'Grok OAuth accounts forward to the official xAI API base URL.',
@@ -1454,6 +1459,10 @@ export default {
         grokLastStatus: 'Status {status}',
         grokLastProbe: 'Probe {time}',
         grokLastHeadersSeen: 'Headers {time}',
+        deepseekProbe: 'Balance',
+        deepseekProbeTooltip: 'Query the DeepSeek account balance',
+        deepseekUnavailable: 'Balance unavailable',
+        deepseekNoBalance: 'No balance data',
         passiveSampled: 'Passive',
         activeQuery: 'Query'
       },

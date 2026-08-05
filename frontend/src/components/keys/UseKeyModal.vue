@@ -251,6 +251,8 @@ const defaultClientTab = computed(() => {
       return 'gemini'
     case 'antigravity':
       return 'claude'
+    case 'deepseek':
+      return 'opencode'
     default:
       return 'claude'
   }
@@ -368,6 +370,8 @@ const clientTabs = computed((): TabConfig[] => {
         { id: 'codex', label: t('keys.useKeyModal.cliTabs.codexCli'), icon: TerminalIcon },
         { id: 'opencode', label: t('keys.useKeyModal.cliTabs.opencode'), icon: TerminalIcon }
       ]
+    case 'deepseek':
+      return [{ id: 'opencode', label: t('keys.useKeyModal.cliTabs.opencode'), icon: TerminalIcon }]
     default:
       return [
         { id: 'claude', label: t('keys.useKeyModal.cliTabs.claudeCode'), icon: TerminalIcon },
@@ -423,6 +427,8 @@ const platformDescription = computed(() => {
         return t('keys.useKeyModal.grok.codexDescription')
       }
       return t('keys.useKeyModal.grok.description')
+    case 'deepseek':
+      return t('keys.useKeyModal.deepseek.description')
     default:
       return t('keys.useKeyModal.description')
   }
@@ -521,6 +527,8 @@ const currentFiles = computed((): FileConfig[] => {
         return [generateOpenCodeConfig('grok', apiBase, apiKey)]
       case 'agnes':
         return [generateOpenCodeConfig('agnes', apiBase, apiKey)]
+      case 'deepseek':
+        return [generateOpenCodeConfig('deepseek', apiBase, apiKey)]
       default:
         return [generateOpenCodeConfig('openai', apiBase, apiKey)]
     }
@@ -550,6 +558,8 @@ const currentFiles = computed((): FileConfig[] => {
         return generateGrokCodexFiles(apiBase, apiKey)
       }
       return generateGrokFiles(apiBase, apiKey)
+    case 'deepseek':
+      return generateOpenAIFiles(apiBase, apiKey)
     default:
       return generateAnthropicFiles(baseUrl, apiKey)
   }
@@ -1510,6 +1520,16 @@ function generateOpenCodeConfig(platform: string, baseUrl: string, apiKey: strin
       modalities: { input: ['text', 'image'], output: ['text'] }
     }
   }
+  const deepseekModels = {
+    'deepseek-chat': {
+      name: 'DeepSeek Chat',
+      limit: { context: 131072, output: 8192 }
+    },
+    'deepseek-reasoner': {
+      name: 'DeepSeek Reasoner',
+      limit: { context: 131072, output: 65536 }
+    }
+  }
 
   if (platform === 'gemini') {
     provider[platform].npm = '@ai-sdk/google'
@@ -1535,6 +1555,10 @@ function generateOpenCodeConfig(platform: string, baseUrl: string, apiKey: strin
     provider[platform].npm = '@ai-sdk/openai'
     provider[platform].name = 'Agnes'
     provider[platform].models = agnesModels
+  } else if (platform === 'deepseek') {
+    provider[platform].npm = '@ai-sdk/openai'
+    provider[platform].name = 'DeepSeek'
+    provider[platform].models = deepseekModels
   }
 
   const agent =

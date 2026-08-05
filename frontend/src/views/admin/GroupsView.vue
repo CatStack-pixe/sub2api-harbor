@@ -148,6 +148,8 @@
                         ? 'bg-zinc-200 text-zinc-800 dark:bg-zinc-700 dark:text-zinc-100'
                         : value === 'agnes'
                           ? 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-300'
+                          : value === 'deepseek'
+                            ? 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300'
                           : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
               ]"
             >
@@ -1193,7 +1195,7 @@
           </div>
         </div>
 
-        <!-- 分组利润控制（五个平台 token 请求） -->
+        <!-- 分组利润控制（支持的平台 token 请求） -->
         <div v-if="isProfitControlPlatform(createForm.platform)" class="border-t pt-4">
           <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
             <input
@@ -2900,7 +2902,7 @@
           </div>
         </div>
 
-        <!-- 分组利润控制（五个平台 token 请求） -->
+        <!-- 分组利润控制（支持的平台 token 请求） -->
         <div v-if="isProfitControlPlatform(editForm.platform)" class="border-t pt-4">
           <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
             <input
@@ -3921,6 +3923,8 @@
                             ? 'bg-zinc-200 text-zinc-800 dark:bg-zinc-700 dark:text-zinc-100'
                             : group.platform === 'agnes'
                               ? 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-300'
+                              : group.platform === 'deepseek'
+                                ? 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300'
                               : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
                   ]"
                 >
@@ -4619,6 +4623,7 @@ const platformOptions = computed(() => [
   { value: "antigravity", label: "Antigravity" },
   { value: "grok", label: "Grok" },
   { value: "agnes", label: "Agnes" },
+  { value: "deepseek", label: "DeepSeek" },
   { value: "composite", label: "Composite" },
 ]);
 
@@ -4630,6 +4635,7 @@ const platformFilterOptions = computed(() => [
   { value: "antigravity", label: "Antigravity" },
   { value: "grok", label: "Grok" },
   { value: "agnes", label: "Agnes" },
+  { value: "deepseek", label: "DeepSeek" },
   { value: "composite", label: "Composite" },
 ]);
 
@@ -4640,6 +4646,7 @@ const compositeRoutePlatformOptions = computed(() => [
   { value: "antigravity", label: "Antigravity" },
   { value: "grok", label: "Grok" },
   { value: "agnes", label: "Agnes" },
+  { value: "deepseek", label: "DeepSeek" },
 ]);
 
 const compositeRouteEndpointOptions = computed(() => [
@@ -4948,7 +4955,7 @@ const createForm = reactive({
   peak_start: "",
   peak_end: "",
   peak_rate_multiplier: 1.0,
-  // 分组利润控制（五个 token 平台）；界面按百分比输入，提交时转小数
+  // 分组利润控制（支持的 token 平台）；界面按百分比输入，提交时转小数
   profit_control_enabled: false,
   profit_min_margin_percent: 0,
   profit_safety_buffer_percent: 0,
@@ -5307,7 +5314,7 @@ const editForm = reactive({
   peak_start: "",
   peak_end: "",
   peak_rate_multiplier: 1.0,
-  // 分组利润控制（五个 token 平台）；界面按百分比输入，提交时转小数
+  // 分组利润控制（支持的 token 平台）；界面按百分比输入，提交时转小数
   profit_control_enabled: false,
   profit_min_margin_percent: 0,
   profit_safety_buffer_percent: 0,
@@ -5883,7 +5890,7 @@ const handleCreateGroup = async () => {
       reasoning_effort_mappings: reasoningEffortMappingsToAPI(
         createForm.reasoning_effort_mappings,
       ),
-      // 利润控制：界面百分比转小数提交；仅五个 token 平台可启用
+      // 利润控制：界面百分比转小数提交；仅支持的平台可启用
       profit_control_enabled:
         isProfitControlPlatform(createForm.platform) &&
         createForm.profit_control_enabled,
@@ -6147,7 +6154,7 @@ const handleUpdateGroup = async () => {
       reasoning_effort_mappings: reasoningEffortMappingsToAPI(
         editForm.reasoning_effort_mappings,
       ),
-      // 利润控制：界面百分比转小数提交；仅五个 token 平台可启用
+      // 利润控制：界面百分比转小数提交；仅支持的平台可启用
       profit_control_enabled:
         isProfitControlPlatform(editForm.platform) &&
         editForm.profit_control_enabled,

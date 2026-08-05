@@ -370,6 +370,34 @@ func TestFetchUpstreamSupportedModelsParsesGrokAPIKeyResponse(t *testing.T) {
 	require.Equal(t, "Bearer xai-key", upstream.lastReq.Header.Get("Authorization"))
 }
 
+func TestFetchUpstreamSupportedModelsParsesDeepSeekResponse(t *testing.T) {
+	t.Parallel()
+
+	upstream := &httpUpstreamRecorder{resp: &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     http.Header{"Content-Type": []string{"application/json"}},
+		Body:       io.NopCloser(strings.NewReader(`{"data":[{"id":"deepseek-chat"},{"id":"deepseek-reasoner"}]}`)),
+	}}
+	svc := &AccountTestService{
+		httpUpstream: upstream,
+		cfg:          upstreamModelSyncTestConfig(),
+	}
+
+	models, err := svc.FetchUpstreamSupportedModels(context.Background(), &Account{
+		ID:       11,
+		Platform: PlatformDeepSeek,
+		Type:     AccountTypeAPIKey,
+		Credentials: map[string]any{
+			"api_key":  "sk-deepseek",
+			"base_url": "https://deepseek.example/v1",
+		},
+	})
+	require.NoError(t, err)
+	require.Equal(t, []string{"deepseek-chat", "deepseek-reasoner"}, models)
+	require.Equal(t, "https://deepseek.example/v1/models", upstream.lastReq.URL.String())
+	require.Equal(t, "Bearer sk-deepseek", upstream.lastReq.Header.Get("Authorization"))
+}
+
 func TestFetchUpstreamSupportedModelsParsesGrokOAuthResponse(t *testing.T) {
 	t.Parallel()
 

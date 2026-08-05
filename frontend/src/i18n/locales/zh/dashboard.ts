@@ -192,6 +192,9 @@ export default {
         codexNoteWindows:
           '设置 $env:SUB2API_API_KEY，将 config.toml 保存到 %USERPROFILE%\\.codex。优先 env_key，勿提交密钥。'
       },
+      deepseek: {
+        description: '配置 OpenCode，让 DeepSeek Chat Completions 请求通过当前 Sub2API DeepSeek 分组发送。'
+      },
       opencode: {
         title: 'OpenCode 配置示例',
         subtitle: 'opencode.json',
@@ -436,7 +439,8 @@ export default {
       anthropic: 'Anthropic',
       gemini: 'Gemini',
       grok: 'Grok',
-      agnes: 'Agnes'
+      agnes: 'Agnes',
+      deepseek: 'DeepSeek'
     },
     extraModelsHeader: '附加模型',
     extraModelsEmpty: '无附加模型',

@@ -110,6 +110,7 @@ const qwenModels = [
 // DeepSeek
 const deepseekModels = [
   'deepseek-chat', 'deepseek-coder', 'deepseek-reasoner',
+  'deepseek-v4-flash', 'deepseek-v4-pro',
   'deepseek-v3', 'deepseek-v3-0324',
   'deepseek-r1', 'deepseek-r1-0528',
   'deepseek-r1-distill-qwen-32b', 'deepseek-r1-distill-qwen-14b', 'deepseek-r1-distill-qwen-7b',
@@ -441,7 +442,7 @@ export function getModelsByPlatform(platform: string): string[] {
 
 // 按平台获取预设映射
 export function getPresetMappingsByPlatform(platform: string) {
-  if (platform === 'agnes') return []
+  if (platform === 'agnes' || platform === 'deepseek') return []
   if (platform === 'openai') return openaiPresetMappings
   if (platform === 'gemini') return geminiPresetMappings
   if (platform === 'grok' || platform === 'xai') return grokPresetMappings

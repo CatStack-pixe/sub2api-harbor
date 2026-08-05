@@ -24,12 +24,14 @@ const (
 	PlatformAntigravity = "antigravity"
 	PlatformGrok        = "grok"
 	PlatformAgnes       = "agnes"
+	PlatformDeepSeek    = "deepseek"
 	PlatformComposite   = "composite"
 )
 
 const (
-	AgnesDefaultBaseURL = "https://apihub.agnes-ai.com/v1"
-	AgnesDefaultModel   = "agnes-2.0-flash"
+	AgnesDefaultBaseURL    = "https://apihub.agnes-ai.com/v1"
+	AgnesDefaultModel      = "agnes-2.0-flash"
+	DeepSeekDefaultBaseURL = "https://api.deepseek.com"
 )
 
 // Account type constants

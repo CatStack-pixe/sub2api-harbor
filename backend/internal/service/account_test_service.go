@@ -284,6 +284,10 @@ func (s *AccountTestService) TestAccountConnection(c *gin.Context, accountID int
 	}
 
 	// Route to platform-specific test method
+	if account.IsDeepSeek() {
+		return s.testDeepSeekAccountConnection(c, account, modelID, prompt)
+	}
+
 	if account.IsOpenAI() || account.IsAgnes() {
 		return s.testOpenAIAccountConnection(c, account, modelID, prompt, normalizeAccountTestMode(mode))
 	}
@@ -301,6 +305,23 @@ func (s *AccountTestService) TestAccountConnection(c *gin.Context, accountID int
 	}
 
 	return s.testClaudeAccountConnection(c, account, modelID)
+}
+
+func (s *AccountTestService) testDeepSeekAccountConnection(c *gin.Context, account *Account, modelID string, prompt string) error {
+	testModelID := strings.TrimSpace(modelID)
+	if testModelID == "" {
+		testModelID = "deepseek-chat"
+	}
+	testModelID = account.GetMappedModel(testModelID)
+	authToken := strings.TrimSpace(account.GetOpenAIApiKey())
+	if authToken == "" {
+		return s.sendErrorAndEnd(c, "No DeepSeek API key available")
+	}
+	baseURL, err := s.validateUpstreamBaseURL(account.GetOpenAIBaseURL())
+	if err != nil {
+		return s.sendErrorAndEnd(c, fmt.Sprintf("Invalid DeepSeek base URL: %s", err.Error()))
+	}
+	return s.testOpenAIChatCompletionsConnection(c, account, testModelID, prompt, baseURL, authToken)
 }
 
 // testClaudeAccountConnection tests an Anthropic Claude account's connection
