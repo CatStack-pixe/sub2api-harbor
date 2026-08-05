@@ -406,7 +406,7 @@ func ValidateProfitControlConfig(platform string, enabled bool, minMargin, safet
 		return nil
 	}
 	if !profitControlPlatformSupported(platform) {
-		return errors.New("利润控制仅支持 openai、anthropic、gemini、grok、antigravity、deepseek 平台分组")
+		return errors.New("利润控制仅支持 openai、anthropic、gemini、grok、antigravity、deepseek、nvidia 平台分组")
 	}
 	if !validProfitControlRatio(minMargin) {
 		return fmt.Errorf("profit_min_margin 应为 [0,1) 的小数，got %v", minMargin)
@@ -443,7 +443,7 @@ func NormalizeProfitControlConfig(platform string, enabled bool, minMargin, safe
 
 func profitControlPlatformSupported(platform string) bool {
 	switch platform {
-	case PlatformOpenAI, PlatformAnthropic, PlatformGemini, PlatformGrok, PlatformAntigravity, PlatformDeepSeek:
+	case PlatformOpenAI, PlatformAnthropic, PlatformGemini, PlatformGrok, PlatformAntigravity, PlatformDeepSeek, PlatformNvidia:
 		return true
 	default:
 		return false

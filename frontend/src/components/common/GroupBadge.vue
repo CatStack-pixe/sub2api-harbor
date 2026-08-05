@@ -168,6 +168,9 @@ const labelClass = computed(() => {
   if (props.platform === 'deepseek') {
     return `${base} bg-indigo-200/70 text-indigo-900 dark:bg-indigo-900/50 dark:text-indigo-300`
   }
+  if (props.platform === 'nvidia') {
+    return `${base} bg-lime-200/70 text-lime-900 dark:bg-lime-900/50 dark:text-lime-300`
+  }
   if (props.platform === 'composite') {
     return `${base} bg-cyan-200/70 text-cyan-900 dark:bg-cyan-900/50 dark:text-cyan-300`
   }
@@ -215,6 +218,11 @@ const badgeClass = computed(() => {
     return isSubscription.value
       ? 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300'
       : 'bg-indigo-50 text-indigo-800 dark:bg-indigo-900/20 dark:text-indigo-300'
+  }
+  if (props.platform === 'nvidia') {
+    return isSubscription.value
+      ? 'bg-lime-100 text-lime-800 dark:bg-lime-900/30 dark:text-lime-300'
+      : 'bg-lime-50 text-lime-800 dark:bg-lime-900/20 dark:text-lime-300'
   }
   if (props.platform === 'composite') {
     return isSubscription.value

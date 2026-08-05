@@ -18,6 +18,25 @@ func TestDeepSeekDefaultModelIDs(t *testing.T) {
 	}
 }
 
+func TestNvidiaDefaultModelIDs(t *testing.T) {
+	got := NvidiaDefaultModelIDs()
+	want := []string{
+		"nvidia/llama-3.1-nemotron-nano-8b-v1",
+		"meta/llama-3.1-8b-instruct",
+		"meta/llama-3.1-70b-instruct",
+		"meta/llama-3.3-70b-instruct",
+	}
+
+	if len(got) != len(want) {
+		t.Fatalf("NvidiaDefaultModelIDs() = %v, want %v", got, want)
+	}
+	for index := range want {
+		if got[index] != want[index] {
+			t.Fatalf("NvidiaDefaultModelIDs() = %v, want %v", got, want)
+		}
+	}
+}
+
 // TestSettingKeyDefaultPlatformQuotas 验证新的系统层 JSON key 常量值正确。
 func TestSettingKeyDefaultPlatformQuotas(t *testing.T) {
 	if SettingKeyDefaultPlatformQuotas != "default_platform_quotas" {

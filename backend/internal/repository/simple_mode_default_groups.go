@@ -28,6 +28,7 @@ func ensureSimpleModeDefaultGroups(ctx context.Context, client *dbent.Client) er
 		service.PlatformGrok:        1,
 		service.PlatformAgnes:       1,
 		service.PlatformDeepSeek:    1,
+		service.PlatformNvidia:      1,
 	}
 
 	for platform, minCount := range requiredByPlatform {

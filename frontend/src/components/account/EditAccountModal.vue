@@ -45,7 +45,9 @@
                       ? 'https://api.x.ai/v1'
                       : account.platform === 'agnes'
                         ? 'https://apihub.agnes-ai.com/v1'
-                        : account.platform === 'deepseek'
+                        : account.platform === 'nvidia'
+                          ? 'https://integrate.api.nvidia.com/v1'
+                          : account.platform === 'deepseek'
                           ? 'https://api.deepseek.com'
                           : 'https://api.anthropic.com'
             "
@@ -78,7 +80,9 @@
                       ? 'xai-...'
                       : account.platform === 'agnes'
                         ? 'YOUR_API_KEY'
-                        : account.platform === 'deepseek'
+                        : account.platform === 'nvidia'
+                          ? 'nvapi-...'
+                          : account.platform === 'deepseek'
                           ? 'sk-...'
                           : 'sk-ant-...'
             "
@@ -2816,6 +2820,7 @@ const baseUrlHint = computed(() => {
   if (props.account.platform === 'grok') return ''
   if (props.account.platform === 'agnes') return ''
   if (props.account.platform === 'deepseek') return t('admin.accounts.deepseek.baseUrlHint')
+  if (props.account.platform === 'nvidia') return t('admin.accounts.nvidia.baseUrlHint')
   return t('admin.accounts.baseUrlHint')
 })
 
@@ -3283,6 +3288,7 @@ const defaultBaseUrl = computed(() => {
   if (props.account?.platform === 'gemini') return 'https://generativelanguage.googleapis.com'
   if (props.account?.platform === 'grok') return 'https://api.x.ai/v1'
   if (props.account?.platform === 'agnes') return 'https://apihub.agnes-ai.com/v1'
+  if (props.account?.platform === 'nvidia') return 'https://integrate.api.nvidia.com/v1'
   if (props.account?.platform === 'deepseek') return 'https://api.deepseek.com'
   return 'https://api.anthropic.com'
 })
@@ -3642,8 +3648,10 @@ const syncFormFromAccount = (newAccount: Account | null) => {
             ? 'https://api.x.ai/v1'
             : newAccount.platform === 'agnes'
               ? 'https://apihub.agnes-ai.com/v1'
-              : newAccount.platform === 'deepseek'
-                ? 'https://api.deepseek.com'
+              : newAccount.platform === 'nvidia'
+                ? 'https://integrate.api.nvidia.com/v1'
+                : newAccount.platform === 'deepseek'
+                  ? 'https://api.deepseek.com'
                 : 'https://api.anthropic.com'
     editBaseUrl.value = (credentials.base_url as string) || platformDefaultUrl
 
@@ -3717,8 +3725,10 @@ const syncFormFromAccount = (newAccount: Account | null) => {
             ? 'https://api.x.ai/v1'
             : newAccount.platform === 'agnes'
               ? 'https://apihub.agnes-ai.com/v1'
-              : newAccount.platform === 'deepseek'
-                ? 'https://api.deepseek.com'
+              : newAccount.platform === 'nvidia'
+                ? 'https://integrate.api.nvidia.com/v1'
+                : newAccount.platform === 'deepseek'
+                  ? 'https://api.deepseek.com'
                 : 'https://api.anthropic.com'
     editBaseUrl.value = platformDefaultUrl
 

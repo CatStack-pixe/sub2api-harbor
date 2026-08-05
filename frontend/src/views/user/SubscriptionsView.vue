@@ -275,6 +275,7 @@ function platformAccentDotClass(p: string): string {
     case 'grok': return 'bg-zinc-500'
     case 'agnes': return 'bg-cyan-500'
     case 'deepseek': return 'bg-indigo-500'
+    case 'nvidia': return 'bg-lime-500'
     default: return 'bg-gray-400'
   }
 }

@@ -112,6 +112,15 @@ const deepseekModels = [
   'deepseek-v4-pro', 'deepseek-v4-flash'
 ]
 
+// NVIDIA NIM models. The account sync action can add any model returned by
+// the upstream /v1/models endpoint when the catalog changes.
+export const nvidiaModels = [
+  'nvidia/llama-3.1-nemotron-nano-8b-v1',
+  'meta/llama-3.1-8b-instruct',
+  'meta/llama-3.1-70b-instruct',
+  'meta/llama-3.3-70b-instruct'
+]
+
 // Mistral
 const mistralModels = [
   'mistral-small-latest', 'mistral-medium-latest', 'mistral-large-latest',
@@ -235,6 +244,7 @@ const allModelsList: string[] = [
   ...zhipuModels,
   ...qwenModels,
   ...deepseekModels,
+  ...nvidiaModels,
   ...mistralModels,
   ...metaModels,
   ...xaiModels,
@@ -417,6 +427,7 @@ export function getModelsByPlatform(platform: string): string[] {
     case 'zhipu': return zhipuModels
     case 'qwen': return qwenModels
     case 'deepseek': return deepseekModels
+    case 'nvidia': return nvidiaModels
     case 'mistral': return mistralModels
     case 'meta': return metaModels
     case 'xai':
@@ -437,7 +448,7 @@ export function getModelsByPlatform(platform: string): string[] {
 
 // 按平台获取预设映射
 export function getPresetMappingsByPlatform(platform: string) {
-  if (platform === 'agnes' || platform === 'deepseek') return []
+  if (platform === 'agnes' || platform === 'deepseek' || platform === 'nvidia') return []
   if (platform === 'openai') return openaiPresetMappings
   if (platform === 'gemini') return geminiPresetMappings
   if (platform === 'grok' || platform === 'xai') return grokPresetMappings

@@ -36,6 +36,8 @@ func TestIsHeaderOverrideEligible(t *testing.T) {
 		{"agnes oauth", PlatformAgnes, AccountTypeOAuth, false},
 		{"deepseek apikey", PlatformDeepSeek, AccountTypeAPIKey, true},
 		{"deepseek oauth", PlatformDeepSeek, AccountTypeOAuth, false},
+		{"nvidia apikey", PlatformNvidia, AccountTypeAPIKey, true},
+		{"nvidia oauth", PlatformNvidia, AccountTypeOAuth, false},
 		{"antigravity apikey", PlatformAntigravity, AccountTypeAPIKey, false},
 		{"anthropic bedrock", PlatformAnthropic, AccountTypeBedrock, false},
 	}

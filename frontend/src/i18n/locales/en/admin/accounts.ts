@@ -106,6 +106,7 @@ export default {
         grok: 'Grok',
         agnes: 'Agnes',
         deepseek: 'DeepSeek',
+        nvidia: 'NVIDIA',
       },
       types: {
         oauth: 'OAuth',
@@ -618,6 +619,10 @@ export default {
       deepseek: {
         baseUrlHint: 'Leave default for the official DeepSeek API',
         apiKeyHint: 'Your DeepSeek API Key'
+      },
+      nvidia: {
+        baseUrlHint: 'OpenAI-compatible NVIDIA NIM endpoint. The default includes /v1.',
+        apiKeyHint: 'Your NVIDIA API Key'
       },
       grok: {
         baseUrlHint: 'Grok OAuth accounts forward to the official xAI API base URL.',
