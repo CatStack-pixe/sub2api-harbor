@@ -4,6 +4,20 @@ package service
 
 import "testing"
 
+func TestDeepSeekDefaultModelIDs(t *testing.T) {
+	got := DeepSeekDefaultModelIDs()
+	want := []string{"deepseek-v4-pro", "deepseek-v4-flash"}
+
+	if len(got) != len(want) {
+		t.Fatalf("DeepSeekDefaultModelIDs() = %v, want %v", got, want)
+	}
+	for index := range want {
+		if got[index] != want[index] {
+			t.Fatalf("DeepSeekDefaultModelIDs() = %v, want %v", got, want)
+		}
+	}
+}
+
 // TestSettingKeyDefaultPlatformQuotas 验证新的系统层 JSON key 常量值正确。
 func TestSettingKeyDefaultPlatformQuotas(t *testing.T) {
 	if SettingKeyDefaultPlatformQuotas != "default_platform_quotas" {
