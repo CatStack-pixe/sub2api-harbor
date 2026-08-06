@@ -291,7 +291,7 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 	// body-signal compact：上游 unary 等待期间向下游发 SSE 注释行心跳，防止
 	// 反向代理空闲超时掐断长压缩连接（#3887）。首拍延迟一个心跳间隔，快速
 	// 失败仍走 JSON+状态码链路；未标记客户端流式或间隔为 0 时是 no-op。
-	stopCompactKeepalive := service.StartOpenAICompactSSEKeepalive(c, h.openAICompactKeepaliveInterval())
+	stopCompactKeepalive := service.StartOpenAICompactSSEKeepalive(c, h.openAIResponsesKeepaliveInterval())
 	defer stopCompactKeepalive()
 
 	// 校验请求体 JSON 合法性
@@ -395,6 +395,11 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 	// Get subscription info (may be nil)
 	subscription, _ := middleware2.GetSubscriptionFromContext(c)
 	requestPlatform := openAICompatibleRequestPlatform(c.Request.Context(), apiKey)
+	stopNvidiaResponsesKeepalive := func() {}
+	if reqStream && requestPlatform == service.PlatformNvidia && isBareOpenAIResponsesPath(c) {
+		stopNvidiaResponsesKeepalive = service.StartOpenAIResponsesSSEKeepalive(c, h.openAIResponsesKeepaliveInterval())
+	}
+	defer stopNvidiaResponsesKeepalive()
 
 	service.SetOpsLatencyMs(c, service.OpsAuthLatencyMsKey, time.Since(requestStart).Milliseconds())
 	routingStart := time.Now()
@@ -545,7 +550,7 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 		forwardStart := time.Now()
 		// 用扣除 compact 心跳字节的口径快照：心跳注释不构成语义响应，
 		// 不能因心跳字节变化而放弃 failover 换号（#3887）。
-		writerSizeBeforeForward := service.OpenAICompactKeepaliveAdjustedWrittenSize(c)
+		writerSizeBeforeForward := service.OpenAIResponsesKeepaliveAdjustedWrittenSize(c)
 		// 跨 passthrough 边界的 failover：从 Kiro 等透传账号切到 Bedrock 等非透传账号前，
 		// 从不可变的 canonical forwardBody 派生本次尝试 body 并整块剔除上游私有的加密
 		// reasoning item（含耦合的 id/summary），避免非透传上游 400 拒绝 Kiro reasoning 形态。
@@ -2628,7 +2633,7 @@ func (h *OpenAIGatewayHandler) handleStreamingAwareErrorWithCode(
 ) {
 	// body-signal compact 心跳可能已把响应头提交为 200：先停心跳（建立
 	// happens-before，接管 ResponseWriter），并升级为流内错误处理。
-	if service.StopOpenAICompactSSEKeepaliveCommitted(c) {
+	if service.StopOpenAIResponsesSSEKeepaliveCommitted(c) {
 		streamStarted = true
 	}
 	if streamStarted {
@@ -2696,8 +2701,8 @@ func (h *OpenAIGatewayHandler) ensureForwardErrorResponse(c *gin.Context, stream
 		return false
 	}
 	// 先停 compact 心跳再读 Writer 状态，避免与心跳 goroutine 竞争。
-	compactKeepaliveCommitted := service.StopOpenAICompactSSEKeepaliveCommitted(c)
-	if compactKeepaliveCommitted {
+	responsesKeepaliveCommitted := service.StopOpenAIResponsesSSEKeepaliveCommitted(c)
+	if responsesKeepaliveCommitted {
 		streamStarted = true
 	}
 	imageKeepalivePresent := service.OpenAIImagesJSONKeepalivePresent(c)
@@ -2709,7 +2714,7 @@ func (h *OpenAIGatewayHandler) ensureForwardErrorResponse(c *gin.Context, stream
 		imageKeepalivePaddingOnly = adjustedSize < 0
 		imageKeepaliveResponseWritten = adjustedSize >= 0
 	}
-	if service.IsResponseCommitted(c) || (!compactKeepaliveCommitted && imageKeepaliveResponseWritten) {
+	if service.IsResponseCommitted(c) || (!responsesKeepaliveCommitted && imageKeepaliveResponseWritten) {
 		return false
 	}
 	if c.Writer.Written() && !imageKeepalivePaddingOnly {
@@ -2746,7 +2751,7 @@ func openAIForwardErrorAlreadyCommunicated(c *gin.Context, writerSizeBeforeForwa
 	}
 	// 与快照同口径：排除 compact 心跳字节，避免"仅心跳写出"被误判为
 	// 响应已写出（#3887）。
-	if service.OpenAICompactKeepaliveAdjustedWrittenSize(c) == writerSizeBeforeForward ||
+	if service.OpenAIResponsesKeepaliveAdjustedWrittenSize(c) == writerSizeBeforeForward ||
 		service.OpenAIImagesJSONKeepaliveAdjustedWrittenSize(c) == writerSizeBeforeForward {
 		return false
 	}
@@ -2775,7 +2780,7 @@ func openAIForwardMayFailover(c *gin.Context, writerSizeBeforeForward int, failo
 	if c == nil || c.Writer == nil {
 		return false
 	}
-	if service.OpenAICompactKeepaliveAdjustedWrittenSize(c) == writerSizeBeforeForward {
+	if service.OpenAIResponsesKeepaliveAdjustedWrittenSize(c) == writerSizeBeforeForward {
 		return true
 	}
 	return failoverErr != nil && failoverErr.SafeToFailoverAfterWrite
@@ -2803,7 +2808,7 @@ func openAIFirstOutputFailoverExhausted(failoverErr *service.UpstreamFailoverErr
 func (h *OpenAIGatewayHandler) errorResponse(c *gin.Context, status int, errType, message string) {
 	// body-signal compact 心跳可能已把响应头提交为 200：JSON 错误体会与已
 	// 提交的 SSE 流交错，必须降级为 response.failed 终止事件（#3887）。
-	if service.StopOpenAICompactSSEKeepaliveCommitted(c) {
+	if service.StopOpenAIResponsesSSEKeepaliveCommitted(c) {
 		service.MarkOpsStreamError(c, errType, message, status)
 		if writeResponsesFailedSSE(c, errType, message) {
 			return
@@ -2817,9 +2822,9 @@ func (h *OpenAIGatewayHandler) errorResponse(c *gin.Context, status int, errType
 	})
 }
 
-// openAICompactKeepaliveInterval 复用流式 keepalive 配置作为 compact 下游
-// 心跳间隔；0 表示禁用（与流式路径语义一致）。
-func (h *OpenAIGatewayHandler) openAICompactKeepaliveInterval() time.Duration {
+// openAIResponsesKeepaliveInterval 复用流式 keepalive 配置作为 Responses
+// 下游心跳间隔；0 表示禁用（与流式路径语义一致）。
+func (h *OpenAIGatewayHandler) openAIResponsesKeepaliveInterval() time.Duration {
 	if h.cfg == nil || h.cfg.Gateway.StreamKeepaliveInterval <= 0 {
 		return 0
 	}
@@ -3095,7 +3100,7 @@ func (h *OpenAIGatewayHandler) rejectIfCyberSessionBlocked(c *gin.Context, apiKe
 	// body-signal compact 心跳可能已把响应头提交为 200（cyber 检查在用户槽位
 	// 长等待之后执行）：以 response.failed 终止事件回传；未提交时停拍后照常
 	// 写 JSON（#3887）。
-	if service.StopOpenAICompactSSEKeepaliveCommitted(c) {
+	if service.StopOpenAIResponsesSSEKeepaliveCommitted(c) {
 		service.MarkOpsStreamError(c, "permission_error", cyberSessionBlockedClientMsg, http.StatusForbidden)
 		if writeResponsesFailedSSE(c, "permission_error", cyberSessionBlockedClientMsg) {
 			h.enqueueCyberSessionBlockedOpsEntry(c, apiKey, model, key)

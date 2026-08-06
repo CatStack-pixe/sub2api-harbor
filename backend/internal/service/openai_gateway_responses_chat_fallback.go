@@ -175,18 +175,27 @@ func (s *OpenAIGatewayService) streamChatCompletionsAsResponses(
 	startTime time.Time,
 ) (*OpenAIForwardResult, error) {
 	requestID := resp.Header.Get("x-request-id")
-	writeStreamHeaders := s.newStreamHeaderWriter(c, resp.Header)
+	keepaliveOwner, _, lastDownstreamWriteAt, keepaliveInterval := takeOverOpenAIResponsesSSEKeepalive(c)
+	writeInitialStreamHeaders := s.newStreamHeaderWriter(c, resp.Header)
+	writeStreamHeaders := func() {
+		if keepaliveOwner != nil && keepaliveOwner.committed() {
+			return
+		}
+		writeInitialStreamHeaders()
+	}
 
 	state := apicompat.NewChatCompletionsToResponsesStreamState(originalModel)
 	state.CustomTools = customTools
 	state.ToolSearchDeclared = toolSearch
 	state.NamespaceTools = namespaceTools
 	clientDisconnected := false
+	downstreamWritten := func() {}
 
 	writeEvents := func(events []apicompat.ResponsesStreamEvent) {
 		if clientDisconnected || len(events) == 0 {
 			return
 		}
+		wroteEvent := false
 		writeStreamHeaders()
 		for _, event := range events {
 			sse, err := apicompat.ResponsesEventToSSE(event)
@@ -205,15 +214,15 @@ func (s *OpenAIGatewayService) streamChatCompletionsAsResponses(
 				)
 				return
 			}
+			wroteEvent = true
 		}
-		c.Writer.Flush()
+		if wroteEvent {
+			c.Writer.Flush()
+			downstreamWritten()
+		}
 	}
 
-	scan := s.scanCCStream(resp, "openai responses chat fallback", requestID, startTime, func(chunk *apicompat.ChatCompletionsChunk) {
-		writeEvents(apicompat.ChatCompletionsChunkToResponsesEvents(chunk, state))
-	})
-
-	if scan.Err != nil {
+	resultWithScan := func(scan ccStreamScanState) *OpenAIForwardResult {
 		return &OpenAIForwardResult{
 			RequestID:       requestID,
 			Usage:           scan.Usage,
@@ -225,35 +234,105 @@ func (s *OpenAIGatewayService) streamChatCompletionsAsResponses(
 			Stream:          true,
 			Duration:        time.Since(startTime),
 			FirstTokenMs:    scan.FirstTokenMs,
-		}, fmt.Errorf("stream usage incomplete: %w", scan.Err)
+		}
 	}
 
-	writeEvents(apicompat.FinalizeChatCompletionsResponsesStream(state))
-	if !clientDisconnected {
-		writeStreamHeaders()
-		if _, err := fmt.Fprint(c.Writer, "data: [DONE]\n\n"); err != nil {
-			clientDisconnected = true
+	finishStream := func(scan ccStreamScanState) (*OpenAIForwardResult, error) {
+		if scan.Err != nil {
+			return resultWithScan(scan), fmt.Errorf("stream usage incomplete: %w", scan.Err)
 		}
+
+		writeEvents(apicompat.FinalizeChatCompletionsResponsesStream(state))
 		if !clientDisconnected {
-			c.Writer.Flush()
+			writeStreamHeaders()
+			if _, err := fmt.Fprint(c.Writer, "data: [DONE]\n\n"); err != nil {
+				clientDisconnected = true
+			}
+			if !clientDisconnected {
+				c.Writer.Flush()
+				downstreamWritten()
+			}
 		}
-	}
-	if !scan.SawDone {
-		logCCStreamMissingDoneSentinel("openai responses chat fallback", requestID)
+		if !scan.SawDone {
+			logCCStreamMissingDoneSentinel("openai responses chat fallback", requestID)
+		}
+		return resultWithScan(scan), nil
 	}
 
-	return &OpenAIForwardResult{
-		RequestID:       requestID,
-		Usage:           scan.Usage,
-		Model:           originalModel,
-		BillingModel:    billingModel,
-		UpstreamModel:   upstreamModel,
-		ReasoningEffort: reasoningEffort,
-		ServiceTier:     serviceTier,
-		Stream:          true,
-		Duration:        time.Since(startTime),
-		FirstTokenMs:    scan.FirstTokenMs,
-	}, nil
+	if keepaliveOwner == nil || keepaliveInterval <= 0 {
+		scan := s.scanCCStream(resp, "openai responses chat fallback", requestID, startTime, func(chunk *apicompat.ChatCompletionsChunk) {
+			writeEvents(apicompat.ChatCompletionsChunkToResponsesEvents(chunk, state))
+		})
+		return finishStream(scan)
+	}
+
+	if lastDownstreamWriteAt.IsZero() {
+		lastDownstreamWriteAt = time.Now()
+	}
+	firstTickAfter := keepaliveInterval - time.Since(lastDownstreamWriteAt)
+	if firstTickAfter <= 0 {
+		firstTickAfter = time.Nanosecond
+	}
+	keepaliveTicker := time.NewTicker(firstTickAfter)
+	defer keepaliveTicker.Stop()
+	keepaliveCh := keepaliveTicker.C
+	downstreamWritten = func() {
+		lastDownstreamWriteAt = time.Now()
+		keepaliveTicker.Reset(keepaliveInterval)
+	}
+
+	chunks := make(chan *apicompat.ChatCompletionsChunk)
+	scanDone := make(chan ccStreamScanState, 1)
+	go func() {
+		scan := s.scanCCStream(resp, "openai responses chat fallback", requestID, startTime, func(chunk *apicompat.ChatCompletionsChunk) {
+			chunks <- chunk
+		})
+		scanDone <- scan
+	}()
+
+	var clientDone <-chan struct{}
+	if c.Request != nil {
+		clientDone = c.Request.Context().Done()
+		if c.Request.Context().Err() != nil {
+			clientDisconnected = true
+			clientDone = nil
+			keepaliveCh = nil
+		}
+	}
+
+	for {
+		select {
+		case chunk := <-chunks:
+			if !clientDisconnected && c.Request != nil && c.Request.Context().Err() != nil {
+				clientDisconnected = true
+				clientDone = nil
+				keepaliveCh = nil
+			}
+			writeEvents(apicompat.ChatCompletionsChunkToResponsesEvents(chunk, state))
+		case scan := <-scanDone:
+			return finishStream(scan)
+		case <-clientDone:
+			clientDisconnected = true
+			clientDone = nil
+			keepaliveCh = nil
+		case <-keepaliveCh:
+			if clientDisconnected || (c.Request != nil && c.Request.Context().Err() != nil) {
+				clientDisconnected = true
+				clientDone = nil
+				keepaliveCh = nil
+				continue
+			}
+			if !keepaliveOwner.beat() {
+				clientDisconnected = true
+				keepaliveCh = nil
+				logger.L().Debug("openai responses chat fallback: client disconnected during keepalive, continuing to drain upstream for billing",
+					zap.String("request_id", requestID),
+				)
+				continue
+			}
+			downstreamWritten()
+		}
+	}
 }
 
 func chatChunkStartsResponsesOutput(chunk *apicompat.ChatCompletionsChunk) bool {
