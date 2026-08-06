@@ -56,7 +56,14 @@ func (h *OpenAIGatewayHandler) CodexModels(c *gin.Context) {
 		// 让 ops 错误日志携带实际选中的上游账号，便于定位失效账号（#4544）。
 		setOpsSelectedAccount(c, account.ID, account.Platform)
 
-		manifest, err := h.gatewayService.FetchCodexModelsManifest(c.Request.Context(), account, c.Query("client_version"), c.GetHeader("If-None-Match"))
+		restricted := len(apiKey.ModelWhitelist) > 0
+		ifNoneMatch := c.GetHeader("If-None-Match")
+		if restricted {
+			// Filtering must happen before conditional response handling; otherwise
+			// a cached unfiltered client manifest could be reused after a 304.
+			ifNoneMatch = ""
+		}
+		manifest, err := h.gatewayService.FetchCodexModelsManifest(c.Request.Context(), account, c.Query("client_version"), ifNoneMatch)
 		if err != nil {
 			if c.Request.Context().Err() != nil {
 				return
@@ -74,6 +81,15 @@ func (h *OpenAIGatewayHandler) CodexModels(c *gin.Context) {
 			return
 		}
 
+		if restricted {
+			body, filterErr := service.FilterCodexModelsManifest(manifest.Body, apiKey)
+			if filterErr != nil {
+				h.errorResponse(c, http.StatusBadGateway, "upstream_error", "Invalid Codex models manifest")
+				return
+			}
+			c.Data(http.StatusOK, "application/json", body)
+			return
+		}
 		if manifest.ETag != "" {
 			c.Header("ETag", manifest.ETag)
 		}

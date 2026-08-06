@@ -130,6 +130,13 @@
                 class="text-blue-500"
                 :title="t('keys.ipRestrictionEnabled')"
               />
+              <Icon
+                v-if="row.model_whitelist?.length > 0"
+                name="lock"
+                size="sm"
+                class="text-amber-500"
+                :title="t('keys.modelRestrictionEnabled')"
+              />
             </div>
           </template>
 
@@ -505,6 +512,18 @@
               />
             </template>
           </Select>
+        </div>
+
+        <!-- Model Restriction Section -->
+        <div class="space-y-2">
+          <label class="input-label">{{ t('keys.modelWhitelist') }}</label>
+          <textarea
+            v-model="formData.model_whitelist"
+            rows="3"
+            class="input font-mono text-sm"
+            :placeholder="t('keys.modelWhitelistPlaceholder')"
+          />
+          <p class="input-hint">{{ t('keys.modelWhitelistHint') }}</p>
         </div>
 
         <!-- Custom Key Section (only for create) -->
@@ -1336,6 +1355,7 @@ const formData = ref({
   enable_ip_restriction: false,
   ip_whitelist: '',
   ip_blacklist: '',
+  model_whitelist: '',
   // Quota settings (empty = unlimited)
   enable_quota: false,
   quota: null as number | null,
@@ -1570,6 +1590,7 @@ const editKey = (key: ApiKey) => {
     enable_ip_restriction: hasIPRestriction,
     ip_whitelist: (key.ip_whitelist || []).join('\n'),
     ip_blacklist: (key.ip_blacklist || []).join('\n'),
+    model_whitelist: (key.model_whitelist || []).join('\n'),
     enable_quota: key.quota > 0,
     quota: key.quota > 0 ? key.quota : null,
     enable_rate_limit: (key.rate_limit_5h > 0) || (key.rate_limit_1d > 0) || (key.rate_limit_7d > 0),
@@ -1685,6 +1706,10 @@ const handleSubmit = async () => {
     text.split('\n').map(ip => ip.trim()).filter(ip => ip.length > 0)
   const ipWhitelist = formData.value.enable_ip_restriction ? parseIPList(formData.value.ip_whitelist) : []
   const ipBlacklist = formData.value.enable_ip_restriction ? parseIPList(formData.value.ip_blacklist) : []
+  const modelWhitelist = formData.value.model_whitelist
+    .split(/[\n,]+/)
+    .map(model => model.trim())
+    .filter(model => model.length > 0)
 
   // Calculate quota value (null/empty/0 = unlimited, stored as 0)
   const quota = formData.value.quota && formData.value.quota > 0 ? formData.value.quota : 0
@@ -1723,6 +1748,7 @@ const handleSubmit = async () => {
         group_id: formData.value.group_id,
         ip_whitelist: ipWhitelist,
         ip_blacklist: ipBlacklist,
+        model_whitelist: modelWhitelist,
         quota: quota,
         expires_at: expiresAt,
         rate_limit_5h: rateLimitData.rate_limit_5h,
@@ -1744,6 +1770,7 @@ const handleSubmit = async () => {
         ipBlacklist,
         quota,
         expiresInDays,
+        modelWhitelist,
         rateLimitData
       )
       appStore.showSuccess(t('keys.keyCreatedSuccess'))
@@ -1796,6 +1823,7 @@ const closeModals = () => {
     enable_ip_restriction: false,
     ip_whitelist: '',
     ip_blacklist: '',
+    model_whitelist: '',
     enable_quota: false,
     quota: null,
     enable_rate_limit: false,

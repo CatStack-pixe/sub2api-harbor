@@ -1,6 +1,7 @@
 package service
 
 import (
+	"strings"
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/ip"
@@ -28,14 +29,15 @@ func IsWindowExpired(windowStart *time.Time, duration time.Duration) bool {
 }
 
 type APIKey struct {
-	ID          int64
-	UserID      int64
-	Key         string
-	Name        string
-	GroupID     *int64
-	Status      string
-	IPWhitelist []string
-	IPBlacklist []string
+	ID             int64
+	UserID         int64
+	Key            string
+	Name           string
+	GroupID        *int64
+	Status         string
+	IPWhitelist    []string
+	IPBlacklist    []string
+	ModelWhitelist []string
 	// 预编译的 IP 规则，用于认证热路径避免重复 ParseIP/ParseCIDR。
 	CompiledIPWhitelist *ip.CompiledIPRules `json:"-"`
 	CompiledIPBlacklist *ip.CompiledIPRules `json:"-"`
@@ -66,6 +68,39 @@ type APIKey struct {
 
 func (k *APIKey) IsActive() bool {
 	return k.Status == StatusActive
+}
+
+// AllowsModel reports whether this key may request model. An empty whitelist
+// preserves the legacy behavior and allows every model. Entries ending in '*'
+// match the corresponding model prefix. Gemini model names are accepted with
+// or without their "models/" transport prefix.
+func (k *APIKey) AllowsModel(model string) bool {
+	if k == nil || len(k.ModelWhitelist) == 0 {
+		return true
+	}
+
+	model = strings.TrimSpace(model)
+	if model == "" {
+		return false
+	}
+	models := []string{model}
+	if strings.HasPrefix(model, "models/") {
+		models = append(models, strings.TrimPrefix(model, "models/"))
+	} else {
+		models = append(models, "models/"+model)
+	}
+	for _, candidate := range models {
+		for _, pattern := range k.ModelWhitelist {
+			pattern = strings.TrimSpace(pattern)
+			if pattern == candidate || pattern == "*" {
+				return true
+			}
+			if strings.HasSuffix(pattern, "*") && strings.HasPrefix(candidate, strings.TrimSuffix(pattern, "*")) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // HasRateLimits returns true if any rate limit window is configured

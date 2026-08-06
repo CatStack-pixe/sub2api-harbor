@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/Wei-Shaw/sub2api/internal/pkg/antigravity"
 	middleware2 "github.com/Wei-Shaw/sub2api/internal/server/middleware"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/gin-gonic/gin"
@@ -67,6 +68,16 @@ func TestDefaultModelIDsForCompositeIncludesAntigravityDefaults(t *testing.T) {
 
 	compositeIDs := defaultModelIDsForPlatform(service.PlatformComposite)
 	require.Contains(t, compositeIDs, antigravityIDs[0])
+}
+
+func TestFilterAPIKeyModelsByWhitelist(t *testing.T) {
+	apiKey := &service.APIKey{ModelWhitelist: []string{"gpt-5.6*"}}
+
+	require.Equal(t, []string{"gpt-5.6", "gpt-5.6-codex"}, filterAPIKeyModels(apiKey, []string{
+		"gpt-5.6",
+		"gpt-5.6-codex",
+		"gpt-5.5",
+	}))
 }
 
 func TestGatewayModels_GeminiGroupFallsBackToGeminiModels(t *testing.T) {
@@ -734,4 +745,24 @@ func TestGatewayModels_AgnesGroupMappingExposesOnlyConfiguredAliases(t *testing.
 	var got gatewayModelsResponseForTest
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &got))
 	require.Equal(t, []string{"deepseek-v4-pro", "deepseek-v4-flash"}, modelIDsForTest(got.Data))
+}
+
+func TestGatewayAntigravityModelsFiltersByAPIKeyWhitelist(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	models := antigravity.DefaultModels()
+	require.GreaterOrEqual(t, len(models), 2)
+
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Request = httptest.NewRequest(http.MethodGet, "/antigravity/models", nil)
+	c.Set(string(middleware2.ContextKeyAPIKey), &service.APIKey{
+		ModelWhitelist: []string{models[0].ID},
+	})
+
+	(&GatewayHandler{}).AntigravityModels(c)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	var got gatewayModelsResponseForTest
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &got))
+	require.Equal(t, []string{models[0].ID}, modelIDsForTest(got.Data))
 }
