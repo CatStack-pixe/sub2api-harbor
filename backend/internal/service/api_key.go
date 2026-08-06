@@ -72,7 +72,8 @@ func (k *APIKey) IsActive() bool {
 
 // AllowsModel reports whether this key may request model. An empty whitelist
 // preserves the legacy behavior and allows every model. Entries ending in '*'
-// match the corresponding model prefix.
+// match the corresponding model prefix. Gemini model names are accepted with
+// or without their "models/" transport prefix.
 func (k *APIKey) AllowsModel(model string) bool {
 	if k == nil || len(k.ModelWhitelist) == 0 {
 		return true
@@ -82,13 +83,21 @@ func (k *APIKey) AllowsModel(model string) bool {
 	if model == "" {
 		return false
 	}
-	for _, pattern := range k.ModelWhitelist {
-		pattern = strings.TrimSpace(pattern)
-		if pattern == model || pattern == "*" {
-			return true
-		}
-		if strings.HasSuffix(pattern, "*") && strings.HasPrefix(model, strings.TrimSuffix(pattern, "*")) {
-			return true
+	models := []string{model}
+	if strings.HasPrefix(model, "models/") {
+		models = append(models, strings.TrimPrefix(model, "models/"))
+	} else {
+		models = append(models, "models/"+model)
+	}
+	for _, candidate := range models {
+		for _, pattern := range k.ModelWhitelist {
+			pattern = strings.TrimSpace(pattern)
+			if pattern == candidate || pattern == "*" {
+				return true
+			}
+			if strings.HasSuffix(pattern, "*") && strings.HasPrefix(candidate, strings.TrimSuffix(pattern, "*")) {
+				return true
+			}
 		}
 	}
 	return false

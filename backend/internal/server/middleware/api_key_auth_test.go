@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -1568,6 +1569,116 @@ func TestAPIKeyAuthEnforcesModelWhitelist(t *testing.T) {
 
 		require.Equal(t, http.StatusForbidden, w.Code)
 		require.Contains(t, w.Body.String(), "MODEL_NOT_ALLOWED")
+	})
+}
+
+func TestAPIKeyAuthModelRestrictionCoversLiveAndDefaultImages(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	user := &service.User{
+		ID:          17,
+		Role:        service.RoleUser,
+		Status:      service.StatusActive,
+		Balance:     10,
+		Concurrency: 3,
+	}
+	groupID := int64(43)
+	group := &service.Group{
+		ID:       groupID,
+		Name:     "openai",
+		Status:   service.StatusActive,
+		Platform: service.PlatformOpenAI,
+		Hydrated: true,
+	}
+	keys := map[string]*service.APIKey{
+		"live-key": {
+			ID:             101,
+			UserID:         user.ID,
+			Key:            "live-key",
+			Status:         service.StatusActive,
+			GroupID:        &groupID,
+			ModelWhitelist: []string{"gpt-5.6"},
+			User:           user,
+			Group:          group,
+		},
+		"image-key": {
+			ID:             102,
+			UserID:         user.ID,
+			Key:            "image-key",
+			Status:         service.StatusActive,
+			GroupID:        &groupID,
+			ModelWhitelist: []string{"gpt-image-2"},
+			User:           user,
+			Group:          group,
+		},
+	}
+	repo := &stubApiKeyRepo{
+		getByKey: func(_ context.Context, key string) (*service.APIKey, error) {
+			apiKey, ok := keys[key]
+			if !ok {
+				return nil, service.ErrAPIKeyNotFound
+			}
+			clone := *apiKey
+			return &clone, nil
+		},
+	}
+	cfg := &config.Config{RunMode: config.RunModeSimple}
+	router := gin.New()
+	router.Use(gin.HandlerFunc(NewAPIKeyAuthMiddleware(
+		service.NewAPIKeyService(repo, nil, nil, nil, nil, nil, cfg), nil, cfg,
+	)))
+	readBody := func(c *gin.Context) {
+		body, err := io.ReadAll(c.Request.Body)
+		require.NoError(t, err)
+		c.Data(http.StatusOK, "application/json", body)
+	}
+	router.POST("/v1/live", readBody)
+	router.POST("/v1/images/generations", readBody)
+	router.POST("/v1/images/edits", readBody)
+	router.POST("/v1/images/generations/async", readBody)
+	router.POST("/v1/images/edits/async", readBody)
+
+	request := func(t *testing.T, path, key, body string) *httptest.ResponseRecorder {
+		t.Helper()
+		w := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodPost, path, strings.NewReader(body))
+		req.Header.Set("x-api-key", key)
+		req.Header.Set("content-type", "application/json")
+		router.ServeHTTP(w, req)
+		return w
+	}
+
+	t.Run("live uses session model and preserves body", func(t *testing.T) {
+		w := request(t, "/v1/live", "live-key", `{"sdp":"offer","session":{"model":"gpt-5.6"}}`)
+		require.Equal(t, http.StatusOK, w.Code)
+		require.Contains(t, w.Body.String(), `"session":{"model":"gpt-5.6"}`)
+	})
+	t.Run("live without session model is rejected", func(t *testing.T) {
+		w := request(t, "/v1/live", "live-key", `{"sdp":"offer","session":{}}`)
+		require.Equal(t, http.StatusForbidden, w.Code)
+		require.Contains(t, w.Body.String(), "MODEL_REQUIRED")
+	})
+	t.Run("sync image checks the gpt-image-2 default", func(t *testing.T) {
+		w := request(t, "/v1/images/generations", "image-key", `{"prompt":"draw a cat"}`)
+		require.Equal(t, http.StatusOK, w.Code)
+		require.Contains(t, w.Body.String(), `"prompt":"draw a cat"`)
+	})
+	t.Run("sync image edit checks the gpt-image-2 default", func(t *testing.T) {
+		w := request(t, "/v1/images/edits", "image-key", `{"prompt":"edit a cat"}`)
+		require.Equal(t, http.StatusOK, w.Code)
+	})
+	t.Run("async image checks the gpt-image-2 default", func(t *testing.T) {
+		w := request(t, "/v1/images/generations/async", "image-key", `{"prompt":"draw a cat"}`)
+		require.Equal(t, http.StatusOK, w.Code)
+	})
+	t.Run("async image edit checks the gpt-image-2 default", func(t *testing.T) {
+		w := request(t, "/v1/images/edits/async", "image-key", `{"prompt":"edit a cat"}`)
+		require.Equal(t, http.StatusOK, w.Code)
+	})
+	t.Run("image default is rejected when not whitelisted", func(t *testing.T) {
+		w := request(t, "/v1/images/generations/async", "live-key", `{"prompt":"draw a cat"}`)
+		require.Equal(t, http.StatusForbidden, w.Code)
+		require.Contains(t, w.Body.String(), "gpt-image-2")
 	})
 }
 

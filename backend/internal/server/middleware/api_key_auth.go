@@ -423,6 +423,20 @@ func enforceAPIKeyModelRestriction(c *gin.Context, apiKey *service.APIKey, googl
 		}
 		return false
 	}
+	if model == "" {
+		if apiKeyModelIsRequired(c) {
+			message := "model is required for this API key"
+			if googleStyle {
+				abortWithGoogleError(c, http.StatusForbidden, message)
+			} else {
+				AbortWithError(c, http.StatusForbidden, "MODEL_REQUIRED", message)
+			}
+			return false
+		}
+		if defaultModel := defaultAPIKeyRestrictedModel(c); defaultModel != "" {
+			model = defaultModel
+		}
+	}
 	if model == "" || apiKey.AllowsModel(model) {
 		return true
 	}
@@ -459,6 +473,16 @@ func requestModelForAPIKeyRestriction(c *gin.Context) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	if isLiveRequestPath(c.Request.URL.Path) {
+		if model := strings.TrimSpace(gjson.GetBytes(body, "session.model").String()); model != "" {
+			return model, nil
+		}
+		if session := multipartRequestField(c.GetHeader("Content-Type"), body, "session"); session != "" {
+			if model := strings.TrimSpace(gjson.Get([]byte(session), "model").String()); model != "" {
+				return model, nil
+			}
+		}
+	}
 	if model := strings.TrimSpace(gjson.GetBytes(body, "model").String()); model != "" {
 		return model, nil
 	}
@@ -466,6 +490,10 @@ func requestModelForAPIKeyRestriction(c *gin.Context) (string, error) {
 }
 
 func multipartRequestModel(contentType string, body []byte) string {
+	return multipartRequestField(contentType, body, "model")
+}
+
+func multipartRequestField(contentType string, body []byte, fieldName string) string {
 	mediaType, params, err := mime.ParseMediaType(strings.TrimSpace(contentType))
 	if err != nil || !strings.EqualFold(mediaType, "multipart/form-data") {
 		return ""
@@ -483,7 +511,7 @@ func multipartRequestModel(contentType string, body []byte) string {
 		if err != nil {
 			return ""
 		}
-		if part.FormName() != "model" || part.FileName() != "" {
+		if part.FormName() != fieldName || part.FileName() != "" {
 			continue
 		}
 		value, err := io.ReadAll(part)
@@ -492,6 +520,35 @@ func multipartRequestModel(contentType string, body []byte) string {
 		}
 		return strings.TrimSpace(string(value))
 	}
+}
+
+func apiKeyModelIsRequired(c *gin.Context) bool {
+	if c == nil || c.Request == nil || c.Request.Method == http.MethodGet || c.Request.Method == http.MethodHead {
+		return false
+	}
+	return isLiveRequestPath(c.Request.URL.Path)
+}
+
+func defaultAPIKeyRestrictedModel(c *gin.Context) string {
+	if c == nil || c.Request == nil || c.Request.Method != http.MethodPost {
+		return ""
+	}
+	path := c.Request.URL.Path
+	for _, suffix := range []string{
+		"/images/generations",
+		"/images/edits",
+		"/images/generations/async",
+		"/images/edits/async",
+	} {
+		if strings.HasSuffix(path, suffix) {
+			return "gpt-image-2"
+		}
+	}
+	return ""
+}
+
+func isLiveRequestPath(path string) bool {
+	return path == "/v1/live" || strings.HasSuffix(path, "/realtime/calls")
 }
 
 // apiKeyBalanceBelowAuthThreshold 保持鉴权层的历史语义：仅在余额耗尽（<=0）时拒绝。

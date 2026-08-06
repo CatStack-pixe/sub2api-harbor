@@ -30,6 +30,20 @@ func TestAPIKeyAllowsModel(t *testing.T) {
 	}
 }
 
+func TestAPIKeyAllowsModelNormalizesGeminiModelsPrefix(t *testing.T) {
+	key := &APIKey{ModelWhitelist: []string{"gemini-2.5-*"}}
+
+	if !key.AllowsModel("models/gemini-2.5-flash") {
+		t.Fatal("expected Gemini model with transport prefix to be allowed")
+	}
+	if !key.AllowsModel("gemini-2.5-pro") {
+		t.Fatal("expected Gemini model without transport prefix to be allowed")
+	}
+	if key.AllowsModel("models/gemini-3.0-pro") {
+		t.Fatal("did not expect an unlisted Gemini model to be allowed")
+	}
+}
+
 func TestNormalizeAPIKeyModelWhitelist(t *testing.T) {
 	models, err := normalizeAPIKeyModelWhitelist([]string{
 		" deepseek-ai/deepseek-v4-pro ",

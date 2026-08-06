@@ -1452,9 +1452,19 @@ func mergeModelIDs(primary, secondary []string) []string {
 // AntigravityModels 返回 Antigravity 支持的全部模型
 // GET /antigravity/models
 func (h *GatewayHandler) AntigravityModels(c *gin.Context) {
+	models := antigravity.DefaultModels()
+	if apiKey, ok := middleware2.GetAPIKeyFromContext(c); ok {
+		filtered := make([]antigravity.ClaudeModel, 0, len(models))
+		for _, model := range models {
+			if apiKey.AllowsModel(model.ID) {
+				filtered = append(filtered, model)
+			}
+		}
+		models = filtered
+	}
 	c.JSON(http.StatusOK, gin.H{
 		"object": "list",
-		"data":   antigravity.DefaultModels(),
+		"data":   models,
 	})
 }
 

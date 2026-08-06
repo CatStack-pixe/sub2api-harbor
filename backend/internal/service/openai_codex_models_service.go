@@ -678,6 +678,57 @@ func validateCodexModelsManifestEnvelope(body []byte) error {
 	return nil
 }
 
+// FilterCodexModelsManifest removes models that an API key is not allowed to
+// use. Restricted keys deliberately bypass conditional upstream requests so a
+// 304 cannot cause a client to reuse an unfiltered manifest.
+func FilterCodexModelsManifest(body []byte, apiKey *APIKey) ([]byte, error) {
+	if apiKey == nil || len(apiKey.ModelWhitelist) == 0 {
+		return body, nil
+	}
+
+	var envelope map[string]json.RawMessage
+	if err := json.Unmarshal(body, &envelope); err != nil || envelope == nil {
+		if err == nil {
+			err = errors.New("expected a JSON object")
+		}
+		return nil, fmt.Errorf("decode Codex models manifest: %w", err)
+	}
+	modelsRaw, ok := envelope["models"]
+	if !ok {
+		return nil, errors.New("Codex models manifest is missing top-level models")
+	}
+	var models []json.RawMessage
+	if err := json.Unmarshal(modelsRaw, &models); err != nil {
+		return nil, fmt.Errorf("decode Codex models: %w", err)
+	}
+
+	filtered := make([]json.RawMessage, 0, len(models))
+	for _, rawModel := range models {
+		var model map[string]json.RawMessage
+		if err := json.Unmarshal(rawModel, &model); err != nil || model == nil {
+			continue
+		}
+		var slug string
+		if err := json.Unmarshal(model["slug"], &slug); err != nil {
+			continue
+		}
+		slug = strings.TrimSpace(slug)
+		if slug != "" && apiKey.AllowsModel(slug) {
+			filtered = append(filtered, rawModel)
+		}
+	}
+	encoded, err := json.Marshal(filtered)
+	if err != nil {
+		return nil, fmt.Errorf("encode filtered Codex models: %w", err)
+	}
+	envelope["models"] = encoded
+	filteredBody, err := json.Marshal(envelope)
+	if err != nil {
+		return nil, fmt.Errorf("encode filtered Codex manifest: %w", err)
+	}
+	return filteredBody, nil
+}
+
 func buildCodexModelsManifestCacheKey(request codexModelsManifestRequest) string {
 	hasher := sha256.New()
 	_, _ = fmt.Fprintf(hasher, "%d\n%d\n%s\n%s\n", request.accountID, request.credentialAccountID, request.proxyURL, request.url)

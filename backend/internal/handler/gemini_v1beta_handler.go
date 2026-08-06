@@ -48,7 +48,7 @@ func (h *GatewayHandler) GeminiV1BetaListModels(c *gin.Context) {
 
 	// 强制 antigravity 模式：返回 antigravity 支持的模型列表
 	if forcePlatform == service.PlatformAntigravity {
-		c.JSON(http.StatusOK, antigravity.FallbackGeminiModelsList())
+		writeFilteredGeminiModelList(c, apiKey, antigravity.FallbackGeminiModelsList())
 		return
 	}
 
@@ -58,7 +58,7 @@ func (h *GatewayHandler) GeminiV1BetaListModels(c *gin.Context) {
 		hasAntigravity, _ := h.geminiCompatService.HasAntigravityAccounts(c.Request.Context(), apiKey.GroupID)
 		if hasAntigravity {
 			// antigravity 账户使用静态模型列表
-			c.JSON(http.StatusOK, gemini.FallbackModelsList())
+			writeFilteredGeminiModelList(c, apiKey, gemini.FallbackModelsList())
 			return
 		}
 		markOpsRoutingCapacityLimitedIfNoAvailable(c, err)
@@ -72,7 +72,18 @@ func (h *GatewayHandler) GeminiV1BetaListModels(c *gin.Context) {
 		return
 	}
 	if shouldFallbackGeminiModels(res) {
-		c.JSON(http.StatusOK, gemini.FallbackModelsList())
+		writeFilteredGeminiModelList(c, apiKey, gemini.FallbackModelsList())
+		return
+	}
+	if len(apiKey.ModelWhitelist) > 0 {
+		filtered, filterErr := filterGeminiModelListBody(res.Body, apiKey)
+		if filterErr != nil {
+			googleError(c, http.StatusBadGateway, "Invalid Gemini model list response")
+			return
+		}
+		filteredResponse := *res
+		filteredResponse.Body = filtered
+		writeUpstreamResponse(c, &filteredResponse)
 		return
 	}
 	writeUpstreamResponse(c, res)
@@ -719,6 +730,59 @@ func writeUpstreamResponse(c *gin.Context, res *service.UpstreamHTTPResult) {
 		contentType = "application/json"
 	}
 	c.Data(res.StatusCode, contentType, res.Body)
+}
+
+func writeFilteredGeminiModelList(c *gin.Context, apiKey *service.APIKey, response any) {
+	body, err := json.Marshal(response)
+	if err != nil {
+		googleError(c, http.StatusBadGateway, "Failed to encode Gemini model list")
+		return
+	}
+	filtered, err := filterGeminiModelListBody(body, apiKey)
+	if err != nil {
+		googleError(c, http.StatusBadGateway, "Invalid Gemini model list response")
+		return
+	}
+	c.Data(http.StatusOK, "application/json", filtered)
+}
+
+func filterGeminiModelListBody(body []byte, apiKey *service.APIKey) ([]byte, error) {
+	if apiKey == nil || len(apiKey.ModelWhitelist) == 0 {
+		return body, nil
+	}
+	var envelope map[string]json.RawMessage
+	if err := json.Unmarshal(body, &envelope); err != nil || envelope == nil {
+		if err == nil {
+			err = errors.New("expected a JSON object")
+		}
+		return nil, err
+	}
+	modelsRaw, ok := envelope["models"]
+	if !ok {
+		return nil, errors.New("missing top-level models")
+	}
+	var models []json.RawMessage
+	if err := json.Unmarshal(modelsRaw, &models); err != nil {
+		return nil, err
+	}
+	filtered := make([]json.RawMessage, 0, len(models))
+	for _, rawModel := range models {
+		var model struct {
+			Name string `json:"name"`
+		}
+		if err := json.Unmarshal(rawModel, &model); err != nil {
+			continue
+		}
+		if name := strings.TrimSpace(model.Name); name != "" && apiKey.AllowsModel(name) {
+			filtered = append(filtered, rawModel)
+		}
+	}
+	encoded, err := json.Marshal(filtered)
+	if err != nil {
+		return nil, err
+	}
+	envelope["models"] = encoded
+	return json.Marshal(envelope)
 }
 
 func shouldFallbackGeminiModels(res *service.UpstreamHTTPResult) bool {
