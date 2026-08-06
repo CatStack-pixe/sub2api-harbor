@@ -478,7 +478,7 @@ func requestModelForAPIKeyRestriction(c *gin.Context) (string, error) {
 			return model, nil
 		}
 		if session := multipartRequestField(c.GetHeader("Content-Type"), body, "session"); session != "" {
-			if model := strings.TrimSpace(gjson.Get([]byte(session), "model").String()); model != "" {
+			if model := strings.TrimSpace(gjson.Get(session, "model").String()); model != "" {
 				return model, nil
 			}
 		}
