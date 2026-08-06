@@ -486,7 +486,7 @@ func TestForwardResponses_NvidiaTransportErrorDoesNotFailoverOrWriteAfterDisconn
 	require.False(t, errors.As(err, &failoverErr), "transport errors while waiting for first output must not fail over")
 	body, _ := recorder.snapshot()
 	require.NotContains(t, body, "response.failed")
-	require.Len(t, upstream.requests, 1)
+	require.Equal(t, 1, upstream.requests)
 }
 
 func TestOpenAIResponsesKeepaliveErrorSwitchesFromJSONToFailedSSE(t *testing.T) {
