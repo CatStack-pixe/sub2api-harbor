@@ -18,6 +18,11 @@ export async function getAvailable(): Promise<Group[]> {
   return data
 }
 
+export async function getAvailableModels(groupId: number): Promise<string[]> {
+  const { data } = await apiClient.get<string[]>(`/groups/${groupId}/models`)
+  return data
+}
+
 /**
  * Get current user's custom group rate multipliers
  * @returns Map of group_id to custom rate_multiplier
@@ -29,6 +34,7 @@ export async function getUserGroupRates(): Promise<Record<number, number>> {
 
 export const userGroupsAPI = {
   getAvailable,
+  getAvailableModels,
   getUserGroupRates
 }
 
