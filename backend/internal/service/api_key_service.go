@@ -24,14 +24,15 @@ import (
 )
 
 var (
-	ErrAPIKeyNotFound       = infraerrors.NotFound("API_KEY_NOT_FOUND", "api key not found")
-	ErrGroupNotAllowed      = infraerrors.Forbidden("GROUP_NOT_ALLOWED", "user is not allowed to bind this group")
-	ErrAPIKeyExists         = infraerrors.Conflict("API_KEY_EXISTS", "api key already exists")
-	ErrAPIKeyTooShort       = infraerrors.BadRequest("API_KEY_TOO_SHORT", "api key must be at least 16 characters")
-	ErrAPIKeyInvalidChars   = infraerrors.BadRequest("API_KEY_INVALID_CHARS", "api key can only contain letters, numbers, underscores, and hyphens")
-	ErrAPIKeyRateLimited    = infraerrors.TooManyRequests("API_KEY_RATE_LIMITED", "too many failed attempts, please try again later")
-	ErrAPIKeyAuthOverloaded = infraerrors.ServiceUnavailable("API_KEY_AUTH_OVERLOADED", "api key authentication is temporarily overloaded")
-	ErrInvalidIPPattern     = infraerrors.BadRequest("INVALID_IP_PATTERN", "invalid IP or CIDR pattern")
+	ErrAPIKeyNotFound            = infraerrors.NotFound("API_KEY_NOT_FOUND", "api key not found")
+	ErrGroupNotAllowed           = infraerrors.Forbidden("GROUP_NOT_ALLOWED", "user is not allowed to bind this group")
+	ErrAPIKeyExists              = infraerrors.Conflict("API_KEY_EXISTS", "api key already exists")
+	ErrAPIKeyTooShort            = infraerrors.BadRequest("API_KEY_TOO_SHORT", "api key must be at least 16 characters")
+	ErrAPIKeyInvalidChars        = infraerrors.BadRequest("API_KEY_INVALID_CHARS", "api key can only contain letters, numbers, underscores, and hyphens")
+	ErrAPIKeyRateLimited         = infraerrors.TooManyRequests("API_KEY_RATE_LIMITED", "too many failed attempts, please try again later")
+	ErrAPIKeyAuthOverloaded      = infraerrors.ServiceUnavailable("API_KEY_AUTH_OVERLOADED", "api key authentication is temporarily overloaded")
+	ErrInvalidIPPattern          = infraerrors.BadRequest("INVALID_IP_PATTERN", "invalid IP or CIDR pattern")
+	ErrAPIKeyInvalidModelPattern = infraerrors.BadRequest("API_KEY_INVALID_MODEL_PATTERN", "api key model whitelist contains an invalid pattern")
 	// ErrAPIKeyExpired        = infraerrors.Forbidden("API_KEY_EXPIRED", "api key has expired")
 	ErrAPIKeyExpired = infraerrors.Forbidden("API_KEY_EXPIRED", "api key 已过期")
 	// ErrAPIKeyQuotaExhausted = infraerrors.TooManyRequests("API_KEY_QUOTA_EXHAUSTED", "api key quota exhausted")
@@ -44,12 +45,14 @@ var (
 )
 
 const (
-	MaxAPIKeyCredentialBytes     = 128
-	defaultAuthLookupConcurrency = 64
-	defaultNegativeAuthCacheSize = 16384
-	apiKeyMaxErrorsPerHour       = 20
-	apiKeyLastUsedMinTouch       = 30 * time.Second
-	apiKeySortCurrentConcurrency = "current_concurrency"
+	MaxAPIKeyCredentialBytes       = 128
+	maxAPIKeyModelWhitelistEntries = 256
+	maxAPIKeyModelPatternBytes     = 256
+	defaultAuthLookupConcurrency   = 64
+	defaultNegativeAuthCacheSize   = 16384
+	apiKeyMaxErrorsPerHour         = 20
+	apiKeyLastUsedMinTouch         = 30 * time.Second
+	apiKeySortCurrentConcurrency   = "current_concurrency"
 	// DB 写失败后的短退避，避免请求路径持续同步重试造成写风暴与高延迟。
 	apiKeyLastUsedFailBackoff = 5 * time.Second
 )
@@ -75,6 +78,8 @@ type APIKeyUpdateFields struct {
 	RateLimitUsage bool
 	// IPRules 覆盖 ip_whitelist 与 ip_blacklist。
 	IPRules bool
+	// ModelWhitelist 覆盖 API Key 可请求的模型列表。
+	ModelWhitelist bool
 }
 
 // IsEmpty 报告该次 Update 是否不写任何列。
@@ -209,11 +214,12 @@ type APIKeyAuthCacheInvalidator interface {
 
 // CreateAPIKeyRequest 创建API Key请求
 type CreateAPIKeyRequest struct {
-	Name        string   `json:"name"`
-	GroupID     *int64   `json:"group_id"`
-	CustomKey   *string  `json:"custom_key"`   // 可选的自定义key
-	IPWhitelist []string `json:"ip_whitelist"` // IP 白名单
-	IPBlacklist []string `json:"ip_blacklist"` // IP 黑名单
+	Name           string   `json:"name"`
+	GroupID        *int64   `json:"group_id"`
+	CustomKey      *string  `json:"custom_key"`      // 可选的自定义key
+	IPWhitelist    []string `json:"ip_whitelist"`    // IP 白名单
+	IPBlacklist    []string `json:"ip_blacklist"`    // IP 黑名单
+	ModelWhitelist []string `json:"model_whitelist"` // 可请求的模型（为空=不限制）
 
 	// Quota fields
 	Quota         float64 `json:"quota"`           // Quota limit in USD (0 = unlimited)
@@ -227,11 +233,12 @@ type CreateAPIKeyRequest struct {
 
 // UpdateAPIKeyRequest 更新API Key请求
 type UpdateAPIKeyRequest struct {
-	Name        *string   `json:"name"`
-	GroupID     *int64    `json:"group_id"`
-	Status      *string   `json:"status"`
-	IPWhitelist *[]string `json:"ip_whitelist"` // IP 白名单（nil 不修改，空数组清空）
-	IPBlacklist *[]string `json:"ip_blacklist"` // IP 黑名单（nil 不修改，空数组清空）
+	Name           *string   `json:"name"`
+	GroupID        *int64    `json:"group_id"`
+	Status         *string   `json:"status"`
+	IPWhitelist    *[]string `json:"ip_whitelist"`    // IP 白名单（nil 不修改，空数组清空）
+	IPBlacklist    *[]string `json:"ip_blacklist"`    // IP 黑名单（nil 不修改，空数组清空）
+	ModelWhitelist *[]string `json:"model_whitelist"` // 可请求的模型（nil 不修改，空数组清空）
 
 	// Quota fields
 	Quota           *float64   `json:"quota"`       // Quota limit in USD (nil = no change, 0 = unlimited)
@@ -457,6 +464,33 @@ func (s *APIKeyService) canUserBindGroup(ctx context.Context, user *User, group 
 	return user.CanBindGroup(group.ID, group.IsExclusive)
 }
 
+func normalizeAPIKeyModelWhitelist(models []string) ([]string, error) {
+	if len(models) == 0 {
+		return nil, nil
+	}
+
+	seen := make(map[string]struct{}, len(models))
+	result := make([]string, 0, len(models))
+	for _, raw := range models {
+		model := strings.TrimSpace(raw)
+		if model == "" {
+			continue
+		}
+		if len(model) > maxAPIKeyModelPatternBytes || strings.Count(model, "*") > 1 || (strings.Contains(model, "*") && !strings.HasSuffix(model, "*")) {
+			return nil, ErrAPIKeyInvalidModelPattern
+		}
+		if _, ok := seen[model]; ok {
+			continue
+		}
+		seen[model] = struct{}{}
+		result = append(result, model)
+		if len(result) > maxAPIKeyModelWhitelistEntries {
+			return nil, ErrAPIKeyInvalidModelPattern
+		}
+	}
+	return result, nil
+}
+
 // Create 创建API Key
 func (s *APIKeyService) Create(ctx context.Context, userID int64, req CreateAPIKeyRequest) (*APIKey, error) {
 	if err := validateCreateAPIKeyRequest(req); err != nil {
@@ -480,6 +514,11 @@ func (s *APIKeyService) Create(ctx context.Context, userID int64, req CreateAPIK
 		if invalid := ip.ValidateIPPatterns(req.IPBlacklist); len(invalid) > 0 {
 			return nil, fmt.Errorf("%w: %v", ErrInvalidIPPattern, invalid)
 		}
+	}
+
+	modelWhitelist, err := normalizeAPIKeyModelWhitelist(req.ModelWhitelist)
+	if err != nil {
+		return nil, err
 	}
 
 	// 验证分组权限（如果指定了分组）
@@ -532,18 +571,19 @@ func (s *APIKeyService) Create(ctx context.Context, userID int64, req CreateAPIK
 
 	// 创建API Key记录
 	apiKey := &APIKey{
-		UserID:      userID,
-		Key:         key,
-		Name:        html.EscapeString(req.Name),
-		GroupID:     req.GroupID,
-		Status:      StatusActive,
-		IPWhitelist: req.IPWhitelist,
-		IPBlacklist: req.IPBlacklist,
-		Quota:       req.Quota,
-		QuotaUsed:   0,
-		RateLimit5h: req.RateLimit5h,
-		RateLimit1d: req.RateLimit1d,
-		RateLimit7d: req.RateLimit7d,
+		UserID:         userID,
+		Key:            key,
+		Name:           html.EscapeString(req.Name),
+		GroupID:        req.GroupID,
+		Status:         StatusActive,
+		IPWhitelist:    req.IPWhitelist,
+		IPBlacklist:    req.IPBlacklist,
+		ModelWhitelist: modelWhitelist,
+		Quota:          req.Quota,
+		QuotaUsed:      0,
+		RateLimit5h:    req.RateLimit5h,
+		RateLimit1d:    req.RateLimit1d,
+		RateLimit7d:    req.RateLimit7d,
 	}
 
 	// Set expiration time if specified
@@ -783,6 +823,13 @@ func (s *APIKeyService) Update(ctx context.Context, id int64, userID int64, req 
 			return nil, fmt.Errorf("%w: %v", ErrInvalidIPPattern, invalid)
 		}
 	}
+	var normalizedModelWhitelist []string
+	if req.ModelWhitelist != nil {
+		normalizedModelWhitelist, err = normalizeAPIKeyModelWhitelist(*req.ModelWhitelist)
+		if err != nil {
+			return nil, err
+		}
+	}
 
 	// fields 只登记本次请求真正要改的列。quota_used 与 usage_5h/1d/7d 由计费热路径
 	// 原子递增，除非用户显式点了"重置"，否则这里不用快照把它们写回去。
@@ -867,6 +914,10 @@ func (s *APIKeyService) Update(ctx context.Context, id int64, userID int64, req 
 	if req.IPBlacklist != nil {
 		apiKey.IPBlacklist = *req.IPBlacklist
 		fields.IPRules = true
+	}
+	if req.ModelWhitelist != nil {
+		apiKey.ModelWhitelist = normalizedModelWhitelist
+		fields.ModelWhitelist = true
 	}
 
 	// Update rate limit configuration

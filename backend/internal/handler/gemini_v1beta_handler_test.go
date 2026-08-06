@@ -167,3 +167,12 @@ func TestShouldFallbackGeminiModel_DelegatesScopeFallback(t *testing.T) {
 	}
 	require.True(t, shouldFallbackGeminiModel("gemini-future-model", res))
 }
+
+func TestFilterGeminiModelListBodyByAPIKeyWhitelist(t *testing.T) {
+	apiKey := &service.APIKey{ModelWhitelist: []string{"gemini-2.5-flash"}}
+	body := []byte(`{"models":[{"name":"models/gemini-2.5-flash"},{"name":"models/gemini-2.5-pro"}]}`)
+
+	filtered, err := filterGeminiModelListBody(body, apiKey)
+	require.NoError(t, err)
+	require.JSONEq(t, `{"models":[{"name":"models/gemini-2.5-flash"}]}`, string(filtered))
+}

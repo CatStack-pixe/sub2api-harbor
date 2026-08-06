@@ -139,6 +139,12 @@ func (_c *APIKeyCreate) SetIPBlacklist(v []string) *APIKeyCreate {
 	return _c
 }
 
+// SetModelWhitelist sets the "model_whitelist" field.
+func (_c *APIKeyCreate) SetModelWhitelist(v []string) *APIKeyCreate {
+	_c.mutation.SetModelWhitelist(v)
+	return _c
+}
+
 // SetQuota sets the "quota" field.
 func (_c *APIKeyCreate) SetQuota(v float64) *APIKeyCreate {
 	_c.mutation.SetQuota(v)
@@ -547,6 +553,10 @@ func (_c *APIKeyCreate) createSpec() (*APIKey, *sqlgraph.CreateSpec) {
 		_spec.SetField(apikey.FieldIPBlacklist, field.TypeJSON, value)
 		_node.IPBlacklist = value
 	}
+	if value, ok := _c.mutation.ModelWhitelist(); ok {
+		_spec.SetField(apikey.FieldModelWhitelist, field.TypeJSON, value)
+		_node.ModelWhitelist = value
+	}
 	if value, ok := _c.mutation.Quota(); ok {
 		_spec.SetField(apikey.FieldQuota, field.TypeFloat64, value)
 		_node.Quota = value
@@ -844,6 +854,24 @@ func (u *APIKeyUpsert) UpdateIPBlacklist() *APIKeyUpsert {
 // ClearIPBlacklist clears the value of the "ip_blacklist" field.
 func (u *APIKeyUpsert) ClearIPBlacklist() *APIKeyUpsert {
 	u.SetNull(apikey.FieldIPBlacklist)
+	return u
+}
+
+// SetModelWhitelist sets the "model_whitelist" field.
+func (u *APIKeyUpsert) SetModelWhitelist(v []string) *APIKeyUpsert {
+	u.Set(apikey.FieldModelWhitelist, v)
+	return u
+}
+
+// UpdateModelWhitelist sets the "model_whitelist" field to the value that was provided on create.
+func (u *APIKeyUpsert) UpdateModelWhitelist() *APIKeyUpsert {
+	u.SetExcluded(apikey.FieldModelWhitelist)
+	return u
+}
+
+// ClearModelWhitelist clears the value of the "model_whitelist" field.
+func (u *APIKeyUpsert) ClearModelWhitelist() *APIKeyUpsert {
+	u.SetNull(apikey.FieldModelWhitelist)
 	return u
 }
 
@@ -1280,6 +1308,27 @@ func (u *APIKeyUpsertOne) UpdateIPBlacklist() *APIKeyUpsertOne {
 func (u *APIKeyUpsertOne) ClearIPBlacklist() *APIKeyUpsertOne {
 	return u.Update(func(s *APIKeyUpsert) {
 		s.ClearIPBlacklist()
+	})
+}
+
+// SetModelWhitelist sets the "model_whitelist" field.
+func (u *APIKeyUpsertOne) SetModelWhitelist(v []string) *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.SetModelWhitelist(v)
+	})
+}
+
+// UpdateModelWhitelist sets the "model_whitelist" field to the value that was provided on create.
+func (u *APIKeyUpsertOne) UpdateModelWhitelist() *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.UpdateModelWhitelist()
+	})
+}
+
+// ClearModelWhitelist clears the value of the "model_whitelist" field.
+func (u *APIKeyUpsertOne) ClearModelWhitelist() *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.ClearModelWhitelist()
 	})
 }
 
@@ -1918,6 +1967,27 @@ func (u *APIKeyUpsertBulk) UpdateIPBlacklist() *APIKeyUpsertBulk {
 func (u *APIKeyUpsertBulk) ClearIPBlacklist() *APIKeyUpsertBulk {
 	return u.Update(func(s *APIKeyUpsert) {
 		s.ClearIPBlacklist()
+	})
+}
+
+// SetModelWhitelist sets the "model_whitelist" field.
+func (u *APIKeyUpsertBulk) SetModelWhitelist(v []string) *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.SetModelWhitelist(v)
+	})
+}
+
+// UpdateModelWhitelist sets the "model_whitelist" field to the value that was provided on create.
+func (u *APIKeyUpsertBulk) UpdateModelWhitelist() *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.UpdateModelWhitelist()
+	})
+}
+
+// ClearModelWhitelist clears the value of the "model_whitelist" field.
+func (u *APIKeyUpsertBulk) ClearModelWhitelist() *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.ClearModelWhitelist()
 	})
 }
 

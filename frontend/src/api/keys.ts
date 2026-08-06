@@ -54,6 +54,7 @@ export async function getById(id: number): Promise<ApiKey> {
  * @param ipBlacklist - Optional IP blacklist
  * @param quota - Optional quota limit in USD (0 = unlimited)
  * @param expiresInDays - Optional days until expiry (undefined = never expires)
+ * @param modelWhitelist - Optional allowed request models (empty = unrestricted)
  * @param rateLimitData - Optional rate limit fields
  * @returns Created API key
  */
@@ -65,6 +66,7 @@ export async function create(
   ipBlacklist?: string[],
   quota?: number,
   expiresInDays?: number,
+  modelWhitelist?: string[],
   rateLimitData?: { rate_limit_5h?: number; rate_limit_1d?: number; rate_limit_7d?: number }
 ): Promise<ApiKey> {
   const payload: CreateApiKeyRequest = { name }
@@ -79,6 +81,9 @@ export async function create(
   }
   if (ipBlacklist && ipBlacklist.length > 0) {
     payload.ip_blacklist = ipBlacklist
+  }
+  if (modelWhitelist && modelWhitelist.length > 0) {
+    payload.model_whitelist = modelWhitelist
   }
   if (quota !== undefined && quota > 0) {
     payload.quota = quota

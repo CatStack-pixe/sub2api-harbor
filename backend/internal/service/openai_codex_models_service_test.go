@@ -27,6 +27,15 @@ type codexModelsHTTPUpstreamStub struct {
 	do func(req *http.Request, proxyURL string, accountID int64, accountConcurrency int) (*http.Response, error)
 }
 
+func TestFilterCodexModelsManifestByAPIKeyWhitelist(t *testing.T) {
+	body := []byte(`{"metadata":{"version":1},"models":[{"slug":"gpt-5.6-sol","label":"Sol"},{"slug":"gpt-5.6-codex","label":"Codex"}]}`)
+	apiKey := &APIKey{ModelWhitelist: []string{"gpt-5.6-sol"}}
+
+	filtered, err := FilterCodexModelsManifest(body, apiKey)
+	require.NoError(t, err)
+	require.JSONEq(t, `{"metadata":{"version":1},"models":[{"slug":"gpt-5.6-sol","label":"Sol"}]}`, string(filtered))
+}
+
 type codexModelsBlockingBody struct {
 	ctx         context.Context
 	readStarted chan struct{}
