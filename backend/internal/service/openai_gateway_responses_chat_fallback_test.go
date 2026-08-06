@@ -321,10 +321,12 @@ type delayedNvidiaHTTPUpstream struct {
 	release <-chan struct{}
 	resp    *http.Response
 	err     error
+	requests int
 	once    sync.Once
 }
 
 func (u *delayedNvidiaHTTPUpstream) Do(_ *http.Request, _ string, _ int64, _ int) (*http.Response, error) {
+	u.requests++
 	u.once.Do(func() { close(u.entered) })
 	if u.release != nil {
 		<-u.release
@@ -399,7 +401,7 @@ func TestForwardResponses_NvidiaHTTPErrorBeforeKeepalivePreservesStatus(t *testi
 	require.Contains(t, recorder.Body.String(), `"type":"upstream_error"`)
 	require.Contains(t, recorder.Body.String(), "NIM timed out")
 	require.NotContains(t, recorder.Body.String(), "response.failed")
-	require.Len(t, upstream.requests, 1)
+	require.Equal(t, 1, upstream.requests)
 }
 
 func TestForwardResponses_NvidiaHTTPErrorAfterKeepaliveWritesSingleFailedEvent(t *testing.T) {
@@ -443,7 +445,7 @@ func TestForwardResponses_NvidiaHTTPErrorAfterKeepaliveWritesSingleFailedEvent(t
 	require.Equal(t, 1, strings.Count(body, `"type":"response.failed"`))
 	require.Contains(t, body, "NIM timed out after headers")
 	require.NotContains(t, body, "data: [DONE]")
-	require.Len(t, upstream.requests, 1)
+	require.Equal(t, 1, upstream.requests)
 }
 
 func TestForwardResponses_NvidiaTransportErrorDoesNotFailoverOrWriteAfterDisconnect(t *testing.T) {
