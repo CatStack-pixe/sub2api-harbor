@@ -517,13 +517,14 @@
         <!-- Model Restriction Section -->
         <div class="space-y-2">
           <label class="input-label">{{ t('keys.modelWhitelist') }}</label>
-          <textarea
+          <GroupModelSelector
+            v-if="formData.group_id !== null"
             v-model="formData.model_whitelist"
-            rows="3"
-            class="input font-mono text-sm"
-            :placeholder="t('keys.modelWhitelistPlaceholder')"
+            :models="modelOptions"
+            :loading="modelOptionsLoading"
+            :error="modelOptionsError"
           />
-          <p class="input-hint">{{ t('keys.modelWhitelistHint') }}</p>
+          <p v-else class="input-hint">{{ t('keys.modelRestrictionSelectGroupFirst') }}</p>
         </div>
 
         <!-- Custom Key Section (only for create) -->
@@ -935,7 +936,7 @@
           <button
             form="key-form"
             type="submit"
-            :disabled="submitting"
+            :disabled="submitting || modelOptionsLoading"
             class="btn btn-primary"
             data-tour="key-form-submit"
           >
@@ -1136,7 +1137,7 @@
 </template>
 
 <script setup lang="ts">
-	import { ref, reactive, computed, onMounted, onUnmounted, type ComponentPublicInstance } from 'vue'
+	import { ref, reactive, computed, onMounted, onUnmounted, watch, type ComponentPublicInstance } from 'vue'
 	import { useI18n } from 'vue-i18n'
 	import { useAppStore } from '@/stores/app'
 	import { useOnboardingStore } from '@/stores/onboarding'
@@ -1145,6 +1146,7 @@ import { getPersistedPageSize } from '@/composables/usePersistedPageSize'
 
 const { t } = useI18n()
 import { keysAPI, authAPI, usageAPI, userGroupsAPI } from '@/api'
+import GroupModelSelector from '@/components/keys/GroupModelSelector.vue'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import TablePageLayout from '@/components/layout/TablePageLayout.vue'
 	import DataTable from '@/components/common/DataTable.vue'
@@ -1290,6 +1292,10 @@ const columns = computed<Column[]>(() =>
 
 const apiKeys = ref<ApiKey[]>([])
 const groups = ref<Group[]>([])
+const modelOptions = ref<string[]>([])
+const modelOptionsLoading = ref(false)
+const modelOptionsError = ref(false)
+let modelOptionsRequestID = 0
 const loading = ref(false)
 const submitting = ref(false)
 const now = ref(new Date())
@@ -1355,7 +1361,7 @@ const formData = ref({
   enable_ip_restriction: false,
   ip_whitelist: '',
   ip_blacklist: '',
-  model_whitelist: '',
+  model_whitelist: [] as string[],
   // Quota settings (empty = unlimited)
   enable_quota: false,
   quota: null as number | null,
@@ -1533,6 +1539,39 @@ const loadGroups = async () => {
   }
 }
 
+const loadModelOptions = async (groupID: number | null, previousGroupID: number | null | undefined) => {
+  const requestID = ++modelOptionsRequestID
+  modelOptionsError.value = false
+  if (groupID === null) {
+    modelOptions.value = []
+    modelOptionsLoading.value = false
+    return
+  }
+
+  modelOptionsLoading.value = true
+  try {
+    const models = await userGroupsAPI.getAvailableModels(groupID)
+    if (requestID !== modelOptionsRequestID) return
+    modelOptions.value = models
+    if (previousGroupID !== null && previousGroupID !== undefined && previousGroupID !== groupID) {
+      formData.value.model_whitelist = formData.value.model_whitelist.filter(model => models.includes(model))
+    }
+  } catch (error) {
+    if (requestID !== modelOptionsRequestID) return
+    modelOptions.value = []
+    modelOptionsError.value = true
+    console.error('Failed to load group models:', error)
+  } finally {
+    if (requestID === modelOptionsRequestID) {
+      modelOptionsLoading.value = false
+    }
+  }
+}
+
+watch(() => formData.value.group_id, (groupID, previousGroupID) => {
+  void loadModelOptions(groupID, previousGroupID)
+})
+
 const loadUserGroupRates = async () => {
   try {
     userGroupRates.value = await userGroupsAPI.getUserGroupRates()
@@ -1590,7 +1629,7 @@ const editKey = (key: ApiKey) => {
     enable_ip_restriction: hasIPRestriction,
     ip_whitelist: (key.ip_whitelist || []).join('\n'),
     ip_blacklist: (key.ip_blacklist || []).join('\n'),
-    model_whitelist: (key.model_whitelist || []).join('\n'),
+    model_whitelist: [...(key.model_whitelist || [])],
     enable_quota: key.quota > 0,
     quota: key.quota > 0 ? key.quota : null,
     enable_rate_limit: (key.rate_limit_5h > 0) || (key.rate_limit_1d > 0) || (key.rate_limit_7d > 0),
@@ -1689,6 +1728,11 @@ const handleSubmit = async () => {
     return
   }
 
+  if (modelOptionsLoading.value || modelOptionsError.value) {
+    appStore.showError(t('keys.modelRestrictionLoadFailed'))
+    return
+  }
+
   // Validate custom key if enabled
   if (!showEditModal.value && formData.value.use_custom_key) {
     if (!formData.value.custom_key) {
@@ -1706,10 +1750,7 @@ const handleSubmit = async () => {
     text.split('\n').map(ip => ip.trim()).filter(ip => ip.length > 0)
   const ipWhitelist = formData.value.enable_ip_restriction ? parseIPList(formData.value.ip_whitelist) : []
   const ipBlacklist = formData.value.enable_ip_restriction ? parseIPList(formData.value.ip_blacklist) : []
-  const modelWhitelist = formData.value.model_whitelist
-    .split(/[\n,]+/)
-    .map(model => model.trim())
-    .filter(model => model.length > 0)
+  const modelWhitelist = [...formData.value.model_whitelist]
 
   // Calculate quota value (null/empty/0 = unlimited, stored as 0)
   const quota = formData.value.quota && formData.value.quota > 0 ? formData.value.quota : 0
@@ -1814,6 +1855,10 @@ const closeModals = () => {
   showCreateModal.value = false
   showEditModal.value = false
   selectedKey.value = null
+  modelOptionsRequestID++
+  modelOptions.value = []
+  modelOptionsLoading.value = false
+  modelOptionsError.value = false
   formData.value = {
     name: '',
     group_id: null,
@@ -1823,7 +1868,7 @@ const closeModals = () => {
     enable_ip_restriction: false,
     ip_whitelist: '',
     ip_blacklist: '',
-    model_whitelist: '',
+    model_whitelist: [],
     enable_quota: false,
     quota: null,
     enable_rate_limit: false,

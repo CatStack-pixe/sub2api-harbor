@@ -262,6 +262,7 @@ type APIKeyService struct {
 	apiKeyRepo                APIKeyRepository
 	userRepo                  UserRepository
 	groupRepo                 GroupRepository
+	accountRepo               AccountRepository
 	userSubRepo               UserSubscriptionRepository
 	userGroupRateRepo         UserGroupRateRepository
 	cache                     APIKeyCache
@@ -343,6 +344,10 @@ func (s *APIKeyService) SetRateLimitCacheInvalidator(inv RateLimitCacheInvalidat
 
 func (s *APIKeyService) SetConcurrencyService(concurrencyService *ConcurrencyService) {
 	s.concurrencyService = concurrencyService
+}
+
+func (s *APIKeyService) SetAccountRepository(accountRepo AccountRepository) {
+	s.accountRepo = accountRepo
 }
 
 func (s *APIKeyService) compileAPIKeyIPRules(apiKey *APIKey) {
