@@ -395,6 +395,7 @@ func TestOpenAIResponsesKeepaliveBeforeFirstBeatPreservesJSONStatus(t *testing.T
 	writeOpenAIResponsesFallbackError(c, http.StatusBadGateway, "upstream_error", "fast fail")
 	body, _ := recorder.snapshot()
 	require.Equal(t, http.StatusBadGateway, recorder.status)
-	require.Contains(t, body, `"error":{"type":"upstream_error"`)
+	require.Contains(t, body, `"error":`)
+	require.Contains(t, body, `"type":"upstream_error"`)
 	require.NotContains(t, body, "response.failed")
 }

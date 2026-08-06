@@ -31,7 +31,7 @@ type openAIResponsesSSEKeepalive struct {
 	interval    time.Duration
 	started     bool
 	stopped     bool
-	lastWriteAt time.Time
+	lastWriteAt             time.Time
 	externalCommentPending bool
 	// bytes 是心跳已写出的注释字节数。心跳不构成语义响应，handler 的
 	// "Forward 期间是否已写响应"判定（failover 放弃换号的依据）必须扣除
