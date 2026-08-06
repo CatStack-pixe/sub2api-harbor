@@ -2762,6 +2762,9 @@ func openAIForwardErrorAlreadyCommunicated(c *gin.Context, writerSizeBeforeForwa
 		service.OpenAIImagesJSONKeepaliveAdjustedWrittenSize(c) == writerSizeBeforeForward {
 		return false
 	}
+	if service.IsResponseCommitted(c) {
+		return true
+	}
 
 	// cyber_policy 命中时上游原始错误体已透传给客户端（非流式 c.Data 写出 400 body，
 	// 流式写出 response.failed 事件），不能再让 ensureForwardErrorResponse 追加
