@@ -15,6 +15,58 @@ import (
 // openAIResponsesSSEKeepaliveKey 存放 Responses 请求的下游 SSE 预输出心跳器。
 const openAIResponsesSSEKeepaliveKey = "openai_responses_sse_keepalive"
 
+const (
+	openAINvidiaResponsesStreamKey         = "openai_nvidia_responses_stream"
+	openAINvidiaResponsesBusinessOutputKey = "openai_nvidia_responses_business_output"
+)
+
+// MarkOpenAINvidiaResponsesStream records the request scope for the NVIDIA
+// Responses-to-Chat-Completions bridge. The marker is deliberately separate
+// from keepalive bytes: comments are liveness traffic, not business output.
+func MarkOpenAINvidiaResponsesStream(c *gin.Context) {
+	if c == nil {
+		return
+	}
+	c.Set(openAINvidiaResponsesStreamKey, true)
+	c.Set(openAINvidiaResponsesBusinessOutputKey, false)
+}
+
+// MarkOpenAINvidiaResponsesBusinessOutput records that the first downstream
+// Responses business event has been written.
+func MarkOpenAINvidiaResponsesBusinessOutput(c *gin.Context) {
+	if c == nil {
+		return
+	}
+	if IsOpenAINvidiaResponsesStream(c) {
+		c.Set(openAINvidiaResponsesBusinessOutputKey, true)
+	}
+}
+
+// IsOpenAINvidiaResponsesStream reports whether the request uses the NVIDIA
+// Responses-to-Chat-Completions streaming bridge.
+func IsOpenAINvidiaResponsesStream(c *gin.Context) bool {
+	if c == nil {
+		return false
+	}
+	value, ok := c.Get(openAINvidiaResponsesStreamKey)
+	stream, _ := value.(bool)
+	return ok && stream
+}
+
+// IsOpenAINvidiaResponsesStreamBeforeBusinessOutput is true only while the
+// NVIDIA Responses stream is waiting for its first business event.
+func IsOpenAINvidiaResponsesStreamBeforeBusinessOutput(c *gin.Context) bool {
+	if !IsOpenAINvidiaResponsesStream(c) {
+		return false
+	}
+	value, ok := c.Get(openAINvidiaResponsesBusinessOutputKey)
+	if !ok {
+		return true
+	}
+	businessOutput, _ := value.(bool)
+	return !businessOutput
+}
+
 // openAICompactSSEKeepalive 在 compact 上游 unary 等待期间向下游写 SSE 注释行
 // 心跳。上游 /responses/compact 在模型处理期间不发送任何字节（大上下文可长达
 // 数分钟），下游若经过反向代理（Nginx/Cloudflare Tunnel 等），零字节静默会触发

@@ -217,6 +217,9 @@ func (s *OpenAIGatewayService) sendCCUpstreamRequest(
 	}
 	resp, err := s.httpUpstream.Do(upstreamReq, proxyURL, account.ID, account.Concurrency)
 	if err != nil {
+		if stream && IsOpenAINvidiaResponsesStreamBeforeBusinessOutput(c) {
+			return nil, s.handleOpenAINvidiaResponsesTransportError(c, account, err)
+		}
 		return nil, s.handleOpenAIUpstreamTransportError(ctx, c, account, err, false)
 	}
 	return resp, nil

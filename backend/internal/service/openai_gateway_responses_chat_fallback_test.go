@@ -5,6 +5,7 @@ package service
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -319,13 +320,16 @@ type delayedNvidiaHTTPUpstream struct {
 	entered chan struct{}
 	release <-chan struct{}
 	resp    *http.Response
+	err     error
 	once    sync.Once
 }
 
 func (u *delayedNvidiaHTTPUpstream) Do(_ *http.Request, _ string, _ int64, _ int) (*http.Response, error) {
 	u.once.Do(func() { close(u.entered) })
-	<-u.release
-	return u.resp, nil
+	if u.release != nil {
+		<-u.release
+	}
+	return u.resp, u.err
 }
 
 func (u *delayedNvidiaHTTPUpstream) DoWithTLS(req *http.Request, proxyURL string, accountID int64, concurrency int, _ *tlsfingerprint.Profile) (*http.Response, error) {
@@ -367,6 +371,120 @@ func TestForwardResponses_NvidiaKeepaliveCoversUpstreamHeaderWait(t *testing.T) 
 	require.NotNil(t, <-resultCh)
 	body, _ = recorder.snapshot()
 	require.Contains(t, body, "response.completed")
+}
+
+func TestForwardResponses_NvidiaHTTPErrorBeforeKeepalivePreservesStatus(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", nil)
+
+	upstream := &httpUpstreamRecorder{resp: &http.Response{
+		StatusCode: http.StatusGatewayTimeout,
+		Header:     http.Header{"Content-Type": []string{"application/json"}, "x-request-id": []string{"rid_nim_504"}},
+		Body:       io.NopCloser(strings.NewReader(`{"error":{"message":"NIM timed out"}}`)),
+	}}
+	svc := &OpenAIGatewayService{cfg: rawChatCompletionsTestConfig(), httpUpstream: upstream}
+	account := forceChatResponsesFallbackAccount()
+	account.Platform = PlatformNvidia
+	stop := StartOpenAIResponsesSSEKeepalive(c, time.Hour)
+	defer stop()
+
+	result, err := svc.Forward(context.Background(), c, account, []byte(`{"model":"nvidia/test","input":"hello","stream":true}`))
+	var failoverErr *UpstreamFailoverError
+	require.Error(t, err)
+	require.False(t, errors.As(err, &failoverErr), "NVIDIA first-output errors must not trigger failover")
+	require.Nil(t, result)
+	require.Equal(t, http.StatusGatewayTimeout, recorder.Code)
+	require.Contains(t, recorder.Body.String(), `"type":"upstream_error"`)
+	require.Contains(t, recorder.Body.String(), "NIM timed out")
+	require.NotContains(t, recorder.Body.String(), "response.failed")
+	require.Len(t, upstream.requests, 1)
+}
+
+func TestForwardResponses_NvidiaHTTPErrorAfterKeepaliveWritesSingleFailedEvent(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	recorder := newOpenAIResponseFlushRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", nil)
+	release := make(chan struct{})
+	upstream := &delayedNvidiaHTTPUpstream{
+		entered: make(chan struct{}),
+		release: release,
+		resp: &http.Response{
+			StatusCode: http.StatusGatewayTimeout,
+			Header:     http.Header{"Content-Type": []string{"application/json"}, "x-request-id": []string{"rid_nim_504_stream"}},
+			Body: io.NopCloser(strings.NewReader(
+				`{"error":{"message":"NIM timed out after headers"}}`,
+			)),
+		},
+	}
+	svc := &OpenAIGatewayService{cfg: rawChatCompletionsTestConfig(), httpUpstream: upstream}
+	account := forceChatResponsesFallbackAccount()
+	account.Platform = PlatformNvidia
+	stop := StartOpenAIResponsesSSEKeepalive(c, 10*time.Millisecond)
+	defer stop()
+
+	resultCh := make(chan *OpenAIForwardResult, 1)
+	errCh := make(chan error, 1)
+	go func() {
+		result, err := svc.Forward(context.Background(), c, account, []byte(`{"model":"nvidia/test","input":"hello","stream":true}`))
+		resultCh <- result
+		errCh <- err
+	}()
+	waitForFallbackGate(t, upstream.entered)
+	waitForFallbackRecorderBody(t, recorder, ": keepalive\n\n")
+	close(release)
+
+	require.Nil(t, <-resultCh)
+	require.Error(t, <-errCh)
+	body, _ := recorder.snapshot()
+	require.Equal(t, http.StatusOK, recorder.status)
+	require.Equal(t, 1, strings.Count(body, `"type":"response.failed"`))
+	require.Contains(t, body, "NIM timed out after headers")
+	require.NotContains(t, body, "data: [DONE]")
+	require.Len(t, upstream.requests, 1)
+}
+
+func TestForwardResponses_NvidiaTransportErrorDoesNotFailoverOrWriteAfterDisconnect(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	recorder := newOpenAIResponseFlushRecorder()
+	requestCtx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", nil).WithContext(requestCtx)
+	release := make(chan struct{})
+	upstream := &delayedNvidiaHTTPUpstream{
+		entered: make(chan struct{}),
+		release: release,
+		err:     errors.New("dial tcp: i/o timeout"),
+	}
+	svc := &OpenAIGatewayService{cfg: rawChatCompletionsTestConfig(), httpUpstream: upstream}
+	account := forceChatResponsesFallbackAccount()
+	account.Platform = PlatformNvidia
+	stop := StartOpenAIResponsesSSEKeepalive(c, 10*time.Millisecond)
+	defer stop()
+
+	resultCh := make(chan *OpenAIForwardResult, 1)
+	errCh := make(chan error, 1)
+	go func() {
+		result, err := svc.Forward(context.Background(), c, account, []byte(`{"model":"nvidia/test","input":"hello","stream":true}`))
+		resultCh <- result
+		errCh <- err
+	}()
+	waitForFallbackGate(t, upstream.entered)
+	waitForFallbackRecorderBody(t, recorder, ": keepalive\n\n")
+	cancel()
+	close(release)
+
+	require.Nil(t, <-resultCh)
+	err := <-errCh
+	var failoverErr *UpstreamFailoverError
+	require.Error(t, err)
+	require.False(t, errors.As(err, &failoverErr), "transport errors while waiting for first output must not fail over")
+	body, _ := recorder.snapshot()
+	require.NotContains(t, body, "response.failed")
+	require.Len(t, upstream.requests, 1)
 }
 
 func TestOpenAIResponsesKeepaliveErrorSwitchesFromJSONToFailedSSE(t *testing.T) {
