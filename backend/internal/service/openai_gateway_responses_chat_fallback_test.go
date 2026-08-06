@@ -401,7 +401,7 @@ func TestForwardResponses_NvidiaHTTPErrorBeforeKeepalivePreservesStatus(t *testi
 	require.Contains(t, recorder.Body.String(), `"type":"upstream_error"`)
 	require.Contains(t, recorder.Body.String(), "NIM timed out")
 	require.NotContains(t, recorder.Body.String(), "response.failed")
-	require.Equal(t, 1, upstream.requests)
+	require.Len(t, upstream.requests, 1)
 }
 
 func TestForwardResponses_NvidiaHTTPErrorAfterKeepaliveWritesSingleFailedEvent(t *testing.T) {
