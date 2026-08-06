@@ -695,7 +695,7 @@ func FilterCodexModelsManifest(body []byte, apiKey *APIKey) ([]byte, error) {
 	}
 	modelsRaw, ok := envelope["models"]
 	if !ok {
-		return nil, errors.New("Codex models manifest is missing top-level models")
+		return nil, errors.New("codex models manifest is missing top-level models")
 	}
 	var models []json.RawMessage
 	if err := json.Unmarshal(modelsRaw, &models); err != nil {
