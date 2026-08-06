@@ -76,6 +76,19 @@ func TestGatewayRoutesOpenAIResponsesCompactPathIsRegistered(t *testing.T) {
 	}
 }
 
+func TestGatewayRoutesNvidiaResponsesUsesOpenAICompatibleHandler(t *testing.T) {
+	router := newGatewayRoutesTestRouter(service.PlatformNvidia)
+	req := httptest.NewRequest(http.MethodPost, "/v1/responses", strings.NewReader(`{"model":"z-ai/glm-5.2","input":"hi"}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusInternalServerError, w.Code)
+	require.Contains(t, w.Body.String(), `"type":"api_error"`)
+	require.NotContains(t, w.Body.String(), `"code":"api_error"`)
+}
+
 func TestGatewayRoutesOpenAIAlphaSearchPathsAreRegistered(t *testing.T) {
 	router := newGatewayRoutesTestRouter()
 	registered := make(map[string]bool)
