@@ -26,12 +26,12 @@ const openAIResponsesSSEKeepaliveKey = "openai_responses_sse_keepalive"
 // 原 JSON+状态码链路（Codex 按 HTTP 状态码重试）；首拍之后状态码固化为 200，
 // 后续错误由写回方降级为 response.failed 流内终止事件。
 type openAIResponsesSSEKeepalive struct {
-	mu          sync.Mutex
-	writer      gin.ResponseWriter
-	interval    time.Duration
-	started     bool
-	stopped     bool
-	lastWriteAt             time.Time
+	mu                     sync.Mutex
+	writer                 gin.ResponseWriter
+	interval               time.Duration
+	started                bool
+	stopped                bool
+	lastWriteAt            time.Time
 	externalCommentPending bool
 	// bytes 是心跳已写出的注释字节数。心跳不构成语义响应，handler 的
 	// "Forward 期间是否已写响应"判定（failover 放弃换号的依据）必须扣除
