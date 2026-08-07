@@ -410,11 +410,11 @@ func (s *OpenAIGatewayService) handleOpenAINvidiaResponsesTransportError(
 	}
 	setOpsUpstreamError(c, 0, safeErr, "")
 	appendOpsUpstreamError(c, OpsUpstreamErrorEvent{
-		Platform:           platform,
-		AccountID:          accountID,
-		AccountName:        accountName,
-		Kind:               "request_error",
-		Message:            safeErr,
+		Platform:    platform,
+		AccountID:   accountID,
+		AccountName: accountName,
+		Kind:        "request_error",
+		Message:     safeErr,
 	})
 	if errors.Is(err, context.Canceled) {
 		return err
