@@ -38,6 +38,10 @@ func (s *OpenAIGatewayService) forwardResponsesViaRawChatCompletions(
 	}
 
 	clientStream := responsesReq.Stream
+	nvidiaResponsesStream := account != nil && account.IsNvidia() && clientStream && !isOpenAIResponsesCompactPath(c)
+	if nvidiaResponsesStream {
+		MarkOpenAINvidiaResponsesStream(c)
+	}
 	serviceTier := extractOpenAIServiceTierFromBody(body)
 	// custom 工具（如 codex 的 exec）降级为 function 工具转发，回程需按名字还原为
 	// custom_tool_call 项，先记下名字集合；tool_search 工具同理，回程还原为
@@ -108,6 +112,9 @@ func (s *OpenAIGatewayService) forwardResponsesViaRawChatCompletions(
 
 	if resp.StatusCode >= 400 {
 		respBody, upstreamMsg := s.readOpenAIUpstreamError(resp)
+		if nvidiaResponsesStream && IsOpenAINvidiaResponsesStreamBeforeBusinessOutput(c) {
+			return nil, s.handleOpenAINvidiaResponsesHTTPError(c, account, resp, respBody, upstreamMsg)
+		}
 		if s.activateAgnesQuotaFallback(account, upstreamModel, resp.StatusCode, respBody, time.Now()) {
 			return s.forwardResponsesViaRawChatCompletions(ctx, c, account, body)
 		}
@@ -217,6 +224,7 @@ func (s *OpenAIGatewayService) streamChatCompletionsAsResponses(
 			wroteEvent = true
 		}
 		if wroteEvent {
+			MarkOpenAINvidiaResponsesBusinessOutput(c)
 			c.Writer.Flush()
 			downstreamWritten()
 		}
@@ -333,6 +341,85 @@ func (s *OpenAIGatewayService) streamChatCompletionsAsResponses(
 			downstreamWritten()
 		}
 	}
+}
+
+func (s *OpenAIGatewayService) handleOpenAINvidiaResponsesHTTPError(
+	c *gin.Context,
+	account *Account,
+	resp *http.Response,
+	respBody []byte,
+	upstreamMsg string,
+) error {
+	message := sanitizeUpstreamErrorMessage(strings.TrimSpace(upstreamMsg))
+	if message == "" {
+		message = "Upstream request failed"
+	}
+
+	upstreamDetail := ""
+	if s != nil && s.cfg != nil && s.cfg.Gateway.LogUpstreamErrorBody {
+		maxBytes := s.cfg.Gateway.LogUpstreamErrorBodyMaxBytes
+		if maxBytes <= 0 {
+			maxBytes = 2048
+		}
+		upstreamDetail = truncateString(string(respBody), maxBytes)
+	}
+	platform := ""
+	accountID := int64(0)
+	accountName := ""
+	if account != nil {
+		platform = account.Platform
+		accountID = account.ID
+		accountName = account.Name
+	}
+	setOpsUpstreamError(c, resp.StatusCode, message, upstreamDetail)
+	appendOpsUpstreamError(c, OpsUpstreamErrorEvent{
+		Platform:           platform,
+		AccountID:          accountID,
+		AccountName:        accountName,
+		UpstreamStatusCode: resp.StatusCode,
+		UpstreamRequestID:  resp.Header.Get("x-request-id"),
+		Kind:               "http_error",
+		Message:            message,
+		Detail:             upstreamDetail,
+	})
+
+	// The upstream response is still drained above, but a disconnected client
+	// must not receive a late terminal event.
+	if c != nil && c.Request != nil && c.Request.Context().Err() != nil {
+		return fmt.Errorf("upstream response failed: %d message=%s", resp.StatusCode, message)
+	}
+
+	MarkResponseCommitted(c)
+	writeOpenAIResponsesFallbackError(c, resp.StatusCode, "upstream_error", message)
+	return fmt.Errorf("upstream response failed: %d message=%s", resp.StatusCode, message)
+}
+
+func (s *OpenAIGatewayService) handleOpenAINvidiaResponsesTransportError(
+	c *gin.Context,
+	account *Account,
+	err error,
+) error {
+	safeErr := sanitizeUpstreamErrorMessage(err.Error())
+	platform := ""
+	accountID := int64(0)
+	accountName := ""
+	if account != nil {
+		platform = account.Platform
+		accountID = account.ID
+		accountName = account.Name
+	}
+	setOpsUpstreamError(c, 0, safeErr, "")
+	appendOpsUpstreamError(c, OpsUpstreamErrorEvent{
+		Platform:    platform,
+		AccountID:   accountID,
+		AccountName: accountName,
+		Kind:        "request_error",
+		Message:     safeErr,
+	})
+	if errors.Is(err, context.Canceled) {
+		return err
+	}
+	return fmt.Errorf("upstream response failed: %s", safeErr)
 }
 
 func chatChunkStartsResponsesOutput(chunk *apicompat.ChatCompletionsChunk) bool {
