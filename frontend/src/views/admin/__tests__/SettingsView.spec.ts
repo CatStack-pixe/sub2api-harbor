@@ -820,6 +820,21 @@ describe("admin SettingsView payment visible method controls", () => {
         tencent_captcha_region: "cn",
       }),
     );
+
+    expect(inputs.slice(1).map((input) => (input.element as HTMLInputElement).value)).toEqual([
+      "",
+      "",
+      "",
+    ]);
+
+    await wrapper.find("form").trigger("submit.prevent");
+    await flushPromises();
+
+    expect(updateSettings).toHaveBeenCalledTimes(2);
+    const secondPayload = updateSettings.mock.calls[1]![0];
+    expect(secondPayload.tencent_captcha_app_secret_key).toBeUndefined();
+    expect(secondPayload.tencent_captcha_cloud_secret_id).toBeUndefined();
+    expect(secondPayload.tencent_captcha_cloud_secret_key).toBeUndefined();
   });
 
   it("腾讯天御切换到国际站后保存站点并更新控制台入口", async () => {
