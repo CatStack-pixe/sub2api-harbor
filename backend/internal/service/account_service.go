@@ -11,17 +11,19 @@ import (
 )
 
 var (
-	ErrAccountNotFound              = infraerrors.NotFound("ACCOUNT_NOT_FOUND", "account not found")
-	ErrAccountNilInput              = infraerrors.BadRequest("ACCOUNT_NIL_INPUT", "account input cannot be nil")
-	ErrAccountNotInFallback         = infraerrors.BadRequest("ACCOUNT_NOT_IN_FALLBACK", "account is not in proxy fallback state")
-	ErrRemoteIngestAccountManaged   = infraerrors.Conflict(
-		"REMOTE_INGEST_ACCOUNT_MANAGED",
-		"remote ingest accounts must be managed through the dedicated remote ingest lifecycle",
-	)
-	ErrRemoteIngestMetadataReserved = infraerrors.BadRequest(
-		"REMOTE_INGEST_METADATA_RESERVED",
-		"remote ingest metadata is reserved for the dedicated remote ingest lifecycle",
-	)
+	ErrAccountNotFound      = infraerrors.NotFound("ACCOUNT_NOT_FOUND", "account not found")
+	ErrAccountNilInput      = infraerrors.BadRequest("ACCOUNT_NIL_INPUT", "account input cannot be nil")
+	ErrAccountNotInFallback = infraerrors.BadRequest("ACCOUNT_NOT_IN_FALLBACK", "account is not in proxy fallback state")
+)
+
+var ErrRemoteIngestAccountManaged = infraerrors.Conflict(
+	"REMOTE_INGEST_ACCOUNT_MANAGED",
+	"remote ingest accounts must be managed through the dedicated remote ingest lifecycle",
+)
+
+var ErrRemoteIngestMetadataReserved = infraerrors.BadRequest(
+	"REMOTE_INGEST_METADATA_RESERVED",
+	"remote ingest metadata is reserved for the dedicated remote ingest lifecycle",
 )
 
 const AccountListGroupUngrouped int64 = -1

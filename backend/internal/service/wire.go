@@ -873,8 +873,8 @@ func ProvideRemoteAccessVerifier(cfg *config.Config) (RemoteAccessVerifier, erro
 	}
 	return NewCloudflareAccessVerifier(CloudflareAccessVerifierConfig{
 		TeamDomain: cfg.RemoteIngest.CloudflareTeamDomain,
-		Audience: cfg.RemoteIngest.CloudflareAudience,
-		ClockSkew: time.Duration(cfg.RemoteIngest.TimestampSkew) * time.Second,
+		Audience:   cfg.RemoteIngest.CloudflareAudience,
+		ClockSkew:  time.Duration(cfg.RemoteIngest.TimestampSkew) * time.Second,
 	}, nil)
 }
 

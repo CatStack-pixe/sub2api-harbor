@@ -403,6 +403,14 @@ func (r *remoteIngestRepositoryStub) ClaimProbe(context.Context, time.Duration) 
 	return nil, nil
 }
 
-func (r *remoteIngestRepositoryStub) CompleteProbe(context.Context, string, int) error { return nil }
-func (r *remoteIngestRepositoryStub) FailProbe(context.Context, string, int, string) error { return nil }
-func (r *remoteIngestRepositoryStub) RetryProbe(context.Context, string) error        { return nil }
+func (r *remoteIngestRepositoryStub) CompleteProbe(context.Context, string, int) error {
+	return nil
+}
+
+func (r *remoteIngestRepositoryStub) FailProbe(context.Context, string, int, string) error {
+	return nil
+}
+
+func (r *remoteIngestRepositoryStub) RetryProbe(context.Context, string) error {
+	return nil
+}
