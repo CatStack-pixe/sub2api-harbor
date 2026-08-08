@@ -12,7 +12,7 @@ import (
 func TestRemoteIngestRevokeClientLocksDeliveriesBeforeClient(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
-	t.Cleanup(func() { require.NoError(t, db.Close()) })
+	t.Cleanup(func() { _ = db.Close() })
 
 	repository := &remoteIngestRepository{db: db}
 	mock.ExpectBegin()
@@ -37,7 +37,7 @@ func TestRemoteIngestRevokeClientLocksDeliveriesBeforeClient(t *testing.T) {
 func TestRemoteIngestRetryProbeLocksDeliveryThenActiveClient(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
-	t.Cleanup(func() { require.NoError(t, db.Close()) })
+	t.Cleanup(func() { _ = db.Close() })
 
 	repository := &remoteIngestRepository{db: db}
 	mock.ExpectBegin()
@@ -59,7 +59,7 @@ func TestRemoteIngestRetryProbeLocksDeliveryThenActiveClient(t *testing.T) {
 func TestRemoteIngestRetryProbeRejectsRevokedClientInsideTransaction(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
-	t.Cleanup(func() { require.NoError(t, db.Close()) })
+	t.Cleanup(func() { _ = db.Close() })
 
 	repository := &remoteIngestRepository{db: db}
 	mock.ExpectBegin()
