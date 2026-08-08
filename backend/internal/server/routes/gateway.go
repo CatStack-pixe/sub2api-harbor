@@ -53,6 +53,14 @@ func RegisterGatewayRoutes(
 			return false
 		}
 	}
+	isOpenAIMessagesCompatibleGatewayPlatform := func(c *gin.Context) bool {
+		switch getGroupPlatform(c) {
+		case service.PlatformOpenAI, service.PlatformGrok, service.PlatformAgnes, service.PlatformNvidia:
+			return true
+		default:
+			return false
+		}
+	}
 	isOpenAIChatCompatibleGatewayPlatform := func(c *gin.Context) bool {
 		if isOpenAIResponsesCompatibleGatewayPlatform(c) {
 			return true
@@ -192,7 +200,7 @@ func RegisterGatewayRoutes(
 	{
 		// /v1/messages: auto-route based on group platform
 		gateway.POST("/messages", func(c *gin.Context) {
-			if isOpenAIResponsesCompatibleGatewayPlatform(c) {
+			if isOpenAIMessagesCompatibleGatewayPlatform(c) {
 				h.OpenAIGateway.Messages(c)
 				return
 			}

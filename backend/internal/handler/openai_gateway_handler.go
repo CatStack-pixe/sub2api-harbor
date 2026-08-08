@@ -186,7 +186,7 @@ func allowOpenAICompatibleMessagesDispatch(apiKey *service.APIKey) bool {
 	if apiKey == nil || apiKey.Group == nil {
 		return true
 	}
-	if apiKey.Group.Platform == service.PlatformGrok || apiKey.Group.Platform == service.PlatformAgnes || apiKey.Group.Platform == service.PlatformDeepSeek || apiKey.Group.Platform == service.PlatformNvidia {
+	if apiKey.Group.Platform == service.PlatformGrok || apiKey.Group.Platform == service.PlatformAgnes || apiKey.Group.Platform == service.PlatformNvidia {
 		return true
 	}
 	return apiKey.Group.AllowMessagesDispatch
