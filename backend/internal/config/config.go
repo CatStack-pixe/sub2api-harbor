@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"math"
+	"net"
 	"net/textproto"
 	"net/url"
 	"os"
@@ -99,6 +100,7 @@ type Config struct {
 	Idempotency             IdempotencyConfig             `mapstructure:"idempotency"`
 	BatchImage              BatchImageConfig              `mapstructure:"batch_image"`
 	ImageStorage            ImageStorageConfig            `mapstructure:"image_storage"`
+	RemoteIngest            RemoteIngestConfig            `mapstructure:"remote_ingest"`
 }
 
 type LogConfig struct {
@@ -179,6 +181,22 @@ type IdempotencyConfig struct {
 	CleanupIntervalSeconds int `mapstructure:"cleanup_interval_seconds"`
 	// CleanupBatchSize 每次清理的最大记录数。
 	CleanupBatchSize int `mapstructure:"cleanup_batch_size"`
+}
+
+// RemoteIngestConfig controls the isolated, machine-to-machine account intake API.
+// The feature is deliberately fail-closed and disabled by default.
+type RemoteIngestConfig struct {
+	Enabled              bool     `mapstructure:"enabled"`
+	CloudflareTeamDomain string   `mapstructure:"cloudflare_team_domain"`
+	CloudflareAudience   string   `mapstructure:"cloudflare_audience"`
+	KeyringFile          string   `mapstructure:"keyring_file"`
+	AllowedPrivateCIDRs  []string `mapstructure:"allowed_private_cidrs"`
+	RegistrationTTL      int      `mapstructure:"registration_ttl_seconds"`
+	ChallengeTTL         int      `mapstructure:"challenge_ttl_seconds"`
+	TimestampSkew        int      `mapstructure:"timestamp_skew_seconds"`
+	WorkerConcurrency    int      `mapstructure:"worker_concurrency"`
+	WorkerTimeout        int      `mapstructure:"worker_timeout_seconds"`
+	WorkerPollInterval   int      `mapstructure:"worker_poll_interval_seconds"`
 }
 
 type BatchImageConfig struct {
@@ -1769,6 +1787,10 @@ func load(allowMissingJWTSecret bool) (*Config, error) {
 	cfg.Log.Environment = strings.TrimSpace(cfg.Log.Environment)
 	cfg.Log.StacktraceLevel = strings.ToLower(strings.TrimSpace(cfg.Log.StacktraceLevel))
 	cfg.Log.Output.FilePath = strings.TrimSpace(cfg.Log.Output.FilePath)
+	cfg.RemoteIngest.CloudflareTeamDomain = strings.TrimSpace(cfg.RemoteIngest.CloudflareTeamDomain)
+	cfg.RemoteIngest.CloudflareAudience = strings.TrimSpace(cfg.RemoteIngest.CloudflareAudience)
+	cfg.RemoteIngest.KeyringFile = strings.TrimSpace(cfg.RemoteIngest.KeyringFile)
+	cfg.RemoteIngest.AllowedPrivateCIDRs = normalizeStringSlice(cfg.RemoteIngest.AllowedPrivateCIDRs)
 	cfg.Gateway.ForcedCodexInstructionsTemplateFile = strings.TrimSpace(cfg.Gateway.ForcedCodexInstructionsTemplateFile)
 	if cfg.Gateway.ForcedCodexInstructionsTemplateFile != "" {
 		content, err := os.ReadFile(cfg.Gateway.ForcedCodexInstructionsTemplateFile)
@@ -2224,6 +2246,20 @@ func setDefaults() {
 	viper.SetDefault("idempotency.cleanup_interval_seconds", 60)
 	viper.SetDefault("idempotency.cleanup_batch_size", 500)
 
+	// Remote machine account intake is opt-in and requires Cloudflare Access
+	// plus a persistent application-level credential keyring.
+	viper.SetDefault("remote_ingest.enabled", false)
+	viper.SetDefault("remote_ingest.cloudflare_team_domain", "")
+	viper.SetDefault("remote_ingest.cloudflare_audience", "")
+	viper.SetDefault("remote_ingest.keyring_file", "")
+	viper.SetDefault("remote_ingest.allowed_private_cidrs", []string{})
+	viper.SetDefault("remote_ingest.registration_ttl_seconds", 600)
+	viper.SetDefault("remote_ingest.challenge_ttl_seconds", 60)
+	viper.SetDefault("remote_ingest.timestamp_skew_seconds", 60)
+	viper.SetDefault("remote_ingest.worker_concurrency", 4)
+	viper.SetDefault("remote_ingest.worker_timeout_seconds", 240)
+	viper.SetDefault("remote_ingest.worker_poll_interval_seconds", 2)
+
 	// Gateway
 	viper.SetDefault("gateway.response_header_timeout", 600) // 600秒(10分钟)等待上游响应头，LLM高负载时可能排队较久
 	viper.SetDefault("gateway.openai_response_header_timeout", 0)
@@ -2497,6 +2533,44 @@ func setEnvReachableDefaults() {
 }
 
 func (c *Config) Validate() error {
+	if c.RemoteIngest.Enabled {
+		team := strings.TrimSuffix(strings.TrimSpace(c.RemoteIngest.CloudflareTeamDomain), "/")
+		if team == "" || strings.Contains(team, "://") || strings.ContainsAny(team, "/?#") {
+			return fmt.Errorf("remote_ingest.cloudflare_team_domain must be a Cloudflare Access team hostname")
+		}
+		if !strings.HasSuffix(strings.ToLower(team), ".cloudflareaccess.com") {
+			return fmt.Errorf("remote_ingest.cloudflare_team_domain must end with .cloudflareaccess.com")
+		}
+		if strings.TrimSpace(c.RemoteIngest.CloudflareAudience) == "" {
+			return fmt.Errorf("remote_ingest.cloudflare_audience is required when remote ingest is enabled")
+		}
+		if strings.TrimSpace(c.RemoteIngest.KeyringFile) == "" {
+			return fmt.Errorf("remote_ingest.keyring_file is required when remote ingest is enabled")
+		}
+		if c.RemoteIngest.RegistrationTTL <= 0 || c.RemoteIngest.RegistrationTTL > 86400 {
+			return fmt.Errorf("remote_ingest.registration_ttl_seconds must be between 1 and 86400")
+		}
+		if c.RemoteIngest.ChallengeTTL <= 0 || c.RemoteIngest.ChallengeTTL > 300 {
+			return fmt.Errorf("remote_ingest.challenge_ttl_seconds must be between 1 and 300")
+		}
+		if c.RemoteIngest.TimestampSkew <= 0 || c.RemoteIngest.TimestampSkew > 300 {
+			return fmt.Errorf("remote_ingest.timestamp_skew_seconds must be between 1 and 300")
+		}
+		if c.RemoteIngest.WorkerConcurrency <= 0 || c.RemoteIngest.WorkerConcurrency > 32 {
+			return fmt.Errorf("remote_ingest.worker_concurrency must be between 1 and 32")
+		}
+		if c.RemoteIngest.WorkerTimeout <= 0 || c.RemoteIngest.WorkerTimeout > 1800 {
+			return fmt.Errorf("remote_ingest.worker_timeout_seconds must be between 1 and 1800")
+		}
+		if c.RemoteIngest.WorkerPollInterval <= 0 || c.RemoteIngest.WorkerPollInterval > 60 {
+			return fmt.Errorf("remote_ingest.worker_poll_interval_seconds must be between 1 and 60")
+		}
+		for _, cidr := range c.RemoteIngest.AllowedPrivateCIDRs {
+			if _, _, err := net.ParseCIDR(cidr); err != nil {
+				return fmt.Errorf("remote_ingest.allowed_private_cidrs contains invalid CIDR %q", cidr)
+			}
+		}
+	}
 	forwardedClientIPHeaders, err := NormalizeForwardedClientIPHeaders(c.Security.ForwardedClientIPHeaders)
 	if err != nil {
 		return fmt.Errorf("security.forwarded_client_ip_headers: %w", err)

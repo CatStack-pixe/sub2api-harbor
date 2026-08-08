@@ -410,6 +410,8 @@ type PublicSettings struct {
 
 	RiskControlEnabled bool `json:"risk_control_enabled"`
 
+	RemoteIngestEnabled bool `json:"remote_ingest_enabled"`
+
 	AllowUserViewErrorRequests bool `json:"allow_user_view_error_requests"`
 }
 

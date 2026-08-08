@@ -169,6 +169,7 @@ export default {
     modelPlaza: '模型广场',
     subscriptions: '订阅管理',
     accounts: '账号管理',
+    remoteIngest: '远程接入',
     proxies: 'IP管理',
     redeemCodes: '兑换码',
     ops: '运维监控',

@@ -847,9 +847,47 @@ var ProviderSet = wire.NewSet(
 	ProvideBalanceNotifyService,
 	ProvideChannelMonitorService,
 	ProvideChannelMonitorRunner,
+	ProvideRemoteCredentialCipher,
+	ProvideRemoteAccessVerifier,
+	ProvideRemoteIngestService,
 	NewChannelMonitorRequestTemplateService,
 	ProvideUserPlatformQuotaUsageFlusher,
 )
+
+func ProvideRemoteCredentialCipher(cfg *config.Config) (RemoteCredentialCipher, error) {
+	path := ""
+	if cfg != nil {
+		path = cfg.RemoteIngest.KeyringFile
+	}
+	keyring, err := LoadRemoteIngestKeyring(RemoteIngestKeyringConfig{FilePath: path})
+	if err != nil { return nil, err }
+	RegisterRemoteIngestCredentialDecryptor(keyring)
+	return keyring, nil
+}
+
+func ProvideRemoteAccessVerifier(cfg *config.Config) (RemoteAccessVerifier, error) {
+	if cfg == nil || !cfg.RemoteIngest.Enabled {
+		return &CloudflareAccessVerifier{}, nil
+	}
+	return NewCloudflareAccessVerifier(CloudflareAccessVerifierConfig{
+		TeamDomain: cfg.RemoteIngest.CloudflareTeamDomain,
+		Audience: cfg.RemoteIngest.CloudflareAudience,
+		ClockSkew: time.Duration(cfg.RemoteIngest.TimestampSkew) * time.Second,
+	}, nil)
+}
+
+func ProvideRemoteIngestService(
+	repo RemoteIngestRepository,
+	challenges RemoteChallengeStore,
+	access RemoteAccessVerifier,
+	cipher RemoteCredentialCipher,
+	accountTest *AccountTestService,
+	cfg *config.Config,
+) *RemoteIngestService {
+	svc := NewRemoteIngestService(repo, challenges, access, cipher, accountTest, cfg)
+	svc.Start()
+	return svc
+}
 
 // ProvideUserPlatformQuotaUsageFlusher 创建并启动 UserPlatformQuotaUsageFlusher。
 func ProvideUserPlatformQuotaUsageFlusher(cfg *config.Config, cache BillingCache, quotaRepo UserPlatformQuotaRepository, tw *TimingWheelService) *UserPlatformQuotaUsageFlusher {

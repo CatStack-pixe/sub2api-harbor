@@ -9,6 +9,8 @@ redis_data/
 
 # Environment configuration (contains sensitive information)
 .env
+secrets/
+__pycache__/
 
 # Backup files
 *.backup

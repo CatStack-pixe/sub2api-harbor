@@ -101,7 +101,10 @@ const (
 	upstreamProtocolModeOpenAIH1Fallback = "openai_h1_fallback"
 )
 
-var errUpstreamClientLimitReached = errors.New("upstream client cache limit reached")
+var (
+	errUpstreamClientLimitReached  = errors.New("upstream client cache limit reached")
+	errRemoteIngestResponseTooLarge = errors.New("remote ingest probe response exceeds 4 MiB")
+)
 
 // poolSettings 连接池配置参数
 // 封装 Transport 所需的各项连接池参数
@@ -197,6 +200,9 @@ func NewHTTPUpstream(cfg *config.Config) service.HTTPUpstream {
 //   - inFlight > 0 的客户端不会被淘汰，确保活跃请求不被中断
 func (s *httpUpstreamService) Do(req *http.Request, proxyURL string, accountID int64, accountConcurrency int) (*http.Response, error) {
 	applyGrokCLIProxyHeaders(req)
+	if err := validateRemoteIngestUpstreamRequest(req, proxyURL, accountID); err != nil {
+		return nil, err
+	}
 	if err := s.validateRequestHost(req); err != nil {
 		return nil, err
 	}
@@ -226,6 +232,9 @@ func (s *httpUpstreamService) Do(req *http.Request, proxyURL string, accountID i
 
 	// 如果上游返回了压缩内容，解压后再交给业务层
 	decompressResponseBody(resp)
+	if service.IsRemoteIngestProbe(req.Context()) {
+		resp.Body = newHardLimitReadCloser(resp.Body, 4<<20)
+	}
 
 	// 包装响应体，在关闭时自动减少计数并更新时间戳
 	// 这确保了流式响应（如 SSE）在完全读取前不会被淘汰
@@ -235,6 +244,26 @@ func (s *httpUpstreamService) Do(req *http.Request, proxyURL string, accountID i
 	})
 
 	return resp, nil
+}
+
+func validateRemoteIngestUpstreamRequest(req *http.Request, proxyURL string, accountID int64) error {
+	remoteProbe := req != nil && service.IsRemoteIngestProbe(req.Context())
+	if remoteProbe {
+		service.RegisterRemoteIngestAccount(accountID)
+	}
+	if !remoteProbe && !service.IsRemoteIngestAccount(accountID) {
+		return nil
+	}
+	if req == nil || req.URL == nil {
+		return errors.New("remote ingest request URL is required")
+	}
+	if !strings.EqualFold(strings.TrimSpace(req.URL.Scheme), "https") || strings.TrimSpace(req.URL.Hostname()) == "" {
+		return errors.New("remote ingest upstream must use HTTPS")
+	}
+	if strings.TrimSpace(proxyURL) != "" {
+		return errors.New("remote ingest accounts cannot use an upstream proxy")
+	}
+	return nil
 }
 
 // DoWithTLS 执行带 TLS 指纹伪装的 HTTP 请求
@@ -251,6 +280,9 @@ func (s *httpUpstreamService) DoWithTLS(req *http.Request, proxyURL string, acco
 		return s.Do(req, proxyURL, accountID, accountConcurrency)
 	}
 	applyGrokCLIProxyHeaders(req)
+	if err := validateRemoteIngestUpstreamRequest(req, proxyURL, accountID); err != nil {
+		return nil, err
+	}
 	upstreamProfile := service.HTTPUpstreamProfileDefault
 	if req != nil {
 		upstreamProfile = service.HTTPUpstreamProfileFromContext(req.Context())
@@ -287,6 +319,9 @@ func (s *httpUpstreamService) DoWithTLS(req *http.Request, proxyURL string, acco
 	}
 
 	decompressResponseBody(resp)
+	if service.IsRemoteIngestProbe(req.Context()) {
+		resp.Body = newHardLimitReadCloser(resp.Body, 4<<20)
+	}
 
 	resp.Body = wrapTrackedBody(resp.Body, func() {
 		atomic.AddInt64(&entry.inFlight, -1)
@@ -482,6 +517,7 @@ func (s *httpUpstreamService) acquireClientWithTLS(proxyURL string, accountID in
 // getClientEntryWithTLS 获取或创建带 TLS 指纹的客户端条目
 // TLS 指纹客户端使用独立的缓存键，与普通客户端隔离
 func (s *httpUpstreamService) getClientEntryWithTLS(proxyURL string, accountID int64, accountConcurrency int, profile *tlsfingerprint.Profile, upstreamProfile service.HTTPUpstreamProfile, markInFlight bool, enforceLimit bool) (*upstreamClientEntry, error) {
+	remoteSecure := service.IsRemoteIngestAccount(accountID)
 	isolation := s.getIsolationMode()
 	proxyKey, parsedProxy, err := normalizeProxyURL(proxyURL)
 	if err != nil {
@@ -492,6 +528,13 @@ func (s *httpUpstreamService) getClientEntryWithTLS(proxyURL string, accountID i
 	// TLS 指纹客户端使用独立的缓存键，加 "tls:" 前缀
 	cacheKey := "tls:" + buildCacheKey(isolation, proxyKey, accountID, upstreamProtocolModeDefault)
 	poolKey := buildPoolKey(settings, upstreamProtocolModeDefault) + ":tls"
+	if remoteSecure {
+		if parsedProxy != nil {
+			return nil, errors.New("remote ingest accounts cannot use an upstream proxy")
+		}
+		cacheKey = "remote-ingest:" + cacheKey
+		poolKey += ":remote-ingest"
+	}
 
 	now := time.Now()
 	nowUnix := now.UnixNano()
@@ -547,9 +590,15 @@ func (s *httpUpstreamService) getClientEntryWithTLS(proxyURL string, accountID i
 		s.mu.Unlock()
 		return nil, fmt.Errorf("build TLS fingerprint transport: %w", err)
 	}
+	if remoteSecure {
+		dialer := tlsfingerprint.NewDialer(profile, newRemoteIngestDialContext(s.remoteIngestAllowedCIDRs()))
+		transport.DialTLSContext = dialer.DialTLSContext
+	}
 
 	client := &http.Client{Transport: transport}
-	if s.shouldValidateResolvedIP() {
+	if remoteSecure {
+		client.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+	} else if s.shouldValidateResolvedIP() {
 		client.CheckRedirect = s.redirectChecker
 	}
 
@@ -578,6 +627,13 @@ func (s *httpUpstreamService) shouldValidateResolvedIP() bool {
 		return false
 	}
 	return !s.cfg.Security.URLAllowlist.AllowPrivateHosts
+}
+
+func (s *httpUpstreamService) remoteIngestAllowedCIDRs() []string {
+	if s == nil || s.cfg == nil {
+		return nil
+	}
+	return s.cfg.RemoteIngest.AllowedPrivateCIDRs
 }
 
 func (s *httpUpstreamService) validateRequestHost(req *http.Request) error {
@@ -638,6 +694,7 @@ func (s *httpUpstreamService) getOrCreateClient(proxyURL string, accountID int64
 // markInFlight=true 时会标记进行中请求，用于请求路径防止被淘汰
 // enforceLimit=true 时会限制客户端数量，超限且无法淘汰时返回错误
 func (s *httpUpstreamService) getClientEntry(proxyURL string, accountID int64, accountConcurrency int, profile service.HTTPUpstreamProfile, markInFlight bool, enforceLimit bool) (*upstreamClientEntry, error) {
+	remoteSecure := service.IsRemoteIngestAccount(accountID)
 	// 获取隔离模式
 	isolation := s.getIsolationMode()
 	// 标准化代理 URL 并解析
@@ -653,6 +710,13 @@ func (s *httpUpstreamService) getClientEntry(proxyURL string, accountID int64, a
 	cacheKey := buildCacheKey(isolation, proxyKey, accountID, protocolMode)
 	// 构建连接池配置键（用于检测配置变更）
 	poolKey := buildPoolKey(settings, protocolMode)
+	if remoteSecure {
+		if parsedProxy != nil {
+			return nil, errors.New("remote ingest accounts cannot use an upstream proxy")
+		}
+		cacheKey = "remote-ingest:" + cacheKey
+		poolKey += ":remote-ingest"
+	}
 
 	now := time.Now()
 	nowUnix := now.UnixNano()
@@ -700,8 +764,13 @@ func (s *httpUpstreamService) getClientEntry(proxyURL string, accountID int64, a
 		s.mu.Unlock()
 		return nil, fmt.Errorf("build transport: %w", err)
 	}
+	if remoteSecure {
+		transport.DialContext = newRemoteIngestDialContext(s.remoteIngestAllowedCIDRs())
+	}
 	client := &http.Client{Transport: transport}
-	if s.shouldValidateResolvedIP() {
+	if remoteSecure {
+		client.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+	} else if s.shouldValidateResolvedIP() {
 		client.CheckRedirect = s.redirectChecker
 	}
 	entry := &upstreamClientEntry{
@@ -1430,6 +1499,39 @@ func wrapTrackedBody(body io.ReadCloser, onClose func()) io.ReadCloser {
 		return body
 	}
 	return &trackedBody{ReadCloser: body, onClose: onClose}
+}
+
+type hardLimitReadCloser struct {
+	body      io.ReadCloser
+	remaining int64
+}
+
+func newHardLimitReadCloser(body io.ReadCloser, limit int64) io.ReadCloser {
+	if body == nil || limit <= 0 {
+		return body
+	}
+	return &hardLimitReadCloser{body: body, remaining: limit}
+}
+
+func (b *hardLimitReadCloser) Read(p []byte) (int, error) {
+	if b.remaining == 0 {
+		var extra [1]byte
+		n, err := b.body.Read(extra[:])
+		if n > 0 {
+			return 0, errRemoteIngestResponseTooLarge
+		}
+		return 0, err
+	}
+	if int64(len(p)) > b.remaining {
+		p = p[:b.remaining]
+	}
+	n, err := b.body.Read(p)
+	b.remaining -= int64(n)
+	return n, err
+}
+
+func (b *hardLimitReadCloser) Close() error {
+	return b.body.Close()
 }
 
 // decompressResponseBody 根据 Content-Encoding 解压响应体。
