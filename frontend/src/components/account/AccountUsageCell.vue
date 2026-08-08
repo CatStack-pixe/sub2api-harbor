@@ -553,7 +553,12 @@
   <!-- Non-OAuth/Setup-Token accounts -->
   <div ref="rootRef" v-else>
     <!-- Gemini API Key accounts: show quota info -->
-    <DeepSeekBalanceCell v-if="account.platform === 'deepseek'" :account="account" />
+    <DeepSeekBalanceCell
+      v-if="account.platform === 'deepseek'"
+      :account="account"
+      :auto-load="shouldAutoLoadDeepSeekBalance"
+      :refresh-token="manualRefreshToken"
+    />
     <AccountQuotaInfo v-else-if="account.platform === 'gemini'" :account="account" />
     <!-- Key/Bedrock accounts: show today stats + optional quota bars -->
     <div v-else class="space-y-1">
@@ -654,11 +659,13 @@ const props = withDefaults(
     todayStats?: WindowStats | null
     todayStatsLoading?: boolean
     manualRefreshToken?: number
+    pageVisible?: boolean
   }>(),
   {
     todayStats: null,
     todayStatsLoading: false,
-    manualRefreshToken: 0
+    manualRefreshToken: 0,
+    pageVisible: true
   }
 )
 
@@ -682,6 +689,7 @@ const isDesktopViewport = ref(
   typeof window === 'undefined' ? true : window.matchMedia(desktopViewportQuery).matches
 )
 const hasEnteredViewport = ref(false)
+const isRowVisible = ref(false)
 const pendingAutoLoad = ref(false)
 const pendingAutoLoadSource = ref<'passive' | 'active' | undefined>(undefined)
 
@@ -741,8 +749,14 @@ const shouldAutoLoadUsageOnMount = computed(() => {
   return shouldFetchUsage.value
 })
 
+const shouldAutoLoadDeepSeekBalance = computed(() => {
+  return props.account.platform === 'deepseek' && props.pageVisible && (
+    isDesktopViewport.value || isRowVisible.value
+  )
+})
+
 const shouldLazyLoadOnMobile = computed(() => {
-  return shouldFetchUsage.value && !isDesktopViewport.value
+  return (shouldFetchUsage.value || props.account.platform === 'deepseek') && !isDesktopViewport.value
 })
 
 // Antigravity quota types (用于 API 返回的数据)
@@ -1339,18 +1353,22 @@ const detachVisibilityObserver = () => {
 
 const attachVisibilityObserver = () => {
   detachVisibilityObserver()
-  if (!shouldLazyLoadOnMobile.value || hasEnteredViewport.value) return
+  if (!shouldLazyLoadOnMobile.value) return
+  if (props.account.platform !== 'deepseek' && hasEnteredViewport.value) return
   if (typeof window === 'undefined' || typeof IntersectionObserver === 'undefined') {
     hasEnteredViewport.value = true
+    isRowVisible.value = true
     flushPendingAutoLoad()
     return
   }
   if (!rootRef.value) return
 
   visibilityObserver = new IntersectionObserver((entries) => {
-    if (!entries.some((entry) => entry.isIntersecting)) return
+    const isIntersecting = entries.some((entry) => entry.isIntersecting)
+    if (props.account.platform === 'deepseek') isRowVisible.value = isIntersecting
+    if (!isIntersecting) return
     hasEnteredViewport.value = true
-    detachVisibilityObserver()
+    if (props.account.platform !== 'deepseek') detachVisibilityObserver()
     flushPendingAutoLoad()
   }, {
     root: null,
@@ -1578,10 +1596,12 @@ watch(isDesktopViewport, (isDesktop) => {
   if (isDesktop) {
     detachVisibilityObserver()
     hasEnteredViewport.value = true
+    isRowVisible.value = true
     flushPendingAutoLoad()
     return
   }
   hasEnteredViewport.value = false
+  isRowVisible.value = false
   attachVisibilityObserver()
 })
 
