@@ -52,6 +52,126 @@ func (r *groupRepository) Create(ctx context.Context, groupIn *service.Group) er
 	return nil
 }
 
+func (r *groupRepository) withGroupTransaction(ctx context.Context, fn func(*dbent.Client, sqlExecutor) error) error {
+	tx, err := r.client.Tx(ctx)
+	if err != nil {
+		if errors.Is(err, dbent.ErrTxStarted) {
+			return fn(r.client, r.client)
+		}
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	txClient := tx.Client()
+	if err := fn(txClient, txClient); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+func normalizeGroupIDs(groupIDs []int64) []int64 {
+	seen := make(map[int64]struct{}, len(groupIDs))
+	normalized := make([]int64, 0, len(groupIDs))
+	for _, groupID := range groupIDs {
+		if groupID <= 0 {
+			continue
+		}
+		if _, exists := seen[groupID]; exists {
+			continue
+		}
+		seen[groupID] = struct{}{}
+		normalized = append(normalized, groupID)
+	}
+	sort.Slice(normalized, func(i, j int) bool { return normalized[i] < normalized[j] })
+	return normalized
+}
+
+// lockGroupsForRemoteMutation takes exclusive locks in stable ID order. Remote
+// delivery creation takes a shared lock on the selected group, so either the
+// delivery commits first and is observed here, or this mutation commits first.
+func lockGroupsForRemoteMutation(ctx context.Context, exec sqlExecutor, groupIDs []int64) error {
+	groupIDs = normalizeGroupIDs(groupIDs)
+	if len(groupIDs) == 0 {
+		return nil
+	}
+
+	rows, err := exec.QueryContext(ctx, `
+		SELECT id
+		FROM groups
+		WHERE deleted_at IS NULL AND id = ANY($1)
+		ORDER BY id
+		FOR UPDATE`, pq.Array(groupIDs))
+	if err != nil {
+		return err
+	}
+	lockedCount := 0
+	for rows.Next() {
+		var groupID int64
+		if err := rows.Scan(&groupID); err != nil {
+			_ = rows.Close()
+			return err
+		}
+		lockedCount++
+	}
+	if err := rows.Close(); err != nil {
+		return err
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	if lockedCount != len(groupIDs) {
+		return service.ErrGroupNotFound
+	}
+
+	return rejectRemoteIngestGroupBindings(ctx, exec, groupIDs)
+}
+
+func rejectRemoteIngestGroupBindings(ctx context.Context, exec sqlExecutor, groupIDs []int64) error {
+	var hasRemoteAccounts bool
+	if err := scanSingleRow(ctx, exec, `
+		SELECT EXISTS (
+			SELECT 1
+			FROM account_groups ag
+			JOIN remote_ingest_deliveries d ON d.account_id = ag.account_id
+			WHERE ag.group_id = ANY($1)
+		)`, []any{pq.Array(groupIDs)}, &hasRemoteAccounts); err != nil {
+		return err
+	}
+	if hasRemoteAccounts {
+		return service.ErrRemoteIngestAccountManaged
+	}
+	return nil
+}
+
+func validateLockedCopyPlatforms(ctx context.Context, exec sqlExecutor, targetPlatform string, sourceGroupIDs []int64) error {
+	if len(sourceGroupIDs) == 0 {
+		return nil
+	}
+	rows, err := exec.QueryContext(ctx, `
+		SELECT id, platform
+		FROM groups
+		WHERE deleted_at IS NULL AND id = ANY($1)
+		ORDER BY id`, pq.Array(sourceGroupIDs))
+	if err != nil {
+		return err
+	}
+	for rows.Next() {
+		var sourceGroupID int64
+		var sourcePlatform string
+		if err := rows.Scan(&sourceGroupID, &sourcePlatform); err != nil {
+			_ = rows.Close()
+			return err
+		}
+		if !service.CanCopyAccountsFromGroupPlatform(targetPlatform, sourcePlatform) {
+			_ = rows.Close()
+			return fmt.Errorf("source group %d platform mismatch: expected %s, got %s", sourceGroupID, targetPlatform, sourcePlatform)
+		}
+	}
+	if err := rows.Close(); err != nil {
+		return err
+	}
+	return rows.Err()
+}
+
 func createGroupRecord(ctx context.Context, client *dbent.Client, groupIn *service.Group) error {
 	if groupIn == nil {
 		return errors.New("group is nil")
@@ -128,6 +248,49 @@ func createGroupRecord(ctx context.Context, client *dbent.Client, groupIn *servi
 	return nil
 }
 
+// CreateWithAccountCopy creates a group and copies the current source bindings
+// while holding exclusive locks on every source group.
+func (r *groupRepository) CreateWithAccountCopy(ctx context.Context, groupIn *service.Group, sourceGroupIDs []int64) error {
+	if groupIn == nil {
+		return errors.New("group is nil")
+	}
+	sourceGroupIDs = normalizeGroupIDs(sourceGroupIDs)
+	return r.withGroupTransaction(ctx, func(txClient *dbent.Client, exec sqlExecutor) error {
+		if err := lockGroupsForRemoteMutation(ctx, exec, sourceGroupIDs); err != nil {
+			return err
+		}
+		if err := validateLockedCopyPlatforms(ctx, exec, groupIn.Platform, sourceGroupIDs); err != nil {
+			return err
+		}
+		if err := createGroupRecord(ctx, txClient, groupIn); err != nil {
+			return err
+		}
+		if len(sourceGroupIDs) > 0 {
+			result, err := exec.ExecContext(ctx, `
+				INSERT INTO account_groups (account_id, group_id, priority, created_at)
+				SELECT DISTINCT ag.account_id, $2, 50, NOW()
+				FROM account_groups ag
+				JOIN accounts a ON a.id = ag.account_id
+				WHERE ag.group_id = ANY($1)
+				  AND a.deleted_at IS NULL
+				  AND (NOT $3 OR a.type <> $4)
+				ON CONFLICT (account_id, group_id) DO NOTHING`,
+				pq.Array(sourceGroupIDs),
+				groupIn.ID,
+				groupIn.RequireOAuthOnly,
+				service.AccountTypeAPIKey,
+			)
+			if err != nil {
+				return err
+			}
+			if count, err := result.RowsAffected(); err == nil {
+				groupIn.AccountCount = count
+			}
+		}
+		return enqueueSchedulerOutbox(ctx, exec, service.SchedulerOutboxEventGroupChanged, nil, &groupIn.ID, nil)
+	})
+}
+
 func (r *groupRepository) FindByDuplicateOperationID(ctx context.Context, operationID string) (*service.Group, error) {
 	operationID = strings.TrimSpace(operationID)
 	if operationID == "" {
@@ -164,6 +327,9 @@ func (r *groupRepository) CreateFromSource(ctx context.Context, groupIn *service
 	} else {
 		// Reuse a caller-owned transaction when this repository is already transactional.
 		txClient = r.client
+	}
+	if err := lockGroupsForRemoteMutation(ctx, txClient, []int64{sourceGroupID}); err != nil {
+		return err
 	}
 
 	if err := createGroupRecord(ctx, txClient, groupIn); err != nil {
@@ -228,8 +394,8 @@ func (r *groupRepository) GetByIDLite(ctx context.Context, id int64) (*service.G
 	return groupEntityToService(m), nil
 }
 
-func (r *groupRepository) Update(ctx context.Context, groupIn *service.Group) error {
-	builder := r.client.Group.UpdateOneID(groupIn.ID).
+func updateGroupRecord(ctx context.Context, client *dbent.Client, groupIn *service.Group) error {
+	builder := client.Group.UpdateOneID(groupIn.ID).
 		SetName(groupIn.Name).
 		SetDescription(groupIn.Description).
 		SetPlatform(groupIn.Platform).
@@ -356,21 +522,86 @@ func (r *groupRepository) Update(ctx context.Context, groupIn *service.Group) er
 		return translatePersistenceError(err, service.ErrGroupNotFound, service.ErrGroupExists)
 	}
 	groupIn.UpdatedAt = updated.UpdatedAt
-	if err := enqueueSchedulerOutbox(ctx, r.sql, service.SchedulerOutboxEventGroupChanged, nil, &groupIn.ID, nil); err != nil {
-		logger.LegacyPrintf("repository.group", "[SchedulerOutbox] enqueue group update failed: group=%d err=%v", groupIn.ID, err)
-	}
 	return nil
 }
 
+func (r *groupRepository) Update(ctx context.Context, groupIn *service.Group) error {
+	if groupIn == nil {
+		return errors.New("group is nil")
+	}
+	return r.withGroupTransaction(ctx, func(txClient *dbent.Client, exec sqlExecutor) error {
+		if err := lockGroupsForRemoteMutation(ctx, exec, []int64{groupIn.ID}); err != nil {
+			return err
+		}
+		if err := updateGroupRecord(ctx, txClient, groupIn); err != nil {
+			return err
+		}
+		return enqueueSchedulerOutbox(ctx, exec, service.SchedulerOutboxEventGroupChanged, nil, &groupIn.ID, nil)
+	})
+}
+
+// UpdateWithAccountCopy updates a group and, when sources are provided,
+// replaces its bindings from a transactionally stable source snapshot.
+func (r *groupRepository) UpdateWithAccountCopy(ctx context.Context, groupIn *service.Group, sourceGroupIDs []int64) error {
+	if groupIn == nil {
+		return errors.New("group is nil")
+	}
+	sourceGroupIDs = normalizeGroupIDs(sourceGroupIDs)
+	for _, sourceGroupID := range sourceGroupIDs {
+		if sourceGroupID == groupIn.ID {
+			return errors.New("cannot copy accounts from self")
+		}
+	}
+	groupIDs := append([]int64{groupIn.ID}, sourceGroupIDs...)
+	return r.withGroupTransaction(ctx, func(txClient *dbent.Client, exec sqlExecutor) error {
+		if err := lockGroupsForRemoteMutation(ctx, exec, groupIDs); err != nil {
+			return err
+		}
+		if err := validateLockedCopyPlatforms(ctx, exec, groupIn.Platform, sourceGroupIDs); err != nil {
+			return err
+		}
+		if err := updateGroupRecord(ctx, txClient, groupIn); err != nil {
+			return err
+		}
+		if len(sourceGroupIDs) > 0 {
+			if _, err := exec.ExecContext(ctx, "DELETE FROM account_groups WHERE group_id = $1", groupIn.ID); err != nil {
+				return err
+			}
+			result, err := exec.ExecContext(ctx, `
+				INSERT INTO account_groups (account_id, group_id, priority, created_at)
+				SELECT DISTINCT ag.account_id, $2, 50, NOW()
+				FROM account_groups ag
+				JOIN accounts a ON a.id = ag.account_id
+				WHERE ag.group_id = ANY($1)
+				  AND a.deleted_at IS NULL
+				  AND (NOT $3 OR a.type <> $4)
+				ON CONFLICT (account_id, group_id) DO NOTHING`,
+				pq.Array(sourceGroupIDs),
+				groupIn.ID,
+				groupIn.RequireOAuthOnly,
+				service.AccountTypeAPIKey,
+			)
+			if err != nil {
+				return err
+			}
+			if count, err := result.RowsAffected(); err == nil {
+				groupIn.AccountCount = count
+			}
+		}
+		return enqueueSchedulerOutbox(ctx, exec, service.SchedulerOutboxEventGroupChanged, nil, &groupIn.ID, nil)
+	})
+}
+
 func (r *groupRepository) Delete(ctx context.Context, id int64) error {
-	_, err := r.client.Group.Delete().Where(group.IDEQ(id)).Exec(ctx)
-	if err != nil {
-		return translatePersistenceError(err, service.ErrGroupNotFound, nil)
-	}
-	if err := enqueueSchedulerOutbox(ctx, r.sql, service.SchedulerOutboxEventGroupChanged, nil, &id, nil); err != nil {
-		logger.LegacyPrintf("repository.group", "[SchedulerOutbox] enqueue group delete failed: group=%d err=%v", id, err)
-	}
-	return nil
+	return r.withGroupTransaction(ctx, func(txClient *dbent.Client, exec sqlExecutor) error {
+		if err := lockGroupsForRemoteMutation(ctx, exec, []int64{id}); err != nil {
+			return err
+		}
+		if _, err := txClient.Group.Delete().Where(group.IDEQ(id)).Exec(ctx); err != nil {
+			return translatePersistenceError(err, service.ErrGroupNotFound, nil)
+		}
+		return enqueueSchedulerOutbox(ctx, exec, service.SchedulerOutboxEventGroupChanged, nil, &id, nil)
+	})
 }
 
 func (r *groupRepository) List(ctx context.Context, params pagination.PaginationParams) ([]service.Group, *pagination.PaginationResult, error) {
@@ -802,6 +1033,9 @@ func (r *groupRepository) DeleteCascade(ctx context.Context, id int64) ([]int64,
 	}
 	if lockedID == 0 {
 		return nil, service.ErrGroupNotFound
+	}
+	if err := rejectRemoteIngestGroupBindings(ctx, exec, []int64{id}); err != nil {
+		return nil, err
 	}
 
 	var affectedUserIDs []int64

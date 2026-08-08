@@ -294,7 +294,9 @@ func compositeDefaultModelsListCandidateIDs() []string {
 	return ids
 }
 
-func canCopyAccountsFromGroupPlatform(targetPlatform, sourcePlatform string) bool {
+// CanCopyAccountsFromGroupPlatform reports whether source bindings are valid
+// for the target platform.
+func CanCopyAccountsFromGroupPlatform(targetPlatform, sourcePlatform string) bool {
 	if targetPlatform == PlatformComposite {
 		return sourcePlatform == PlatformComposite || isConcreteRequestPlatform(sourcePlatform)
 	}
@@ -432,10 +434,11 @@ func (s *adminServiceImpl) CreateGroup(ctx context.Context, input *CreateGroupIn
 
 	// 如果指定了复制账号的源分组，先获取账号 ID 列表
 	var accountIDsToCopy []int64
+	var uniqueSourceGroupIDs []int64
 	if len(input.CopyAccountsFromGroupIDs) > 0 {
 		// 去重源分组 IDs
 		seen := make(map[int64]struct{})
-		uniqueSourceGroupIDs := make([]int64, 0, len(input.CopyAccountsFromGroupIDs))
+		uniqueSourceGroupIDs = make([]int64, 0, len(input.CopyAccountsFromGroupIDs))
 		for _, srcGroupID := range input.CopyAccountsFromGroupIDs {
 			if _, exists := seen[srcGroupID]; !exists {
 				seen[srcGroupID] = struct{}{}
@@ -449,7 +452,7 @@ func (s *adminServiceImpl) CreateGroup(ctx context.Context, input *CreateGroupIn
 			if err != nil {
 				return nil, fmt.Errorf("source group %d not found: %w", srcGroupID, err)
 			}
-			if !canCopyAccountsFromGroupPlatform(platform, srcGroup.Platform) {
+			if !CanCopyAccountsFromGroupPlatform(platform, srcGroup.Platform) {
 				return nil, fmt.Errorf("source group %d platform mismatch: expected %s, got %s", srcGroupID, platform, srcGroup.Platform)
 			}
 		}
@@ -517,6 +520,14 @@ func (s *adminServiceImpl) CreateGroup(ctx context.Context, input *CreateGroupIn
 		group.AllowLive = false
 	}
 	sanitizeGroupReasoningEffortPolicy(group)
+	if len(uniqueSourceGroupIDs) > 0 {
+		if mutationRepo, ok := s.groupRepo.(GroupMutationRepository); ok {
+			if err := mutationRepo.CreateWithAccountCopy(ctx, group, uniqueSourceGroupIDs); err != nil {
+				return nil, err
+			}
+			return group, nil
+		}
+	}
 	if err := s.groupRepo.Create(ctx, group); err != nil {
 		return nil, err
 	}
@@ -643,7 +654,18 @@ func (s *adminServiceImpl) UpdateGroup(ctx context.Context, id int64, input *Upd
 	if err != nil {
 		return nil, err
 	}
-
+	seenSourceGroupIDs := make(map[int64]struct{}, len(input.CopyAccountsFromGroupIDs))
+	uniqueSourceGroupIDs := make([]int64, 0, len(input.CopyAccountsFromGroupIDs))
+	for _, sourceGroupID := range input.CopyAccountsFromGroupIDs {
+		if sourceGroupID == id {
+			return nil, fmt.Errorf("cannot copy accounts from self")
+		}
+		if _, exists := seenSourceGroupIDs[sourceGroupID]; exists {
+			continue
+		}
+		seenSourceGroupIDs[sourceGroupID] = struct{}{}
+		uniqueSourceGroupIDs = append(uniqueSourceGroupIDs, sourceGroupID)
+	}
 	if input.Name != "" {
 		group.Name = input.Name
 	}
@@ -878,7 +900,22 @@ func (s *adminServiceImpl) UpdateGroup(ctx context.Context, id int64, input *Upd
 	}
 	sanitizeGroupReasoningEffortPolicy(group)
 
-	if err := s.groupRepo.Update(ctx, group); err != nil {
+	for _, sourceGroupID := range uniqueSourceGroupIDs {
+		sourceGroup, err := s.groupRepo.GetByIDLite(ctx, sourceGroupID)
+		if err != nil {
+			return nil, fmt.Errorf("source group %d not found: %w", sourceGroupID, err)
+		}
+		if !CanCopyAccountsFromGroupPlatform(group.Platform, sourceGroup.Platform) {
+			return nil, fmt.Errorf("source group %d platform mismatch: expected %s, got %s", sourceGroupID, group.Platform, sourceGroup.Platform)
+		}
+	}
+
+	mutationRepo, supportsAtomicMutation := s.groupRepo.(GroupMutationRepository)
+	if supportsAtomicMutation {
+		if err := mutationRepo.UpdateWithAccountCopy(ctx, group, uniqueSourceGroupIDs); err != nil {
+			return nil, err
+		}
+	} else if err := s.groupRepo.Update(ctx, group); err != nil {
 		return nil, err
 	}
 
@@ -887,33 +924,7 @@ func (s *adminServiceImpl) UpdateGroup(ctx context.Context, id int64, input *Upd
 	}
 
 	// 如果指定了复制账号的源分组，同步绑定（替换当前分组的账号）
-	if len(input.CopyAccountsFromGroupIDs) > 0 {
-		// 去重源分组 IDs
-		seen := make(map[int64]struct{})
-		uniqueSourceGroupIDs := make([]int64, 0, len(input.CopyAccountsFromGroupIDs))
-		for _, srcGroupID := range input.CopyAccountsFromGroupIDs {
-			// 校验：源分组不能是自身
-			if srcGroupID == id {
-				return nil, fmt.Errorf("cannot copy accounts from self")
-			}
-			// 去重
-			if _, exists := seen[srcGroupID]; !exists {
-				seen[srcGroupID] = struct{}{}
-				uniqueSourceGroupIDs = append(uniqueSourceGroupIDs, srcGroupID)
-			}
-		}
-
-		// 校验源分组的平台是否与当前分组一致
-		for _, srcGroupID := range uniqueSourceGroupIDs {
-			srcGroup, err := s.groupRepo.GetByIDLite(ctx, srcGroupID)
-			if err != nil {
-				return nil, fmt.Errorf("source group %d not found: %w", srcGroupID, err)
-			}
-			if !canCopyAccountsFromGroupPlatform(group.Platform, srcGroup.Platform) {
-				return nil, fmt.Errorf("source group %d platform mismatch: expected %s, got %s", srcGroupID, group.Platform, srcGroup.Platform)
-			}
-		}
-
+	if len(uniqueSourceGroupIDs) > 0 && !supportsAtomicMutation {
 		// 获取所有源分组的账号（去重）
 		accountIDsToCopy, err := s.groupRepo.GetAccountIDsByGroupIDs(ctx, uniqueSourceGroupIDs)
 		if err != nil {

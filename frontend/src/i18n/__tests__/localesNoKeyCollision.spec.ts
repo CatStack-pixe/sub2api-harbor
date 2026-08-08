@@ -5,6 +5,7 @@ import enAdminChannels from '../locales/en/admin/channels'
 import enAdminOps from '../locales/en/admin/ops'
 import enAdminOverview from '../locales/en/admin/overview'
 import enAdminResources from '../locales/en/admin/resources'
+import enAdminRemoteIngest from '../locales/en/admin/remoteIngest'
 import enAdminSettings from '../locales/en/admin/settings'
 import enCommon from '../locales/en/common'
 import enDashboard from '../locales/en/dashboard'
@@ -15,6 +16,7 @@ import zhAdminChannels from '../locales/zh/admin/channels'
 import zhAdminOps from '../locales/zh/admin/ops'
 import zhAdminOverview from '../locales/zh/admin/overview'
 import zhAdminResources from '../locales/zh/admin/resources'
+import zhAdminRemoteIngest from '../locales/zh/admin/remoteIngest'
 import zhAdminSettings from '../locales/zh/admin/settings'
 import zhCommon from '../locales/zh/common'
 import zhDashboard from '../locales/zh/dashboard'
@@ -52,6 +54,7 @@ const admins: Record<string, Modules> = {
     channels: zhAdminChannels,
     accounts: zhAdminAccounts,
     resources: zhAdminResources,
+    remoteIngest: zhAdminRemoteIngest,
     ops: zhAdminOps,
     settings: zhAdminSettings
   },
@@ -60,6 +63,7 @@ const admins: Record<string, Modules> = {
     channels: enAdminChannels,
     accounts: enAdminAccounts,
     resources: enAdminResources,
+    remoteIngest: enAdminRemoteIngest,
     ops: enAdminOps,
     settings: enAdminSettings
   }

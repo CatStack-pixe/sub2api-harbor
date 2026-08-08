@@ -119,6 +119,11 @@ export const FeatureFlags = {
     mode: 'opt-in',
     label: 'Risk Control',
   }),
+  remoteIngest: defineFlag({
+    key: 'remote_ingest_enabled',
+    mode: 'opt-in',
+    label: 'Remote Ingest',
+  }),
   affiliate: defineFlag({
     key: 'affiliate_enabled',
     mode: 'opt-in',

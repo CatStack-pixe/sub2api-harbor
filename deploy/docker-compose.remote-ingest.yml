@@ -1,0 +1,22 @@
+services:
+  sub2api:
+    # Enabling this overlay must not expose the application origin publicly.
+    # !override replaces, rather than appends to, the base Compose port list.
+    ports: !override
+      - "127.0.0.1:${SERVER_PORT:-8080}:8080"
+    environment:
+      REMOTE_INGEST_ENABLED: "true"
+      REMOTE_INGEST_CLOUDFLARE_TEAM_DOMAIN: ${REMOTE_INGEST_CLOUDFLARE_TEAM_DOMAIN:?Cloudflare Access team domain is required}
+      REMOTE_INGEST_CLOUDFLARE_AUDIENCE: ${REMOTE_INGEST_CLOUDFLARE_AUDIENCE:?Cloudflare Access application audience is required}
+      REMOTE_INGEST_KEYRING_FILE: /run/secrets/sub2api_remote_ingest_keyring
+      REMOTE_INGEST_ALLOWED_PRIVATE_CIDRS: ${REMOTE_INGEST_ALLOWED_PRIVATE_CIDRS:-}
+      REMOTE_INGEST_WORKER_CONCURRENCY: ${REMOTE_INGEST_WORKER_CONCURRENCY:-4}
+      REMOTE_INGEST_WORKER_TIMEOUT_SECONDS: ${REMOTE_INGEST_WORKER_TIMEOUT_SECONDS:-240}
+    secrets:
+      - source: sub2api_remote_ingest_keyring
+        target: sub2api_remote_ingest_keyring
+        mode: 0400
+
+secrets:
+  sub2api_remote_ingest_keyring:
+    file: ${REMOTE_INGEST_KEYRING_SOURCE:?Path to the remote-ingest keyring is required}
