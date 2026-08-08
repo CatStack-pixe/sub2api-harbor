@@ -211,6 +211,40 @@ func TestForwardAsRawChatCompletions_TransportErrorFailsOver(t *testing.T) {
 	require.Equal(t, 0, rec.Body.Len(), "service must not write a hard 502 before handler can fail over")
 }
 
+func TestForwardResponses_DeepSeekTransportErrorFailsOver(t *testing.T) {
+	repo := &openaiTransportAccountRepoStub{}
+	upstream := &failingOpenAIHTTPUpstream{
+		err: errors.New(`Post "https://api.deepseek.com/v1/chat/completions": net/http: TLS handshake timeout`),
+	}
+	svc := &OpenAIGatewayService{
+		accountRepo:  repo,
+		httpUpstream: upstream,
+		cfg: &config.Config{
+			Security: config.SecurityConfig{
+				URLAllowlist: config.URLAllowlistConfig{Enabled: false},
+			},
+		},
+	}
+	account := &Account{
+		ID:          82,
+		Name:        "deepseek-account",
+		Platform:    PlatformDeepSeek,
+		Type:        AccountTypeAPIKey,
+		Credentials: map[string]any{"api_key": "sk-test", "base_url": "https://api.deepseek.com"},
+	}
+	c, rec := newOpenAITransportErrTestContext()
+	body := []byte(`{"model":"deepseek-v4-flash","input":"say hi","stream":true}`)
+
+	_, err := svc.Forward(context.Background(), c, account, body)
+
+	require.Equal(t, 1, upstream.calls)
+	var fo *UpstreamFailoverError
+	require.True(t, errors.As(err, &fo), "TLS handshake timeout must trigger account failover")
+	require.Equal(t, http.StatusBadGateway, fo.StatusCode)
+	require.Empty(t, repo.tempUnschedCalls, "TLS handshake timeout is transient: fail over but do not evict")
+	require.Equal(t, 0, rec.Body.Len(), "service must not write a hard 502 before handler can fail over")
+}
+
 func TestHandleOpenAIUpstreamTransportError_RecordsOllamaActivityOnly(t *testing.T) {
 	deferred := NewDeferredService(nil, nil, time.Second)
 	svc := &OpenAIGatewayService{
