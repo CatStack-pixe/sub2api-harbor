@@ -50,8 +50,11 @@ func (h *RemoteIngestHandler) CreateRegistrationToken(c *gin.Context) {
 			return nil, err
 		}
 		return storedRemoteRegistrationToken{
-			ID: token.ID, TokenCiphertext: ciphertext, Fingerprint: token.Fingerprint,
-			ExpiresAt: token.ExpiresAt, CreatedAt: token.CreatedAt,
+			ID:              token.ID,
+			TokenCiphertext: ciphertext,
+			Fingerprint:     token.Fingerprint,
+			ExpiresAt:       token.ExpiresAt,
+			CreatedAt:       token.CreatedAt,
 		}, nil
 	})
 	if err != nil {
@@ -84,8 +87,11 @@ func (h *RemoteIngestHandler) CreateRegistrationToken(c *gin.Context) {
 		return
 	}
 	response.Success(c, service.RemoteRegistrationToken{
-		ID: stored.ID, Token: plaintext, Fingerprint: stored.Fingerprint,
-		ExpiresAt: stored.ExpiresAt, CreatedAt: stored.CreatedAt,
+		ID:          stored.ID,
+		Token:       plaintext,
+		Fingerprint: stored.Fingerprint,
+		ExpiresAt:   stored.ExpiresAt,
+		CreatedAt:   stored.CreatedAt,
 	})
 }
 

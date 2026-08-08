@@ -42,9 +42,9 @@ func (h *RemoteIngestHandler) Enroll(c *gin.Context) {
 		return
 	}
 	response.Created(c, gin.H{
-		"client_id": client.ID,
+		"client_id":              client.ID,
 		"public_key_fingerprint": client.PublicKeyFingerprint,
-		"enrolled_at": client.EnrolledAt,
+		"enrolled_at":            client.EnrolledAt,
 	})
 }
 
@@ -96,7 +96,7 @@ func (h *RemoteIngestHandler) SubmitAccount(c *gin.Context) {
 	response.Accepted(c, gin.H{
 		"delivery_id": delivery.ID,
 		"query_token": queryToken,
-		"status": delivery.Status,
+		"status":      delivery.Status,
 	})
 }
 

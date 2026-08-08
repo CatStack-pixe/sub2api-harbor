@@ -68,6 +68,12 @@ func TestRemoteIngestResolvedHostRejectsSSRFAddresses(t *testing.T) {
 		"198.51.100.8",
 		"203.0.113.1",
 		"224.0.0.1",
+		"::127.0.0.1",
+		"::ffff:0:127.0.0.1",
+		"64:ff9b::7f00:1",
+		"64:ff9b:1::a00:1",
+		"2001::1",
+		"2002:7f00:1::",
 		"2001:db8::1",
 		"mixed.example",
 		"private.example",
@@ -92,6 +98,48 @@ func TestRemoteIngestResolvedHostAllowsExplicitPrivateCIDR(t *testing.T) {
 	require.NoError(t, service.validateResolvedHost(context.Background(), "private.example"))
 	require.NoError(t, service.validateResolvedHost(context.Background(), "10.10.1.4"))
 	require.Error(t, service.validateResolvedHost(context.Background(), "10.11.1.4"))
+}
+
+func TestSanitizeRemoteProbeErrorNeverPersistsUpstreamBody(t *testing.T) {
+	tests := []struct {
+		name string
+		raw  string
+		want string
+	}{
+		{
+			name: "HTTP status without response body",
+			raw:  `API returned 401: {"error":"reflected-secret"}`,
+			want: "upstream probe failed with HTTP 401",
+		},
+		{
+			name: "provider-specific HTTP status",
+			raw:  `Grok Responses API returned 429: attacker-controlled-body`,
+			want: "upstream probe failed with HTTP 429",
+		},
+		{
+			name: "connection details",
+			raw:  "Request failed: dial tcp 192.0.2.2:443: reflected-secret",
+			want: "upstream connection failed",
+		},
+		{
+			name: "timeout",
+			raw:  "probe timed out",
+			want: "probe timed out",
+		},
+		{
+			name: "arbitrary response",
+			raw:  `{"api_key":"reflected-secret"}`,
+			want: "upstream probe failed",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := sanitizeRemoteProbeError(tt.raw)
+			require.Equal(t, tt.want, got)
+			require.NotContains(t, got, "reflected-secret")
+		})
+	}
 }
 
 func TestRemoteIngestSubmitRejectsTamperingWithoutConsumingChallengeAndRejectsReplay(t *testing.T) {

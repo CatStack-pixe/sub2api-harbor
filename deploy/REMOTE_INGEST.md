@@ -19,8 +19,10 @@ hostname, Cloudflare Access application, or service token with the normal API.
    Cloudflare IP ranges. Do not allow direct Internet access to this hostname.
 5. Deploy the extra Caddy virtual host in `Caddyfile`; it exposes only the
    remote-ingest API and limits each request body to 16 KiB.
-6. Set `BIND_HOST=127.0.0.1` and verify port 8080 is not reachable from another
-   machine. Only Caddy should be able to reach the application origin.
+6. Use Docker Compose 2.24.4 or newer. The remote-ingest overlay uses
+   `ports: !override` to replace the base mapping and force the application
+   origin to `127.0.0.1`. Verify port 8080 is not reachable from another
+   machine. Only host-level Caddy should be able to reach the origin.
 
 Cloudflare Access configuration and origin JWT validation are described in
 [Cloudflare service tokens](https://developers.cloudflare.com/cloudflare-one/access-controls/service-credentials/service-tokens/)
@@ -53,6 +55,10 @@ docker compose -f docker-compose.local.yml \
 For the named-volume setup, replace `docker-compose.local.yml` with
 `docker-compose.yml`. The base files intentionally do not reference the
 keyring secret, so disabled installations retain their existing startup path.
+The opt-in overlay also replaces the application's published port with
+`127.0.0.1:${SERVER_PORT:-8080}:8080`; do not remove that override or publish a
+second application port. The bundled Caddy routes continue to use the matching
+host loopback endpoint.
 
 The application encrypts remote API keys as versioned AES-256-GCM envelopes
 before writing PostgreSQL or Redis. To rotate, add a new 32-byte key, switch
@@ -74,9 +80,10 @@ administrator. The registration token, delivery query token, and API key are
 never shown in list views or logs.
 
 The backend rejects HTTP, userinfo, query strings, fragments, loopback,
-link-local, private, multicast, and reserved resolved destinations. Use
+link-local, private, multicast, reserved, and IPv4-embedding IPv6 destinations
+(including NAT64, 6to4, Teredo, and IPv4-compatible forms). Use
 `REMOTE_INGEST_ALLOWED_PRIVATE_CIDRS` only for a reviewed internal upstream;
-use narrowly scoped CIDRs, not broad private ranges.
+use narrowly scoped CIDRs, not broad private or transition ranges.
 
 ## Client Protocol
 
@@ -109,3 +116,7 @@ Runnable reference clients are under `deploy/examples/remote-ingest/`. They
 need the registration token, a Cloudflare Access service token, and the API
 key only in process environment variables. They print the delivery ID and
 query token; redirect sensitive output to a protected terminal only.
+
+For a client-facing end-to-end handoff, including request examples, exact-body
+retry rules, delivery states, and a rollout checklist, see
+[`REMOTE_INGEST_CLIENT_GUIDE.zh-CN.md`](REMOTE_INGEST_CLIENT_GUIDE.zh-CN.md).

@@ -129,7 +129,7 @@ ingest.catpithos.top {
 		request_body {
 			max_size 16KB
 		}
-		reverse_proxy localhost:8080 {
+		reverse_proxy 127.0.0.1:8080 {
 			# Cloudflare injects Cf-Access-Jwt-Assertion after Access policy
 			# evaluation. Never forward service-token credentials to the app.
 			header_up -CF-Access-Client-Id

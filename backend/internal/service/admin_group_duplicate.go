@@ -186,6 +186,13 @@ func (s *adminServiceImpl) DuplicateGroup(ctx context.Context, id int64, actorSc
 	if existing != nil {
 		return existing, nil
 	}
+	accountIDs, err := s.groupRepo.GetAccountIDsByGroupIDs(ctx, []int64{id})
+	if err != nil {
+		return nil, fmt.Errorf("check remote ingest group bindings: %w", err)
+	}
+	if err := rejectRemoteIngestAccountWrite(ctx, s.accountRepo, accountIDs...); err != nil {
+		return nil, err
+	}
 
 	source, err := s.groupRepo.GetByID(ctx, id)
 	if err != nil {

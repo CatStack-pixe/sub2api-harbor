@@ -189,6 +189,11 @@ func createTestPayload(modelID string) (map[string]any, error) {
 // mode is optional - "compact" routes OpenAI accounts to the /responses/compact probe path
 func (s *AccountTestService) TestAccountConnection(c *gin.Context, accountID int64, modelID string, prompt string, mode string) error {
 	ctx := c.Request.Context()
+	if !IsRemoteIngestProbe(ctx) {
+		if err := rejectRemoteIngestAccountWrite(ctx, s.accountRepo, accountID); err != nil {
+			return s.sendErrorAndEnd(c, "Remote ingest accounts must be probed through the dedicated remote ingest lifecycle")
+		}
+	}
 
 	// Get account
 	account, err := s.accountRepo.GetByID(ctx, accountID)
@@ -1996,8 +2001,17 @@ func (s *AccountTestService) sendErrorAndEnd(c *gin.Context, errorMsg string) er
 // RunTestBackground executes an account test in-memory (no real HTTP client),
 // capturing SSE output via httptest.NewRecorder, then parses the result.
 func (s *AccountTestService) RunTestBackground(ctx context.Context, accountID int64, modelID string) (*ScheduledTestResult, error) {
+	return s.runTestBackground(ctx, accountID, modelID)
+}
+
+// RunRemoteIngestProbe is the only background probe entry point allowed to
+// test remote-ingest managed accounts before scheduler activation.
+func (s *AccountTestService) RunRemoteIngestProbe(ctx context.Context, accountID int64, modelID string) (*ScheduledTestResult, error) {
+	return s.runTestBackground(withRemoteIngestProbe(ctx), accountID, modelID)
+}
+
+func (s *AccountTestService) runTestBackground(ctx context.Context, accountID int64, modelID string) (*ScheduledTestResult, error) {
 	startedAt := time.Now()
-	ctx = withRemoteIngestProbe(ctx)
 
 	w := httptest.NewRecorder()
 	ginCtx, _ := gin.CreateTestContext(w)
@@ -2026,28 +2040,6 @@ func (s *AccountTestService) RunTestBackground(ctx context.Context, accountID in
 		StartedAt:    startedAt,
 		FinishedAt:   finishedAt,
 	}, nil
-}
-
-func (s *AccountTestService) RedactAccountSecrets(ctx context.Context, accountID int64, message string) string {
-	if s == nil || s.accountRepo == nil || message == "" {
-		return message
-	}
-	account, err := s.accountRepo.GetByID(ctx, accountID)
-	if err != nil || account == nil {
-		return message
-	}
-	for key := range account.Credentials {
-		lower := strings.ToLower(key)
-		if !strings.Contains(lower, "key") && !strings.Contains(lower, "token") &&
-			!strings.Contains(lower, "secret") && !strings.Contains(lower, "password") {
-			continue
-		}
-		secret := account.GetCredential(key)
-		if len(secret) >= 4 {
-			message = strings.ReplaceAll(message, secret, "[REDACTED]")
-		}
-	}
-	return message
 }
 
 // parseTestSSEOutput extracts response text and error message from captured SSE output.

@@ -860,7 +860,9 @@ func ProvideRemoteCredentialCipher(cfg *config.Config) (RemoteCredentialCipher, 
 		path = cfg.RemoteIngest.KeyringFile
 	}
 	keyring, err := LoadRemoteIngestKeyring(RemoteIngestKeyringConfig{FilePath: path})
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	RegisterRemoteIngestCredentialDecryptor(keyring)
 	return keyring, nil
 }

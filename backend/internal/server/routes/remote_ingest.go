@@ -9,7 +9,9 @@ import (
 const remoteIngestMaxBodyBytes = 16 * 1024
 
 func RegisterRemoteIngestRoutes(v1 *gin.RouterGroup, h *handler.RemoteIngestHandler) {
-	if h == nil { return }
+	if h == nil {
+		return
+	}
 	remote := v1.Group("/remote-ingest")
 	remote.Use(middleware.RequestBodyLimit(remoteIngestMaxBodyBytes))
 	{

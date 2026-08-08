@@ -21,22 +21,33 @@ func NewRemoteChallengeStore(rdb *redis.Client) service.RemoteChallengeStore {
 }
 
 func (s *remoteChallengeStore) Create(ctx context.Context, clientID string, ttl time.Duration) (*service.RemoteChallenge, error) {
-	if ttl <= 0 { return nil, fmt.Errorf("challenge ttl must be positive") }
+	if ttl <= 0 {
+		return nil, fmt.Errorf("challenge ttl must be positive")
+	}
 	nonceBytes := make([]byte, 32)
-	if _, err := rand.Read(nonceBytes); err != nil { return nil, err }
+	if _, err := rand.Read(nonceBytes); err != nil {
+		return nil, err
+	}
 	challenge := &service.RemoteChallenge{
-		ID: uuid.NewString(), Nonce: base64.RawURLEncoding.EncodeToString(nonceBytes),
+		ID:        uuid.NewString(),
+		Nonce:     base64.RawURLEncoding.EncodeToString(nonceBytes),
 		ExpiresAt: time.Now().UTC().Add(ttl),
 	}
 	ok, err := s.rdb.SetNX(ctx, remoteChallengeKey(clientID, challenge.ID), challenge.Nonce, ttl).Result()
-	if err != nil { return nil, err }
-	if !ok { return nil, fmt.Errorf("challenge collision") }
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
+		return nil, fmt.Errorf("challenge collision")
+	}
 	return challenge, nil
 }
 
 func (s *remoteChallengeStore) Get(ctx context.Context, clientID, challengeID string) (string, error) {
 	value, err := s.rdb.Get(ctx, remoteChallengeKey(clientID, challengeID)).Result()
-	if err == redis.Nil { return "", service.ErrRemoteChallengeInvalid }
+	if err == redis.Nil {
+		return "", service.ErrRemoteChallengeInvalid
+	}
 	return value, err
 }
 
@@ -51,7 +62,9 @@ return 1
 
 func (s *remoteChallengeStore) Consume(ctx context.Context, clientID, challengeID, nonce string) (bool, error) {
 	result, err := consumeRemoteChallengeScript.Run(ctx, s.rdb, []string{remoteChallengeKey(clientID, challengeID)}, nonce).Int()
-	if err != nil { return false, err }
+	if err != nil {
+		return false, err
+	}
 	return result == 1, nil
 }
 

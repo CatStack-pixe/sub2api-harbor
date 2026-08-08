@@ -46,11 +46,20 @@ type GroupDuplicateRepository interface {
 	CreateFromSource(ctx context.Context, group *Group, sourceGroupID int64) error
 }
 
+// GroupMutationRepository owns admin group writes that also copy account
+// bindings. Implementations must lock every affected group before checking
+// remote-ingest ownership and keep those locks until the write commits.
+type GroupMutationRepository interface {
+	CreateWithAccountCopy(ctx context.Context, group *Group, sourceGroupIDs []int64) error
+	UpdateWithAccountCopy(ctx context.Context, group *Group, sourceGroupIDs []int64) error
+}
+
 // AdminGroupRepository makes the group-duplication write capability an explicit
 // admin-service dependency without widening gateway-only group test doubles.
 type AdminGroupRepository interface {
 	GroupRepository
 	GroupDuplicateRepository
+	GroupMutationRepository
 }
 
 // GroupSortOrderUpdate 分组排序更新

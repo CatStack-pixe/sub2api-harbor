@@ -29,3 +29,6 @@ For a production client, keep the generated Ed25519 private key in a protected
 machine secret store after enrollment and reuse its returned `client_id`. Do
 not automatically recreate identities after a failed enrollment: the
 registration token can only be consumed once.
+
+The complete client handoff and retry contract is documented in
+[`../../REMOTE_INGEST_CLIENT_GUIDE.zh-CN.md`](../../REMOTE_INGEST_CLIENT_GUIDE.zh-CN.md).
