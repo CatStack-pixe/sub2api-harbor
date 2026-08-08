@@ -131,10 +131,17 @@ func TestForwardResponses_DeepSeekReasoningOnlyStreamProducesVisibleText(t *test
 		httpUpstream: upstream,
 	}
 
-	result, err := svc.Forward(context.Background(), c, forceChatResponsesFallbackAccount(), body)
+	account := rawChatCompletionsTestAccount()
+	account.Platform = PlatformDeepSeek
+	account.Extra = nil
+
+	result, err := svc.Forward(context.Background(), c, account, body)
 	require.NoError(t, err)
 	require.NotNil(t, result)
 	require.True(t, result.Stream)
+	require.Equal(t, "http://upstream.example/v1/chat/completions", upstream.lastReq.URL.String())
+	require.True(t, gjson.GetBytes(upstream.lastBody, "messages").IsArray())
+	require.False(t, gjson.GetBytes(upstream.lastBody, "input").Exists())
 	require.Contains(t, rec.Body.String(), "event: response.output_text.delta")
 	require.Contains(t, rec.Body.String(), `"delta":"visible fallback"`)
 	require.Contains(t, rec.Body.String(), `"status":"incomplete"`)

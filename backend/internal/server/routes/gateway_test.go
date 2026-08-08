@@ -76,6 +76,20 @@ func TestGatewayRoutesOpenAIResponsesCompactPathIsRegistered(t *testing.T) {
 	}
 }
 
+func TestGatewayRoutesDeepSeekResponsesUseOpenAICompatibleHandler(t *testing.T) {
+	router := newGatewayRoutesTestRouter(service.PlatformDeepSeek)
+	body, err := json.Marshal(map[string]any{"model": "deepseek-v4-flash", "input": "hi"})
+	require.NoError(t, err)
+	req := httptest.NewRequest(http.MethodPost, "/v1/responses", strings.NewReader(string(body)))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusInternalServerError, w.Code)
+	require.Contains(t, w.Body.String(), `"type":"api_error"`)
+	require.NotContains(t, w.Body.String(), `"code":"api_error"`)
+}
 func TestGatewayRoutesOpenAIAlphaSearchPathsAreRegistered(t *testing.T) {
 	router := newGatewayRoutesTestRouter()
 	registered := make(map[string]bool)
