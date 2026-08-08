@@ -378,9 +378,6 @@ type PublicSettings struct {
 	// 风控中心功能开关
 	RiskControlEnabled bool `json:"risk_control_enabled"`
 
-	// Remote ingest is an infrastructure-controlled, opt-in feature.
-	RemoteIngestEnabled bool `json:"remote_ingest_enabled"`
-
 	// 允许终端用户在用量页查看自己的失败请求
 	AllowUserViewErrorRequests bool `json:"allow_user_view_error_requests"`
 }

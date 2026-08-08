@@ -6,7 +6,6 @@ import ops from './ops'
 import settings from './settings'
 import audit from './audit'
 import promptAudit from './promptAudit'
-import remoteIngest from './remoteIngest'
 
 export default {
   ...overview,
@@ -17,5 +16,4 @@ export default {
   ...settings,
   ...audit,
   ...promptAudit,
-  ...remoteIngest,
 }

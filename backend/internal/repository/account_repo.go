@@ -335,36 +335,6 @@ func (r *accountRepository) ExistsByID(ctx context.Context, id int64) (bool, err
 	return exists, nil
 }
 
-func (r *accountRepository) ListRemoteIngestAccountIDs(ctx context.Context, accountIDs []int64) ([]int64, error) {
-	if len(accountIDs) == 0 {
-		return []int64{}, nil
-	}
-	if r == nil || r.sql == nil {
-		return nil, errors.New("account repository SQL executor is not configured")
-	}
-	rows, err := r.sql.QueryContext(ctx, `
-		SELECT DISTINCT account_id
-		FROM remote_ingest_deliveries
-		WHERE account_id = ANY($1)`, pq.Array(accountIDs))
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = rows.Close() }()
-
-	remoteIDs := make([]int64, 0)
-	for rows.Next() {
-		var accountID int64
-		if err := rows.Scan(&accountID); err != nil {
-			return nil, err
-		}
-		remoteIDs = append(remoteIDs, accountID)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return remoteIDs, nil
-}
-
 func (r *accountRepository) GetByCRSAccountID(ctx context.Context, crsAccountID string) (*service.Account, error) {
 	if crsAccountID == "" {
 		return nil, nil
@@ -641,10 +611,6 @@ func lockAndMergeAccountProbeExtra(
 			extra -> 'ollama_cloud_usage_snapshot'
 		FROM accounts
 		WHERE id = $1 AND deleted_at IS NULL
-			AND NOT EXISTS (
-				SELECT 1 FROM remote_ingest_deliveries d
-				WHERE d.account_id = accounts.id
-			)
 		FOR NO KEY UPDATE
 	`, account.ID, account.Platform, account.Type, string(credentials), proxyID)
 	if err != nil {
@@ -839,10 +805,6 @@ func (r *accountRepository) UpdateCredentials(ctx context.Context, id int64, cre
 			END,
 			updated_at = NOW()
 		WHERE id = $2 AND deleted_at IS NULL
-			AND NOT EXISTS (
-				SELECT 1 FROM remote_ingest_deliveries d
-				WHERE d.account_id = accounts.id
-			)
 	`, string(payload), id)
 	if err != nil {
 		return err

@@ -3,7 +3,6 @@ package domain
 // Status constants
 const (
 	StatusActive   = "active"
-	StatusInactive = "inactive"
 	StatusDisabled = "disabled"
 	StatusError    = "error"
 	StatusUnused   = "unused"

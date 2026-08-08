@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
@@ -14,16 +13,6 @@ var (
 	ErrAccountNotFound      = infraerrors.NotFound("ACCOUNT_NOT_FOUND", "account not found")
 	ErrAccountNilInput      = infraerrors.BadRequest("ACCOUNT_NIL_INPUT", "account input cannot be nil")
 	ErrAccountNotInFallback = infraerrors.BadRequest("ACCOUNT_NOT_IN_FALLBACK", "account is not in proxy fallback state")
-)
-
-var ErrRemoteIngestAccountManaged = infraerrors.Conflict(
-	"REMOTE_INGEST_ACCOUNT_MANAGED",
-	"remote ingest accounts must be managed through the dedicated remote ingest lifecycle",
-)
-
-var ErrRemoteIngestMetadataReserved = infraerrors.BadRequest(
-	"REMOTE_INGEST_METADATA_RESERVED",
-	"remote ingest metadata is reserved for the dedicated remote ingest lifecycle",
 )
 
 const AccountListGroupUngrouped int64 = -1
@@ -155,50 +144,12 @@ type AccountBillingSettingsRepository interface {
 	) error
 }
 
-// RemoteIngestAccountOwnershipRepository resolves immutable remote-ingest
-// provenance from the delivery relation rather than mutable account metadata.
-type RemoteIngestAccountOwnershipRepository interface {
-	ListRemoteIngestAccountIDs(ctx context.Context, accountIDs []int64) ([]int64, error)
-}
-
 // AdminAccountRepository makes the account-duplication write capability an explicit
 // construction dependency without forcing read-only gateway test doubles to implement it.
 type AdminAccountRepository interface {
 	AccountRepository
 	AccountDuplicateRepository
 	AccountBillingSettingsRepository
-	RemoteIngestAccountOwnershipRepository
-}
-
-func rejectRemoteIngestAccountWrite(ctx context.Context, repo AccountRepository, accountIDs ...int64) error {
-	if len(accountIDs) == 0 {
-		return nil
-	}
-	ownershipRepo, ok := repo.(RemoteIngestAccountOwnershipRepository)
-	if !ok {
-		return nil
-	}
-	remoteIDs, err := ownershipRepo.ListRemoteIngestAccountIDs(ctx, accountIDs)
-	if err != nil {
-		return fmt.Errorf("check remote ingest account ownership: %w", err)
-	}
-	if len(remoteIDs) > 0 {
-		return ErrRemoteIngestAccountManaged
-	}
-	return nil
-}
-
-func rejectReservedRemoteIngestExtra(extra map[string]any) error {
-	for key := range extra {
-		normalized := strings.ToLower(strings.TrimSpace(key))
-		if strings.HasPrefix(normalized, "remote_ingest") ||
-			normalized == "remote_delivery_id" ||
-			normalized == "remote_client_id" ||
-			normalized == "remote_external_id" {
-			return ErrRemoteIngestMetadataReserved
-		}
-	}
-	return nil
 }
 
 // AccountBulkUpdate describes the fields that can be updated in a bulk operation.
@@ -268,9 +219,6 @@ func NewAccountService(accountRepo AccountRepository, groupRepo GroupRepository)
 
 // Create 创建账号
 func (s *AccountService) Create(ctx context.Context, req CreateAccountRequest) (*Account, error) {
-	if err := rejectReservedRemoteIngestExtra(req.Extra); err != nil {
-		return nil, err
-	}
 	if err := validateAccountCredentials(req.Platform, req.Type, req.Credentials); err != nil {
 		return nil, err
 	}
@@ -369,14 +317,6 @@ func (s *AccountService) ListByGroup(ctx context.Context, groupID int64) ([]Acco
 
 // Update 更新账号
 func (s *AccountService) Update(ctx context.Context, id int64, req UpdateAccountRequest) (*Account, error) {
-	if err := rejectRemoteIngestAccountWrite(ctx, s.accountRepo, id); err != nil {
-		return nil, err
-	}
-	if req.Extra != nil {
-		if err := rejectReservedRemoteIngestExtra(*req.Extra); err != nil {
-			return nil, err
-		}
-	}
 	account, err := s.accountRepo.GetByID(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("get account: %w", err)
@@ -472,9 +412,6 @@ func (s *AccountService) Update(ctx context.Context, id int64, req UpdateAccount
 // 优化：使用 ExistsByID 替代 GetByID 进行存在性检查，
 // 避免加载完整账号对象及其关联数据，提升删除操作的性能
 func (s *AccountService) Delete(ctx context.Context, id int64) error {
-	if err := rejectRemoteIngestAccountWrite(ctx, s.accountRepo, id); err != nil {
-		return err
-	}
 	// 使用轻量级的存在性检查，而非加载完整账号对象
 	exists, err := s.accountRepo.ExistsByID(ctx, id)
 	if err != nil {
@@ -530,9 +467,6 @@ func (s *AccountService) validateGroupIDsExist(ctx context.Context, groupIDs []i
 
 // UpdateStatus 更新账号状态
 func (s *AccountService) UpdateStatus(ctx context.Context, id int64, status string, errorMessage string) error {
-	if err := rejectRemoteIngestAccountWrite(ctx, s.accountRepo, id); err != nil {
-		return err
-	}
 	account, err := s.accountRepo.GetByID(ctx, id)
 	if err != nil {
 		return fmt.Errorf("get account: %w", err)

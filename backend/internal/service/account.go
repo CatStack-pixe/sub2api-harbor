@@ -10,7 +10,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
@@ -18,27 +17,6 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/pkg/openai_compat"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/xai"
 )
-
-var remoteIngestAccountIDs sync.Map
-
-func RegisterRemoteIngestAccount(accountID int64) {
-	if accountID > 0 {
-		remoteIngestAccountIDs.Store(accountID, struct{}{})
-	}
-}
-
-func IsRemoteIngestAccount(accountID int64) bool {
-	_, ok := remoteIngestAccountIDs.Load(accountID)
-	return ok
-}
-
-func (a *Account) IsRemoteIngest() bool {
-	if a == nil || a.Extra == nil {
-		return false
-	}
-	value, ok := a.Extra["remote_ingest"].(bool)
-	return ok && value
-}
 
 type Account struct {
 	ID                      int64
@@ -346,9 +324,6 @@ func (a *Account) CanGetUsage() bool {
 }
 
 func (a *Account) GetCredential(key string) string {
-	if a != nil && a.IsRemoteIngest() {
-		RegisterRemoteIngestAccount(a.ID)
-	}
 	if a.Credentials == nil {
 		return ""
 	}
@@ -360,11 +335,7 @@ func (a *Account) GetCredential(key string) string {
 	// 支持多种类型（兼容历史数据中 expires_at 等字段可能是数字或字符串）
 	switch val := v.(type) {
 	case string:
-		decrypted, err := decryptRemoteIngestCredential(val)
-		if err != nil {
-			return ""
-		}
-		return decrypted
+		return val
 	case json.Number:
 		// GORM datatypes.JSONMap 使用 UseNumber() 解析，数字类型为 json.Number
 		return val.String()

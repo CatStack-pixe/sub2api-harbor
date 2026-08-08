@@ -234,9 +234,6 @@ func cloneAccountValuePointer[T any](value *T) *T {
 // account cannot mutate the in-memory source. Linked credential shadows are excluded because they
 // intentionally do not own credentials and must be created through CreateShadow.
 func (s *adminServiceImpl) DuplicateAccount(ctx context.Context, id int64, actorScope, operationKey string) (*Account, error) {
-	if err := rejectRemoteIngestAccountWrite(ctx, s.accountRepo, id); err != nil {
-		return nil, err
-	}
 	operationID := duplicateAccountOperationID(id, actorScope, operationKey)
 	existing, err := s.RecoverDuplicateAccount(ctx, id, actorScope, operationKey)
 	if err != nil {
@@ -270,9 +267,6 @@ func (s *adminServiceImpl) DuplicateAccount(ctx context.Context, id int64, actor
 	extra, err := duplicateAccountExtra(source.Extra)
 	if err != nil {
 		return nil, fmt.Errorf("clone account extra configuration: %w", err)
-	}
-	if err := rejectReservedRemoteIngestExtra(extra); err != nil {
-		return nil, err
 	}
 	if operationID != "" {
 		if extra == nil {
@@ -559,9 +553,6 @@ func (s *adminServiceImpl) CreateAccount(ctx context.Context, input *CreateAccou
 	if input == nil {
 		return nil, infraerrors.BadRequest("INVALID_ACCOUNT_INPUT", "account input is required")
 	}
-	if err := rejectReservedRemoteIngestExtra(input.Extra); err != nil {
-		return nil, err
-	}
 	if err := validateAccountCredentials(input.Platform, input.Type, input.Credentials); err != nil {
 		return nil, err
 	}
@@ -655,12 +646,6 @@ func (s *adminServiceImpl) CreateAccount(ctx context.Context, input *CreateAccou
 func (s *adminServiceImpl) UpdateAccount(ctx context.Context, id int64, input *UpdateAccountInput) (*Account, error) {
 	if input == nil {
 		return nil, infraerrors.BadRequest("INVALID_ACCOUNT_INPUT", "account input is required")
-	}
-	if err := rejectRemoteIngestAccountWrite(ctx, s.accountRepo, id); err != nil {
-		return nil, err
-	}
-	if err := rejectReservedRemoteIngestExtra(input.Extra); err != nil {
-		return nil, err
 	}
 	account, err := s.accountRepo.GetByID(ctx, id)
 	if err != nil {
@@ -976,12 +961,6 @@ func (s *adminServiceImpl) UpdateAccount(ctx context.Context, id int64, input *U
 // UpdateAccountExtra 仅对 Extra JSONB 做 key 级合并，避免覆盖其它运行态键
 // （如 model_rate_limits / passive_usage_* 等）。
 func (s *adminServiceImpl) UpdateAccountExtra(ctx context.Context, id int64, updates map[string]any) error {
-	if err := rejectRemoteIngestAccountWrite(ctx, s.accountRepo, id); err != nil {
-		return err
-	}
-	if err := rejectReservedRemoteIngestExtra(updates); err != nil {
-		return err
-	}
 	delete(updates, UpstreamBillingProbeEnabledExtraKey)
 	delete(updates, UpstreamBillingRateSyncEnabledExtraKey)
 	delete(updates, UpstreamBillingProbeExtraKey)
@@ -1006,9 +985,6 @@ func (s *adminServiceImpl) UpdateAccountExtra(ctx context.Context, id int64, upd
 // BulkUpdateAccounts updates multiple accounts in one request.
 // It merges credentials/extra keys instead of overwriting the whole object.
 func (s *adminServiceImpl) BulkUpdateAccounts(ctx context.Context, input *BulkUpdateAccountsInput) (*BulkUpdateAccountsResult, error) {
-	if err := rejectReservedRemoteIngestExtra(input.Extra); err != nil {
-		return nil, err
-	}
 	// Managed probe/session state may only enter through dedicated typed endpoints.
 	delete(input.Extra, UpstreamBillingProbeEnabledExtraKey)
 	delete(input.Extra, UpstreamBillingRateSyncEnabledExtraKey)
@@ -1033,9 +1009,6 @@ func (s *adminServiceImpl) BulkUpdateAccounts(ctx context.Context, input *BulkUp
 
 	if len(input.AccountIDs) == 0 {
 		return result, nil
-	}
-	if err := rejectRemoteIngestAccountWrite(ctx, s.accountRepo, input.AccountIDs...); err != nil {
-		return nil, err
 	}
 	hasGroupBindingUpdate := input.GroupIDs != nil && len(*input.GroupIDs) > 0
 	if input.GroupIDs != nil {
@@ -1355,9 +1328,6 @@ func (s *adminServiceImpl) resolveBulkUpdateTargetIDs(ctx context.Context, filte
 }
 
 func (s *adminServiceImpl) DeleteAccount(ctx context.Context, id int64) error {
-	if err := rejectRemoteIngestAccountWrite(ctx, s.accountRepo, id); err != nil {
-		return err
-	}
 	// 级联删除 spark 影子账号（先删影子，再删母账号）
 	shadows, err := s.accountRepo.ListShadowsByParent(ctx, id)
 	if err != nil {
@@ -1384,9 +1354,6 @@ func (s *adminServiceImpl) RefreshAccountCredentials(ctx context.Context, id int
 }
 
 func (s *adminServiceImpl) ClearAccountError(ctx context.Context, id int64) (*Account, error) {
-	if err := rejectRemoteIngestAccountWrite(ctx, s.accountRepo, id); err != nil {
-		return nil, err
-	}
 	if err := s.accountRepo.ClearError(ctx, id); err != nil {
 		return nil, err
 	}
@@ -1409,16 +1376,10 @@ func (s *adminServiceImpl) ClearAccountError(ctx context.Context, id int64) (*Ac
 }
 
 func (s *adminServiceImpl) SetAccountError(ctx context.Context, id int64, errorMsg string) error {
-	if err := rejectRemoteIngestAccountWrite(ctx, s.accountRepo, id); err != nil {
-		return err
-	}
 	return s.accountRepo.SetError(ctx, id, errorMsg)
 }
 
 func (s *adminServiceImpl) SetAccountSchedulable(ctx context.Context, id int64, schedulable bool) (*Account, error) {
-	if err := rejectRemoteIngestAccountWrite(ctx, s.accountRepo, id); err != nil {
-		return nil, err
-	}
 	if err := s.accountRepo.SetSchedulable(ctx, id, schedulable); err != nil {
 		return nil, err
 	}
@@ -1430,9 +1391,6 @@ func (s *adminServiceImpl) SetAccountSchedulable(ctx context.Context, id int64, 
 }
 
 func (s *adminServiceImpl) RevertAccountProxyFallback(ctx context.Context, id int64) error {
-	if err := rejectRemoteIngestAccountWrite(ctx, s.accountRepo, id); err != nil {
-		return err
-	}
 	if err := s.accountRepo.RevertProxyFallback(ctx, id); err != nil {
 		return err
 	}
@@ -1447,9 +1405,6 @@ func (s *adminServiceImpl) RevertAccountProxyFallback(ctx context.Context, id in
 // CreateShadow 为指定 OpenAI OAuth 母账号创建 spark 维度影子账号（一母一影）。
 // 安全不变量：Credentials 恒不含 auth token（仅 model_mapping，守卫 isAllowedSparkShadowCredentialsUpdate 放行）。
 func (s *adminServiceImpl) CreateShadow(ctx context.Context, parentID int64, opts ShadowOptions) (*Account, error) {
-	if err := rejectRemoteIngestAccountWrite(ctx, s.accountRepo, parentID); err != nil {
-		return nil, err
-	}
 	// 1. 加载母账号并校验平台/类型
 	parent, err := s.accountRepo.GetByID(ctx, parentID)
 	if err != nil {
