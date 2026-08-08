@@ -1819,20 +1819,8 @@ func (stubGroupRepo) CreateFromSource(ctx context.Context, group *service.Group,
 	return errors.New("not implemented")
 }
 
-func (stubGroupRepo) CreateWithAccountCopy(ctx context.Context, group *service.Group, sourceGroupIDs []int64) error {
-	return errors.New("not implemented")
-}
-
-func (stubGroupRepo) UpdateWithAccountCopy(ctx context.Context, group *service.Group, sourceGroupIDs []int64) error {
-	return errors.New("not implemented")
-}
-
 type stubAccountRepo struct {
 	bulkUpdateIDs []int64
-}
-
-func (s *stubAccountRepo) ListRemoteIngestAccountIDs(context.Context, []int64) ([]int64, error) {
-	return nil, nil
 }
 
 func (s *stubAccountRepo) Create(ctx context.Context, account *service.Account) error {

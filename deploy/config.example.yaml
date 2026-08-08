@@ -73,27 +73,6 @@ server:
     max_upload_buffer_per_stream: 524288
 
 # =============================================================================
-# Remote Account Intake (opt-in)
-# =============================================================================
-# Protect the dedicated hostname with a Cloudflare Access Service Auth
-# application before enabling this feature. The keyring file must be readable
-# only by the Sub2API process and must never be stored in Git or an image.
-remote_ingest:
-  enabled: false
-  cloudflare_team_domain: ""
-  cloudflare_audience: ""
-  keyring_file: ""
-  # Private/reserved destinations are blocked by default. Add only narrowly
-  # scoped operator-approved CIDRs when an internal upstream is intentional.
-  allowed_private_cidrs: []
-  registration_ttl_seconds: 600
-  challenge_ttl_seconds: 60
-  timestamp_skew_seconds: 60
-  worker_concurrency: 4
-  worker_timeout_seconds: 240
-  worker_poll_interval_seconds: 2
-
-# =============================================================================
 # WebAuthn / Passkey Configuration
 # WebAuthn / Passkey 配置
 # =============================================================================

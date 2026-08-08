@@ -56,12 +56,6 @@ declare module 'vue-router' {
     requiresRiskControl?: boolean
 
     /**
-     * Whether this route requires remote ingest to be enabled
-     * @default false
-     */
-    requiresRemoteIngest?: boolean
-
-    /**
      * i18n key for the page title
      */
     titleKey?: string

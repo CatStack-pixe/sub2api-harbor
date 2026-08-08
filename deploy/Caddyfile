@@ -24,11 +24,6 @@ api.sub2api.com {
 		ciphers TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384 TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384 TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256 TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256 TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256 TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
 	}
 
-	# The remote intake API is available only on ingest.catpithos.top, where
-	# Cloudflare Access and the stricter request-body policy are enforced.
-	@remote_ingest_path path /api/v1/remote-ingest /api/v1/remote-ingest/*
-	respond @remote_ingest_path "Not Found" 404
-
 	# =========================================================================
 	# 反向代理配置
 	# =========================================================================
@@ -113,55 +108,5 @@ api.sub2api.com {
 	# =========================================================================
 	handle_errors {
 		respond "{err.status_code} {err.status_text}"
-	}
-}
-
-# Remote machine intake is isolated from the normal API hostname. Cloudflare
-# Access must protect this application, and the origin firewall must only allow
-# Cloudflare proxy addresses to reach port 443.
-ingest.catpithos.top {
-	tls {
-		protocols tls1.2 tls1.3
-	}
-
-	@remote_ingest path /api/v1/remote-ingest /api/v1/remote-ingest/*
-	handle @remote_ingest {
-		request_body {
-			max_size 16KB
-		}
-		reverse_proxy 127.0.0.1:8080 {
-			# Cloudflare injects Cf-Access-Jwt-Assertion after Access policy
-			# evaluation. Never forward service-token credentials to the app.
-			header_up -CF-Access-Client-Id
-			header_up -CF-Access-Client-Secret
-			header_up X-Real-IP {remote_host}
-			header_up X-Forwarded-For {remote_host}
-			header_up X-Forwarded-Proto {scheme}
-			header_up X-Forwarded-Host {host}
-		}
-	}
-
-	handle {
-		respond "Not Found" 404
-	}
-
-	log {
-		output file /var/log/caddy/sub2api-remote-ingest.log {
-			roll_size 50mb
-			roll_keep 10
-			roll_keep_for 720h
-		}
-		format filter {
-			wrap json
-			fields {
-				request>headers>Authorization delete
-				request>headers>Cookie delete
-				request>headers>Cf-Access-Jwt-Assertion delete
-				request>headers>Cf-Access-Client-Id delete
-				request>headers>Cf-Access-Client-Secret delete
-				request>headers>X-Remote-Signature delete
-			}
-		}
-		level INFO
 	}
 }

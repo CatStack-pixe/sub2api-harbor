@@ -25,7 +25,6 @@ const appStore = vi.hoisted(() => ({
   cachedPublicSettings: null as null | {
     payment_enabled?: boolean
     risk_control_enabled?: boolean
-    remote_ingest_enabled?: boolean
     custom_menu_items?: []
   },
   fetchPublicSettings: vi.fn(),
@@ -143,7 +142,6 @@ describe('feature route guard', () => {
   it.each([
     ['payment', { requiresPayment: true }, '/purchase'],
     ['risk control', { requiresRiskControl: true }, '/admin/risk-control'],
-    ['remote ingest', { requiresRemoteIngest: true }, '/admin/remote-ingest'],
   ])('does not treat a failed %s settings load as explicitly disabled', async (_name, meta, path) => {
     authStore.isAdmin = meta.requiresRiskControl === true
     appStore.fetchPublicSettings.mockResolvedValue(null)
@@ -164,12 +162,6 @@ describe('feature route guard', () => {
       { risk_control_enabled: false },
       '/admin/settings',
     ],
-    [
-      'remote ingest',
-      { requiresRemoteIngest: true },
-      { remote_ingest_enabled: false },
-      '/admin/settings',
-    ],
   ])('redirects when loaded settings explicitly disable %s', async (_name, meta, settings, target) => {
     authStore.isAdmin = meta.requiresRiskControl === true
     appStore.cachedPublicSettings = settings
@@ -181,20 +173,5 @@ describe('feature route guard', () => {
     expect(appStore.fetchPublicSettings).not.toHaveBeenCalled()
     expect(next).toHaveBeenCalledOnce()
     expect(next).toHaveBeenCalledWith(target)
-  })
-
-  it('allows the remote ingest route when the opt-in flag is enabled', async () => {
-    authStore.isAdmin = true
-    appStore.cachedPublicSettings = { remote_ingest_enabled: true }
-    appStore.publicSettingsLoaded = true
-
-    const { navigation, next } = runGuard(
-      { requiresAdmin: true, requiresRemoteIngest: true },
-      '/admin/remote-ingest'
-    )
-    await navigation
-
-    expect(next).toHaveBeenCalledOnce()
-    expect(next).toHaveBeenCalledWith()
   })
 })

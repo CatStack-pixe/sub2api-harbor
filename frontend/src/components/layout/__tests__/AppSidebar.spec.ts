@@ -53,11 +53,3 @@ describe('AppSidebar header styles', () => {
     expect(sidebarBrandBlockMatch?.[0]).not.toContain('overflow: hidden;')
   })
 })
-
-describe('AppSidebar remote ingest navigation', () => {
-  it('gates the admin entry with the registered opt-in feature flag', () => {
-    expect(componentSource).toContain('const flagRemoteIngest = makeSidebarFlag(FeatureFlags.remoteIngest)')
-    expect(componentSource).toContain("path: '/admin/remote-ingest'")
-    expect(componentSource).toContain('featureFlag: flagRemoteIngest')
-  })
-})

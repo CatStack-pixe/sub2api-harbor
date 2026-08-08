@@ -114,8 +114,6 @@ func (h *SettingHandler) GetPublicSettings(c *gin.Context) {
 
 		RiskControlEnabled: settings.RiskControlEnabled,
 
-		RemoteIngestEnabled: settings.RemoteIngestEnabled,
-
 		AllowUserViewErrorRequests: settings.AllowUserViewErrorRequests,
 	})
 }

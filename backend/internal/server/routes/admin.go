@@ -42,9 +42,6 @@ func RegisterAdminRoutes(
 		// 账号管理
 		registerAccountRoutes(admin, h, stepUpAuth)
 
-		// Machine-to-machine account intake administration.
-		registerRemoteIngestAdminRoutes(admin, h, stepUpAuth)
-
 		// 公告管理
 		registerAnnouncementRoutes(admin, h)
 
@@ -125,18 +122,6 @@ func RegisterAdminRoutes(
 
 		// 操作审计日志
 		registerAuditLogRoutes(admin, h, stepUpAuth)
-	}
-}
-
-func registerRemoteIngestAdminRoutes(admin *gin.RouterGroup, h *handler.Handlers, stepUpAuth middleware.StepUpAuthMiddleware) {
-	remote := admin.Group("/remote-ingest")
-	{
-		remote.GET("/registration-tokens", h.Admin.RemoteIngest.ListRegistrationTokens)
-		remote.POST("/registration-tokens", gin.HandlerFunc(stepUpAuth), h.Admin.RemoteIngest.CreateRegistrationToken)
-		remote.GET("/clients", h.Admin.RemoteIngest.ListClients)
-		remote.POST("/clients/:id/revoke", gin.HandlerFunc(stepUpAuth), h.Admin.RemoteIngest.RevokeClient)
-		remote.GET("/deliveries", h.Admin.RemoteIngest.ListDeliveries)
-		remote.POST("/deliveries/:id/retry", gin.HandlerFunc(stepUpAuth), h.Admin.RemoteIngest.RetryDelivery)
 	}
 }
 
