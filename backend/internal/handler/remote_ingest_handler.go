@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"errors"
 	"io"
 	"net/http"
 	"strings"
@@ -29,14 +28,19 @@ type remoteEnrollRequest struct {
 
 func (h *RemoteIngestHandler) Enroll(c *gin.Context) {
 	subject, ok := h.verifyAccess(c)
-	if !ok { return }
+	if !ok {
+		return
+	}
 	var req remoteEnrollRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, "invalid enrollment request")
 		return
 	}
 	client, err := h.service.Enroll(c.Request.Context(), req.RegistrationToken, req.MachineName, req.PublicKey, subject)
-	if err != nil { response.ErrorFrom(c, err); return }
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
 	response.Created(c, gin.H{
 		"client_id": client.ID,
 		"public_key_fingerprint": client.PublicKeyFingerprint,
@@ -50,17 +54,27 @@ type remoteHandshakeRequest struct {
 
 func (h *RemoteIngestHandler) Handshake(c *gin.Context) {
 	subject, ok := h.verifyAccess(c)
-	if !ok { return }
+	if !ok {
+		return
+	}
 	var req remoteHandshakeRequest
-	if err := c.ShouldBindJSON(&req); err != nil { response.BadRequest(c, "invalid handshake request"); return }
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "invalid handshake request")
+		return
+	}
 	challenge, err := h.service.Handshake(c.Request.Context(), req.ClientID, subject)
-	if err != nil { response.ErrorFrom(c, err); return }
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
 	response.Created(c, challenge)
 }
 
 func (h *RemoteIngestHandler) SubmitAccount(c *gin.Context) {
 	subject, ok := h.verifyAccess(c)
-	if !ok { return }
+	if !ok {
+		return
+	}
 	body, err := io.ReadAll(io.LimitReader(c.Request.Body, 16*1024+1))
 	if err != nil || len(body) > 16*1024 {
 		response.Error(c, http.StatusRequestEntityTooLarge, "request body exceeds 16 KiB")
@@ -75,7 +89,10 @@ func (h *RemoteIngestHandler) SubmitAccount(c *gin.Context) {
 		body,
 		subject,
 	)
-	if err != nil { response.ErrorFrom(c, err); return }
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
 	response.Accepted(c, gin.H{
 		"delivery_id": delivery.ID,
 		"query_token": queryToken,
@@ -85,14 +102,19 @@ func (h *RemoteIngestHandler) SubmitAccount(c *gin.Context) {
 
 func (h *RemoteIngestHandler) GetDelivery(c *gin.Context) {
 	subject, ok := h.verifyAccess(c)
-	if !ok { return }
+	if !ok {
+		return
+	}
 	authorization := strings.TrimSpace(c.GetHeader("Authorization"))
 	if !strings.HasPrefix(authorization, "Bearer ") {
 		response.Unauthorized(c, "delivery query token is required")
 		return
 	}
 	delivery, err := h.service.GetDeliveryAuthorized(c.Request.Context(), c.Param("id"), strings.TrimSpace(strings.TrimPrefix(authorization, "Bearer ")), subject)
-	if err != nil { response.ErrorFrom(c, err); return }
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
 	response.Success(c, delivery)
 }
 
@@ -107,9 +129,4 @@ func (h *RemoteIngestHandler) verifyAccess(c *gin.Context) (string, bool) {
 		return "", false
 	}
 	return subject, true
-}
-
-func isBodyTooLarge(err error) bool {
-	var maxErr *http.MaxBytesError
-	return errors.As(err, &maxErr)
 }

@@ -64,7 +64,7 @@ func LoadRemoteIngestKeyring(cfg RemoteIngestKeyringConfig) (*RemoteIngestKeyrin
 	if err != nil {
 		return nil, fmt.Errorf("open remote ingest keyring: %w", err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	var raw remoteIngestKeyringFile
 	decoder := json.NewDecoder(io.LimitReader(f, maxCloudflareAccessJWKSBytes))
@@ -467,7 +467,7 @@ func (v *CloudflareAccessVerifier) fetchKeys(ctx context.Context) (map[string]*r
 	if err != nil {
 		return nil, fmt.Errorf("fetch cloudflare access JWKS: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("fetch cloudflare access JWKS: status %d", resp.StatusCode)
 	}

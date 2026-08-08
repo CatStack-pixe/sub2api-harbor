@@ -38,7 +38,7 @@ func (r *remoteIngestRepository) ListRegistrationTokens(ctx context.Context, lim
 		FROM remote_ingest_registration_tokens
 		ORDER BY created_at DESC LIMIT $1`, limit)
 	if err != nil { return nil, err }
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	items := make([]service.RemoteRegistrationToken, 0)
 	for rows.Next() {
 		var item service.RemoteRegistrationToken
@@ -94,7 +94,7 @@ func (r *remoteIngestRepository) ListClients(ctx context.Context, limit int) ([]
 		       access_subject, enrolled_at, last_active_at, revoked_at
 		FROM remote_ingest_clients ORDER BY enrolled_at DESC LIMIT $1`, limit)
 	if err != nil { return nil, err }
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	items := make([]service.RemoteClient, 0)
 	for rows.Next() {
 		item, err := scanRemoteClient(rows)
@@ -164,9 +164,17 @@ func (r *remoteIngestRepository) CreateDelivery(ctx context.Context, create serv
 	count := 0
 	for rows.Next() {
 		count++
-		if err := rows.Scan(&groupID, &groupPlatform, &requireOAuthOnly); err != nil { rows.Close(); return nil, false, err }
+		if err := rows.Scan(&groupID, &groupPlatform, &requireOAuthOnly); err != nil {
+			_ = rows.Close()
+			return nil, false, err
+		}
 	}
-	rows.Close()
+	if err := rows.Close(); err != nil {
+		return nil, false, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, false, err
+	}
 	if count != 1 || groupPlatform != create.Submission.Platform || requireOAuthOnly {
 		return nil, false, service.ErrRemoteGroupInvalid
 	}

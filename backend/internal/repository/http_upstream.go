@@ -102,7 +102,7 @@ const (
 )
 
 var (
-	errUpstreamClientLimitReached  = errors.New("upstream client cache limit reached")
+	errUpstreamClientLimitReached   = errors.New("upstream client cache limit reached")
 	errRemoteIngestResponseTooLarge = errors.New("remote ingest probe response exceeds 4 MiB")
 )
 
