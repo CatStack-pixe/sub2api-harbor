@@ -463,9 +463,6 @@ func (s *adminServiceImpl) CreateGroup(ctx context.Context, input *CreateGroupIn
 		if err != nil {
 			return nil, fmt.Errorf("failed to get accounts from source groups: %w", err)
 		}
-		if err := rejectRemoteIngestAccountWrite(ctx, s.accountRepo, accountIDsToCopy...); err != nil {
-			return nil, err
-		}
 	}
 
 	group := &Group{
@@ -669,15 +666,6 @@ func (s *adminServiceImpl) UpdateGroup(ctx context.Context, id int64, input *Upd
 		seenSourceGroupIDs[sourceGroupID] = struct{}{}
 		uniqueSourceGroupIDs = append(uniqueSourceGroupIDs, sourceGroupID)
 	}
-	groupIDs := append([]int64{id}, uniqueSourceGroupIDs...)
-	accountIDs, err := s.groupRepo.GetAccountIDsByGroupIDs(ctx, groupIDs)
-	if err != nil {
-		return nil, fmt.Errorf("check remote ingest group bindings: %w", err)
-	}
-	if err := rejectRemoteIngestAccountWrite(ctx, s.accountRepo, accountIDs...); err != nil {
-		return nil, err
-	}
-
 	if input.Name != "" {
 		group.Name = input.Name
 	}
@@ -981,13 +969,6 @@ func (s *adminServiceImpl) UpdateGroup(ctx context.Context, id int64, input *Upd
 }
 
 func (s *adminServiceImpl) DeleteGroup(ctx context.Context, id int64) error {
-	accountIDs, err := s.groupRepo.GetAccountIDsByGroupIDs(ctx, []int64{id})
-	if err != nil {
-		return fmt.Errorf("check remote ingest group bindings: %w", err)
-	}
-	if err := rejectRemoteIngestAccountWrite(ctx, s.accountRepo, accountIDs...); err != nil {
-		return err
-	}
 	var groupKeys []string
 	if s.authCacheInvalidator != nil {
 		keys, err := s.apiKeyRepo.ListKeysByGroupID(ctx, id)
