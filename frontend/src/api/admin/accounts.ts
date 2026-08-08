@@ -542,8 +542,11 @@ export interface DeepSeekBalanceResult {
   fetched_at: number
 }
 
-export async function getDeepSeekBalance(id: number): Promise<DeepSeekBalanceResult> {
-  const { data } = await apiClient.get<DeepSeekBalanceResult>(`/admin/deepseek/accounts/${id}/balance`)
+export async function getDeepSeekBalance(id: number, signal?: AbortSignal): Promise<DeepSeekBalanceResult> {
+  const { data } = await apiClient.get<DeepSeekBalanceResult>(
+    `/admin/deepseek/accounts/${id}/balance`,
+    { signal }
+  )
   return data
 }
 
