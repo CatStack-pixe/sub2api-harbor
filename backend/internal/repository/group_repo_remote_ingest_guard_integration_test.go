@@ -103,8 +103,8 @@ func TestGroupMutationsRejectRemoteIngestBindingsAtomically(t *testing.T) {
 	require.ErrorIs(t, err, service.ErrRemoteIngestAccountManaged)
 
 	var sourceDescription, targetDescription string
-	require.NoError(t, integrationDB.QueryRowContext(ctx, "SELECT description FROM groups WHERE id = $1", source.ID).Scan(&sourceDescription))
-	require.NoError(t, integrationDB.QueryRowContext(ctx, "SELECT description FROM groups WHERE id = $1", target.ID).Scan(&targetDescription))
+	require.NoError(t, integrationDB.QueryRowContext(ctx, "SELECT COALESCE(description, '') FROM groups WHERE id = $1", source.ID).Scan(&sourceDescription))
+	require.NoError(t, integrationDB.QueryRowContext(ctx, "SELECT COALESCE(description, '') FROM groups WHERE id = $1", target.ID).Scan(&targetDescription))
 	require.Empty(t, sourceDescription)
 	require.Empty(t, targetDescription)
 	for _, name := range []string{createdCopy.Name, duplicate.Name} {
