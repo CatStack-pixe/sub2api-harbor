@@ -76,17 +76,32 @@ func TestGatewayRoutesOpenAIResponsesCompactPathIsRegistered(t *testing.T) {
 	}
 }
 
-func TestGatewayRoutesNvidiaResponsesUsesOpenAICompatibleHandler(t *testing.T) {
-	router := newGatewayRoutesTestRouter(service.PlatformNvidia)
-	req := httptest.NewRequest(http.MethodPost, "/v1/responses", strings.NewReader(`{"model":"z-ai/glm-5.2","input":"hi"}`))
-	req.Header.Set("Content-Type", "application/json")
-	w := httptest.NewRecorder()
+func TestGatewayRoutesChatOnlyPlatformsResponsesUseOpenAICompatibleHandler(t *testing.T) {
+	tests := []struct {
+		name     string
+		platform string
+		model    string
+	}{
+		{name: "deepseek", platform: service.PlatformDeepSeek, model: "deepseek-v4-flash"},
+		{name: "nvidia", platform: service.PlatformNvidia, model: "z-ai/glm-5.2"},
+	}
 
-	router.ServeHTTP(w, req)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			router := newGatewayRoutesTestRouter(tt.platform)
+			body, err := json.Marshal(map[string]any{"model": tt.model, "input": "hi"})
+			require.NoError(t, err)
+			req := httptest.NewRequest(http.MethodPost, "/v1/responses", strings.NewReader(string(body)))
+			req.Header.Set("Content-Type", "application/json")
+			w := httptest.NewRecorder()
 
-	require.Equal(t, http.StatusInternalServerError, w.Code)
-	require.Contains(t, w.Body.String(), `"type":"api_error"`)
-	require.NotContains(t, w.Body.String(), `"code":"api_error"`)
+			router.ServeHTTP(w, req)
+
+			require.Equal(t, http.StatusInternalServerError, w.Code)
+			require.Contains(t, w.Body.String(), `"type":"api_error"`)
+			require.NotContains(t, w.Body.String(), `"code":"api_error"`)
+		})
+	}
 }
 
 func TestGatewayRoutesOpenAIAlphaSearchPathsAreRegistered(t *testing.T) {

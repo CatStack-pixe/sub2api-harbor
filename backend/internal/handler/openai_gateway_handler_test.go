@@ -28,6 +28,17 @@ import (
 	"go.uber.org/zap"
 )
 
+func TestAllowOpenAICompatibleMessagesDispatch_DeepSeek(t *testing.T) {
+	apiKey := &service.APIKey{
+		Group: &service.Group{
+			Platform:              service.PlatformDeepSeek,
+			AllowMessagesDispatch: false,
+		},
+	}
+
+	require.True(t, allowOpenAICompatibleMessagesDispatch(apiKey))
+}
+
 func TestOpenAIHandleStreamingAwareError_JSONEscaping(t *testing.T) {
 	tests := []struct {
 		name    string

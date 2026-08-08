@@ -186,7 +186,7 @@ func allowOpenAICompatibleMessagesDispatch(apiKey *service.APIKey) bool {
 	if apiKey == nil || apiKey.Group == nil {
 		return true
 	}
-	if apiKey.Group.Platform == service.PlatformGrok || apiKey.Group.Platform == service.PlatformAgnes || apiKey.Group.Platform == service.PlatformNvidia {
+	if apiKey.Group.Platform == service.PlatformGrok || apiKey.Group.Platform == service.PlatformAgnes || apiKey.Group.Platform == service.PlatformDeepSeek || apiKey.Group.Platform == service.PlatformNvidia {
 		return true
 	}
 	return apiKey.Group.AllowMessagesDispatch
@@ -309,7 +309,7 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 	}
 	reqModel := modelResult.String()
 	ensureCompositeTargetPlatform(c, apiKey, reqModel)
-	if !compositeTargetPlatformAllowed(c, apiKey, reqModel, service.PlatformOpenAI, service.PlatformGrok, service.PlatformAgnes, service.PlatformNvidia) {
+	if !openAICompatibleTextTargetAllowed(c, apiKey, reqModel) {
 		h.errorResponse(c, http.StatusBadRequest, "invalid_request_error", "Model is not supported by this OpenAI-compatible endpoint for composite groups")
 		return
 	}
