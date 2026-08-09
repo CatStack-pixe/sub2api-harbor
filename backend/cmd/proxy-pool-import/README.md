@@ -4,10 +4,14 @@ This one-time tool validates and streams the `Proxy-20260808` workbook. It does
 not use the proxy JSON API because that path probes every new proxy and can
 modify matching existing proxies.
 
-Dry-run:
+Download the Windows artifact from the successful `main` GitHub Actions run for
+the exact commit being deployed. Verify `proxy-pool-import.exe` against the
+included SHA-256 file before use. Do not build the importer locally.
+
+Dry-run from the repository's `backend` directory:
 
 ```powershell
-go run ./cmd/proxy-pool-import -input ..\..\Proxy-20260808-031830.xlsx
+.\proxy-pool-import.exe -input ..\..\Proxy-20260808-031830.xlsx
 ```
 
 The command refuses to continue unless the workbook SHA-256 and the expected
