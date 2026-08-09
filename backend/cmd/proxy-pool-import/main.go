@@ -470,7 +470,7 @@ CREATE TEMP TABLE proxy_pool_import_stage (
   username varchar(100) NOT NULL,
   password varchar(100) NOT NULL
 ) ON COMMIT DROP;
-\copy proxy_pool_import_stage (source_row, name, protocol, host, port, username, password) FROM STDIN WITH (FORMAT csv)
+\copy proxy_pool_import_stage (source_row, name, protocol, host, port, username, password) FROM STDIN WITH (FORMAT csv, FORCE_NOT_NULL (username, password))
 `, importAdvisoryLockID)
 	if _, err := io.WriteString(w, header); err != nil {
 		return err
