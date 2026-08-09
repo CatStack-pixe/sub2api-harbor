@@ -41,6 +41,33 @@ jobs:
         working-directory: backend
         run: make test-integration
 
+  proxy-pool-import:
+    needs: [test, golangci-lint]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: backend/go.mod
+          check-latest: false
+          cache: true
+          cache-dependency-path: backend/go.sum
+      - name: Build controlled proxy pool importer
+        working-directory: backend
+        run: |
+          GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -o proxy-pool-import.exe ./cmd/proxy-pool-import
+          sha256sum proxy-pool-import.exe > proxy-pool-import.exe.sha256
+      - name: Upload proxy pool importer
+        uses: actions/upload-artifact@v7
+        with:
+          name: proxy-pool-import-windows-amd64-${{ github.sha }}
+          path: |
+            backend/proxy-pool-import.exe
+            backend/proxy-pool-import.exe.sha256
+          if-no-files-found: error
+          retention-days: 7
+
   frontend:
     runs-on: ubuntu-latest
     steps:

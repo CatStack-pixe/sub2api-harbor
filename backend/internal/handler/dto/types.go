@@ -332,6 +332,18 @@ type Proxy struct {
 	FallbackMode   string     `json:"fallback_mode"`
 	BackupProxyID  *int64     `json:"backup_proxy_id"`
 	ExpiryWarnDays int        `json:"expiry_warn_days"`
+	ProxyGroupID   *int64     `json:"proxy_group_id"`
+	ProxyGroupName string     `json:"proxy_group_name"`
+}
+
+type ProxyGroup struct {
+	ID            int64     `json:"id"`
+	Name          string    `json:"name"`
+	TotalCount    int64     `json:"total_count"`
+	ActiveCount   int64     `json:"active_count"`
+	InactiveCount int64     `json:"inactive_count"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
 }
 
 type ProxyWithAccountCount struct {

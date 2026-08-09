@@ -476,6 +476,23 @@ func ProxyFromService(p *service.Proxy) *Proxy {
 		FallbackMode:   p.FallbackMode,
 		BackupProxyID:  p.BackupProxyID,
 		ExpiryWarnDays: p.ExpiryWarnDays,
+		ProxyGroupID:   p.ProxyGroupID,
+		ProxyGroupName: p.ProxyGroupName,
+	}
+}
+
+func ProxyGroupFromService(group *service.ProxyGroup) *ProxyGroup {
+	if group == nil {
+		return nil
+	}
+	return &ProxyGroup{
+		ID:            group.ID,
+		Name:          group.Name,
+		TotalCount:    group.TotalCount,
+		ActiveCount:   group.ActiveCount,
+		InactiveCount: group.InactiveCount,
+		CreatedAt:     group.CreatedAt,
+		UpdatedAt:     group.UpdatedAt,
 	}
 }
 

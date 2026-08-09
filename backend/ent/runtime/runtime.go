@@ -31,6 +31,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/promocode"
 	"github.com/Wei-Shaw/sub2api/ent/promocodeusage"
 	"github.com/Wei-Shaw/sub2api/ent/proxy"
+	"github.com/Wei-Shaw/sub2api/ent/proxygroup"
 	"github.com/Wei-Shaw/sub2api/ent/redeemcode"
 	"github.com/Wei-Shaw/sub2api/ent/schema"
 	"github.com/Wei-Shaw/sub2api/ent/securitysecret"
@@ -1687,6 +1688,39 @@ func init() {
 	proxyDescExpiryWarnDays := proxyFields[10].Descriptor()
 	// proxy.DefaultExpiryWarnDays holds the default value on creation for the expiry_warn_days field.
 	proxy.DefaultExpiryWarnDays = proxyDescExpiryWarnDays.Default.(int)
+	proxygroupMixin := schema.ProxyGroup{}.Mixin()
+	proxygroupMixinFields0 := proxygroupMixin[0].Fields()
+	_ = proxygroupMixinFields0
+	proxygroupFields := schema.ProxyGroup{}.Fields()
+	_ = proxygroupFields
+	// proxygroupDescCreatedAt is the schema descriptor for created_at field.
+	proxygroupDescCreatedAt := proxygroupMixinFields0[0].Descriptor()
+	// proxygroup.DefaultCreatedAt holds the default value on creation for the created_at field.
+	proxygroup.DefaultCreatedAt = proxygroupDescCreatedAt.Default.(func() time.Time)
+	// proxygroupDescUpdatedAt is the schema descriptor for updated_at field.
+	proxygroupDescUpdatedAt := proxygroupMixinFields0[1].Descriptor()
+	// proxygroup.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	proxygroup.DefaultUpdatedAt = proxygroupDescUpdatedAt.Default.(func() time.Time)
+	// proxygroup.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	proxygroup.UpdateDefaultUpdatedAt = proxygroupDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// proxygroupDescName is the schema descriptor for name field.
+	proxygroupDescName := proxygroupFields[0].Descriptor()
+	// proxygroup.NameValidator is a validator for the "name" field. It is called by the builders before save.
+	proxygroup.NameValidator = func() func(string) error {
+		validators := proxygroupDescName.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(name string) error {
+			for _, fn := range fns {
+				if err := fn(name); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
 	redeemcodeFields := schema.RedeemCode{}.Fields()
 	_ = redeemcodeFields
 	// redeemcodeDescCode is the schema descriptor for code field.

@@ -3,6 +3,7 @@ package admin
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -26,14 +27,15 @@ type dataPayload struct {
 }
 
 type dataProxy struct {
-	ProxyKey string `json:"proxy_key"`
-	Name     string `json:"name"`
-	Protocol string `json:"protocol"`
-	Host     string `json:"host"`
-	Port     int    `json:"port"`
-	Username string `json:"username"`
-	Password string `json:"password"`
-	Status   string `json:"status"`
+	ProxyKey       string `json:"proxy_key"`
+	Name           string `json:"name"`
+	Protocol       string `json:"protocol"`
+	Host           string `json:"host"`
+	Port           int    `json:"port"`
+	Username       string `json:"username"`
+	Password       string `json:"password"`
+	Status         string `json:"status"`
+	ProxyGroupName string `json:"proxy_group_name"`
 }
 
 type dataAccount struct {
@@ -49,8 +51,13 @@ type dataAccount struct {
 
 func setupAccountDataRouter() (*gin.Engine, *stubAdminService) {
 	gin.SetMode(gin.TestMode)
-	router := gin.New()
 	adminSvc := newStubAdminService()
+	return setupAccountDataRouterForService(adminSvc), adminSvc
+}
+
+func setupAccountDataRouterForService(adminSvc service.AdminService) *gin.Engine {
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
 
 	h := NewAccountHandler(
 		adminSvc,
@@ -71,7 +78,7 @@ func setupAccountDataRouter() (*gin.Engine, *stubAdminService) {
 
 	router.GET("/api/v1/admin/accounts/data", h.ExportData)
 	router.POST("/api/v1/admin/accounts/data", h.ImportData)
-	return router, adminSvc
+	return router
 }
 
 func TestExportDataIncludesSecrets(t *testing.T) {
@@ -80,14 +87,15 @@ func TestExportDataIncludesSecrets(t *testing.T) {
 	proxyID := int64(11)
 	adminSvc.proxies = []service.Proxy{
 		{
-			ID:       proxyID,
-			Name:     "proxy",
-			Protocol: "http",
-			Host:     "127.0.0.1",
-			Port:     8080,
-			Username: "user",
-			Password: "pass",
-			Status:   service.StatusActive,
+			ID:             proxyID,
+			Name:           "proxy",
+			Protocol:       "http",
+			Host:           "127.0.0.1",
+			Port:           8080,
+			Username:       "user",
+			Password:       "pass",
+			Status:         service.StatusActive,
+			ProxyGroupName: "Primary",
 		},
 		{
 			ID:       12,
@@ -127,6 +135,7 @@ func TestExportDataIncludesSecrets(t *testing.T) {
 	require.Equal(t, 0, resp.Data.Version)
 	require.Len(t, resp.Data.Proxies, 1)
 	require.Equal(t, "pass", resp.Data.Proxies[0].Password)
+	require.Equal(t, "Primary", resp.Data.Proxies[0].ProxyGroupName)
 	require.Len(t, resp.Data.Accounts, 1)
 	require.Equal(t, "secret", resp.Data.Accounts[0].Credentials["token"])
 }
@@ -316,4 +325,49 @@ func TestImportDataReusesProxyAndSkipsDefaultGroup(t *testing.T) {
 	require.Len(t, adminSvc.createdProxies, 0)
 	require.Len(t, adminSvc.createdAccounts, 1)
 	require.True(t, adminSvc.createdAccounts[0].SkipDefaultGroupBind)
+}
+
+func TestImportDataReportsReusedProxyGroupUpdateFailure(t *testing.T) {
+	adminSvc := newProxyGroupAwareAdminService()
+	adminSvc.proxies = []service.Proxy{{
+		ID:       1,
+		Name:     "proxy",
+		Protocol: "http",
+		Host:     "1.2.3.4",
+		Port:     8080,
+		Status:   service.StatusActive,
+	}}
+	adminSvc.updateProxyErr = errors.New("database unavailable")
+	router := setupAccountDataRouterForService(adminSvc)
+
+	payload := map[string]any{
+		"data": map[string]any{
+			"type":    dataType,
+			"version": dataVersion,
+			"proxies": []map[string]any{{
+				"proxy_key":        "http|1.2.3.4|8080||",
+				"name":             "proxy",
+				"protocol":         "http",
+				"host":             "1.2.3.4",
+				"port":             8080,
+				"status":           "active",
+				"proxy_group_name": "Primary",
+			}},
+			"accounts": []map[string]any{},
+		},
+	}
+
+	body, err := json.Marshal(payload)
+	require.NoError(t, err)
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/api/v1/admin/accounts/data", bytes.NewReader(body))
+	request.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(recorder, request)
+	require.Equal(t, http.StatusOK, recorder.Code)
+
+	var response proxyImportResponse
+	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &response))
+	require.Equal(t, 1, response.Data.ProxyReused)
+	require.Len(t, response.Data.Errors, 1)
+	require.Contains(t, response.Data.Errors[0].Message, "database unavailable")
 }

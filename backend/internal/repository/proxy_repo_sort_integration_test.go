@@ -21,7 +21,7 @@ func (s *ProxyRepoSuite) TestListWithFiltersAndAccountCount_SortByAccountCountDe
 		PageSize:  10,
 		SortBy:    "account_count",
 		SortOrder: "desc",
-	}, "", "", "")
+	}, service.ProxyListFilters{})
 	s.Require().NoError(err)
 	s.Require().Len(proxies, 2)
 	s.Require().Equal(p1.ID, proxies[0].ID)
@@ -45,7 +45,7 @@ func (s *ProxyRepoSuite) TestListWithFiltersAndAccountCount_SortByExpiry() {
 	// 升序:最快到期在前,NULL(永不过期)垫底
 	asc, _, err := s.repo.ListWithFiltersAndAccountCount(s.ctx, pagination.PaginationParams{
 		Page: 1, PageSize: 10, SortBy: "expiry", SortOrder: "asc",
-	}, "", "", "")
+	}, service.ProxyListFilters{})
 	s.Require().NoError(err)
 	s.Require().Len(asc, 4)
 	s.Require().Equal(
@@ -57,7 +57,7 @@ func (s *ProxyRepoSuite) TestListWithFiltersAndAccountCount_SortByExpiry() {
 	// 降序:NULL(永不过期)置顶
 	desc, _, err := s.repo.ListWithFiltersAndAccountCount(s.ctx, pagination.PaginationParams{
 		Page: 1, PageSize: 10, SortBy: "expiry", SortOrder: "desc",
-	}, "", "", "")
+	}, service.ProxyListFilters{})
 	s.Require().NoError(err)
 	s.Require().Len(desc, 4)
 	s.Require().Equal(

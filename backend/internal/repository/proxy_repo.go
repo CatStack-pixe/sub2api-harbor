@@ -41,7 +41,8 @@ func (r *proxyRepository) Create(ctx context.Context, proxyIn *service.Proxy) er
 		SetPort(proxyIn.Port).
 		SetStatus(proxyIn.Status).
 		SetFallbackMode(proxyIn.FallbackMode).
-		SetExpiryWarnDays(proxyIn.ExpiryWarnDays)
+		SetExpiryWarnDays(proxyIn.ExpiryWarnDays).
+		SetNillableProxyGroupID(proxyIn.ProxyGroupID)
 	if proxyIn.Username != "" {
 		builder.SetUsername(proxyIn.Username)
 	}
@@ -63,7 +64,10 @@ func (r *proxyRepository) Create(ctx context.Context, proxyIn *service.Proxy) er
 }
 
 func (r *proxyRepository) GetByID(ctx context.Context, id int64) (*service.Proxy, error) {
-	m, err := r.client.Proxy.Get(ctx, id)
+	m, err := r.client.Proxy.Query().
+		Where(proxy.IDEQ(id)).
+		WithProxyGroup().
+		Only(ctx)
 	if err != nil {
 		if dbent.IsNotFound(err) {
 			return nil, service.ErrProxyNotFound
@@ -80,6 +84,7 @@ func (r *proxyRepository) ListByIDs(ctx context.Context, ids []int64) ([]service
 
 	proxies, err := r.client.Proxy.Query().
 		Where(proxy.IDIn(ids...)).
+		WithProxyGroup().
 		All(ctx)
 	if err != nil {
 		return nil, err
@@ -156,6 +161,11 @@ func updateProxyAndInvalidateProbeSnapshots(ctx context.Context, client *dbent.C
 		SetStatus(proxyIn.Status).
 		SetFallbackMode(proxyIn.FallbackMode).
 		SetExpiryWarnDays(proxyIn.ExpiryWarnDays)
+	if proxyIn.ProxyGroupID != nil {
+		builder.SetProxyGroupID(*proxyIn.ProxyGroupID)
+	} else {
+		builder.ClearProxyGroupID()
+	}
 	if proxyIn.Username != "" {
 		builder.SetUsername(proxyIn.Username)
 	} else {
@@ -279,21 +289,12 @@ func (r *proxyRepository) Delete(ctx context.Context, id int64) error {
 }
 
 func (r *proxyRepository) List(ctx context.Context, params pagination.PaginationParams) ([]service.Proxy, *pagination.PaginationResult, error) {
-	return r.ListWithFilters(ctx, params, "", "", "")
+	return r.ListWithFilters(ctx, params, service.ProxyListFilters{})
 }
 
-// ListWithFilters lists proxies with optional filtering by protocol, status, and search query
-func (r *proxyRepository) ListWithFilters(ctx context.Context, params pagination.PaginationParams, protocol, status, search string) ([]service.Proxy, *pagination.PaginationResult, error) {
-	q := r.client.Proxy.Query()
-	if protocol != "" {
-		q = q.Where(proxy.ProtocolEQ(protocol))
-	}
-	if status != "" {
-		q = q.Where(proxy.StatusEQ(status))
-	}
-	if search != "" {
-		q = q.Where(proxy.NameContainsFold(search))
-	}
+// ListWithFilters lists proxies with optional protocol, status, search, and group filters.
+func (r *proxyRepository) ListWithFilters(ctx context.Context, params pagination.PaginationParams, filters service.ProxyListFilters) ([]service.Proxy, *pagination.PaginationResult, error) {
+	q := applyProxyListFilters(r.client.Proxy.Query(), filters)
 
 	total, err := q.Count(ctx)
 	if err != nil {
@@ -302,7 +303,8 @@ func (r *proxyRepository) ListWithFilters(ctx context.Context, params pagination
 
 	proxiesQuery := q.
 		Offset(params.Offset()).
-		Limit(params.Limit())
+		Limit(params.Limit()).
+		WithProxyGroup()
 	for _, order := range proxyListOrder(params) {
 		proxiesQuery = proxiesQuery.Order(order)
 	}
@@ -321,17 +323,8 @@ func (r *proxyRepository) ListWithFilters(ctx context.Context, params pagination
 }
 
 // ListWithFiltersAndAccountCount lists proxies with filters and includes account count per proxy
-func (r *proxyRepository) ListWithFiltersAndAccountCount(ctx context.Context, params pagination.PaginationParams, protocol, status, search string) ([]service.ProxyWithAccountCount, *pagination.PaginationResult, error) {
-	q := r.client.Proxy.Query()
-	if protocol != "" {
-		q = q.Where(proxy.ProtocolEQ(protocol))
-	}
-	if status != "" {
-		q = q.Where(proxy.StatusEQ(status))
-	}
-	if search != "" {
-		q = q.Where(proxy.NameContainsFold(search))
-	}
+func (r *proxyRepository) ListWithFiltersAndAccountCount(ctx context.Context, params pagination.PaginationParams, filters service.ProxyListFilters) ([]service.ProxyWithAccountCount, *pagination.PaginationResult, error) {
+	q := applyProxyListFilters(r.client.Proxy.Query(), filters)
 
 	total, err := q.Count(ctx)
 	if err != nil {
@@ -344,7 +337,8 @@ func (r *proxyRepository) ListWithFiltersAndAccountCount(ctx context.Context, pa
 
 	proxiesQuery := q.
 		Offset(params.Offset()).
-		Limit(params.Limit())
+		Limit(params.Limit()).
+		WithProxyGroup()
 	for _, order := range proxyListOrder(params) {
 		proxiesQuery = proxiesQuery.Order(order)
 	}
@@ -360,6 +354,7 @@ func (r *proxyRepository) ListWithFiltersAndAccountCount(ctx context.Context, pa
 func (r *proxyRepository) listWithAccountCountSort(ctx context.Context, q *dbent.ProxyQuery, params pagination.PaginationParams, total int) ([]service.ProxyWithAccountCount, *pagination.PaginationResult, error) {
 	proxies, err := q.
 		Order(dbent.Desc(proxy.FieldID)).
+		WithProxyGroup().
 		All(ctx)
 	if err != nil {
 		return nil, nil, err
@@ -435,9 +430,31 @@ func proxyListOrder(params pagination.PaginationParams) []func(*entsql.Selector)
 	return []func(*entsql.Selector){dbent.Desc(field), dbent.Desc(proxy.FieldID)}
 }
 
+func applyProxyListFilters(q *dbent.ProxyQuery, filters service.ProxyListFilters) *dbent.ProxyQuery {
+	if filters.Protocol != "" {
+		q = q.Where(proxy.ProtocolEQ(filters.Protocol))
+	}
+	if filters.Status != "" {
+		q = q.Where(proxy.StatusEQ(filters.Status))
+	}
+	if filters.Search != "" {
+		q = q.Where(proxy.Or(
+			proxy.NameContainsFold(filters.Search),
+			proxy.HostContainsFold(filters.Search),
+		))
+	}
+	if filters.ProxyGroupID != nil {
+		q = q.Where(proxy.ProxyGroupIDEQ(*filters.ProxyGroupID))
+	} else if filters.Ungrouped {
+		q = q.Where(proxy.ProxyGroupIDIsNil())
+	}
+	return q
+}
+
 func (r *proxyRepository) ListActive(ctx context.Context) ([]service.Proxy, error) {
 	proxies, err := r.client.Proxy.Query().
 		Where(proxy.StatusEQ(service.StatusActive)).
+		WithProxyGroup().
 		All(ctx)
 	if err != nil {
 		return nil, err
@@ -552,6 +569,7 @@ func (r *proxyRepository) ListActiveWithAccountCount(ctx context.Context) ([]ser
 	proxies, err := r.client.Proxy.Query().
 		Where(proxy.StatusEQ(service.StatusActive)).
 		Order(dbent.Desc(proxy.FieldCreatedAt)).
+		WithProxyGroup().
 		All(ctx)
 	if err != nil {
 		return nil, err
@@ -596,6 +614,10 @@ func proxyEntityToService(m *dbent.Proxy) *service.Proxy {
 		FallbackMode:   m.FallbackMode,
 		BackupProxyID:  m.BackupProxyID,
 		ExpiryWarnDays: m.ExpiryWarnDays,
+		ProxyGroupID:   m.ProxyGroupID,
+	}
+	if m.Edges.ProxyGroup != nil {
+		out.ProxyGroupName = m.Edges.ProxyGroup.Name
 	}
 	if m.Username != nil {
 		out.Username = *m.Username
@@ -613,11 +635,15 @@ func applyProxyEntityToService(dst *service.Proxy, src *dbent.Proxy) {
 	dst.ID = src.ID
 	dst.CreatedAt = src.CreatedAt
 	dst.UpdatedAt = src.UpdatedAt
+	dst.ProxyGroupID = src.ProxyGroupID
+	if src.Edges.ProxyGroup != nil {
+		dst.ProxyGroupName = src.Edges.ProxyGroup.Name
+	}
 }
 
 // ListAllForFallback 返回所有代理（含过期/非活跃），供改投逻辑使用。
 func (r *proxyRepository) ListAllForFallback(ctx context.Context) ([]service.Proxy, error) {
-	proxies, err := r.client.Proxy.Query().All(ctx)
+	proxies, err := r.client.Proxy.Query().WithProxyGroup().All(ctx)
 	if err != nil {
 		return nil, err
 	}
