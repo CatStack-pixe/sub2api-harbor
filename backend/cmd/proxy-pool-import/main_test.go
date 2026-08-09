@@ -137,6 +137,7 @@ func TestWriteImportSQLUsesLockedInsertOnlyTransaction(t *testing.T) {
 	require.Contains(t, sql, "pg_advisory_xact_lock")
 	require.Contains(t, sql, "LOCK TABLE proxy_groups, proxies IN SHARE ROW EXCLUSIVE MODE")
 	require.Contains(t, sql, "\\copy proxy_pool_import_stage")
+	require.Contains(t, sql, "FORCE_NOT_NULL (username, password)")
 	require.Contains(t, sql, "COALESCE(p.username, '') = s.username")
 	require.Contains(t, sql, "created + result.skipped")
 	require.Contains(t, sql, "COMMIT;")
