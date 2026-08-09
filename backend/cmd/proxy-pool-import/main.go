@@ -200,9 +200,9 @@ func readSharedStrings(files []*zip.File) ([]string, error) {
 	values := make([]string, 0, len(table.Items))
 	for _, item := range table.Items {
 		var value strings.Builder
-		value.WriteString(item.Text)
+		_, _ = value.WriteString(item.Text)
 		for _, run := range item.Runs {
-			value.WriteString(run.Text)
+			_, _ = value.WriteString(run.Text)
 		}
 		values = append(values, value.String())
 	}

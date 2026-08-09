@@ -41,6 +41,28 @@ jobs:
         working-directory: backend
         run: make test-integration
 
+  proxy-pool-import:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: backend/go.mod
+          check-latest: false
+          cache: true
+          cache-dependency-path: backend/go.sum
+      - name: Build controlled proxy pool importer
+        working-directory: backend
+        run: go build -trimpath -o proxy-pool-import ./cmd/proxy-pool-import
+      - name: Upload proxy pool importer
+        uses: actions/upload-artifact@v4
+        with:
+          name: proxy-pool-import-linux-amd64
+          path: backend/proxy-pool-import
+          if-no-files-found: error
+          retention-days: 7
+
   frontend:
     runs-on: ubuntu-latest
     steps:

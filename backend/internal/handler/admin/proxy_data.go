@@ -182,11 +182,11 @@ func (h *ProxyHandler) ImportData(c *gin.Context) {
 					}
 				}
 				updateInput := &service.UpdateProxyInput{
-					Status:          normalizedStatus,
-					ExpiresAt:       existingExpiresAt,
-					FallbackMode:    existingFallbackMode,
-					BackupProxyID:   existingBackupProxyID,
-					ExpiryWarnDays:  item.ExpiryWarnDays,
+					Status:         normalizedStatus,
+					ExpiresAt:      existingExpiresAt,
+					FallbackMode:   existingFallbackMode,
+					BackupProxyID:  existingBackupProxyID,
+					ExpiryWarnDays: item.ExpiryWarnDays,
 					// 保留已存在代理的网络配置字段
 					Name:            existing.Name,
 					Protocol:        existing.Protocol,

@@ -34,10 +34,6 @@ func TestProxyGroupRepoSuite(t *testing.T) {
 func (s *ProxyGroupRepoSuite) TestCRUDCountsAndCaseInsensitiveUniqueName() {
 	group := s.createGroup("Primary")
 
-	duplicate := &service.ProxyGroup{Name: " primary "}
-	err := s.groupRepo.Create(s.ctx, duplicate)
-	s.Require().ErrorIs(err, service.ErrProxyGroupExists)
-
 	s.createProxy("active", "active.example.test", service.StatusActive, &group.ID)
 	s.createProxy("inactive", "inactive.example.test", "inactive", &group.ID)
 	s.createProxy("expired", "expired.example.test", service.StatusExpired, &group.ID)
@@ -54,6 +50,11 @@ func (s *ProxyGroupRepoSuite) TestCRUDCountsAndCaseInsensitiveUniqueName() {
 	byName, err := s.groupRepo.GetByName(s.ctx, "renamed")
 	s.Require().NoError(err)
 	s.Require().Equal(group.ID, byName.ID)
+
+	// A unique-constraint error aborts the suite transaction, so assert it last.
+	duplicate := &service.ProxyGroup{Name: " renamed "}
+	err = s.groupRepo.Create(s.ctx, duplicate)
+	s.Require().ErrorIs(err, service.ErrProxyGroupExists)
 }
 
 func (s *ProxyGroupRepoSuite) TestListFiltersByGroupUngroupedAndHost() {

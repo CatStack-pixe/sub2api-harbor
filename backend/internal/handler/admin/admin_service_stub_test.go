@@ -19,7 +19,6 @@ type stubAdminService struct {
 	schedulerScoreFilterCalls           int
 	openAISchedulerScorePoolCalls       int
 	proxies                             []service.Proxy
-	proxyGroups                         []service.ProxyGroup
 	proxyCounts                         []service.ProxyWithAccountCount
 	redeems                             []service.RedeemCode
 	boundAuthIdentity                   *service.AdminBindAuthIdentityInput
