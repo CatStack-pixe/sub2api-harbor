@@ -76,10 +76,10 @@ func (m *mockProxyRepoForOAuth) Delete(ctx context.Context, id int64) error {
 func (m *mockProxyRepoForOAuth) List(ctx context.Context, params pagination.PaginationParams) ([]Proxy, *pagination.PaginationResult, error) {
 	panic("List not implemented")
 }
-func (m *mockProxyRepoForOAuth) ListWithFilters(ctx context.Context, params pagination.PaginationParams, protocol, status, search string) ([]Proxy, *pagination.PaginationResult, error) {
+func (m *mockProxyRepoForOAuth) ListWithFilters(ctx context.Context, params pagination.PaginationParams, filters ProxyListFilters) ([]Proxy, *pagination.PaginationResult, error) {
 	panic("ListWithFilters not implemented")
 }
-func (m *mockProxyRepoForOAuth) ListWithFiltersAndAccountCount(ctx context.Context, params pagination.PaginationParams, protocol, status, search string) ([]ProxyWithAccountCount, *pagination.PaginationResult, error) {
+func (m *mockProxyRepoForOAuth) ListWithFiltersAndAccountCount(ctx context.Context, params pagination.PaginationParams, filters ProxyListFilters) ([]ProxyWithAccountCount, *pagination.PaginationResult, error) {
 	panic("ListWithFiltersAndAccountCount not implemented")
 }
 func (m *mockProxyRepoForOAuth) ListActive(ctx context.Context) ([]Proxy, error) {

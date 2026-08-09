@@ -2,6 +2,7 @@ package admin
 
 import (
 	"context"
+	"encoding/json"
 	"strconv"
 	"strings"
 	"time"
@@ -15,13 +16,16 @@ import (
 
 // ProxyHandler handles admin proxy management
 type ProxyHandler struct {
-	adminService service.AdminService
+	adminService      service.AdminService
+	proxyGroupService service.ProxyGroupAdminService
 }
 
 // NewProxyHandler creates a new admin proxy handler
 func NewProxyHandler(adminService service.AdminService) *ProxyHandler {
+	proxyGroupService, _ := adminService.(service.ProxyGroupAdminService)
 	return &ProxyHandler{
-		adminService: adminService,
+		adminService:      adminService,
+		proxyGroupService: proxyGroupService,
 	}
 }
 
@@ -37,39 +41,56 @@ type CreateProxyRequest struct {
 	FallbackMode   string `json:"fallback_mode" binding:"omitempty,oneof=none proxy direct"`
 	BackupProxyID  *int64 `json:"backup_proxy_id"`
 	ExpiryWarnDays int    `json:"expiry_warn_days" binding:"omitempty,min=0"`
+	ProxyGroupID   *int64 `json:"proxy_group_id"`
 }
 
 // UpdateProxyRequest represents update proxy request
 type UpdateProxyRequest struct {
-	Name           string `json:"name"`
-	Protocol       string `json:"protocol" binding:"omitempty,oneof=http https socks5 socks5h"`
-	Host           string `json:"host"`
-	Port           int    `json:"port" binding:"omitempty,min=1,max=65535"`
-	Username       string `json:"username"`
-	Password       string `json:"password"`
-	Status         string `json:"status" binding:"omitempty,oneof=active inactive"`
-	ExpiresAt      *int64 `json:"expires_at"`
-	FallbackMode   string `json:"fallback_mode" binding:"omitempty,oneof=none proxy direct"`
-	BackupProxyID  *int64 `json:"backup_proxy_id"`
-	ExpiryWarnDays int    `json:"expiry_warn_days" binding:"omitempty,min=0"`
+	Name            string `json:"name"`
+	Protocol        string `json:"protocol" binding:"omitempty,oneof=http https socks5 socks5h"`
+	Host            string `json:"host"`
+	Port            int    `json:"port" binding:"omitempty,min=1,max=65535"`
+	Username        string `json:"username"`
+	Password        string `json:"password"`
+	Status          string `json:"status" binding:"omitempty,oneof=active inactive"`
+	ExpiresAt       *int64 `json:"expires_at"`
+	FallbackMode    string `json:"fallback_mode" binding:"omitempty,oneof=none proxy direct"`
+	BackupProxyID   *int64 `json:"backup_proxy_id"`
+	ExpiryWarnDays  int    `json:"expiry_warn_days" binding:"omitempty,min=0"`
+	ProxyGroupID    *int64 `json:"proxy_group_id"`
+	ProxyGroupIDSet bool   `json:"-"`
+}
+
+// UnmarshalJSON preserves the difference between an omitted proxy_group_id
+// (leave the current group unchanged) and an explicit null (clear the group).
+func (r *UpdateProxyRequest) UnmarshalJSON(data []byte) error {
+	type plainUpdateProxyRequest UpdateProxyRequest
+	var decoded plainUpdateProxyRequest
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(data, &fields); err != nil {
+		return err
+	}
+	*r = UpdateProxyRequest(decoded)
+	_, r.ProxyGroupIDSet = fields["proxy_group_id"]
+	return nil
 }
 
 // List handles listing all proxies with pagination
 // GET /api/v1/admin/proxies
 func (h *ProxyHandler) List(c *gin.Context) {
 	page, pageSize := response.ParsePagination(c)
-	protocol := c.Query("protocol")
-	status := c.Query("status")
-	search := c.Query("search")
+	filters, err := parseProxyListFilters(c)
+	if err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
 	sortBy := c.DefaultQuery("sort_by", "id")
 	sortOrder := c.DefaultQuery("sort_order", "desc")
 	// 标准化和验证 search 参数
-	search = strings.TrimSpace(search)
-	if len(search) > 100 {
-		search = search[:100]
-	}
-
-	proxies, total, err := h.adminService.ListProxiesWithAccountCount(c.Request.Context(), page, pageSize, protocol, status, search, sortBy, sortOrder)
+	proxies, total, err := h.adminService.ListProxiesWithAccountCount(c.Request.Context(), page, pageSize, filters, sortBy, sortOrder)
 	if err != nil {
 		response.ErrorFrom(c, err)
 		return
@@ -159,6 +180,7 @@ func (h *ProxyHandler) Create(c *gin.Context) {
 			FallbackMode:   strings.TrimSpace(req.FallbackMode),
 			BackupProxyID:  req.BackupProxyID,
 			ExpiryWarnDays: req.ExpiryWarnDays,
+			ProxyGroupID:   req.ProxyGroupID,
 		})
 		if err != nil {
 			return nil, err
@@ -188,17 +210,19 @@ func (h *ProxyHandler) Update(c *gin.Context) {
 		expiresAt = &t
 	}
 	proxy, err := h.adminService.UpdateProxy(c.Request.Context(), proxyID, &service.UpdateProxyInput{
-		Name:           strings.TrimSpace(req.Name),
-		Protocol:       strings.TrimSpace(req.Protocol),
-		Host:           strings.TrimSpace(req.Host),
-		Port:           req.Port,
-		Username:       strings.TrimSpace(req.Username),
-		Password:       strings.TrimSpace(req.Password),
-		Status:         strings.TrimSpace(req.Status),
-		ExpiresAt:      expiresAt,
-		FallbackMode:   strings.TrimSpace(req.FallbackMode),
-		BackupProxyID:  req.BackupProxyID,
-		ExpiryWarnDays: req.ExpiryWarnDays,
+		Name:            strings.TrimSpace(req.Name),
+		Protocol:        strings.TrimSpace(req.Protocol),
+		Host:            strings.TrimSpace(req.Host),
+		Port:            req.Port,
+		Username:        strings.TrimSpace(req.Username),
+		Password:        strings.TrimSpace(req.Password),
+		Status:          strings.TrimSpace(req.Status),
+		ExpiresAt:       expiresAt,
+		FallbackMode:    strings.TrimSpace(req.FallbackMode),
+		BackupProxyID:   req.BackupProxyID,
+		ExpiryWarnDays:  req.ExpiryWarnDays,
+		ProxyGroupID:    req.ProxyGroupID,
+		ProxyGroupIDSet: req.ProxyGroupIDSet,
 	})
 	if err != nil {
 		response.ErrorFrom(c, err)
@@ -246,6 +270,27 @@ func (h *ProxyHandler) BatchDelete(c *gin.Context) {
 	}
 
 	response.Success(c, result)
+}
+
+// BatchGroup moves proxies to a group, or to the ungrouped pool when proxy_group_id is null.
+// POST /api/v1/admin/proxies/batch-group
+func (h *ProxyHandler) BatchGroup(c *gin.Context) {
+	type batchGroupRequest struct {
+		IDs          []int64 `json:"ids" binding:"required"`
+		ProxyGroupID *int64  `json:"proxy_group_id"`
+	}
+
+	var req batchGroupRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "Invalid request: "+err.Error())
+		return
+	}
+	updated, err := h.proxyGroupService.BatchGroupProxies(c.Request.Context(), req.IDs, req.ProxyGroupID)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, gin.H{"updated": updated})
 }
 
 // Test handles testing proxy connectivity

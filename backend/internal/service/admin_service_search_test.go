@@ -76,12 +76,12 @@ type proxyRepoStubForAdminList struct {
 	listWithFiltersAndAccountCountErr      error
 }
 
-func (s *proxyRepoStubForAdminList) ListWithFilters(_ context.Context, params pagination.PaginationParams, protocol, status, search string) ([]Proxy, *pagination.PaginationResult, error) {
+func (s *proxyRepoStubForAdminList) ListWithFilters(_ context.Context, params pagination.PaginationParams, filters ProxyListFilters) ([]Proxy, *pagination.PaginationResult, error) {
 	s.listWithFiltersCalls++
 	s.listWithFiltersParams = params
-	s.listWithFiltersProtocol = protocol
-	s.listWithFiltersStatus = status
-	s.listWithFiltersSearch = search
+	s.listWithFiltersProtocol = filters.Protocol
+	s.listWithFiltersStatus = filters.Status
+	s.listWithFiltersSearch = filters.Search
 
 	if s.listWithFiltersErr != nil {
 		return nil, nil, s.listWithFiltersErr
@@ -99,12 +99,12 @@ func (s *proxyRepoStubForAdminList) ListWithFilters(_ context.Context, params pa
 	return s.listWithFiltersProxies, result, nil
 }
 
-func (s *proxyRepoStubForAdminList) ListWithFiltersAndAccountCount(_ context.Context, params pagination.PaginationParams, protocol, status, search string) ([]ProxyWithAccountCount, *pagination.PaginationResult, error) {
+func (s *proxyRepoStubForAdminList) ListWithFiltersAndAccountCount(_ context.Context, params pagination.PaginationParams, filters ProxyListFilters) ([]ProxyWithAccountCount, *pagination.PaginationResult, error) {
 	s.listWithFiltersAndAccountCountCalls++
 	s.listWithFiltersAndAccountCountParams = params
-	s.listWithFiltersAndAccountCountProtocol = protocol
-	s.listWithFiltersAndAccountCountStatus = status
-	s.listWithFiltersAndAccountCountSearch = search
+	s.listWithFiltersAndAccountCountProtocol = filters.Protocol
+	s.listWithFiltersAndAccountCountStatus = filters.Status
+	s.listWithFiltersAndAccountCountSearch = filters.Search
 
 	if s.listWithFiltersAndAccountCountErr != nil {
 		return nil, nil, s.listWithFiltersAndAccountCountErr
@@ -212,7 +212,7 @@ func TestAdminService_ListProxies_WithSearch(t *testing.T) {
 		}
 		svc := &adminServiceImpl{proxyRepo: repo}
 
-		proxies, total, err := svc.ListProxies(context.Background(), 3, 50, "http", StatusActive, "p1", "name", "ASC")
+		proxies, total, err := svc.ListProxies(context.Background(), 3, 50, ProxyListFilters{Protocol: "http", Status: StatusActive, Search: "p1"}, "name", "ASC")
 		require.NoError(t, err)
 		require.Equal(t, int64(7), total)
 		require.Equal(t, []Proxy{{ID: 2, Name: "p1"}}, proxies)
@@ -233,7 +233,11 @@ func TestAdminService_ListProxiesWithAccountCount_WithSearch(t *testing.T) {
 		}
 		svc := &adminServiceImpl{proxyRepo: repo}
 
-		proxies, total, err := svc.ListProxiesWithAccountCount(context.Background(), 2, 10, "socks5", StatusDisabled, "p2", "account_count", "DESC")
+		proxies, total, err := svc.ListProxiesWithAccountCount(context.Background(), 2, 10, ProxyListFilters{
+			Protocol: "socks5",
+			Status:   StatusDisabled,
+			Search:   "p2",
+		}, "account_count", "DESC")
 		require.NoError(t, err)
 		require.Equal(t, int64(9), total)
 		require.Equal(t, []ProxyWithAccountCount{{Proxy: Proxy{ID: 3, Name: "p2"}, AccountCount: 5}}, proxies)

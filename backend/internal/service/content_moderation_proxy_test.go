@@ -53,11 +53,11 @@ func (r *contentModerationTestProxyRepo) List(ctx context.Context, params pagina
 	panic("not implemented")
 }
 
-func (r *contentModerationTestProxyRepo) ListWithFilters(ctx context.Context, params pagination.PaginationParams, protocol, status, search string) ([]Proxy, *pagination.PaginationResult, error) {
+func (r *contentModerationTestProxyRepo) ListWithFilters(ctx context.Context, params pagination.PaginationParams, filters ProxyListFilters) ([]Proxy, *pagination.PaginationResult, error) {
 	panic("not implemented")
 }
 
-func (r *contentModerationTestProxyRepo) ListWithFiltersAndAccountCount(ctx context.Context, params pagination.PaginationParams, protocol, status, search string) ([]ProxyWithAccountCount, *pagination.PaginationResult, error) {
+func (r *contentModerationTestProxyRepo) ListWithFiltersAndAccountCount(ctx context.Context, params pagination.PaginationParams, filters ProxyListFilters) ([]ProxyWithAccountCount, *pagination.PaginationResult, error) {
 	panic("not implemented")
 }
 

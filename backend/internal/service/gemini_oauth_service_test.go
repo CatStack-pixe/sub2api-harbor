@@ -786,10 +786,10 @@ func (m *mockGeminiProxyRepo) Delete(ctx context.Context, id int64) error     { 
 func (m *mockGeminiProxyRepo) List(ctx context.Context, params pagination.PaginationParams) ([]Proxy, *pagination.PaginationResult, error) {
 	panic("not impl")
 }
-func (m *mockGeminiProxyRepo) ListWithFilters(ctx context.Context, params pagination.PaginationParams, protocol, status, search string) ([]Proxy, *pagination.PaginationResult, error) {
+func (m *mockGeminiProxyRepo) ListWithFilters(ctx context.Context, params pagination.PaginationParams, filters ProxyListFilters) ([]Proxy, *pagination.PaginationResult, error) {
 	panic("not impl")
 }
-func (m *mockGeminiProxyRepo) ListWithFiltersAndAccountCount(ctx context.Context, params pagination.PaginationParams, protocol, status, search string) ([]ProxyWithAccountCount, *pagination.PaginationResult, error) {
+func (m *mockGeminiProxyRepo) ListWithFiltersAndAccountCount(ctx context.Context, params pagination.PaginationParams, filters ProxyListFilters) ([]ProxyWithAccountCount, *pagination.PaginationResult, error) {
 	panic("not impl")
 }
 func (m *mockGeminiProxyRepo) ListActive(ctx context.Context) ([]Proxy, error) { panic("not impl") }

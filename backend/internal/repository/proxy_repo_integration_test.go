@@ -108,7 +108,7 @@ func (s *ProxyRepoSuite) TestListWithFilters_Protocol() {
 	s.mustCreateProxy(&service.Proxy{Name: "p1", Protocol: "http", Host: "127.0.0.1", Port: 8080, Status: service.StatusActive})
 	s.mustCreateProxy(&service.Proxy{Name: "p2", Protocol: "socks5", Host: "127.0.0.1", Port: 8081, Status: service.StatusActive})
 
-	proxies, _, err := s.repo.ListWithFilters(s.ctx, pagination.PaginationParams{Page: 1, PageSize: 10}, "socks5", "", "")
+	proxies, _, err := s.repo.ListWithFilters(s.ctx, pagination.PaginationParams{Page: 1, PageSize: 10}, service.ProxyListFilters{Protocol: "socks5"})
 	s.Require().NoError(err)
 	s.Require().Len(proxies, 1)
 	s.Require().Equal("socks5", proxies[0].Protocol)
@@ -118,7 +118,7 @@ func (s *ProxyRepoSuite) TestListWithFilters_Status() {
 	s.mustCreateProxy(&service.Proxy{Name: "p1", Protocol: "http", Host: "127.0.0.1", Port: 8080, Status: service.StatusActive})
 	s.mustCreateProxy(&service.Proxy{Name: "p2", Protocol: "http", Host: "127.0.0.1", Port: 8081, Status: service.StatusDisabled})
 
-	proxies, _, err := s.repo.ListWithFilters(s.ctx, pagination.PaginationParams{Page: 1, PageSize: 10}, "", service.StatusDisabled, "")
+	proxies, _, err := s.repo.ListWithFilters(s.ctx, pagination.PaginationParams{Page: 1, PageSize: 10}, service.ProxyListFilters{Status: service.StatusDisabled})
 	s.Require().NoError(err)
 	s.Require().Len(proxies, 1)
 	s.Require().Equal(service.StatusDisabled, proxies[0].Status)
@@ -128,7 +128,7 @@ func (s *ProxyRepoSuite) TestListWithFilters_Search() {
 	s.mustCreateProxy(&service.Proxy{Name: "production-proxy", Protocol: "http", Host: "127.0.0.1", Port: 8080, Status: service.StatusActive})
 	s.mustCreateProxy(&service.Proxy{Name: "dev-proxy", Protocol: "http", Host: "127.0.0.1", Port: 8081, Status: service.StatusActive})
 
-	proxies, _, err := s.repo.ListWithFilters(s.ctx, pagination.PaginationParams{Page: 1, PageSize: 10}, "", "", "prod")
+	proxies, _, err := s.repo.ListWithFilters(s.ctx, pagination.PaginationParams{Page: 1, PageSize: 10}, service.ProxyListFilters{Search: "prod"})
 	s.Require().NoError(err)
 	s.Require().Len(proxies, 1)
 	s.Require().Contains(proxies[0].Name, "production")

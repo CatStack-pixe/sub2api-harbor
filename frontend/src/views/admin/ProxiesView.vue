@@ -35,6 +35,15 @@
               @change="loadProxies"
             />
           </div>
+          <div class="w-full sm:w-52">
+            <Select
+              v-model="filters.proxy_group"
+              :options="proxyGroupFilterOptions"
+              :placeholder="t('admin.proxies.allProxyGroups')"
+              data-testid="proxy-group-list-filter"
+              @change="handleProxyGroupFilterChange"
+            />
+          </div>
 
           <!-- Right: All action buttons -->
           <div class="flex flex-1 flex-wrap items-center justify-end gap-2">
@@ -51,6 +60,7 @@
               :disabled="batchTesting || loading"
               class="btn btn-secondary"
               :title="t('admin.proxies.testConnection')"
+              data-testid="proxy-page-batch-test"
             >
               <Icon name="play" size="md" class="mr-2" />
               {{ t('admin.proxies.testConnection') }}
@@ -63,6 +73,16 @@
             >
               <Icon name="shield" size="md" class="mr-2" :class="batchQualityChecking ? 'animate-pulse' : ''" />
               {{ t('admin.proxies.batchQualityCheck') }}
+            </button>
+            <button
+              @click="showBatchGroupDialog = true"
+              :disabled="selectedCount === 0"
+              class="btn btn-secondary"
+              :title="t('admin.proxies.batchMove')"
+              data-testid="proxy-batch-move-open"
+            >
+              <Icon name="swap" size="md" class="mr-2" />
+              {{ t('admin.proxies.batchMove') }}
             </button>
             <button
               @click="openBatchDelete"
@@ -79,7 +99,16 @@
             <button @click="showExportDataDialog = true" class="btn btn-secondary">
               {{ selectedCount > 0 ? t('admin.proxies.dataExportSelected') : t('admin.proxies.dataExport') }}
             </button>
-            <button @click="showCreateModal = true" class="btn btn-primary">
+            <button
+              @click="showProxyGroupManager = true"
+              class="btn btn-secondary"
+              :title="t('admin.proxies.proxyGroups.manageTitle')"
+              data-testid="proxy-group-manage-open"
+            >
+              <Icon name="cog" size="md" class="mr-2" />
+              {{ t('admin.proxies.manageGroups') }}
+            </button>
+            <button @click="showCreateModal = true" class="btn btn-primary" data-testid="proxy-create-open">
               <Icon name="plus" size="md" class="mr-2" />
               {{ t('admin.proxies.createProxy') }}
             </button>
@@ -120,6 +149,13 @@
 
           <template #cell-name="{ value }">
             <span class="font-medium text-gray-900 dark:text-white">{{ value }}</span>
+          </template>
+
+          <template #cell-proxy_group_name="{ row }">
+            <span v-if="row.proxy_group_name" class="badge badge-primary" data-testid="proxy-group-badge">
+              {{ row.proxy_group_name }}
+            </span>
+            <span v-else class="badge badge-gray">{{ t('admin.proxies.ungrouped') }}</span>
           </template>
 
           <template #cell-protocol="{ value }">
@@ -438,6 +474,14 @@
           />
         </div>
         <div>
+          <label class="input-label">{{ t('admin.proxies.proxyGroup') }}</label>
+          <Select
+            v-model="createForm.proxy_group_id"
+            :options="proxyGroupAssignmentOptions"
+            data-testid="proxy-create-group"
+          />
+        </div>
+        <div>
           <label class="input-label">{{ t('admin.proxies.protocol') }}</label>
           <Select v-model="createForm.protocol" :options="protocolSelectOptions" />
         </div>
@@ -678,6 +722,14 @@
           <input v-model="editForm.name" type="text" required class="input" />
         </div>
         <div>
+          <label class="input-label">{{ t('admin.proxies.proxyGroup') }}</label>
+          <Select
+            v-model="editForm.proxy_group_id"
+            :options="proxyGroupAssignmentOptions"
+            data-testid="proxy-edit-group"
+          />
+        </div>
+        <div>
           <label class="input-label">{{ t('admin.proxies.protocol') }}</label>
           <Select v-model="editForm.protocol" :options="protocolSelectOptions" />
         </div>
@@ -800,6 +852,50 @@
         </div>
       </template>
     </BaseDialog>
+
+    <BaseDialog
+      :show="showBatchGroupDialog"
+      :title="t('admin.proxies.batchMoveTitle')"
+      width="narrow"
+      @close="closeBatchGroupDialog"
+    >
+      <div class="space-y-4">
+        <p class="text-sm text-gray-600 dark:text-gray-300">
+          {{ t('admin.proxies.batchMoveDescription', { count: selectedCount }) }}
+        </p>
+        <div>
+          <label class="input-label">{{ t('admin.proxies.proxyGroup') }}</label>
+          <Select
+            v-model="batchGroupTargetId"
+            :options="proxyGroupAssignmentOptions"
+            data-testid="proxy-batch-group-target"
+          />
+        </div>
+      </div>
+      <template #footer>
+        <div class="flex justify-end gap-3">
+          <button type="button" class="btn btn-secondary" @click="closeBatchGroupDialog">
+            {{ t('common.cancel') }}
+          </button>
+          <button
+            type="button"
+            class="btn btn-primary"
+            :disabled="batchGrouping"
+            data-testid="proxy-batch-group-submit"
+            @click="handleBatchGroup"
+          >
+            {{ batchGrouping ? t('admin.proxies.moving') : t('admin.proxies.move') }}
+          </button>
+        </div>
+      </template>
+    </BaseDialog>
+
+    <ProxyGroupManageDialog
+      :show="showProxyGroupManager"
+      :groups="proxyGroups"
+      @close="showProxyGroupManager = false"
+      @changed="handleProxyGroupsChanged"
+    />
 
     <!-- Delete Confirmation Dialog -->
     <ConfirmDialog
@@ -968,7 +1064,13 @@ import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
 import { adminAPI } from '@/api/admin'
-import type { Proxy, ProxyAccountSummary, ProxyProtocol, ProxyQualityCheckResult } from '@/types'
+import type {
+  Proxy,
+  ProxyAccountSummary,
+  ProxyGroup,
+  ProxyProtocol,
+  ProxyQualityCheckResult
+} from '@/types'
 import type { Column } from '@/components/common/types'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import TablePageLayout from '@/components/layout/TablePageLayout.vue'
@@ -978,6 +1080,7 @@ import BaseDialog from '@/components/common/BaseDialog.vue'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
 import ImportDataModal from '@/components/admin/proxy/ImportDataModal.vue'
+import ProxyGroupManageDialog from '@/components/admin/proxy/ProxyGroupManageDialog.vue'
 import Select from '@/components/common/Select.vue'
 import ProxyAdBanner from '@/components/common/ProxyAdBanner.vue'
 import Icon from '@/components/icons/Icon.vue'
@@ -996,6 +1099,7 @@ const { copyToClipboard } = useClipboard()
 const columns = computed<Column[]>(() => [
   { key: 'select', label: '', sortable: false },
   { key: 'name', label: t('admin.proxies.columns.name'), sortable: true },
+  { key: 'proxy_group_name', label: t('admin.proxies.columns.group'), sortable: false },
   { key: 'protocol', label: t('admin.proxies.columns.protocol'), sortable: true },
   { key: 'address', label: t('admin.proxies.columns.address'), sortable: false },
   { key: 'auth', label: t('admin.proxies.columns.auth'), sortable: false },
@@ -1024,6 +1128,20 @@ const statusOptions = computed(() => [
   { value: 'expired', label: t('admin.proxies.expired') }
 ])
 
+const proxyGroupFilterOptions = computed(() => [
+  { value: '', label: t('admin.proxies.allProxyGroups') },
+  { value: 'ungrouped', label: t('admin.proxies.ungrouped') },
+  ...proxyGroups.value.map((group) => ({
+    value: String(group.id),
+    label: `${group.name} (${group.total_count})`
+  }))
+])
+
+const proxyGroupAssignmentOptions = computed(() => [
+  { value: null, label: t('admin.proxies.ungrouped') },
+  ...proxyGroups.value.map((group) => ({ value: group.id, label: group.name }))
+])
+
 // Form options
 const protocolSelectOptions = computed(() => [
   { value: 'http', label: t('admin.proxies.protocols.http') },
@@ -1038,13 +1156,15 @@ const editStatusOptions = computed(() => [
 ])
 
 const proxies = ref<Proxy[]>([])
+const proxyGroups = ref<ProxyGroup[]>([])
 const visiblePasswordIds = reactive(new Set<number>())
 const copyMenuProxyId = ref<number | null>(null)
 const loading = ref(false)
 const searchQuery = ref('')
 const filters = reactive({
   protocol: '',
-  status: ''
+  status: '',
+  proxy_group: ''
 })
 const pagination = reactive({
   page: 1,
@@ -1067,12 +1187,16 @@ const showDeleteDialog = ref(false)
 const showBatchDeleteDialog = ref(false)
 const showExportDataDialog = ref(false)
 const showAccountsModal = ref(false)
+const showBatchGroupDialog = ref(false)
+const showProxyGroupManager = ref(false)
 const submitting = ref(false)
 const exportingData = ref(false)
 const testingProxyIds = ref<Set<number>>(new Set())
 const qualityCheckingProxyIds = ref<Set<number>>(new Set())
 const batchTesting = ref(false)
 const batchQualityChecking = ref(false)
+const batchGrouping = ref(false)
+const batchGroupTargetId = ref<number | null>(null)
 const proxyTableRef = ref<HTMLElement | null>(null)
 const {
   selectedSet: selectedProxyIds,
@@ -1132,6 +1256,7 @@ const createForm = reactive({
   fallback_mode: 'none' as 'none' | 'proxy' | 'direct',
   backup_proxy_id: null as number | null,
   expiry_warn_days: 7 as number,
+  proxy_group_id: null as number | null,
 })
 
 const editForm = reactive({
@@ -1146,6 +1271,7 @@ const editForm = reactive({
   fallback_mode: 'none' as 'none' | 'proxy' | 'direct',
   backup_proxy_id: null as number | null,
   expiry_warn_days: 7 as number,
+  proxy_group_id: null as number | null,
 })
 
 const allProxiesForBackup = ref<Proxy[]>([])
@@ -1183,9 +1309,23 @@ const buildProxyQueryFilters = () => ({
   protocol: filters.protocol || undefined,
   status: (filters.status || undefined) as 'active' | 'inactive' | 'expired' | undefined,
   search: searchQuery.value || undefined,
+  group_id:
+    filters.proxy_group && filters.proxy_group !== 'ungrouped'
+      ? Number(filters.proxy_group)
+      : undefined,
+  ungrouped: filters.proxy_group === 'ungrouped' ? true : undefined,
   sort_by: sortState.sort_by,
   sort_order: sortState.sort_order
 })
+
+const loadProxyGroups = async () => {
+  try {
+    proxyGroups.value = await adminAPI.proxyGroups.list()
+  } catch (error) {
+    appStore.showError(t('admin.proxies.proxyGroups.loadFailed'))
+    console.error('Error loading proxy groups:', error)
+  }
+}
 
 const loadProxies = async () => {
   if (abortController) {
@@ -1241,6 +1381,11 @@ const handlePageSizeChange = (pageSize: number) => {
   loadProxies()
 }
 
+const handleProxyGroupFilterChange = () => {
+  pagination.page = 1
+  loadProxies()
+}
+
 const handleSort = (key: string, order: 'asc' | 'desc') => {
   sortState.sort_by = key
   sortState.sort_order = order
@@ -1261,6 +1406,7 @@ const closeCreateModal = () => {
   createForm.fallback_mode = 'none'
   createForm.backup_proxy_id = null
   createForm.expiry_warn_days = 7
+  createForm.proxy_group_id = null
   createPasswordVisible.value = false
   batchInput.value = ''
   batchParseResult.total = 0
@@ -1272,6 +1418,7 @@ const closeCreateModal = () => {
 
 const handleDataImported = () => {
   showImportData.value = false
+  loadProxyGroups()
   loadProxies()
 }
 
@@ -1390,9 +1537,11 @@ const handleCreateProxy = async () => {
       fallback_mode: createForm.fallback_mode,
       backup_proxy_id: createForm.fallback_mode === 'proxy' ? createForm.backup_proxy_id : null,
       expiry_warn_days: createForm.expiry_warn_days,
+      proxy_group_id: createForm.proxy_group_id,
     })
     appStore.showSuccess(t('admin.proxies.proxyCreated'))
     closeCreateModal()
+    loadProxyGroups()
     loadProxies()
   } catch (error: any) {
     appStore.showError(error.response?.data?.detail || t('admin.proxies.failedToCreate'))
@@ -1415,6 +1564,7 @@ const handleEdit = (proxy: Proxy) => {
   editForm.fallback_mode = proxy.fallback_mode || 'none'
   editForm.backup_proxy_id = proxy.backup_proxy_id ?? null
   editForm.expiry_warn_days = proxy.expiry_warn_days ?? 7
+  editForm.proxy_group_id = proxy.proxy_group_id ?? null
   editPasswordVisible.value = false
   editPasswordDirty.value = false
   showEditModal.value = true
@@ -1455,6 +1605,7 @@ const handleUpdateProxy = async () => {
       fallback_mode: editForm.fallback_mode,
       backup_proxy_id: editForm.fallback_mode === 'proxy' ? editForm.backup_proxy_id : null,
       expiry_warn_days: editForm.expiry_warn_days,
+      proxy_group_id: editForm.proxy_group_id,
     }
 
     // Only include password if user actually modified the field
@@ -1465,6 +1616,7 @@ const handleUpdateProxy = async () => {
     await adminAPI.proxies.update(editingProxy.value.id, updateData)
     appStore.showSuccess(t('admin.proxies.proxyUpdated'))
     closeEditModal()
+    loadProxyGroups()
     loadProxies()
   } catch (error: any) {
     appStore.showError(error.response?.data?.detail || t('admin.proxies.failedToUpdate'))
@@ -1791,17 +1943,7 @@ const fetchAllProxiesForBatch = async (): Promise<Proxy[]> => {
   let totalPages = 1
 
   while (page <= totalPages) {
-    const response = await adminAPI.proxies.list(
-      page,
-      pageSize,
-      {
-        protocol: filters.protocol || undefined,
-        status: filters.status as any,
-        search: searchQuery.value || undefined,
-        sort_by: sortState.sort_by,
-        sort_order: sortState.sort_order
-      }
-    )
+    const response = await adminAPI.proxies.list(page, pageSize, buildProxyQueryFilters())
     result.push(...response.items)
     totalPages = response.pages || 1
     page++
@@ -1830,6 +1972,12 @@ const runBatchProxyTests = async (ids: number[]) => {
 const handleBatchTest = async () => {
   if (batchTesting.value) return
 
+  const targetCount = selectedCount.value > 0 ? selectedCount.value : pagination.total
+  if (targetCount > 100) {
+    appStore.showError(t('admin.proxies.batchTestLimitExceeded', { count: 100 }))
+    return
+  }
+
   batchTesting.value = true
   try {
     let ids: number[] = []
@@ -1838,6 +1986,11 @@ const handleBatchTest = async () => {
     } else {
       const allProxies = await fetchAllProxiesForBatch()
       ids = allProxies.map((proxy) => proxy.id)
+    }
+
+    if (ids.length > 100) {
+      appStore.showError(t('admin.proxies.batchTestLimitExceeded', { count: 100 }))
+      return
     }
 
     if (ids.length === 0) {
@@ -1928,6 +2081,50 @@ const handleExportData = async () => {
   }
 }
 
+const closeBatchGroupDialog = () => {
+  if (batchGrouping.value) return
+  showBatchGroupDialog.value = false
+  batchGroupTargetId.value = null
+}
+
+const handleBatchGroup = async () => {
+  const ids = Array.from(selectedProxyIds.value)
+  if (ids.length === 0 || batchGrouping.value) return
+  if (ids.length > 5000) {
+    appStore.showError(t('admin.proxies.batchMoveLimit'))
+    return
+  }
+
+  batchGrouping.value = true
+  try {
+    const result = await adminAPI.proxies.batchGroup(ids, batchGroupTargetId.value)
+    appStore.showSuccess(
+      t('admin.proxies.batchMoveDone', { count: result.updated ?? ids.length })
+    )
+    clearSelectedProxies()
+    showBatchGroupDialog.value = false
+    batchGroupTargetId.value = null
+    await Promise.all([loadProxyGroups(), loadProxies()])
+  } catch (error: any) {
+    appStore.showError(error.response?.data?.detail || t('admin.proxies.batchMoveFailed'))
+  } finally {
+    batchGrouping.value = false
+  }
+}
+
+const handleProxyGroupsChanged = async () => {
+  await loadProxyGroups()
+  if (
+    filters.proxy_group !== '' &&
+    filters.proxy_group !== 'ungrouped' &&
+    !proxyGroups.value.some((group) => String(group.id) === filters.proxy_group)
+  ) {
+    filters.proxy_group = ''
+    pagination.page = 1
+  }
+  await loadProxies()
+}
+
 const handleDelete = (proxy: Proxy) => {
   if ((proxy.account_count || 0) > 0) {
     appStore.showError(t('admin.proxies.deleteBlockedInUse'))
@@ -1953,7 +2150,7 @@ const confirmDelete = async () => {
     showDeleteDialog.value = false
     removeSelectedProxies([deletingProxy.value.id])
     deletingProxy.value = null
-    loadProxies()
+    await Promise.all([loadProxyGroups(), loadProxies()])
   } catch (error: any) {
     appStore.showError(error.response?.data?.detail || t('admin.proxies.failedToDelete'))
     console.error('Error deleting proxy:', error)
@@ -1980,7 +2177,7 @@ const confirmBatchDelete = async () => {
 
     clearSelectedProxies()
     showBatchDeleteDialog.value = false
-    loadProxies()
+    await Promise.all([loadProxyGroups(), loadProxies()])
   } catch (error: any) {
     appStore.showError(error.response?.data?.detail || t('admin.proxies.batchDeleteFailed'))
     console.error('Error batch deleting proxies:', error)
@@ -2057,6 +2254,7 @@ function closeCopyMenu() {
 
 onMounted(() => {
   loadProxies()
+  loadProxyGroups()
   loadBackupProxyOptions()
   document.addEventListener('click', closeCopyMenu)
 })

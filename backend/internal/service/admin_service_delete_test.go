@@ -327,7 +327,7 @@ func (s *proxyRepoStub) List(ctx context.Context, params pagination.PaginationPa
 	panic("unexpected List call")
 }
 
-func (s *proxyRepoStub) ListWithFilters(ctx context.Context, params pagination.PaginationParams, protocol, status, search string) ([]Proxy, *pagination.PaginationResult, error) {
+func (s *proxyRepoStub) ListWithFilters(ctx context.Context, params pagination.PaginationParams, filters ProxyListFilters) ([]Proxy, *pagination.PaginationResult, error) {
 	panic("unexpected ListWithFilters call")
 }
 
@@ -339,7 +339,7 @@ func (s *proxyRepoStub) ListActiveWithAccountCount(ctx context.Context) ([]Proxy
 	panic("unexpected ListActiveWithAccountCount call")
 }
 
-func (s *proxyRepoStub) ListWithFiltersAndAccountCount(ctx context.Context, params pagination.PaginationParams, protocol, status, search string) ([]ProxyWithAccountCount, *pagination.PaginationResult, error) {
+func (s *proxyRepoStub) ListWithFiltersAndAccountCount(ctx context.Context, params pagination.PaginationParams, filters ProxyListFilters) ([]ProxyWithAccountCount, *pagination.PaginationResult, error) {
 	panic("unexpected ListWithFiltersAndAccountCount call")
 }
 

@@ -2,9 +2,11 @@ package admin
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -12,6 +14,52 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
 )
+
+type proxyGroupAwareAdminService struct {
+	*stubAdminService
+	groups           map[string]*service.ProxyGroup
+	groupCreateCalls int
+}
+
+func newProxyGroupAwareAdminService() *proxyGroupAwareAdminService {
+	return &proxyGroupAwareAdminService{
+		stubAdminService: newStubAdminService(),
+		groups:           make(map[string]*service.ProxyGroup),
+	}
+}
+
+func (s *proxyGroupAwareAdminService) ListProxyGroups(context.Context) ([]service.ProxyGroup, error) {
+	groups := make([]service.ProxyGroup, 0, len(s.groups))
+	for _, group := range s.groups {
+		groups = append(groups, *group)
+	}
+	return groups, nil
+}
+
+func (s *proxyGroupAwareAdminService) CreateProxyGroup(_ context.Context, name string) (*service.ProxyGroup, error) {
+	return s.GetOrCreateProxyGroupByName(context.Background(), name)
+}
+
+func (s *proxyGroupAwareAdminService) UpdateProxyGroup(_ context.Context, id int64, name string) (*service.ProxyGroup, error) {
+	return &service.ProxyGroup{ID: id, Name: name}, nil
+}
+
+func (s *proxyGroupAwareAdminService) DeleteProxyGroup(context.Context, int64) error { return nil }
+
+func (s *proxyGroupAwareAdminService) GetOrCreateProxyGroupByName(_ context.Context, name string) (*service.ProxyGroup, error) {
+	key := strings.ToLower(strings.TrimSpace(name))
+	if group := s.groups[key]; group != nil {
+		return group, nil
+	}
+	s.groupCreateCalls++
+	group := &service.ProxyGroup{ID: int64(100 + s.groupCreateCalls), Name: strings.TrimSpace(name)}
+	s.groups[key] = group
+	return group, nil
+}
+
+func (s *proxyGroupAwareAdminService) BatchGroupProxies(context.Context, []int64, *int64) (int64, error) {
+	return 0, nil
+}
 
 type proxyDataResponse struct {
 	Code int         `json:"code"`
@@ -33,6 +81,41 @@ func setupProxyDataRouter() (*gin.Engine, *stubAdminService) {
 	router.POST("/api/v1/admin/proxies/data", h.ImportData)
 
 	return router, adminSvc
+}
+
+func setupProxyDataRouterWithGroups() (*gin.Engine, *proxyGroupAwareAdminService) {
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	adminSvc := newProxyGroupAwareAdminService()
+
+	h := NewProxyHandler(adminSvc)
+	router.GET("/api/v1/admin/proxies/data", h.ExportData)
+	router.POST("/api/v1/admin/proxies/data", h.ImportData)
+
+	return router, adminSvc
+}
+
+func TestProxyExportDataIncludesProxyGroupName(t *testing.T) {
+	router, adminSvc := setupProxyDataRouterWithGroups()
+	adminSvc.proxies = []service.Proxy{{
+		ID:             1,
+		Name:           "proxy-a",
+		Protocol:       "http",
+		Host:           "127.0.0.1",
+		Port:           8080,
+		Status:         service.StatusActive,
+		ProxyGroupName: "Primary",
+	}}
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/admin/proxies/data", nil)
+	router.ServeHTTP(rec, req)
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	var resp proxyDataResponse
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
+	require.Len(t, resp.Data.Proxies, 1)
+	require.Equal(t, "Primary", resp.Data.Proxies[0].ProxyGroupName)
 }
 
 func TestProxyExportDataRespectsFilters(t *testing.T) {
@@ -279,4 +362,87 @@ func TestProxyImportDataReusesAndTriggersLatencyProbe(t *testing.T) {
 		defer adminSvc.mu.Unlock()
 		return len(adminSvc.testedProxyIDs) == 1
 	}, time.Second, 10*time.Millisecond)
+}
+
+func TestProxyImportDataReusesProxyGroupsByNormalizedName(t *testing.T) {
+	router, adminSvc := setupProxyDataRouterWithGroups()
+	adminSvc.proxies = nil
+
+	payload := map[string]any{
+		"data": map[string]any{
+			"type":    dataType,
+			"version": dataVersion,
+			"proxies": []map[string]any{
+				{
+					"proxy_key":        "http|127.0.0.1|8080||",
+					"name":             "proxy-a",
+					"protocol":         "http",
+					"host":             "127.0.0.1",
+					"port":             8080,
+					"status":           "active",
+					"proxy_group_name": "Primary",
+				},
+				{
+					"proxy_key":        "http|127.0.0.2|8080||",
+					"name":             "proxy-b",
+					"protocol":         "http",
+					"host":             "127.0.0.2",
+					"port":             8080,
+					"status":           "active",
+					"proxy_group_name": " primary ",
+				},
+			},
+			"accounts": []map[string]any{},
+		},
+	}
+
+	body, err := json.Marshal(payload)
+	require.NoError(t, err)
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/proxies/data", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(rec, req)
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	var resp proxyImportResponse
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
+	require.Equal(t, 2, resp.Data.ProxyCreated)
+	require.Equal(t, 1, adminSvc.groupCreateCalls)
+	require.Len(t, adminSvc.createdProxies, 2)
+	require.NotNil(t, adminSvc.createdProxies[0].ProxyGroupID)
+	require.NotNil(t, adminSvc.createdProxies[1].ProxyGroupID)
+	require.Equal(t, *adminSvc.createdProxies[0].ProxyGroupID, *adminSvc.createdProxies[1].ProxyGroupID)
+}
+
+func TestProxyImportDataLegacyPayloadLeavesProxyUngrouped(t *testing.T) {
+	router, adminSvc := setupProxyDataRouterWithGroups()
+	adminSvc.proxies = nil
+
+	payload := map[string]any{
+		"data": map[string]any{
+			"type":    dataType,
+			"version": dataVersion,
+			"proxies": []map[string]any{{
+				"proxy_key": "http|127.0.0.1|8080||",
+				"name":      "legacy-proxy",
+				"protocol":  "http",
+				"host":      "127.0.0.1",
+				"port":      8080,
+				"status":    "active",
+			}},
+			"accounts": []map[string]any{},
+		},
+	}
+
+	body, err := json.Marshal(payload)
+	require.NoError(t, err)
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/proxies/data", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(rec, req)
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	require.Zero(t, adminSvc.groupCreateCalls)
+	require.Len(t, adminSvc.createdProxies, 1)
+	require.Nil(t, adminSvc.createdProxies[0].ProxyGroupID)
 }

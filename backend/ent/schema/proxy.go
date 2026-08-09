@@ -64,6 +64,10 @@ func (Proxy) Fields() []ent.Field {
 		field.Int("expiry_warn_days").
 			Default(7).
 			Comment("Days before expiry to flag as expiring-soon (per proxy)."),
+		field.Int64("proxy_group_id").
+			Optional().
+			Nillable().
+			Comment("Independent proxy group id; NULL means ungrouped."),
 	}
 }
 
@@ -76,6 +80,10 @@ func (Proxy) Edges() []ent.Edge {
 		edge.To("backup_proxy", Proxy.Type).
 			Field("backup_proxy_id").
 			Unique(),
+		edge.To("proxy_group", ProxyGroup.Type).
+			Field("proxy_group_id").
+			Unique().
+			Annotations(entsql.OnDelete(entsql.SetNull)),
 	}
 }
 
@@ -85,5 +93,6 @@ func (Proxy) Indexes() []ent.Index {
 		index.Fields("deleted_at"),
 		index.Fields("expires_at"),
 		index.Fields("backup_proxy_id"),
+		index.Fields("proxy_group_id"),
 	}
 }

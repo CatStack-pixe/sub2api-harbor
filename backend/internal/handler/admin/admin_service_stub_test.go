@@ -19,6 +19,7 @@ type stubAdminService struct {
 	schedulerScoreFilterCalls           int
 	openAISchedulerScorePoolCalls       int
 	proxies                             []service.Proxy
+	proxyGroups                         []service.ProxyGroup
 	proxyCounts                         []service.ProxyWithAccountCount
 	redeems                             []service.RedeemCode
 	boundAuthIdentity                   *service.AdminBindAuthIdentityInput
@@ -32,6 +33,7 @@ type stubAdminService struct {
 	createAccountErr                    error
 	createSparkShadowErr                error
 	updateAccountErr                    error
+	updateProxyErr                      error
 	lastUpdateAccountInput              *service.UpdateAccountInput
 	bulkUpdateAccountErr                error
 	lastBulkUpdateAccountInput          *service.BulkUpdateAccountsInput
@@ -67,6 +69,8 @@ type stubAdminService struct {
 		protocol  string
 		status    string
 		search    string
+		groupID   *int64
+		ungrouped bool
 		sortBy    string
 		sortOrder string
 		calls     int
@@ -553,20 +557,22 @@ func (s *stubAdminService) CheckMixedChannelRisk(ctx context.Context, currentAcc
 	return s.checkMixedErr
 }
 
-func (s *stubAdminService) ListProxies(ctx context.Context, page, pageSize int, protocol, status, search string, sortBy, sortOrder string) ([]service.Proxy, int64, error) {
-	s.lastListProxies.protocol = protocol
-	s.lastListProxies.status = status
-	s.lastListProxies.search = search
+func (s *stubAdminService) ListProxies(ctx context.Context, page, pageSize int, filters service.ProxyListFilters, sortBy, sortOrder string) ([]service.Proxy, int64, error) {
+	s.lastListProxies.protocol = filters.Protocol
+	s.lastListProxies.status = filters.Status
+	s.lastListProxies.search = filters.Search
+	s.lastListProxies.groupID = filters.ProxyGroupID
+	s.lastListProxies.ungrouped = filters.Ungrouped
 	s.lastListProxies.sortBy = sortBy
 	s.lastListProxies.sortOrder = sortOrder
 	s.lastListProxies.calls++
-	search = strings.TrimSpace(strings.ToLower(search))
+	search := strings.TrimSpace(strings.ToLower(filters.Search))
 	filtered := make([]service.Proxy, 0, len(s.proxies))
 	for _, proxy := range s.proxies {
-		if protocol != "" && proxy.Protocol != protocol {
+		if filters.Protocol != "" && proxy.Protocol != filters.Protocol {
 			continue
 		}
-		if status != "" && proxy.Status != status {
+		if filters.Status != "" && proxy.Status != filters.Status {
 			continue
 		}
 		if search != "" {
@@ -576,12 +582,18 @@ func (s *stubAdminService) ListProxies(ctx context.Context, page, pageSize int, 
 				continue
 			}
 		}
+		if filters.ProxyGroupID != nil && (proxy.ProxyGroupID == nil || *proxy.ProxyGroupID != *filters.ProxyGroupID) {
+			continue
+		}
+		if filters.Ungrouped && proxy.ProxyGroupID != nil {
+			continue
+		}
 		filtered = append(filtered, proxy)
 	}
 	return filtered, int64(len(filtered)), nil
 }
 
-func (s *stubAdminService) ListProxiesWithAccountCount(ctx context.Context, page, pageSize int, protocol, status, search string, sortBy, sortOrder string) ([]service.ProxyWithAccountCount, int64, error) {
+func (s *stubAdminService) ListProxiesWithAccountCount(ctx context.Context, page, pageSize int, filters service.ProxyListFilters, sortBy, sortOrder string) ([]service.ProxyWithAccountCount, int64, error) {
 	return s.proxyCounts, int64(len(s.proxyCounts)), nil
 }
 
@@ -635,6 +647,9 @@ func (s *stubAdminService) UpdateProxy(ctx context.Context, id int64, input *ser
 	s.updatedProxyIDs = append(s.updatedProxyIDs, id)
 	s.updatedProxies = append(s.updatedProxies, input)
 	s.mu.Unlock()
+	if s.updateProxyErr != nil {
+		return nil, s.updateProxyErr
+	}
 	proxy := service.Proxy{ID: id, Name: input.Name, Status: service.StatusActive}
 	return &proxy, nil
 }
