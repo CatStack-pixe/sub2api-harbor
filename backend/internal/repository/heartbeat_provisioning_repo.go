@@ -1,0 +1,167 @@
+package repository
+
+import (
+	"context"
+	"database/sql"
+	"errors"
+	"fmt"
+	"time"
+
+	"github.com/Wei-Shaw/sub2api/internal/service"
+)
+
+type heartbeatProvisioningRepository struct {
+	db *sql.DB
+}
+
+func NewHeartbeatProvisioningRepository(db *sql.DB) service.HeartbeatProvisioningRepository {
+	return &heartbeatProvisioningRepository{db: db}
+}
+
+func (r *heartbeatProvisioningRepository) Enqueue(ctx context.Context, input service.HeartbeatProvisioningEnqueueInput) error {
+	if r == nil || r.db == nil {
+		return errors.New("nil heartbeat provisioning database")
+	}
+	_, err := r.db.ExecContext(ctx, `
+		INSERT INTO heartbeat_provision_jobs (provider, fingerprint, session_key_ciphertext, source_balance, source_checked_at)
+		VALUES ('ds', $1, $2, $3, NULLIF($4::timestamptz, 'epoch'::timestamptz))
+		ON CONFLICT (provider, fingerprint) DO UPDATE SET
+			session_key_ciphertext = EXCLUDED.session_key_ciphertext,
+			source_balance = EXCLUDED.source_balance,
+			source_checked_at = COALESCE(EXCLUDED.source_checked_at, heartbeat_provision_jobs.source_checked_at),
+			updated_at = NOW()
+	`, input.Fingerprint, input.SessionKeyCiphertext, input.SourceBalance, input.SourceCheckedAt)
+	return err
+}
+
+func (r *heartbeatProvisioningRepository) Claim(ctx context.Context, workerID string, lease time.Duration) (*service.HeartbeatProvisioningJob, error) {
+	if r == nil || r.db == nil {
+		return nil, errors.New("nil heartbeat provisioning database")
+	}
+	seconds := int64(lease / time.Second)
+	if seconds < 1 {
+		seconds = 60
+	}
+	row := r.db.QueryRowContext(ctx, `
+		WITH candidate AS (
+			SELECT id
+			FROM heartbeat_provision_jobs
+			WHERE (status IN ('queued', 'retry') AND available_at <= NOW())
+			   OR (status = 'processing' AND locked_until < NOW())
+			ORDER BY available_at, id
+			FOR UPDATE SKIP LOCKED
+			LIMIT 1
+		)
+		UPDATE heartbeat_provision_jobs AS job
+		SET status = 'processing', attempts = attempts + 1, lock_owner = $1,
+			locked_until = NOW() + ($2 * INTERVAL '1 second'), updated_at = NOW()
+		FROM candidate
+		WHERE job.id = candidate.id
+		RETURNING job.id, job.fingerprint, job.session_key_ciphertext, job.attempts, job.account_id, job.proxy_id
+	`, workerID, seconds)
+	job := &service.HeartbeatProvisioningJob{}
+	var accountID, proxyID sql.NullInt64
+	if err := row.Scan(&job.ID, &job.Fingerprint, &job.SessionKeyCiphertext, &job.Attempts, &accountID, &proxyID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	if accountID.Valid {
+		value := accountID.Int64
+		job.AccountID = &value
+	}
+	if proxyID.Valid {
+		value := proxyID.Int64
+		job.ProxyID = &value
+	}
+	return job, nil
+}
+
+func (r *heartbeatProvisioningRepository) SetProxy(ctx context.Context, jobID, proxyID int64) error {
+	return r.updateClaimed(ctx, `proxy_id = $2, updated_at = NOW()`, jobID, proxyID)
+}
+
+func (r *heartbeatProvisioningRepository) SetAccount(ctx context.Context, jobID, accountID int64) error {
+	return r.updateClaimed(ctx, `account_id = $2, updated_at = NOW()`, jobID, accountID)
+}
+
+func (r *heartbeatProvisioningRepository) FindPendingAccountByFingerprint(ctx context.Context, fingerprint string) (*int64, error) {
+	if r == nil || r.db == nil {
+		return nil, errors.New("nil heartbeat provisioning database")
+	}
+	var id int64
+	err := r.db.QueryRowContext(ctx, `
+		SELECT id
+		FROM accounts
+		WHERE platform = 'deepseek'
+		  AND status = 'disabled'
+		  AND schedulable = FALSE
+		  AND deleted_at IS NULL
+		  AND extra ->> 'heartbeat_fp' = $1
+		ORDER BY id DESC
+		LIMIT 1
+	`, fingerprint).Scan(&id)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &id, nil
+}
+
+func (r *heartbeatProvisioningRepository) updateClaimed(ctx context.Context, setClause string, jobID, value int64) error {
+	if r == nil || r.db == nil {
+		return errors.New("nil heartbeat provisioning database")
+	}
+	query := fmt.Sprintf(`UPDATE heartbeat_provision_jobs SET %s WHERE id = $1 AND status = 'processing'`, setClause)
+	result, err := r.db.ExecContext(ctx, query, jobID, value)
+	if err != nil {
+		return err
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected != 1 {
+		return fmt.Errorf("heartbeat provisioning job %d is no longer claimed", jobID)
+	}
+	return nil
+}
+
+func (r *heartbeatProvisioningRepository) Complete(ctx context.Context, jobID int64) error {
+	result, err := r.db.ExecContext(ctx, `
+		UPDATE heartbeat_provision_jobs
+		SET status = 'complete', locked_until = NULL, lock_owner = NULL, last_error = NULL, completed_at = NOW(), updated_at = NOW()
+		WHERE id = $1 AND status = 'processing'
+	`, jobID)
+	if err != nil {
+		return err
+	}
+	affected, err := result.RowsAffected()
+	if err != nil || affected != 1 {
+		return fmt.Errorf("heartbeat provisioning job %d cannot complete", jobID)
+	}
+	return nil
+}
+
+func (r *heartbeatProvisioningRepository) Retry(ctx context.Context, jobID int64, attempts int, availableAt time.Time, terminal bool, lastError string) error {
+	status := "retry"
+	if terminal {
+		status = "failed"
+	}
+	result, err := r.db.ExecContext(ctx, `
+		UPDATE heartbeat_provision_jobs
+		SET status = $2, available_at = $3, locked_until = NULL, lock_owner = NULL, last_error = $4, updated_at = NOW()
+		WHERE id = $1 AND status = 'processing'
+	`, jobID, status, availableAt, lastError)
+	if err != nil {
+		return err
+	}
+	affected, err := result.RowsAffected()
+	if err != nil || affected != 1 {
+		return fmt.Errorf("heartbeat provisioning job %d cannot retry after attempt %d", jobID, attempts)
+	}
+	return nil
+}

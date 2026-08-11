@@ -22,7 +22,7 @@ heartbeat.catpithos.top {
 		client_ip 47.97.207.205
 	}
 	handle @trusted_heartbeat {
-		reverse_proxy 127.0.0.1:8090 {
+		reverse_proxy 127.0.0.1:8080 {
 			header_up X-Real-IP {client_ip}
 			header_up X-Forwarded-For {client_ip}
 			header_up X-Forwarded-Proto {scheme}
@@ -34,12 +34,7 @@ heartbeat.catpithos.top {
 		respond 403
 	}
 	handle {
-		reverse_proxy 127.0.0.1:8090 {
-			header_up X-Real-IP {client_ip}
-			header_up X-Forwarded-For {client_ip}
-			header_up X-Forwarded-Proto {scheme}
-			header_up X-Forwarded-Host {host}
-		}
+		respond 404
 	}
 	encode zstd gzip
 }
