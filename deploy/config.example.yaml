@@ -1090,6 +1090,28 @@ oidc_connect:
   userinfo_username_path: ""
 
 # =============================================================================
+# Trusted DeepSeek Heartbeat Provisioning
+# =============================================================================
+# The callback receives a short-lived session capability from the trusted
+# source. No Sub2API admin token or preconfigured session key is used.
+heartbeat_provisioning:
+  enabled: false
+  vault_url: "https://key-vault.example.com/api/hb/keys"
+  # Keep false in production. Enable only for a private, explicitly accepted
+  # HTTP vault while migrating it to TLS.
+  allow_insecure_vault: false
+  allowed_source_ips:
+    - "47.97.207.205"
+  deepseek_group_id: 12
+  proxy_group_id: 1
+  worker_count: 2
+  proxy_probe_workers: 10
+  proxy_probe_sample_size: 100
+  proxy_probe_timeout_seconds: 5
+  proxy_sweep_ttl_seconds: 300
+  max_attempts: 5
+
+# =============================================================================
 # Default Settings
 # 默认设置
 # =============================================================================

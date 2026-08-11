@@ -80,6 +80,9 @@ RUN --mount=type=cache,id=sub2api-gomod,target=/go/pkg/mod \
 # Copy backend source first
 COPY backend/ ./
 
+# Keep generated dependency-injection wiring in sync for source builds.
+RUN go generate ./cmd/server
+
 # Copy frontend dist from previous stage (must be after backend copy to avoid being overwritten)
 COPY --from=frontend-builder /app/backend/internal/web/dist ./internal/web/dist
 
