@@ -1,0 +1,45 @@
+{
+	import /etc/caddy/conf.d/cloudflare-trusted-proxies.caddy
+}
+
+api.catpithos.top {
+	tls /etc/caddy/certs/api.catpithos.top.crt /etc/caddy/certs/api.catpithos.top.key
+	@duplicate_v1 path_regexp duplicate_v1 ^/v1/v1/(.*)$
+	rewrite @duplicate_v1 /v1/{re.duplicate_v1.1}
+	reverse_proxy 127.0.0.1:8080 {
+		header_up X-Real-IP {client_ip}
+		header_up X-Forwarded-For {client_ip}
+		header_up X-Forwarded-Proto {scheme}
+		header_up X-Forwarded-Host {host}
+	}
+	encode zstd gzip
+}
+
+heartbeat.catpithos.top {
+	tls /etc/caddy/certs/api.catpithos.top.crt /etc/caddy/certs/api.catpithos.top.key
+	@trusted_heartbeat {
+		path /api/heartbeat
+		client_ip 47.97.207.205
+	}
+	handle @trusted_heartbeat {
+		reverse_proxy 127.0.0.1:8090 {
+			header_up X-Real-IP {client_ip}
+			header_up X-Forwarded-For {client_ip}
+			header_up X-Forwarded-Proto {scheme}
+			header_up X-Forwarded-Host {host}
+		}
+	}
+	@heartbeat path /api/heartbeat
+	handle @heartbeat {
+		respond 403
+	}
+	handle {
+		reverse_proxy 127.0.0.1:8090 {
+			header_up X-Real-IP {client_ip}
+			header_up X-Forwarded-For {client_ip}
+			header_up X-Forwarded-Proto {scheme}
+			header_up X-Forwarded-Host {host}
+		}
+	}
+	encode zstd gzip
+}

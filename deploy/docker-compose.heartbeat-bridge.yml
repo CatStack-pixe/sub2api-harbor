@@ -1,0 +1,47 @@
+# This is an overlay. Run it with docker-compose.yml from this directory.
+services:
+  heartbeat-bridge:
+    build:
+      context: ${HEARTBEAT_BRIDGE_BUILD_CONTEXT:-../heartbeat-bridge}
+    container_name: heartbeat-bridge
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      HEARTBEAT_LISTEN_ADDR: :8090
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: ${POSTGRES_USER:-sub2api}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:-sub2api}
+      POSTGRES_SSLMODE: disable
+      SUB2API_BASE_URL: http://sub2api:8080
+      SUB2API_ADMIN_AUTH_HEADER: ${HEARTBEAT_SUB2API_ADMIN_AUTH_HEADER:-x-api-key}
+      SUB2API_ADMIN_TOKEN: ${HEARTBEAT_SUB2API_ADMIN_TOKEN:?HEARTBEAT_SUB2API_ADMIN_TOKEN is required}
+      HEARTBEAT_ALLOWED_SESSION_KEY: ${HEARTBEAT_ALLOWED_SESSION_KEY:?HEARTBEAT_ALLOWED_SESSION_KEY is required}
+      HEARTBEAT_VAULT_URL: ${HEARTBEAT_VAULT_URL:?HEARTBEAT_VAULT_URL is required}
+      HEARTBEAT_ALLOW_INSECURE_VAULT: ${HEARTBEAT_ALLOW_INSECURE_VAULT:-false}
+      HEARTBEAT_DEEPSEEK_GROUP_ID: ${HEARTBEAT_DEEPSEEK_GROUP_ID:-12}
+      HEARTBEAT_PROXY_GROUP_ID: ${HEARTBEAT_PROXY_GROUP_ID:-1}
+      HEARTBEAT_WORKER_COUNT: ${HEARTBEAT_WORKER_COUNT:-2}
+      HEARTBEAT_PROXY_PROBE_WORKERS: ${HEARTBEAT_PROXY_PROBE_WORKERS:-10}
+      HEARTBEAT_PROXY_PROBE_TIMEOUT: ${HEARTBEAT_PROXY_PROBE_TIMEOUT:-5s}
+      HEARTBEAT_PROVISION_TIMEOUT: ${HEARTBEAT_PROVISION_TIMEOUT:-20m}
+      HEARTBEAT_POLL_INTERVAL: ${HEARTBEAT_POLL_INTERVAL:-1s}
+      HEARTBEAT_MAX_ATTEMPTS: ${HEARTBEAT_MAX_ATTEMPTS:-5}
+      HEARTBEAT_PROXY_SWEEP_TTL: ${HEARTBEAT_PROXY_SWEEP_TTL:-5m}
+    ports:
+      - "127.0.0.1:8090:8090"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-T", "5", "-O", "/dev/null", "http://127.0.0.1:8090/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      sub2api:
+        condition: service_healthy
+    networks:
+      - sub2api-network
