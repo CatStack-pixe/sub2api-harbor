@@ -115,11 +115,11 @@ func (s *OpenAIGatewayService) forwardResponsesViaRawChatCompletions(
 		if s.activateAgnesQuotaFallback(account, upstreamModel, resp.StatusCode, respBody, time.Now()) {
 			return s.forwardResponsesViaRawChatCompletions(ctx, c, account, body)
 		}
-		if foErr := s.failoverOpenAIUpstreamHTTPError(ctx, c, account, resp, respBody, upstreamMsg, upstreamModel); foErr != nil {
-			return nil, foErr
-		}
 		if account.IsNvidia() {
 			return nil, s.handleOpenAINvidiaResponsesHTTPError(c, account, resp, respBody, upstreamMsg)
+		}
+		if foErr := s.failoverOpenAIUpstreamHTTPError(ctx, c, account, resp, respBody, upstreamMsg, upstreamModel); foErr != nil {
+			return nil, foErr
 		}
 		return s.handleErrorResponse(ctx, resp, c, account, chatBody, billingModel)
 	}
