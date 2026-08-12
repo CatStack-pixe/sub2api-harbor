@@ -315,8 +315,6 @@ func isOpenAICompatibleAccountEligibleForRequest(ctx context.Context, account *A
 	if !isOpenAICompatibleAccountEligibleForRequestBeforeProfit(ctx, account, platform, requestedModel, requireCompact, requiredCapability) {
 		return false
 	}
-	// 分组利润控制：legacy 引擎的粘性/候选循环与 DB recheck 共用
-	// 本判定，任何 fallback 都不能把利润不合格账号重新放回候选。
 	if vetoed, _ := openAIProfitControlVetoReason(ctx, account); vetoed {
 		return false
 	}
@@ -366,11 +364,6 @@ func isOpenAICompatibleAccountEligibleForRequestBeforeProfit(ctx context.Context
 		return false
 	}
 	if requireCompact && openAICompactSupportTier(account) == 0 {
-		return false
-	}
-	// 分组利润控制：legacy 引擎的粘性/候选循环与 DB recheck 共用
-	// 本判定，任何 fallback 都不能把利润不合格账号重新放回候选。
-	if vetoed, _ := openAIProfitControlVetoReason(ctx, account); vetoed {
 		return false
 	}
 	return true
