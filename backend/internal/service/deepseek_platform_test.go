@@ -70,11 +70,15 @@ func TestValidateDeepSeekAccountCredentials(t *testing.T) {
 	}
 }
 
-func TestDeepSeekAccountGroupPlatformIsolation(t *testing.T) {
+func TestDedicatedAccountGroupPlatformIsolation(t *testing.T) {
 	require.True(t, accountCanBindToGroupPlatform(PlatformDeepSeek, PlatformDeepSeek))
 	require.True(t, accountCanBindToGroupPlatform(PlatformDeepSeek, PlatformComposite))
 	require.False(t, accountCanBindToGroupPlatform(PlatformDeepSeek, PlatformOpenAI))
 	require.False(t, accountCanBindToGroupPlatform(PlatformOpenAI, PlatformDeepSeek))
+	require.True(t, accountCanBindToGroupPlatform(PlatformNvidia, PlatformNvidia))
+	require.True(t, accountCanBindToGroupPlatform(PlatformNvidia, PlatformComposite))
+	require.False(t, accountCanBindToGroupPlatform(PlatformNvidia, PlatformOpenAI))
+	require.False(t, accountCanBindToGroupPlatform(PlatformOpenAI, PlatformNvidia))
 	require.True(t, accountCanBindToGroupPlatform(PlatformOpenAI, PlatformOpenAI))
 }
 

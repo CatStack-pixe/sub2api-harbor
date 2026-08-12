@@ -69,8 +69,18 @@ func (g *Group) ResolveMessagesDispatchModel(requestedModel string) string {
 	}
 
 	if g.Platform == PlatformGrok {
+		if claudeMessagesDispatchFamily(requestedModel) == "" {
+			return ""
+		}
+		opts := xai.RuntimeModelMappingOptions()
+		if !opts.EnableCrossClientMap {
+			return ""
+		}
+		return xai.ModelMappingWithOptions(opts)["claude-*"]
+	}
+	if g.Platform == PlatformAgnes {
 		if claudeMessagesDispatchFamily(requestedModel) != "" {
-			return xai.DefaultModelMapping()["grok"]
+			return AgnesDefaultModel
 		}
 		return ""
 	}

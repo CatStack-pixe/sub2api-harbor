@@ -219,6 +219,7 @@ func TestLoadHeartbeatAllowedSourceIPsFromEnvironment(t *testing.T) {
 	t.Setenv("HEARTBEAT_PROVISIONING_ENABLED", "true")
 	t.Setenv("HEARTBEAT_PROVISIONING_VAULT_URL", "https://vault.example.test/api/hb/keys")
 	t.Setenv("HEARTBEAT_PROVISIONING_ALLOWED_SOURCE_IPS", "47.97.207.205, 2001:db8::1")
+	t.Setenv("SERVER_TRUSTED_PROXIES", "127.0.0.1/32")
 
 	cfg, err := Load()
 	require.NoError(t, err)
@@ -231,9 +232,20 @@ func TestLoadRejectsInvalidHeartbeatSourceIP(t *testing.T) {
 	viper.Set("heartbeat_provisioning.enabled", true)
 	viper.Set("heartbeat_provisioning.vault_url", "https://vault.example.test/api/hb/keys")
 	viper.Set("heartbeat_provisioning.allowed_source_ips", []string{"not-an-ip"})
+	viper.Set("server.trusted_proxies", []string{"127.0.0.1/32"})
 
 	_, err := Load()
 	require.ErrorContains(t, err, "heartbeat_provisioning.allowed_source_ips")
+}
+
+func TestLoadRejectsHeartbeatWithoutTrustedProxies(t *testing.T) {
+	resetViperWithJWTSecret(t)
+	viper.Set("heartbeat_provisioning.enabled", true)
+	viper.Set("heartbeat_provisioning.vault_url", "https://vault.example.test/api/hb/keys")
+	viper.Set("heartbeat_provisioning.allowed_source_ips", []string{"47.97.207.205"})
+
+	_, err := Load()
+	require.ErrorContains(t, err, "server.trusted_proxies")
 }
 
 func TestLoadExplicitEmptyTrustedProxiesFromEnvironment(t *testing.T) {
@@ -558,6 +570,19 @@ func TestLoadOpenAICompactModelFromEnv(t *testing.T) {
 	cfg, err := Load()
 	require.NoError(t, err)
 	require.Equal(t, "gpt-5.3-codex", cfg.Gateway.OpenAICompactModel)
+}
+
+func TestLoadDefaultGrokFreeQuotaSoftGate(t *testing.T) {
+	resetViperWithJWTSecret(t)
+
+	cfg, err := Load()
+	require.NoError(t, err)
+	require.False(t, cfg.Gateway.Grok.PasswordAuthEnabled)
+	require.True(t, cfg.Gateway.Grok.FreeQuotaSoftGateEnabled)
+	require.Equal(t, int64(500_000), cfg.Gateway.Grok.FreeQuotaTokenLimit)
+	require.Equal(t, 95, cfg.Gateway.Grok.FreeQuotaSoftGatePercent)
+	require.Equal(t, 24, cfg.Gateway.Grok.FreeQuotaWindowHours)
+	require.Equal(t, 60, cfg.Gateway.Grok.FreeQuotaStatsCacheSeconds)
 }
 
 func TestLoadDefaultOpenAIHTTP2Enabled(t *testing.T) {

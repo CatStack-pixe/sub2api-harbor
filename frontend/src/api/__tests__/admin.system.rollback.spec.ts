@@ -54,6 +54,10 @@ describe('admin system rollback API', () => {
 
     await rollback()
 
-    expect(post).toHaveBeenCalledWith('/admin/system/rollback', undefined, { timeout: 15 * 60 * 1000 })
+    expect(post).toHaveBeenCalledWith(
+      '/admin/system/rollback',
+      undefined,
+      { timeout: 15 * 60 * 1000 }
+    )
   })
 })

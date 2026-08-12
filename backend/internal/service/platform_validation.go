@@ -35,7 +35,8 @@ func ValidateGroupPlatform(platform string) error {
 func accountCanBindToGroupPlatform(accountPlatform, groupPlatform string) bool {
 	accountPlatform = strings.TrimSpace(accountPlatform)
 	groupPlatform = strings.TrimSpace(groupPlatform)
-	if accountPlatform != PlatformDeepSeek && groupPlatform != PlatformDeepSeek {
+	if accountPlatform != PlatformDeepSeek && accountPlatform != PlatformNvidia &&
+		groupPlatform != PlatformDeepSeek && groupPlatform != PlatformNvidia {
 		return true
 	}
 	return groupPlatform == PlatformComposite || accountPlatform == groupPlatform

@@ -5,7 +5,6 @@ project_name: sub2api
 before:
   hooks:
     - go mod tidy -C backend
-    - go mod download -C backend github.com/google/subcommands@v1.2.0
     - go generate -C backend ./cmd/server
 
 builds:
