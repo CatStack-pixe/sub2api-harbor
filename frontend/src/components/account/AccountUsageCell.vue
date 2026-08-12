@@ -656,7 +656,6 @@ const props = withDefaults(
     todayStats: null,
     todayStatsLoading: false,
     manualRefreshToken: 0,
-<<<<<<< HEAD
     batchedUsage: null,
     batchedUsageError: null,
     batchedUsageLoading: false,
