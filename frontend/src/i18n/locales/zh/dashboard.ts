@@ -198,6 +198,12 @@ export default {
       nvidia: {
         description: '配置 OpenCode，让 NVIDIA NIM Chat Completions 请求通过当前 Sub2API NVIDIA 分组发送。'
       },
+      deepseek: {
+        description: '配置 OpenCode，让 DeepSeek Chat Completions 请求通过当前 Sub2API DeepSeek 分组发送。'
+      },
+      nvidia: {
+        description: '配置 OpenCode，让 NVIDIA NIM Chat Completions 请求通过当前 Sub2API NVIDIA 分组发送。'
+      },
       opencode: {
         title: 'OpenCode 配置示例',
         subtitle: 'opencode.json',

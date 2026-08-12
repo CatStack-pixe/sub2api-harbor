@@ -25,6 +25,7 @@ export interface PromptAuditConfig {
   blocking_enabled: boolean
   blocking_latest_turn_only: boolean
   store_pass_events: boolean
+  capture_only: boolean
   effective_mode: PromptAuditMode
   strategy: 'priority'
   worker_count: number
@@ -49,6 +50,7 @@ export interface PromptAuditUpdateRequest {
   blocking_enabled: boolean
   blocking_latest_turn_only: boolean
   store_pass_events: boolean
+  capture_only: boolean
   strategy: 'priority'
   worker_count: number
   queue_capacity: number
@@ -136,6 +138,7 @@ export interface PromptAuditRuntime {
 
 export interface PromptSnapshot {
   request_id: string
+  client_ip?: string
   user_id: number
   username: string
   user_email: string
@@ -153,6 +156,20 @@ export interface PromptSnapshot {
   prompt_length: number
   message_count: number
   stage: string
+}
+
+export interface PromptIPNotice {
+  id: number
+  source_event_id?: number
+  client_ip: string
+  message: string
+  created_by: number
+  status: 'pending' | 'delivered' | 'expired'
+  delivered_request_id?: string
+  expires_at: string
+  delivered_at?: string
+  created_at: string
+  updated_at: string
 }
 
 export interface PromptIssueSummary {

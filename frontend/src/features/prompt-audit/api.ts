@@ -10,7 +10,8 @@ import type {
   PromptEventFilters,
   PromptEventPage,
   PromptProbeResult,
-  PromptAuditEndpointDraft,
+	PromptAuditEndpointDraft,
+	PromptIPNotice,
 } from './types'
 import { eventFilterPayload, eventQueryParams } from './viewModel'
 
@@ -64,6 +65,11 @@ export async function getEvent(id: number): Promise<PromptAuditEvent> {
   return data
 }
 
+export async function queueIPNotice(id: number, message: string): Promise<PromptIPNotice> {
+	const { data } = await apiClient.post<PromptIPNotice>(`${basePath}/events/${id}/ip-notice`, { message })
+	return data
+}
+
 export async function deleteEvent(id: number): Promise<PromptDeleteResult> {
   const { data } = await apiClient.delete<PromptDeleteResult>(`${basePath}/events/${id}`)
   return data
@@ -109,7 +115,8 @@ export const promptAuditAPI = {
   probeEndpoint,
   getRuntime,
   listEvents,
-  getEvent,
+	getEvent,
+	queueIPNotice,
   deleteEvent,
   batchDeleteEvents,
   previewDelete,

@@ -113,7 +113,22 @@ func FlattenResponsesNamespacesExcept(req map[string]any, preserved map[string]b
 	if choice, ok := req["tool_choice"].(map[string]any); ok {
 		choiceNamespace := strings.TrimSpace(stringValue(choice["name"]))
 		if strings.TrimSpace(stringValue(choice["type"])) == "namespace" && !preserved[choiceNamespace] {
-			req["tool_choice"] = "auto"
+			selected := make([]any, 0, len(flattened))
+			for _, raw := range flattened {
+				tool, ok := raw.(map[string]any)
+				if !ok {
+					continue
+				}
+				entry, exists := names[strings.TrimSpace(stringValue(tool["name"]))]
+				if exists && entry.Namespace == choiceNamespace {
+					selected = append(selected, raw)
+				}
+			}
+			if len(selected) == 0 {
+				return nil, false, fmt.Errorf("tool_choice references undeclared namespace %q", choiceNamespace)
+			}
+			req["tools"] = selected
+			req["tool_choice"] = "required"
 		} else {
 			rewriteNamespaceQualifiedCall(choice, names)
 		}

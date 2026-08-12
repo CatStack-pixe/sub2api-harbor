@@ -19,6 +19,7 @@ const (
 	ErrorCodeConfigUnavailable     = "prompt_audit_config_unavailable"
 	ErrorCodeEncryptionKeyRequired = "prompt_audit_encryption_key_required"
 	ErrorCodeRequiresEnabled       = "prompt_guard_requires_audit_enabled"
+	ErrorCodeIPNotice              = "admin_ip_notice"
 
 	DefaultGuardModel = "sileader/qwen3guard:0.6b"
 )
@@ -68,6 +69,7 @@ const (
 
 type Request struct {
 	RequestID  string
+	ClientIP   string
 	UserID     int64
 	Username   string
 	UserEmail  string
@@ -94,6 +96,7 @@ func (r Request) Clone() Request {
 
 type PromptSnapshot struct {
 	RequestID          string `json:"request_id"`
+	ClientIP           string `json:"client_ip"`
 	UserID             int64  `json:"user_id"`
 	UsernameSnapshot   string `json:"username"`
 	UserEmailSnapshot  string `json:"user_email"`

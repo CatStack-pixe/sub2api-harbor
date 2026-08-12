@@ -285,7 +285,7 @@ func failoverClientGone(c *gin.Context) bool {
 	// handleStreamingAwareError/errorResponse 等终结路径对齐，避免心跳
 	// goroutine 与下面的状态标记并发触碰同一 writer。心跳已提交 200 时
 	// 状态码已固化，不再标 499。
-	if service.StopOpenAICompactSSEKeepaliveCommitted(c) {
+	if service.StopOpenAIResponsesSSEKeepaliveCommitted(c) {
 		return true
 	}
 	if !c.Writer.Written() {

@@ -1291,22 +1291,74 @@ func TestAnthropicToResponses_ToolChoiceAny(t *testing.T) {
 	assert.Equal(t, "required", tc)
 }
 
+func TestAnthropicToResponses_ToolChoiceDisablesParallelToolUse(t *testing.T) {
+	req := &AnthropicRequest{
+		Model:      "gpt-5.2",
+		MaxTokens:  1024,
+		Messages:   []AnthropicMessage{{Role: "user", Content: json.RawMessage(`"Hello"`)}},
+		ToolChoice: json.RawMessage(`{"type":"auto","disable_parallel_tool_use":true}`),
+	}
+
+	resp, err := AnthropicToResponses(req)
+	require.NoError(t, err)
+	require.NotNil(t, resp.ParallelToolCalls)
+	assert.False(t, *resp.ParallelToolCalls)
+}
+
 func TestAnthropicToResponses_ToolChoiceSpecific(t *testing.T) {
 	req := &AnthropicRequest{
 		Model:      "gpt-5.2",
 		MaxTokens:  1024,
 		Messages:   []AnthropicMessage{{Role: "user", Content: json.RawMessage(`"Hello"`)}},
+		Tools:      []AnthropicTool{{Name: "get_weather", InputSchema: json.RawMessage(`{"type":"object"}`)}},
 		ToolChoice: json.RawMessage(`{"type":"tool","name":"get_weather"}`),
 	}
 
 	resp, err := AnthropicToResponses(req)
 	require.NoError(t, err)
+	require.NotNil(t, resp.ParallelToolCalls)
+	assert.True(t, *resp.ParallelToolCalls)
 
 	var tc map[string]any
 	require.NoError(t, json.Unmarshal(resp.ToolChoice, &tc))
 	assert.Equal(t, "function", tc["type"])
 	assert.Equal(t, "get_weather", tc["name"])
 	assert.NotContains(t, tc, "function")
+}
+
+func TestAnthropicToResponses_ToolChoiceSpecificBuiltIn(t *testing.T) {
+	req := &AnthropicRequest{
+		Model:     "gpt-5.2",
+		MaxTokens: 1024,
+		Messages:  []AnthropicMessage{{Role: "user", Content: json.RawMessage(`"Hello"`)}},
+		Tools: []AnthropicTool{
+			{Type: "web_search_20250305", Name: "web_search"},
+		},
+		ToolChoice: json.RawMessage(`{"type":"tool","name":"web_search"}`),
+	}
+
+	resp, err := AnthropicToResponses(req)
+	require.NoError(t, err)
+	require.Len(t, resp.Tools, 1)
+	assert.Equal(t, "web_search", resp.Tools[0].Type)
+
+	var tc map[string]any
+	require.NoError(t, json.Unmarshal(resp.ToolChoice, &tc))
+	assert.Equal(t, "web_search", tc["type"])
+	assert.NotContains(t, tc, "name")
+}
+
+func TestAnthropicToResponses_RejectsUndeclaredToolChoice(t *testing.T) {
+	req := &AnthropicRequest{
+		Model:      "gpt-5.2",
+		MaxTokens:  1024,
+		Messages:   []AnthropicMessage{{Role: "user", Content: json.RawMessage(`"Hello"`)}},
+		Tools:      []AnthropicTool{{Name: "get_weather", InputSchema: json.RawMessage(`{"type":"object"}`)}},
+		ToolChoice: json.RawMessage(`{"type":"tool","name":"missing"}`),
+	}
+
+	_, err := AnthropicToResponses(req)
+	require.ErrorContains(t, err, `tool_choice references undeclared tool "missing"`)
 }
 
 func TestResponsesToAnthropicRequest_ToolChoiceFunctionName(t *testing.T) {

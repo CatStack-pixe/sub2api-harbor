@@ -192,3 +192,101 @@ func TestOpenAIGatewayHandlerResponses_FailoverContinuesForConnectedClient(t *te
 	require.Equal(t, http.StatusBadGateway, rec.Code)
 	require.Equal(t, "upstream_error", gjson.GetBytes(rec.Body.Bytes(), "error.type").String())
 }
+
+func TestOpenAIGatewayHandlerResponses_NvidiaHTTPErrorDoesNotSelectAnotherAccount(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	groupID := int64(3132)
+	accounts := []service.Account{
+		{
+			ID:          1,
+			Name:        "nvidia-account-1",
+			Platform:    service.PlatformNvidia,
+			Type:        service.AccountTypeAPIKey,
+			Status:      service.StatusActive,
+			Schedulable: true,
+			Concurrency: 0,
+			Priority:    0,
+			Credentials: map[string]any{"api_key": "key-1", "base_url": "http://upstream.example"},
+		},
+		{
+			ID:          2,
+			Name:        "nvidia-account-2",
+			Platform:    service.PlatformNvidia,
+			Type:        service.AccountTypeAPIKey,
+			Status:      service.StatusActive,
+			Schedulable: true,
+			Concurrency: 0,
+			Priority:    1,
+			Credentials: map[string]any{"api_key": "key-2", "base_url": "http://upstream.example"},
+		},
+	}
+	upstream := &openAIResponsesFailoverCancelUpstream{}
+	cfg := &config.Config{
+		RunMode: config.RunModeSimple,
+		Security: config.SecurityConfig{
+			URLAllowlist: config.URLAllowlistConfig{AllowInsecureHTTP: true},
+		},
+	}
+	gatewayService := service.NewOpenAIGatewayService(
+		openAIImagesFailoverAccountRepo{accounts: accounts},
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		cfg,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		upstream,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+	)
+	billingService := service.NewBillingCacheService(nil, nil, nil, nil, nil, nil, cfg, nil)
+	t.Cleanup(billingService.Stop)
+	handler := NewOpenAIGatewayHandler(
+		gatewayService,
+		service.NewConcurrencyService(nil),
+		billingService,
+		service.NewAPIKeyService(nil, nil, nil, nil, nil, nil, cfg),
+		nil,
+		nil,
+		nil,
+		nil,
+		cfg,
+	)
+	handler.maxAccountSwitches = 10
+
+	body := []byte(`{"model":"nvidia/test","stream":true,"input":"hello"}`)
+	req := httptest.NewRequest(http.MethodPost, "/v1/responses", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Request = req
+	c.Set(string(middleware2.ContextKeyAPIKey), &service.APIKey{
+		ID:      99,
+		GroupID: &groupID,
+		Group: &service.Group{
+			ID:       groupID,
+			Platform: service.PlatformNvidia,
+		},
+		User: &service.User{ID: 100},
+	})
+	c.Set(string(middleware2.ContextKeyUser), middleware2.AuthSubject{UserID: 100, Concurrency: 0})
+
+	handler.Responses(c)
+
+	require.Equal(t, []int64{1}, upstream.calls(), "NVIDIA first-output errors must not start another account attempt")
+	require.Equal(t, 520, rec.Code)
+	require.Equal(t, "upstream_error", gjson.GetBytes(rec.Body.Bytes(), "error.type").String())
+	require.NotContains(t, rec.Body.String(), "response.failed")
+}

@@ -503,6 +503,14 @@ func patchGrokResponsesBodyBase(body []byte, upstreamModel string) ([]byte, erro
 	if err != nil {
 		return nil, err
 	}
+	out, err = normalizeGrokForcedFunctionToolChoice(out)
+	if err != nil {
+		return nil, err
+	}
+	out, err = normalizeGrokSimpleFunctionToolInput(out)
+	if err != nil {
+		return nil, err
+	}
 	return out, nil
 }
 
@@ -922,6 +930,173 @@ func shouldDropGrokToolChoice(toolChoice gjson.Result, tools []json.RawMessage) 
 		return true
 	}
 	return false
+}
+
+// normalizeGrokForcedFunctionToolChoice avoids an xAI CLI Responses failure
+// mode where a named function choice is accepted but ignored. Restricting the
+// declaration set to the selected function and using required preserves the
+// forced-choice semantics while taking the reliable upstream path.
+func normalizeGrokForcedFunctionToolChoice(body []byte) ([]byte, error) {
+	toolChoice := gjson.GetBytes(body, "tool_choice")
+	if !toolChoice.IsObject() || strings.TrimSpace(toolChoice.Get("type").String()) != "function" {
+		return body, nil
+	}
+	choiceName := strings.TrimSpace(toolChoice.Get("name").String())
+	if choiceName == "" {
+		choiceName = strings.TrimSpace(toolChoice.Get("function.name").String())
+	}
+	if choiceName == "" {
+		return body, nil
+	}
+
+	tools := gjson.GetBytes(body, "tools")
+	if !tools.IsArray() {
+		return body, nil
+	}
+	selected := make([]json.RawMessage, 0, 1)
+	for _, tool := range tools.Array() {
+		if strings.TrimSpace(tool.Get("type").String()) != "function" || strings.TrimSpace(tool.Get("name").String()) != choiceName {
+			continue
+		}
+		selected = append(selected, json.RawMessage(tool.Raw))
+		break
+	}
+	if len(selected) == 0 {
+		return body, nil
+	}
+
+	encoded, err := json.Marshal(selected)
+	if err != nil {
+		return nil, err
+	}
+	out, err := sjson.SetRawBytes(body, "tools", encoded)
+	if err != nil {
+		return nil, err
+	}
+	return sjson.SetBytes(out, "tool_choice", "required")
+}
+
+// normalizeGrokSimpleFunctionToolInput works around an xAI CLI Responses
+// incompatibility: a first-turn message array can ignore client function tools
+// and exhaust the output budget, while the equivalent input string calls the
+// tool normally. Only flatten a lossless, plain-text first turn; structured or
+// multi-turn input remains untouched.
+func normalizeGrokSimpleFunctionToolInput(body []byte) ([]byte, error) {
+	tools := gjson.GetBytes(body, "tools")
+	if !tools.IsArray() {
+		return body, nil
+	}
+	hasFunctionTool := false
+	for _, tool := range tools.Array() {
+		if strings.TrimSpace(tool.Get("type").String()) == "function" && strings.TrimSpace(tool.Get("name").String()) != "" {
+			hasFunctionTool = true
+			break
+		}
+	}
+	if !hasFunctionTool || !grokToolChoiceAllowsClientFunction(gjson.GetBytes(body, "tool_choice")) {
+		return body, nil
+	}
+
+	input := gjson.GetBytes(body, "input")
+	if !input.IsArray() {
+		return body, nil
+	}
+	items := input.Array()
+	if len(items) == 0 {
+		return body, nil
+	}
+
+	instructionParts := make([]string, 0, len(items)+1)
+	if instructions := gjson.GetBytes(body, "instructions"); instructions.Exists() {
+		if instructions.Type != gjson.String {
+			return body, nil
+		}
+		if text := instructions.String(); strings.TrimSpace(text) != "" {
+			instructionParts = append(instructionParts, text)
+		}
+	}
+
+	userText := ""
+	userMessages := 0
+	seenUser := false
+	for _, item := range items {
+		if !item.IsObject() || strings.TrimSpace(item.Get("type").String()) != "message" {
+			return body, nil
+		}
+		text, ok := grokPlainTextMessageContent(item.Get("content"))
+		if !ok {
+			return body, nil
+		}
+		switch strings.TrimSpace(item.Get("role").String()) {
+		case "developer", "system":
+			if seenUser {
+				return body, nil
+			}
+			if strings.TrimSpace(text) != "" {
+				instructionParts = append(instructionParts, text)
+			}
+		case "user":
+			seenUser = true
+			userMessages++
+			userText = text
+		default:
+			return body, nil
+		}
+	}
+	if userMessages != 1 || strings.TrimSpace(userText) == "" {
+		return body, nil
+	}
+
+	out, err := sjson.SetBytes(body, "input", userText)
+	if err != nil {
+		return nil, err
+	}
+	if len(instructionParts) == 0 {
+		return out, nil
+	}
+	return sjson.SetBytes(out, "instructions", strings.Join(instructionParts, "\n\n"))
+}
+
+func grokToolChoiceAllowsClientFunction(toolChoice gjson.Result) bool {
+	if !toolChoice.Exists() {
+		return true
+	}
+	if toolChoice.Type == gjson.String {
+		switch strings.TrimSpace(toolChoice.String()) {
+		case "auto", "required":
+			return true
+		default:
+			return false
+		}
+	}
+	return toolChoice.IsObject() && strings.TrimSpace(toolChoice.Get("type").String()) == "function"
+}
+
+func grokPlainTextMessageContent(content gjson.Result) (string, bool) {
+	if content.Type == gjson.String {
+		return content.String(), true
+	}
+	if !content.IsArray() {
+		return "", false
+	}
+	parts := content.Array()
+	var text strings.Builder
+	for _, part := range parts {
+		if !part.IsObject() {
+			return "", false
+		}
+		switch strings.TrimSpace(part.Get("type").String()) {
+		case "input_text", "text":
+		default:
+			return "", false
+		}
+		value := part.Get("text")
+		if value.Type != gjson.String {
+			return "", false
+		}
+		_, _ = text.WriteString(value.String())
+	}
+	return text.String(), true
 }
 
 func (s *OpenAIGatewayService) bridgeGrokComposerImageInputs(
