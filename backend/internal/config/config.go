@@ -3165,6 +3165,9 @@ func (c *Config) Validate() error {
 		}
 	}
 	if c.HeartbeatProvisioning.Enabled {
+		if !c.Server.TrustedProxiesConfigured || len(c.Server.TrustedProxies) == 0 {
+			return fmt.Errorf("server.trusted_proxies is required when heartbeat_provisioning is enabled")
+		}
 		vaultURL, err := url.Parse(strings.TrimSpace(c.HeartbeatProvisioning.VaultURL))
 		if err != nil || vaultURL.Host == "" || (vaultURL.Scheme != "https" && (vaultURL.Scheme != "http" || !c.HeartbeatProvisioning.AllowInsecureVault)) {
 			return fmt.Errorf("heartbeat_provisioning.vault_url must use HTTPS unless heartbeat_provisioning.allow_insecure_vault=true")

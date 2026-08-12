@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/pkg/ip"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/gin-gonic/gin"
 )
@@ -71,7 +72,9 @@ func (h *HeartbeatHandler) Handle(c *gin.Context) {
 			CheckedAt:   checkedAt,
 		})
 	}
-	sourceIP := c.ClientIP()
+	// Heartbeats are source-IP restricted. Resolve the IP only through Gin's
+	// configured trusted-proxy chain; never use compatibility forwarding headers.
+	sourceIP := ip.GetSecurityClientIP(c, false)
 	accepted, err := h.provisioning.Queue(c.Request.Context(), sourceIP, request.SessionKey, time.Unix(request.Timestamp, 0), keys)
 	if err != nil {
 		switch {
