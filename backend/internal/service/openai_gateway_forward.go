@@ -30,9 +30,6 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 	logCodexCLIOnlyDetection(ctx, c, account, apiKeyID, restrictionResult, body)
 	if restrictionResult.Enabled && !restrictionResult.Matched {
 		MarkOpsClientBusinessLimited(c, OpsClientBusinessLimitedReasonLocalPolicyDenied)
-		if writeOpenAIResponsesErrorAfterKeepalive(c, http.StatusForbidden, "forbidden_error", CodexClientRestrictionMessage(restrictionResult)) {
-			return nil, errors.New("codex_cli_only restriction: only codex official clients are allowed")
-		}
 		c.JSON(http.StatusForbidden, gin.H{
 			"error": gin.H{
 				"type":    "forbidden_error",
@@ -63,9 +60,6 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 		liteBody, changed, liteErr := normalizeOpenAIResponsesLiteToolsPayload(body)
 		if liteErr != nil {
 			setOpsUpstreamError(c, http.StatusBadRequest, liteErr.Error(), "")
-			if writeOpenAIResponsesErrorAfterKeepalive(c, http.StatusBadRequest, "invalid_request_error", liteErr.Error()) {
-				return nil, liteErr
-			}
 			c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{
 				"type": "invalid_request_error", "message": liteErr.Error(), "param": "tools",
 			}})
@@ -84,9 +78,6 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 		body, err = flattenOpenAIResponsesNamespaces(c, body)
 		if err != nil {
 			setOpsUpstreamError(c, http.StatusBadRequest, err.Error(), "")
-			if writeOpenAIResponsesErrorAfterKeepalive(c, http.StatusBadRequest, "invalid_request_error", err.Error()) {
-				return nil, err
-			}
 			c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{
 				"type": "invalid_request_error", "message": err.Error(), "param": "tools",
 			}})
@@ -100,9 +91,6 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 		body, err = stripOpenAIResponsesInputNamespaces(body, keepToolCallNamespaces)
 		if err != nil {
 			setOpsUpstreamError(c, http.StatusBadRequest, err.Error(), "")
-			if writeOpenAIResponsesErrorAfterKeepalive(c, http.StatusBadRequest, "invalid_request_error", err.Error()) {
-				return nil, err
-			}
 			c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{
 				"type": "invalid_request_error", "message": err.Error(), "param": "input",
 			}})

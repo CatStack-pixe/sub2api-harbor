@@ -255,12 +255,6 @@ func normalizeStorageConfig(cfg *storageConfig) {
 }
 
 func validateStorageConfig(cfg storageConfig) error {
-	if cfg.CaptureOnly && cfg.BlockingEnabled {
-		return infraerrors.BadRequest("prompt_audit_capture_only_blocking", "仅记录模式不支持同步阻止")
-	}
-	if cfg.CaptureOnly && !cfg.StorePassEvents {
-		return infraerrors.BadRequest("prompt_audit_capture_only_requires_pass_events", "仅记录模式必须保存安全事件")
-	}
 	if cfg.BlockingEnabled && !cfg.Enabled {
 		return infraerrors.BadRequest(ErrorCodeRequiresEnabled, "开启同步阻止前必须先启用提示词审计")
 	}
@@ -272,6 +266,9 @@ func validateStorageConfig(cfg storageConfig) error {
 	}
 	if cfg.QueueCapacity < 1 || cfg.QueueCapacity > MaxQueueCapacity {
 		return infraerrors.BadRequest("prompt_audit_invalid_queue_capacity", "队列容量超出允许范围")
+	}
+	if !cfg.AllGroups && len(cfg.GroupIDs) == 0 {
+		return infraerrors.BadRequest("prompt_audit_groups_required", "指定分组模式至少需要选择一个分组")
 	}
 	if len(cfg.Scanners) == 0 {
 		return infraerrors.BadRequest("prompt_audit_scanners_required", "至少需要启用一个风险分类")
@@ -302,19 +299,13 @@ func validateStorageConfig(cfg storageConfig) error {
 			enabled++
 		}
 	}
-	if cfg.Enabled && !cfg.CaptureOnly && enabled == 0 {
+	if cfg.Enabled && enabled == 0 {
 		return infraerrors.BadRequest("prompt_audit_endpoint_required", "启用提示词审计前至少需要启用一个审计节点")
 	}
 	return nil
 }
 
 func validateUpdateConfigRequest(req UpdateConfigRequest) error {
-	if req.CaptureOnly && req.BlockingEnabled {
-		return infraerrors.BadRequest("prompt_audit_capture_only_blocking", "仅记录模式不支持同步阻止")
-	}
-	if req.CaptureOnly && !req.StorePassEvents {
-		return infraerrors.BadRequest("prompt_audit_capture_only_requires_pass_events", "仅记录模式必须保存安全事件")
-	}
 	if strings.TrimSpace(req.Strategy) != "priority" {
 		return infraerrors.BadRequest("prompt_audit_invalid_strategy", "提示词审计策略仅支持 priority")
 	}
@@ -333,6 +324,9 @@ func validateUpdateConfigRequest(req UpdateConfigRequest) error {
 		}
 	}
 	if !req.AllGroups {
+		if len(req.GroupIDs) == 0 {
+			return infraerrors.BadRequest("prompt_audit_groups_required", "指定分组模式至少需要选择一个分组")
+		}
 		for _, groupID := range req.GroupIDs {
 			if groupID <= 0 {
 				return infraerrors.BadRequest("prompt_audit_invalid_group", "提示词审计分组 ID 无效")

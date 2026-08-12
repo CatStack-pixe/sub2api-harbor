@@ -70,19 +70,18 @@ type fakeJobRepository struct {
 	retryErr    error
 	failErr     error
 
-	createdSnapshot   PromptSnapshot
-	markedCode        string
-	completedResult   *NormalizedResult
-	completedSnapshot PromptSnapshot
-	completedStore    bool
-	completeCount     int
-	eventCount        int
-	retryAt           time.Time
-	retryCode         string
-	retried           int
-	failedCode        string
-	failed            int
-	refreshes         int
+	createdSnapshot PromptSnapshot
+	markedCode      string
+	completedResult *NormalizedResult
+	completedStore  bool
+	completeCount   int
+	eventCount      int
+	retryAt         time.Time
+	retryCode       string
+	retried         int
+	failedCode      string
+	failed          int
+	refreshes       int
 
 	claimQueue []*Job
 
@@ -140,11 +139,10 @@ func (r *fakeJobRepository) RefreshLease(context.Context, int64, int64, time.Tim
 	r.refreshes++
 	return r.refreshErr
 }
-func (r *fakeJobRepository) Complete(_ context.Context, job *Job, result *NormalizedResult, storePass bool) (*Event, error) {
+func (r *fakeJobRepository) Complete(_ context.Context, _ *Job, result *NormalizedResult, storePass bool) (*Event, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.completeCount++
-	r.completedSnapshot = job.Snapshot
 	r.completedResult, r.completedStore = result, storePass
 	if r.completeErr != nil {
 		return nil, r.completeErr
@@ -386,31 +384,6 @@ func TestWorkerCompletesPassWithoutEventRefreshesEveryChunkAndDeletesPayload(t *
 	require.Equal(t, []int64{51}, payload.deleted)
 	require.Equal(t, int64(1), metrics.Snapshot().Total)
 	require.Equal(t, int64(1), metrics.Snapshot().Allowed)
-}
-
-func TestCaptureOnlyEnqueuesAndStoresFullPromptWithoutScanner(t *testing.T) {
-	cfg := asyncConfig()
-	cfg.CaptureOnly = true
-	cfg.StorePassEvents = true
-	cfg.Endpoints = nil
-
-	enqueueRepo := &fakeJobRepository{createJob: &Job{ID: 51}}
-	payload := &fakePayloadStore{values: map[int64]string{}}
-	require.NoError(t, NewEnqueuer(&fakeConfigStore{cfg: cfg, active: true}, enqueueRepo, payload).Enqueue(context.Background(), asyncRequest()))
-	require.Equal(t, "payload canary text", payload.values[51])
-
-	repo := &fakeJobRepository{}
-	scanner := PromptScannerFunc(func(context.Context, ActiveEndpoint, string, []string) (*NormalizedResult, error) {
-		t.Fatal("capture-only mode must not call an audit scanner")
-		return nil, nil
-	})
-	runner := NewRunner(&fakeConfigStore{cfg: cfg, active: true}, repo, payload, scanner, NewAtomicMetrics())
-	require.NoError(t, runner.processJob(context.Background(), 0, cfg, workerJob(1, 3)))
-	require.Equal(t, "payload canary text", repo.completedSnapshot.FullPrompt)
-	require.Equal(t, "capture-only", repo.completedResult.ScannerBackend)
-	require.Equal(t, EventPass, repo.completedResult.Decision)
-	require.True(t, repo.completedStore)
-	require.Equal(t, []int64{51}, payload.deleted)
 }
 
 func TestWorkerRetryBackoffTerminalFailureAndFailover(t *testing.T) {

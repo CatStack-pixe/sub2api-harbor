@@ -194,12 +194,6 @@ export default {
       nvidia: {
         description: 'Configure OpenCode to send NVIDIA NIM Chat Completions traffic through your Sub2API NVIDIA group.',
       },
-      deepseek: {
-        description: 'Configure OpenCode to send DeepSeek Chat Completions traffic through your Sub2API DeepSeek group.',
-      },
-      nvidia: {
-        description: 'Configure OpenCode to send NVIDIA NIM Chat Completions traffic through your Sub2API NVIDIA group.',
-      },
       opencode: {
         title: 'OpenCode Example',
         subtitle: 'opencode.json',

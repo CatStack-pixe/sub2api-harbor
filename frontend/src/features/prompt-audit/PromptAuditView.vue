@@ -42,15 +42,7 @@
             <RuntimeOverview :runtime="runtime" :loading="loading.runtime" :error="loadErrors.runtime" @refresh="loadRuntime" />
 
             <template v-if="draft">
-              <div
-                v-if="draft.capture_only"
-                data-test="capture-only-notice"
-                class="mt-6 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900 dark:border-emerald-900/70 dark:bg-emerald-950/30 dark:text-emerald-200"
-              >
-                {{ t('admin.promptAudit.captureOnly.notice') }}
-              </div>
               <EndpointPool
-                v-else
                 :endpoints="draft.endpoints"
                 :probe-results="probeResults"
                 :probing-ids="probingIds"
@@ -147,15 +139,7 @@
       @confirm="confirmFilterDelete"
       @criteria-change="clearDeletePreview"
     />
-	<EventDetailDialog
-	  :show="showEventDetail"
-	  :event="activeEvent"
-	  :loading="loading.detail"
-	  :notice-sending="loading.notice"
-	  :notice-version="noticeVersion"
-	  @queue-notice="queueEventIPNotice"
-	  @close="closeEventDetail"
-	/>
+    <EventDetailDialog :show="showEventDetail" :event="activeEvent" :loading="loading.detail" @close="closeEventDetail" />
   </AppLayout>
 </template>
 
@@ -205,7 +189,6 @@ const appliedFilters = ref<PromptEventFilters>(emptyEventFilters())
 const selectedEventIds = ref<number[]>([])
 const activeEvent = ref<PromptAuditEvent | null>(null)
 const showEventDetail = ref(false)
-const noticeVersion = ref(0)
 const probeResults = reactive<Record<string, PromptProbeResult>>({})
 const probingIds = ref<string[]>([])
 const showFilterDelete = ref(false)
@@ -213,7 +196,7 @@ const deletePreview = ref<PromptDeletePreview | null>(null)
 const deletePreviewFilters = ref<PromptEventFilters | null>(null)
 const showBlockingConfirmation = ref(false)
 const deleteRequest = reactive<{ mode: '' | 'single' | 'batch'; ids: number[] }>({ mode: '', ids: [] })
-const loading = reactive({ config: false, runtime: false, groups: false, events: false, saving: false, detail: false, notice: false, deleting: false, previewing: false })
+const loading = reactive({ config: false, runtime: false, groups: false, events: false, saving: false, detail: false, deleting: false, previewing: false })
 const loadErrors = reactive<PromptLoadErrors>({ config: '', runtime: '', groups: '', events: '' })
 const dirty = computed(() => draftFingerprint(draft.value) !== draftFingerprint(serverConfig.value))
 
@@ -316,18 +299,9 @@ function setEnabled(value: boolean) {
   replaceDraft({ ...draft.value, enabled: value, blocking_enabled: value ? draft.value.blocking_enabled : false })
 }
 function setBlocking(value: boolean) {
-  if (!draft.value || !draft.value.enabled || draft.value.capture_only) return
+  if (!draft.value || !draft.value.enabled) return
   if (value && !draft.value.blocking_enabled) { showBlockingConfirmation.value = true; return }
   replaceDraft({ ...draft.value, blocking_enabled: value })
-}
-function setCaptureOnly(value: boolean) {
-  if (!draft.value) return
-  replaceDraft({
-    ...draft.value,
-    capture_only: value,
-    blocking_enabled: value ? false : draft.value.blocking_enabled,
-    store_pass_events: value ? true : draft.value.store_pass_events,
-  })
 }
 function confirmBlocking() {
   showBlockingConfirmation.value = false
@@ -389,19 +363,6 @@ async function openEvent(id: number) {
   finally { loading.detail = false }
 }
 function closeEventDetail() { showEventDetail.value = false; activeEvent.value = null }
-async function queueEventIPNotice(message: string) {
-  if (!activeEvent.value || loading.notice) return
-  loading.notice = true
-  try {
-    const notice = await promptAuditAPI.queueIPNotice(activeEvent.value.id, message)
-    noticeVersion.value++
-    appStore.showSuccess(t('admin.promptAudit.messages.ipNoticeQueued', { ip: notice.client_ip }))
-  } catch (error) {
-    appStore.showError(errorMessage(error, 'admin.promptAudit.errors.ipNotice'))
-  } finally {
-    loading.notice = false
-  }
-}
 function requestSingleDelete(id: number) { deleteRequest.mode = 'single'; deleteRequest.ids = [id] }
 function requestBatchDelete() { if (selectedEventIds.value.length) { deleteRequest.mode = 'batch'; deleteRequest.ids = [...selectedEventIds.value] } }
 function clearDeleteRequest() { deleteRequest.mode = ''; deleteRequest.ids = [] }

@@ -3,7 +3,6 @@ package apicompat
 import (
 	"encoding/json"
 	"fmt"
-	"sort"
 	"strings"
 	"time"
 )
@@ -173,26 +172,12 @@ func sanitizeAnthropicToolUseInput(name string, raw string) json.RawMessage {
 
 // ResponsesEventToAnthropicState tracks state for converting a sequence of
 // Responses SSE events directly into Anthropic SSE events.
-type responsesAnthropicToolBlockState struct {
-	OutputIndex int
-	BlockIndex  int
-	CallID      string
-	Name        string
-	Arguments   string
-	HadDelta    bool
-	Open        bool
-	StopSent    bool
-}
-
 type ResponsesEventToAnthropicState struct {
 	MessageStartSent bool
 	MessageStopSent  bool
 
-	// ContentBlockIndex is the next Anthropic content block index to allocate.
 	ContentBlockIndex   int
 	ContentBlockOpen    bool
-	CurrentBlockIndex   int
-	CurrentOutputIndex  int
 	CurrentBlockType    string // "text" | "thinking" | "tool_use"
 	CurrentToolName     string
 	CurrentToolArgs     string
@@ -204,10 +189,6 @@ type ResponsesEventToAnthropicState struct {
 
 	// OutputIndexToBlockIdx maps Responses output_index → Anthropic content block index.
 	OutputIndexToBlockIdx map[int]int
-	// Tool state is kept independently because Responses can interleave calls
-	// before their arguments.done events arrive.
-	toolBlocksByOutput map[int]*responsesAnthropicToolBlockState
-	toolOutputByCallID map[string]int
 
 	InputTokens              int
 	OutputTokens             int
@@ -223,8 +204,6 @@ type ResponsesEventToAnthropicState struct {
 func NewResponsesEventToAnthropicState() *ResponsesEventToAnthropicState {
 	return &ResponsesEventToAnthropicState{
 		OutputIndexToBlockIdx: make(map[int]int),
-		toolBlocksByOutput:    make(map[int]*responsesAnthropicToolBlockState),
-		toolOutputByCallID:    make(map[string]int),
 		Created:               time.Now().Unix(),
 	}
 }
@@ -243,12 +222,12 @@ func ResponsesEventToAnthropicEvents(
 	case "response.output_text.delta":
 		return resToAnthHandleTextDelta(evt, state)
 	case "response.output_text.done":
-		return resToAnthHandleBlockDone(evt, state)
+		return resToAnthHandleBlockDone(state)
 	case "response.function_call_arguments.delta",
 		// custom/freeform 工具的输入增量与 function_call 参数增量同形。
 		"response.custom_tool_call_input.delta":
 		return resToAnthHandleFuncArgsDelta(evt, state)
-	case "response.function_call_arguments.done", "response.custom_tool_call_input.done":
+	case "response.function_call_arguments.done":
 		return resToAnthHandleFuncArgsDone(evt, state)
 	case "response.output_item.done":
 		return resToAnthHandleOutputItemDone(evt, state)
@@ -278,7 +257,7 @@ func FinalizeResponsesAnthropicStream(state *ResponsesEventToAnthropicState) []A
 	}
 
 	var events []AnthropicStreamEvent
-	events = append(events, closeAllOpenBlocks(state)...)
+	events = append(events, closeCurrentBlock(state)...)
 
 	stopReason := "end_turn"
 	if state.HasToolCall {
@@ -359,31 +338,16 @@ func resToAnthHandleOutputItemAdded(evt *ResponsesStreamEvent, state *ResponsesE
 	// function_call 与 custom_tool_call（custom/freeform 工具，如新版 apply_patch）
 	// 同样映射为 Anthropic 的 tool_use 块。
 	case "function_call", "custom_tool_call":
-		state.ensureToolBlockMaps()
-		if existing := state.findToolBlock(evt); existing != nil {
-			return nil
-		}
+		var events []AnthropicStreamEvent
+		events = append(events, closeCurrentBlock(state)...)
 
-		events := closeCurrentNonToolBlock(state)
-		idx := allocateAnthropicContentBlockIndex(state)
-		arguments := evt.Item.Arguments
-		if evt.Item.Type == "custom_tool_call" {
-			arguments = evt.Item.Input
-		}
-		tool := &responsesAnthropicToolBlockState{
-			OutputIndex: evt.OutputIndex,
-			BlockIndex:  idx,
-			CallID:      evt.Item.CallID,
-			Name:        evt.Item.Name,
-			Arguments:   arguments,
-			Open:        true,
-		}
+		idx := state.ContentBlockIndex
 		state.OutputIndexToBlockIdx[evt.OutputIndex] = idx
-		state.toolBlocksByOutput[evt.OutputIndex] = tool
-		if tool.CallID != "" {
-			state.toolOutputByCallID[tool.CallID] = evt.OutputIndex
-		}
-		state.mirrorToolBlock(tool)
+		state.ContentBlockOpen = true
+		state.CurrentBlockType = "tool_use"
+		state.CurrentToolName = evt.Item.Name
+		state.CurrentToolArgs = ""
+		state.CurrentToolHadDelta = false
 		state.HasToolCall = true
 
 		events = append(events, AnthropicStreamEvent{
@@ -399,13 +363,12 @@ func resToAnthHandleOutputItemAdded(evt *ResponsesStreamEvent, state *ResponsesE
 		return events
 
 	case "reasoning":
-		events := closeCurrentNonToolBlock(state)
+		var events []AnthropicStreamEvent
+		events = append(events, closeCurrentBlock(state)...)
 
-		idx := allocateAnthropicContentBlockIndex(state)
+		idx := state.ContentBlockIndex
 		state.OutputIndexToBlockIdx[evt.OutputIndex] = idx
 		state.ContentBlockOpen = true
-		state.CurrentBlockIndex = idx
-		state.CurrentOutputIndex = evt.OutputIndex
 		state.CurrentBlockType = "thinking"
 		state.PendingThinkingSignature = strings.TrimSpace(evt.Item.EncryptedContent)
 
@@ -434,13 +397,10 @@ func resToAnthHandleTextDelta(evt *ResponsesStreamEvent, state *ResponsesEventTo
 	var events []AnthropicStreamEvent
 
 	if !state.ContentBlockOpen || state.CurrentBlockType != "text" {
-		events = append(events, closeCurrentNonToolBlock(state)...)
+		events = append(events, closeCurrentBlock(state)...)
 
-		idx := allocateAnthropicContentBlockIndex(state)
-		state.OutputIndexToBlockIdx[evt.OutputIndex] = idx
+		idx := state.ContentBlockIndex
 		state.ContentBlockOpen = true
-		state.CurrentBlockIndex = idx
-		state.CurrentOutputIndex = evt.OutputIndex
 		state.CurrentBlockType = "text"
 
 		events = append(events, AnthropicStreamEvent{
@@ -453,7 +413,7 @@ func resToAnthHandleTextDelta(evt *ResponsesStreamEvent, state *ResponsesEventTo
 		})
 	}
 
-	idx := state.CurrentBlockIndex
+	idx := state.ContentBlockIndex
 	events = append(events, AnthropicStreamEvent{
 		Type:  "content_block_delta",
 		Index: &idx,
@@ -470,25 +430,21 @@ func resToAnthHandleFuncArgsDelta(evt *ResponsesStreamEvent, state *ResponsesEve
 		return nil
 	}
 
-	tool := state.findOrCreateLegacyToolBlock(evt)
-	if tool == nil || !tool.Open || tool.StopSent {
-		return nil
-	}
-
-	tool.Arguments += evt.Delta
-	state.mirrorToolBlock(tool)
-
-	if tool.Name == "Read" {
-		if tool.HadDelta || !json.Valid([]byte(tool.Arguments)) {
+	if state.CurrentBlockType == "tool_use" && state.CurrentToolName == "Read" {
+		state.CurrentToolArgs += evt.Delta
+		if state.CurrentToolHadDelta || !json.Valid([]byte(state.CurrentToolArgs)) {
 			return nil
 		}
 
-		tool.HadDelta = true
-		state.mirrorToolBlock(tool)
-		sanitized := sanitizeAnthropicToolUseInput(tool.Name, tool.Arguments)
+		blockIdx, ok := state.OutputIndexToBlockIdx[evt.OutputIndex]
+		if !ok {
+			return nil
+		}
+		state.CurrentToolHadDelta = true
+		sanitized := sanitizeAnthropicToolUseInput(state.CurrentToolName, state.CurrentToolArgs)
 		return []AnthropicStreamEvent{{
 			Type:  "content_block_delta",
-			Index: &tool.BlockIndex,
+			Index: &blockIdx,
 			Delta: &AnthropicDelta{
 				Type:        "input_json_delta",
 				PartialJSON: string(sanitized),
@@ -496,12 +452,18 @@ func resToAnthHandleFuncArgsDelta(evt *ResponsesStreamEvent, state *ResponsesEve
 		}}
 	}
 
-	tool.HadDelta = true
-	state.mirrorToolBlock(tool)
+	if state.CurrentBlockType == "tool_use" {
+		state.CurrentToolHadDelta = true
+	}
+
+	blockIdx, ok := state.OutputIndexToBlockIdx[evt.OutputIndex]
+	if !ok {
+		return nil
+	}
 
 	return []AnthropicStreamEvent{{
 		Type:  "content_block_delta",
-		Index: &tool.BlockIndex,
+		Index: &blockIdx,
 		Delta: &AnthropicDelta{
 			Type:        "input_json_delta",
 			PartialJSON: evt.Delta,
@@ -510,18 +472,49 @@ func resToAnthHandleFuncArgsDelta(evt *ResponsesStreamEvent, state *ResponsesEve
 }
 
 func resToAnthHandleFuncArgsDone(evt *ResponsesStreamEvent, state *ResponsesEventToAnthropicState) []AnthropicStreamEvent {
-	tool := state.findOrCreateLegacyToolBlock(evt)
-	if tool == nil || !tool.Open || tool.StopSent {
+	if !state.ContentBlockOpen {
 		return nil
 	}
+	if state.CurrentBlockType != "tool_use" {
+		return resToAnthHandleBlockDone(state)
+	}
+
 	raw := evt.Arguments
 	if raw == "" {
-		raw = evt.Input
+		raw = state.CurrentToolArgs
 	}
-	if raw == "" {
-		raw = tool.Arguments
+	if raw == "" || state.CurrentToolHadDelta {
+		return closeCurrentBlock(state)
 	}
-	return emitToolArgumentsAndClose(state, tool, raw)
+	if state.CurrentToolName == "Read" {
+		sanitized := sanitizeAnthropicToolUseInput(state.CurrentToolName, raw)
+		if len(sanitized) == 0 {
+			return closeCurrentBlock(state)
+		}
+		raw = string(sanitized)
+	}
+
+	// 从事件的 OutputIndex 解析正确的 block index，与 resToAnthHandleFuncArgsDelta 对齐
+	blockIdx, ok := state.OutputIndexToBlockIdx[evt.OutputIndex]
+	if !ok {
+		blockIdx = state.ContentBlockIndex
+	}
+
+	// 如果 block 已关闭（ContentBlockIndex 已越过它），说明 arguments 已通过 delta 流式发完，不再补发
+	if !state.ContentBlockOpen || blockIdx != state.ContentBlockIndex {
+		return nil
+	}
+
+	events := []AnthropicStreamEvent{{
+		Type:  "content_block_delta",
+		Index: &blockIdx,
+		Delta: &AnthropicDelta{
+			Type:        "input_json_delta",
+			PartialJSON: raw,
+		},
+	}}
+	events = append(events, closeCurrentBlock(state)...)
+	return events
 }
 
 func resToAnthHandleReasoningDelta(evt *ResponsesStreamEvent, state *ResponsesEventToAnthropicState) []AnthropicStreamEvent {
@@ -544,11 +537,8 @@ func resToAnthHandleReasoningDelta(evt *ResponsesStreamEvent, state *ResponsesEv
 	}}
 }
 
-func resToAnthHandleBlockDone(evt *ResponsesStreamEvent, state *ResponsesEventToAnthropicState) []AnthropicStreamEvent {
-	if !state.ContentBlockOpen || state.CurrentBlockType != "text" {
-		return nil
-	}
-	if blockIdx, ok := state.OutputIndexToBlockIdx[evt.OutputIndex]; ok && blockIdx != state.CurrentBlockIndex {
+func resToAnthHandleBlockDone(state *ResponsesEventToAnthropicState) []AnthropicStreamEvent {
+	if !state.ContentBlockOpen {
 		return nil
 	}
 	return closeCurrentBlock(state)
@@ -564,32 +554,16 @@ func resToAnthHandleOutputItemDone(evt *ResponsesStreamEvent, state *ResponsesEv
 		return resToAnthHandleWebSearchDone(evt, state)
 	}
 
-	switch evt.Item.Type {
-	case "function_call", "custom_tool_call":
-		tool := state.findOrCreateLegacyToolBlock(evt)
-		if tool == nil || !tool.Open || tool.StopSent {
-			return nil
-		}
-		raw := evt.Item.Arguments
-		if evt.Item.Type == "custom_tool_call" {
-			raw = evt.Item.Input
-		}
-		if raw == "" {
-			raw = tool.Arguments
-		}
-		return emitToolArgumentsAndClose(state, tool, raw)
-
-	case "reasoning":
-		// Capture encrypted_content on reasoning item done (often only present here).
+	// Capture encrypted_content on reasoning item done (often only present here).
+	if evt.Item.Type == "reasoning" {
 		if sig := strings.TrimSpace(evt.Item.EncryptedContent); sig != "" {
 			state.PendingThinkingSignature = sig
 		}
-		return closeCurrentOutputBlock(evt, state, "thinking")
-
-	case "message":
-		return closeCurrentOutputBlock(evt, state, "text")
 	}
 
+	if state.ContentBlockOpen {
+		return closeCurrentBlock(state)
+	}
 	return nil
 }
 
@@ -598,7 +572,7 @@ func resToAnthHandleOutputItemDone(evt *ResponsesStreamEvent, state *ResponsesEv
 // This allows Claude Code to count the searches performed.
 func resToAnthHandleWebSearchDone(evt *ResponsesStreamEvent, state *ResponsesEventToAnthropicState) []AnthropicStreamEvent {
 	var events []AnthropicStreamEvent
-	events = append(events, closeCurrentNonToolBlock(state)...)
+	events = append(events, closeCurrentBlock(state)...)
 
 	toolUseID := "srvtoolu_" + evt.Item.ID
 	query := ""
@@ -608,7 +582,7 @@ func resToAnthHandleWebSearchDone(evt *ResponsesStreamEvent, state *ResponsesEve
 	inputJSON, _ := json.Marshal(map[string]string{"query": query})
 
 	// Emit server_tool_use block (start + stop).
-	idx1 := allocateAnthropicContentBlockIndex(state)
+	idx1 := state.ContentBlockIndex
 	events = append(events, AnthropicStreamEvent{
 		Type:  "content_block_start",
 		Index: &idx1,
@@ -623,12 +597,13 @@ func resToAnthHandleWebSearchDone(evt *ResponsesStreamEvent, state *ResponsesEve
 		Type:  "content_block_stop",
 		Index: &idx1,
 	})
+	state.ContentBlockIndex++
 
 	// Emit web_search_tool_result block (start + stop).
 	// Content is empty because OpenAI does not expose individual search results;
 	// the model consumes them internally and produces text output.
 	emptyResults, _ := json.Marshal([]struct{}{})
-	idx2 := allocateAnthropicContentBlockIndex(state)
+	idx2 := state.ContentBlockIndex
 	events = append(events, AnthropicStreamEvent{
 		Type:  "content_block_start",
 		Index: &idx2,
@@ -642,6 +617,8 @@ func resToAnthHandleWebSearchDone(evt *ResponsesStreamEvent, state *ResponsesEve
 		Type:  "content_block_stop",
 		Index: &idx2,
 	})
+	state.ContentBlockIndex++
+
 	return events
 }
 
@@ -651,7 +628,7 @@ func resToAnthHandleCompleted(evt *ResponsesStreamEvent, state *ResponsesEventTo
 	}
 
 	var events []AnthropicStreamEvent
-	events = append(events, closeAllOpenBlocks(state)...)
+	events = append(events, closeCurrentBlock(state)...)
 
 	stopReason := "end_turn"
 	if evt.Usage != nil {
@@ -704,12 +681,7 @@ func closeCurrentBlock(state *ResponsesEventToAnthropicState) []AnthropicStreamE
 	if !state.ContentBlockOpen {
 		return nil
 	}
-	if state.CurrentBlockType == "tool_use" {
-		tool := state.findOrCreateLegacyToolBlock(&ResponsesStreamEvent{OutputIndex: state.CurrentOutputIndex})
-		return closeToolBlock(state, tool)
-	}
-
-	idx := state.CurrentBlockIndex
+	idx := state.ContentBlockIndex
 	var events []AnthropicStreamEvent
 	// Emit signature_delta before stop so Claude clients retain encrypted
 	// reasoning for the next turn (required for Grok multi-turn cache).
@@ -727,9 +699,7 @@ func closeCurrentBlock(state *ResponsesEventToAnthropicState) []AnthropicStreamE
 		state.PendingThinkingSignature = ""
 	}
 	state.ContentBlockOpen = false
-	state.CurrentBlockType = ""
-	state.CurrentBlockIndex = 0
-	state.CurrentOutputIndex = 0
+	state.ContentBlockIndex++
 	state.CurrentToolName = ""
 	state.CurrentToolArgs = ""
 	state.CurrentToolHadDelta = false
@@ -737,211 +707,5 @@ func closeCurrentBlock(state *ResponsesEventToAnthropicState) []AnthropicStreamE
 		Type:  "content_block_stop",
 		Index: &idx,
 	})
-	return events
-}
-
-func allocateAnthropicContentBlockIndex(state *ResponsesEventToAnthropicState) int {
-	idx := state.ContentBlockIndex
-	state.ContentBlockIndex++
-	return idx
-}
-
-func closeCurrentNonToolBlock(state *ResponsesEventToAnthropicState) []AnthropicStreamEvent {
-	if !state.ContentBlockOpen || state.CurrentBlockType == "tool_use" {
-		return nil
-	}
-	return closeCurrentBlock(state)
-}
-
-func closeCurrentOutputBlock(evt *ResponsesStreamEvent, state *ResponsesEventToAnthropicState, blockType string) []AnthropicStreamEvent {
-	if !state.ContentBlockOpen || state.CurrentBlockType != blockType {
-		return nil
-	}
-	if blockIdx, ok := state.OutputIndexToBlockIdx[evt.OutputIndex]; ok && blockIdx != state.CurrentBlockIndex {
-		return nil
-	}
-	return closeCurrentBlock(state)
-}
-
-func (state *ResponsesEventToAnthropicState) ensureToolBlockMaps() {
-	if state.OutputIndexToBlockIdx == nil {
-		state.OutputIndexToBlockIdx = make(map[int]int)
-	}
-	if state.toolBlocksByOutput == nil {
-		state.toolBlocksByOutput = make(map[int]*responsesAnthropicToolBlockState)
-	}
-	if state.toolOutputByCallID == nil {
-		state.toolOutputByCallID = make(map[string]int)
-	}
-}
-
-func (state *ResponsesEventToAnthropicState) findToolBlock(evt *ResponsesStreamEvent) *responsesAnthropicToolBlockState {
-	state.ensureToolBlockMaps()
-	callID := evt.CallID
-	if evt.Item != nil && evt.Item.CallID != "" {
-		callID = evt.Item.CallID
-	}
-	if callID != "" {
-		if outputIndex, ok := state.toolOutputByCallID[callID]; ok {
-			return state.toolBlocksByOutput[outputIndex]
-		}
-	}
-	return state.toolBlocksByOutput[evt.OutputIndex]
-}
-
-func (state *ResponsesEventToAnthropicState) findOrCreateLegacyToolBlock(evt *ResponsesStreamEvent) *responsesAnthropicToolBlockState {
-	if tool := state.findToolBlock(evt); tool != nil {
-		return tool
-	}
-	if state.CurrentBlockType != "tool_use" {
-		return nil
-	}
-
-	blockIdx, ok := state.OutputIndexToBlockIdx[evt.OutputIndex]
-	if !ok {
-		blockIdx = state.CurrentBlockIndex
-	}
-	name := evt.Name
-	callID := evt.CallID
-	if evt.Item != nil {
-		if name == "" {
-			name = evt.Item.Name
-		}
-		if callID == "" {
-			callID = evt.Item.CallID
-		}
-	}
-	if name == "" {
-		name = state.CurrentToolName
-	}
-
-	tool := &responsesAnthropicToolBlockState{
-		OutputIndex: evt.OutputIndex,
-		BlockIndex:  blockIdx,
-		CallID:      callID,
-		Name:        name,
-		Arguments:   state.CurrentToolArgs,
-		HadDelta:    state.CurrentToolHadDelta,
-		Open:        true,
-	}
-	state.toolBlocksByOutput[evt.OutputIndex] = tool
-	state.OutputIndexToBlockIdx[evt.OutputIndex] = blockIdx
-	if callID != "" {
-		state.toolOutputByCallID[callID] = evt.OutputIndex
-	}
-	if state.ContentBlockIndex <= blockIdx {
-		state.ContentBlockIndex = blockIdx + 1
-	}
-	return tool
-}
-
-func (state *ResponsesEventToAnthropicState) mirrorToolBlock(tool *responsesAnthropicToolBlockState) {
-	if tool == nil || (state.ContentBlockOpen && state.CurrentBlockType != "tool_use") {
-		return
-	}
-	state.ContentBlockOpen = tool.Open
-	state.CurrentBlockIndex = tool.BlockIndex
-	state.CurrentOutputIndex = tool.OutputIndex
-	state.CurrentBlockType = "tool_use"
-	state.CurrentToolName = tool.Name
-	state.CurrentToolArgs = tool.Arguments
-	state.CurrentToolHadDelta = tool.HadDelta
-}
-
-func emitToolArgumentsAndClose(
-	state *ResponsesEventToAnthropicState,
-	tool *responsesAnthropicToolBlockState,
-	raw string,
-) []AnthropicStreamEvent {
-	if tool == nil || !tool.Open || tool.StopSent {
-		return nil
-	}
-
-	var events []AnthropicStreamEvent
-	if !tool.HadDelta && raw != "" {
-		if tool.Name == "Read" {
-			raw = string(sanitizeAnthropicToolUseInput(tool.Name, raw))
-		}
-		if raw != "" {
-			events = append(events, AnthropicStreamEvent{
-				Type:  "content_block_delta",
-				Index: &tool.BlockIndex,
-				Delta: &AnthropicDelta{
-					Type:        "input_json_delta",
-					PartialJSON: raw,
-				},
-			})
-			tool.Arguments = raw
-			tool.HadDelta = true
-		}
-	} else if tool.HadDelta && tool.Name != "Read" && strings.HasPrefix(raw, tool.Arguments) && len(raw) > len(tool.Arguments) {
-		remaining := raw[len(tool.Arguments):]
-		events = append(events, AnthropicStreamEvent{
-			Type:  "content_block_delta",
-			Index: &tool.BlockIndex,
-			Delta: &AnthropicDelta{
-				Type:        "input_json_delta",
-				PartialJSON: remaining,
-			},
-		})
-		tool.Arguments = raw
-	}
-	state.mirrorToolBlock(tool)
-	events = append(events, closeToolBlock(state, tool)...)
-	return events
-}
-
-func closeToolBlock(state *ResponsesEventToAnthropicState, tool *responsesAnthropicToolBlockState) []AnthropicStreamEvent {
-	if tool == nil || !tool.Open || tool.StopSent {
-		return nil
-	}
-	tool.Open = false
-	tool.StopSent = true
-	if state.CurrentBlockType == "tool_use" && state.CurrentBlockIndex == tool.BlockIndex {
-		state.ContentBlockOpen = false
-		state.CurrentBlockType = ""
-		state.CurrentBlockIndex = 0
-		state.CurrentOutputIndex = 0
-		state.CurrentToolName = ""
-		state.CurrentToolArgs = ""
-		state.CurrentToolHadDelta = false
-	}
-	idx := tool.BlockIndex
-	return []AnthropicStreamEvent{{Type: "content_block_stop", Index: &idx}}
-}
-
-func closeAllOpenBlocks(state *ResponsesEventToAnthropicState) []AnthropicStreamEvent {
-	state.ensureToolBlockMaps()
-	if state.ContentBlockOpen && state.CurrentBlockType == "tool_use" {
-		state.findOrCreateLegacyToolBlock(&ResponsesStreamEvent{OutputIndex: state.CurrentOutputIndex})
-	}
-
-	type openBlock struct {
-		index  int
-		tool   *responsesAnthropicToolBlockState
-		serial bool
-	}
-	blocks := make([]openBlock, 0, len(state.toolBlocksByOutput)+1)
-	if state.ContentBlockOpen && state.CurrentBlockType != "tool_use" {
-		blocks = append(blocks, openBlock{index: state.CurrentBlockIndex, serial: true})
-	}
-	seenTools := make(map[*responsesAnthropicToolBlockState]bool)
-	for _, tool := range state.toolBlocksByOutput {
-		if tool == nil || !tool.Open || tool.StopSent || seenTools[tool] {
-			continue
-		}
-		seenTools[tool] = true
-		blocks = append(blocks, openBlock{index: tool.BlockIndex, tool: tool})
-	}
-	sort.Slice(blocks, func(i, j int) bool { return blocks[i].index < blocks[j].index })
-
-	var events []AnthropicStreamEvent
-	for _, block := range blocks {
-		if block.serial {
-			events = append(events, closeCurrentBlock(state)...)
-			continue
-		}
-		events = append(events, closeToolBlock(state, block.tool)...)
-	}
 	return events
 }

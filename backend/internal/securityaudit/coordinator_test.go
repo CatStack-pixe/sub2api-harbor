@@ -30,18 +30,6 @@ type fakePromptEngine struct {
 	evaluates atomic.Int64
 }
 
-type noticePromptEngine struct {
-	*fakePromptEngine
-	notice       *IPNotice
-	noticeErr    error
-	consumptions atomic.Int64
-}
-
-func (f *noticePromptEngine) ConsumeIPNotice(context.Context, string, string) (*IPNotice, error) {
-	f.consumptions.Add(1)
-	return f.notice, f.noticeErr
-}
-
 func (f *fakePromptEngine) EffectiveMode() Mode { return f.mode }
 func (f *fakePromptEngine) Enqueue(context.Context, Request) error {
 	f.enqueues.Add(1)
@@ -93,40 +81,6 @@ func TestCoordinatorDoesNotMutateRequestBody(t *testing.T) {
 	decision := NewCoordinator(&fakeLegacyEngine{}, prompt).Check(context.Background(), Request{Body: body})
 	require.True(t, decision.AllowNextStage)
 	require.Equal(t, original, body)
-}
-
-func TestCoordinatorDeliversOneTimeIPNoticeBeforeAuditEngines(t *testing.T) {
-	prompt := &noticePromptEngine{
-		fakePromptEngine: &fakePromptEngine{mode: ModeBlocking, decision: &PromptDecision{Kind: DecisionAllow, AllowNextStage: true}},
-		notice:           &IPNotice{ID: 7, ClientIP: "203.0.113.10", Message: "Please contact support"},
-	}
-	legacy := &fakeLegacyEngine{decision: &LegacyDecision{Allowed: true}}
-	decision := NewCoordinator(legacy, prompt).Check(context.Background(), Request{
-		RequestID: "req-notice", ClientIP: "203.0.113.10",
-	})
-
-	require.Equal(t, DecisionBlock, decision.Kind)
-	require.Equal(t, http.StatusForbidden, decision.HTTPStatus)
-	require.Equal(t, ErrorCodeIPNotice, decision.ErrorCode)
-	require.Equal(t, "Please contact support", decision.ClientMessage)
-	require.False(t, decision.AllowNextStage)
-	require.Equal(t, int64(1), prompt.consumptions.Load())
-	require.Zero(t, prompt.evaluates.Load())
-	require.Zero(t, prompt.enqueues.Load())
-	require.Zero(t, legacy.calls.Load())
-}
-
-func TestCoordinatorFailsOpenWhenIPNoticeLookupFails(t *testing.T) {
-	prompt := &noticePromptEngine{
-		fakePromptEngine: &fakePromptEngine{mode: ModeOff},
-		noticeErr:        errors.New("database unavailable"),
-	}
-	legacy := &fakeLegacyEngine{decision: &LegacyDecision{Allowed: true}}
-	decision := NewCoordinator(legacy, prompt).Check(context.Background(), Request{ClientIP: "203.0.113.10"})
-
-	require.True(t, decision.AllowNextStage)
-	require.Equal(t, DecisionAllow, decision.Kind)
-	require.Equal(t, int64(1), legacy.calls.Load())
 }
 
 func TestCoordinatorBlockingPriorityCoversBothEngineDecisionMatrix(t *testing.T) {

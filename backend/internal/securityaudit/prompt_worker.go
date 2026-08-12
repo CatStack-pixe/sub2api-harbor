@@ -143,18 +143,6 @@ func (r *Runner) processJob(ctx context.Context, workerID int, cfg ActiveConfig,
 	// The job row only carries redacted metadata; the full prompt for the audit
 	// event is reconstructed here from the transient scan payload.
 	job.Snapshot.FullPrompt = FullPromptFromScanText(scanText)
-	if cfg.CaptureOnly {
-		result := captureOnlyResult()
-		event, completeErr := r.repo.Complete(ctx, job, result, true)
-		if completeErr != nil {
-			return completeErr
-		}
-		if deleteErr := r.payload.Delete(ctx, job.ID); deleteErr != nil {
-			LogWarn(EventProcessFailed, mergeLogFields(baseFields, map[string]any{"worker_id": workerID, "status": "payload_delete_deferred", "error_code": "payload_delete_failed"}))
-		}
-		LogInfo(EventProcessed, mergeLogFields(baseFields, map[string]any{"worker_id": workerID, "event_id": eventID(event), "decision": result.Decision, "risk_level": result.RiskLevel, "action": result.Action, "status": "captured"}))
-		return nil
-	}
 	endpoints := cfg.EnabledEndpoints()
 	if len(endpoints) == 0 {
 		return r.finishFailure(ctx, job, &GuardError{Code: "no_enabled_endpoint", Retryable: true})
@@ -213,15 +201,6 @@ func (r *Runner) processJob(ctx context.Context, workerID int, cfg ActiveConfig,
 		LogWarn(EventFindingRecorded, mergeLogFields(baseFields, map[string]any{"worker_id": workerID, "event_id": event.ID, "decision": aggregated.Decision, "risk_level": aggregated.RiskLevel, "action": aggregated.Action, "guard_endpoint_id": aggregated.GuardEndpointID, "status": "recorded"}))
 	}
 	return nil
-}
-
-func captureOnlyResult() *NormalizedResult {
-	return &NormalizedResult{
-		Decision: EventPass, RiskLevel: RiskLow, Action: ActionAllow, Safety: "safe",
-		Categories: []string{}, MatchedScanners: []string{}, ScannerScores: map[string]float64{},
-		ScannerEvidence: map[string]string{}, ScannerBackend: "capture-only", ScannerVersion: "1",
-		PolicyID: "capture-only", ChunkTotal: 0, LatencyMS: 0,
-	}
 }
 
 func (r *Runner) observeAsyncFailure(err error, latency time.Duration) {

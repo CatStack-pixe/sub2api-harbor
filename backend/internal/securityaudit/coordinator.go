@@ -17,10 +17,6 @@ type PromptEngine interface {
 	Evaluate(ctx context.Context, req Request) (*PromptDecision, error)
 }
 
-type IPNoticeConsumer interface {
-	ConsumeIPNotice(context.Context, string, string) (*IPNotice, error)
-}
-
 type Coordinator struct {
 	legacy LegacyEngine
 	prompt PromptEngine
@@ -33,15 +29,6 @@ func NewCoordinator(legacy LegacyEngine, prompt PromptEngine) *Coordinator {
 func (c *Coordinator) Check(ctx context.Context, req Request) Decision {
 	if c == nil {
 		return allowDecision(nil, nil)
-	}
-	if consumer, ok := c.prompt.(IPNoticeConsumer); ok {
-		notice, err := consumer.ConsumeIPNotice(ctx, req.ClientIP, req.RequestID)
-		if err == nil && notice != nil {
-			return Decision{
-				Kind: DecisionBlock, HTTPStatus: http.StatusForbidden, ErrorCode: ErrorCodeIPNotice,
-				ClientMessage: notice.Message, AllowNextStage: false,
-			}
-		}
 	}
 	mode := ModeOff
 	if c.prompt != nil {

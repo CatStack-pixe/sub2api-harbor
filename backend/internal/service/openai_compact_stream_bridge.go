@@ -108,10 +108,6 @@ func writeOpenAICompactSSEFailure(c *gin.Context, statusCode int, errorBody []by
 // 不被识别，会退化为 "stream closed before response.completed" 盲重连）。
 // 同时标记流内错误，保证挂在 200 流上的失败仍进入 ops 错误看板。
 func writeOpenAICompactSSEFailureMessage(c *gin.Context, statusCode int, errType, message string) {
-	writeOpenAIResponsesSSEFailureMessage(c, statusCode, errType, message)
-}
-
-func writeOpenAIResponsesSSEFailureMessage(c *gin.Context, statusCode int, errType, message string) {
 	if c == nil {
 		return
 	}
@@ -136,17 +132,6 @@ func writeOpenAIResponsesSSEFailureMessage(c *gin.Context, statusCode int, errTy
 	_, _ = c.Writer.Write(payload)
 	_, _ = c.Writer.Write([]byte("\n\n"))
 	c.Writer.Flush()
-}
-
-// writeOpenAIResponsesErrorAfterKeepalive 将已被心跳提交为 HTTP 200 的错误改写
-// 为合法 response.failed 终止事件。返回 false 时调用方保留原状态码和 JSON。
-func writeOpenAIResponsesErrorAfterKeepalive(c *gin.Context, statusCode int, errType, message string) bool {
-	if !StopOpenAIResponsesSSEKeepaliveCommitted(c) {
-		return false
-	}
-	MarkResponseCommitted(c)
-	writeOpenAIResponsesSSEFailureMessage(c, statusCode, errType, message)
-	return true
 }
 
 // buildOpenAICompactSSEPayload 把 compact 的 Response JSON 转成 SSE 事件序列：

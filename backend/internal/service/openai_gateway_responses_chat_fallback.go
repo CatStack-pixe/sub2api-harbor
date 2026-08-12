@@ -38,10 +38,6 @@ func (s *OpenAIGatewayService) forwardResponsesViaRawChatCompletions(
 	}
 
 	clientStream := responsesReq.Stream
-	nvidiaResponsesStream := account != nil && account.IsNvidia() && clientStream && !isOpenAIResponsesCompactPath(c)
-	if nvidiaResponsesStream {
-		MarkOpenAINvidiaResponsesStream(c)
-	}
 	serviceTier := extractOpenAIServiceTierFromBody(body)
 	// custom 工具（如 codex 的 exec）降级为 function 工具转发，回程需按名字还原为
 	// custom_tool_call 项，先记下名字集合；tool_search 工具同理，回程还原为
@@ -179,27 +175,18 @@ func (s *OpenAIGatewayService) streamChatCompletionsAsResponses(
 	startTime time.Time,
 ) (*OpenAIForwardResult, error) {
 	requestID := resp.Header.Get("x-request-id")
-	keepaliveOwner, _, lastDownstreamWriteAt, keepaliveInterval := takeOverOpenAIResponsesSSEKeepalive(c)
-	writeInitialStreamHeaders := s.newStreamHeaderWriter(c, resp.Header)
-	writeStreamHeaders := func() {
-		if keepaliveOwner != nil && keepaliveOwner.committed() {
-			return
-		}
-		writeInitialStreamHeaders()
-	}
+	writeStreamHeaders := s.newStreamHeaderWriter(c, resp.Header)
 
 	state := apicompat.NewChatCompletionsToResponsesStreamState(originalModel)
 	state.CustomTools = customTools
 	state.ToolSearchDeclared = toolSearch
 	state.NamespaceTools = namespaceTools
 	clientDisconnected := false
-	downstreamWritten := func() {}
 
 	writeEvents := func(events []apicompat.ResponsesStreamEvent) {
 		if clientDisconnected || len(events) == 0 {
 			return
 		}
-		wroteEvent := false
 		writeStreamHeaders()
 		for _, event := range events {
 			sse, err := apicompat.ResponsesEventToSSE(event)
@@ -218,16 +205,15 @@ func (s *OpenAIGatewayService) streamChatCompletionsAsResponses(
 				)
 				return
 			}
-			wroteEvent = true
 		}
-		if wroteEvent {
-			MarkOpenAINvidiaResponsesBusinessOutput(c)
-			c.Writer.Flush()
-			downstreamWritten()
-		}
+		c.Writer.Flush()
 	}
 
-	resultWithScan := func(scan ccStreamScanState) *OpenAIForwardResult {
+	scan := s.scanCCStream(resp, "openai responses chat fallback", requestID, startTime, func(chunk *apicompat.ChatCompletionsChunk) {
+		writeEvents(apicompat.ChatCompletionsChunkToResponsesEvents(chunk, state))
+	})
+
+	if scan.Err != nil {
 		return &OpenAIForwardResult{
 			RequestID:       requestID,
 			Usage:           scan.Usage,
@@ -239,184 +225,35 @@ func (s *OpenAIGatewayService) streamChatCompletionsAsResponses(
 			Stream:          true,
 			Duration:        time.Since(startTime),
 			FirstTokenMs:    scan.FirstTokenMs,
-		}
+		}, fmt.Errorf("stream usage incomplete: %w", scan.Err)
 	}
 
-	finishStream := func(scan ccStreamScanState) (*OpenAIForwardResult, error) {
-		if scan.Err != nil {
-			return resultWithScan(scan), fmt.Errorf("stream usage incomplete: %w", scan.Err)
+	writeEvents(apicompat.FinalizeChatCompletionsResponsesStream(state))
+	if !clientDisconnected {
+		writeStreamHeaders()
+		if _, err := fmt.Fprint(c.Writer, "data: [DONE]\n\n"); err != nil {
+			clientDisconnected = true
 		}
-
-		writeEvents(apicompat.FinalizeChatCompletionsResponsesStream(state))
 		if !clientDisconnected {
-			writeStreamHeaders()
-			if _, err := fmt.Fprint(c.Writer, "data: [DONE]\n\n"); err != nil {
-				clientDisconnected = true
-			}
-			if !clientDisconnected {
-				c.Writer.Flush()
-				downstreamWritten()
-			}
-		}
-		if !scan.SawDone {
-			logCCStreamMissingDoneSentinel("openai responses chat fallback", requestID)
-		}
-		return resultWithScan(scan), nil
-	}
-
-	if keepaliveOwner == nil || keepaliveInterval <= 0 {
-		scan := s.scanCCStream(resp, "openai responses chat fallback", requestID, startTime, func(chunk *apicompat.ChatCompletionsChunk) {
-			writeEvents(apicompat.ChatCompletionsChunkToResponsesEvents(chunk, state))
-		})
-		return finishStream(scan)
-	}
-
-	if lastDownstreamWriteAt.IsZero() {
-		lastDownstreamWriteAt = time.Now()
-	}
-	firstTickAfter := keepaliveInterval - time.Since(lastDownstreamWriteAt)
-	if firstTickAfter <= 0 {
-		firstTickAfter = time.Nanosecond
-	}
-	keepaliveTicker := time.NewTicker(firstTickAfter)
-	defer keepaliveTicker.Stop()
-	keepaliveCh := keepaliveTicker.C
-	downstreamWritten = func() {
-		lastDownstreamWriteAt = time.Now()
-		keepaliveTicker.Reset(keepaliveInterval)
-	}
-
-	chunks := make(chan *apicompat.ChatCompletionsChunk)
-	scanDone := make(chan ccStreamScanState, 1)
-	go func() {
-		scan := s.scanCCStream(resp, "openai responses chat fallback", requestID, startTime, func(chunk *apicompat.ChatCompletionsChunk) {
-			chunks <- chunk
-		})
-		scanDone <- scan
-	}()
-
-	var clientDone <-chan struct{}
-	if c.Request != nil {
-		clientDone = c.Request.Context().Done()
-		if c.Request.Context().Err() != nil {
-			clientDisconnected = true
-			clientDone = nil
-			keepaliveCh = nil
+			c.Writer.Flush()
 		}
 	}
-
-	for {
-		select {
-		case chunk := <-chunks:
-			if !clientDisconnected && c.Request != nil && c.Request.Context().Err() != nil {
-				clientDisconnected = true
-				clientDone = nil
-				keepaliveCh = nil
-			}
-			writeEvents(apicompat.ChatCompletionsChunkToResponsesEvents(chunk, state))
-		case scan := <-scanDone:
-			return finishStream(scan)
-		case <-clientDone:
-			clientDisconnected = true
-			clientDone = nil
-			keepaliveCh = nil
-		case <-keepaliveCh:
-			if clientDisconnected || (c.Request != nil && c.Request.Context().Err() != nil) {
-				clientDisconnected = true
-				clientDone = nil
-				keepaliveCh = nil
-				continue
-			}
-			if !keepaliveOwner.beat() {
-				clientDisconnected = true
-				keepaliveCh = nil
-				logger.L().Debug("openai responses chat fallback: client disconnected during keepalive, continuing to drain upstream for billing",
-					zap.String("request_id", requestID),
-				)
-				continue
-			}
-			downstreamWritten()
-		}
-	}
-}
-
-func (s *OpenAIGatewayService) handleOpenAINvidiaResponsesHTTPError(
-	c *gin.Context,
-	account *Account,
-	resp *http.Response,
-	respBody []byte,
-	upstreamMsg string,
-) error {
-	message := sanitizeUpstreamErrorMessage(strings.TrimSpace(upstreamMsg))
-	if message == "" {
-		message = "Upstream request failed"
+	if !scan.SawDone {
+		logCCStreamMissingDoneSentinel("openai responses chat fallback", requestID)
 	}
 
-	upstreamDetail := ""
-	if s != nil && s.cfg != nil && s.cfg.Gateway.LogUpstreamErrorBody {
-		maxBytes := s.cfg.Gateway.LogUpstreamErrorBodyMaxBytes
-		if maxBytes <= 0 {
-			maxBytes = 2048
-		}
-		upstreamDetail = truncateString(string(respBody), maxBytes)
-	}
-	platform := ""
-	accountID := int64(0)
-	accountName := ""
-	if account != nil {
-		platform = account.Platform
-		accountID = account.ID
-		accountName = account.Name
-	}
-	setOpsUpstreamError(c, resp.StatusCode, message, upstreamDetail)
-	appendOpsUpstreamError(c, OpsUpstreamErrorEvent{
-		Platform:           platform,
-		AccountID:          accountID,
-		AccountName:        accountName,
-		UpstreamStatusCode: resp.StatusCode,
-		UpstreamRequestID:  resp.Header.Get("x-request-id"),
-		Kind:               "http_error",
-		Message:            message,
-		Detail:             upstreamDetail,
-	})
-
-	// The upstream response is still drained above, but a disconnected client
-	// must not receive a late terminal event.
-	if c != nil && c.Request != nil && c.Request.Context().Err() != nil {
-		return fmt.Errorf("upstream response failed: %d message=%s", resp.StatusCode, message)
-	}
-
-	MarkResponseCommitted(c)
-	writeOpenAIResponsesFallbackError(c, resp.StatusCode, "upstream_error", message)
-	return fmt.Errorf("upstream response failed: %d message=%s", resp.StatusCode, message)
-}
-
-func (s *OpenAIGatewayService) handleOpenAINvidiaResponsesTransportError(
-	c *gin.Context,
-	account *Account,
-	err error,
-) error {
-	safeErr := sanitizeUpstreamErrorMessage(err.Error())
-	platform := ""
-	accountID := int64(0)
-	accountName := ""
-	if account != nil {
-		platform = account.Platform
-		accountID = account.ID
-		accountName = account.Name
-	}
-	setOpsUpstreamError(c, 0, safeErr, "")
-	appendOpsUpstreamError(c, OpsUpstreamErrorEvent{
-		Platform:    platform,
-		AccountID:   accountID,
-		AccountName: accountName,
-		Kind:        "request_error",
-		Message:     safeErr,
-	})
-	if errors.Is(err, context.Canceled) {
-		return err
-	}
-	return fmt.Errorf("upstream response failed: %s", safeErr)
+	return &OpenAIForwardResult{
+		RequestID:       requestID,
+		Usage:           scan.Usage,
+		Model:           originalModel,
+		BillingModel:    billingModel,
+		UpstreamModel:   upstreamModel,
+		ReasoningEffort: reasoningEffort,
+		ServiceTier:     serviceTier,
+		Stream:          true,
+		Duration:        time.Since(startTime),
+		FirstTokenMs:    scan.FirstTokenMs,
+	}, nil
 }
 
 func chatChunkStartsResponsesOutput(chunk *apicompat.ChatCompletionsChunk) bool {

@@ -271,52 +271,6 @@ func TestEffectiveModeTruthTable(t *testing.T) {
 	}
 }
 
-func TestSelectedGroupsAllowsEmptyScopeAndRejectsNonPositiveIDs(t *testing.T) {
-	valid := promptAuditUpdateRequest(1, 1, "")
-	valid.AllGroups = false
-	valid.GroupIDs = []int64{}
-	require.NoError(t, validateUpdateConfigRequest(valid))
-
-	for _, groupIDs := range [][]int64{{0}, {-1}, {1, 0}} {
-		req := valid
-		req.GroupIDs = groupIDs
-		err := validateUpdateConfigRequest(req)
-		require.Error(t, err)
-		require.Equal(t, "prompt_audit_invalid_group", infraerrors.Reason(err))
-	}
-}
-
-func TestEmptySelectedGroupsNeverMatchRequests(t *testing.T) {
-	cfg := ActiveConfig{AllGroups: false, GroupIDs: []int64{}}
-	groupID := int64(1)
-
-	require.False(t, cfg.IncludesGroup(nil))
-	require.False(t, cfg.IncludesGroup(&groupID))
-}
-
-func TestDisabledConfigWithEmptySelectedGroupsIsImmediatelyOff(t *testing.T) {
-	manager := &ConfigManager{encryptor: prefixEncryptor{}, encryptionKeyConfigured: true}
-	current := DefaultStorageConfig()
-	req := promptAuditUpdateRequest(1, 1, "")
-	req.Enabled = false
-	req.BlockingEnabled = false
-	req.AllGroups = false
-	req.GroupIDs = []int64{}
-
-	next, err := manager.buildNextStorage(current, req, 7)
-	require.NoError(t, err)
-	require.False(t, next.Enabled)
-	require.False(t, next.BlockingEnabled)
-	require.False(t, next.AllGroups)
-	require.Empty(t, next.GroupIDs)
-
-	public := PublicFromStorage(next, true, nil)
-	require.Equal(t, ModeOff, public.EffectiveMode)
-	active, err := ActiveFromStorage(next, true, manager.encryptor)
-	require.NoError(t, err)
-	require.Equal(t, ModeOff, active.EffectiveMode())
-}
-
 func TestConfigManagerColdStartOnlyFailsClosedForExplicitBlockingIntent(t *testing.T) {
 	manager := &ConfigManager{}
 
@@ -480,6 +434,7 @@ func TestUpdateConfigStrictBoundsAndKnownValues(t *testing.T) {
 		{name: "capacity low", mutate: func(req *UpdateConfigRequest) { req.QueueCapacity = 0 }, reason: "prompt_audit_invalid_queue_capacity"},
 		{name: "capacity high", mutate: func(req *UpdateConfigRequest) { req.QueueCapacity = MaxQueueCapacity + 1 }, reason: "prompt_audit_invalid_queue_capacity"},
 		{name: "unknown scanner", mutate: func(req *UpdateConfigRequest) { req.Scanners = []string{"made_up"} }, reason: "prompt_audit_invalid_scanner"},
+		{name: "group required", mutate: func(req *UpdateConfigRequest) { req.AllGroups = false; req.GroupIDs = nil }, reason: "prompt_audit_groups_required"},
 		{name: "group positive", mutate: func(req *UpdateConfigRequest) { req.AllGroups = false; req.GroupIDs = []int64{0} }, reason: "prompt_audit_invalid_group"},
 		{name: "timeout low", mutate: func(req *UpdateConfigRequest) { req.Endpoints[0].TimeoutMS = MinTimeoutMS - 1 }, reason: "prompt_audit_invalid_timeout"},
 		{name: "timeout high", mutate: func(req *UpdateConfigRequest) { req.Endpoints[0].TimeoutMS = MaxTimeoutMS + 1 }, reason: "prompt_audit_invalid_timeout"},
@@ -498,27 +453,4 @@ func TestUpdateConfigStrictBoundsAndKnownValues(t *testing.T) {
 			require.Equal(t, tt.reason, infraerrors.Reason(err))
 		})
 	}
-}
-
-func TestCaptureOnlyConfigRequiresPassEventsAndAllowsNoEndpoint(t *testing.T) {
-	cfg := DefaultStorageConfig()
-	cfg.Enabled = true
-	cfg.CaptureOnly = true
-	cfg.StorePassEvents = true
-	require.NoError(t, validateStorageConfig(cfg))
-
-	req := promptAuditUpdateRequest(1, 1, "")
-	req.CaptureOnly = true
-	req.StorePassEvents = true
-	req.Endpoints = nil
-	require.NoError(t, validateUpdateConfigRequest(req))
-
-	req.StorePassEvents = false
-	err := validateUpdateConfigRequest(req)
-	require.Equal(t, "prompt_audit_capture_only_requires_pass_events", infraerrors.Reason(err))
-
-	req.StorePassEvents = true
-	req.BlockingEnabled = true
-	err = validateUpdateConfigRequest(req)
-	require.Equal(t, "prompt_audit_capture_only_blocking", infraerrors.Reason(err))
 }

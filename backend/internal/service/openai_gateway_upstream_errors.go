@@ -327,9 +327,6 @@ func (s *OpenAIGatewayService) handleErrorResponse(
 	// 当前请求恒透传（需求1）；标记供 handler 事后写风控/邮件。400 cyber 不可 failover
 	// （shouldFailoverUpstreamError(400)=false），故走到此处即可安全早返回。
 	if hit, code, cyberMsg := detectOpenAICyberPolicy(body); hit {
-		if strings.TrimSpace(cyberMsg) == "" {
-			cyberMsg = "Request blocked by upstream security policy"
-		}
 		MarkOpsCyberPolicy(c, CyberPolicyMark{
 			Code:           code,
 			Message:        cyberMsg,
@@ -337,14 +334,12 @@ func (s *OpenAIGatewayService) handleErrorResponse(
 			UpstreamStatus: resp.StatusCode,
 		})
 		setOpsUpstreamError(c, resp.StatusCode, cyberMsg, truncateString(string(body), 2048))
-		if !writeOpenAIResponsesErrorAfterKeepalive(c, resp.StatusCode, "cyber_policy", cyberMsg) {
-			writeOpenAIPassthroughResponseHeaders(c.Writer.Header(), resp.Header, s.responseHeaderFilter)
-			contentType := resp.Header.Get("Content-Type")
-			if contentType == "" {
-				contentType = "application/json"
-			}
-			c.Data(resp.StatusCode, contentType, body)
+		writeOpenAIPassthroughResponseHeaders(c.Writer.Header(), resp.Header, s.responseHeaderFilter)
+		contentType := resp.Header.Get("Content-Type")
+		if contentType == "" {
+			contentType = "application/json"
 		}
+		c.Data(resp.StatusCode, contentType, body)
 		if cyberMsg == "" {
 			return nil, fmt.Errorf("openai cyber_policy: %d", resp.StatusCode)
 		}
@@ -353,16 +348,14 @@ func (s *OpenAIGatewayService) handleErrorResponse(
 	if account != nil && account.Platform == PlatformGrok && isGrokContentPolicyRejection(resp.StatusCode, body) {
 		clientMsg := grokContentPolicyClientMessage(body)
 		setOpsUpstreamError(c, resp.StatusCode, clientMsg, truncateString(string(body), 2048))
+		writeOpenAIPassthroughResponseHeaders(c.Writer.Header(), resp.Header, s.responseHeaderFilter)
 		MarkResponseCommitted(c)
-		if !writeOpenAIResponsesErrorAfterKeepalive(c, http.StatusForbidden, "invalid_request_error", clientMsg) {
-			writeOpenAIPassthroughResponseHeaders(c.Writer.Header(), resp.Header, s.responseHeaderFilter)
-			c.JSON(http.StatusForbidden, gin.H{
-				"error": gin.H{
-					"type":    "invalid_request_error",
-					"message": clientMsg,
-				},
-			})
-		}
+		c.JSON(http.StatusForbidden, gin.H{
+			"error": gin.H{
+				"type":    "invalid_request_error",
+				"message": clientMsg,
+			},
+		})
 		return nil, fmt.Errorf("grok content policy rejection: %s", clientMsg)
 	}
 
@@ -421,14 +414,12 @@ func (s *OpenAIGatewayService) handleErrorResponse(
 		"Upstream request failed",
 	); matched {
 		MarkResponseCommitted(c)
-		if !writeOpenAIResponsesErrorAfterKeepalive(c, status, errType, errMsg) {
-			c.JSON(status, gin.H{
-				"error": gin.H{
-					"type":    errType,
-					"message": errMsg,
-				},
-			})
-		}
+		c.JSON(status, gin.H{
+			"error": gin.H{
+				"type":    errType,
+				"message": errMsg,
+			},
+		})
 		if upstreamMsg == "" {
 			upstreamMsg = errMsg
 		}
@@ -451,14 +442,12 @@ func (s *OpenAIGatewayService) handleErrorResponse(
 			Detail:             upstreamDetail,
 		})
 		MarkResponseCommitted(c)
-		if !writeOpenAIResponsesErrorAfterKeepalive(c, http.StatusInternalServerError, "upstream_error", "Upstream gateway error") {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"error": gin.H{
-					"type":    "upstream_error",
-					"message": "Upstream gateway error",
-				},
-			})
-		}
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": gin.H{
+				"type":    "upstream_error",
+				"message": "Upstream gateway error",
+			},
+		})
 		if upstreamMsg == "" {
 			return nil, fmt.Errorf("upstream error: %d (not in custom error codes)", resp.StatusCode)
 		}
@@ -547,14 +536,12 @@ func (s *OpenAIGatewayService) handleErrorResponse(
 		errMsg = upstreamMsg
 	}
 
-	if !writeOpenAIResponsesErrorAfterKeepalive(c, statusCode, errType, errMsg) {
-		c.JSON(statusCode, gin.H{
-			"error": gin.H{
-				"type":    errType,
-				"message": errMsg,
-			},
-		})
-	}
+	c.JSON(statusCode, gin.H{
+		"error": gin.H{
+			"type":    errType,
+			"message": errMsg,
+		},
+	})
 
 	if upstreamMsg == "" {
 		return nil, fmt.Errorf("upstream error: %d", resp.StatusCode)

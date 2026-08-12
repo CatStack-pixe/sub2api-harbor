@@ -15,36 +15,15 @@
             <h4 class="text-sm font-medium text-gray-900 dark:text-white">{{ t('admin.promptAudit.events.promptFull') }}</h4>
             <pre class="mt-2 max-h-[min(46vh,26rem)] overflow-auto whitespace-pre-wrap break-words rounded-lg bg-gray-50 p-4 text-sm text-gray-700 dark:bg-dark-900 dark:text-dark-200" data-test="summary-prompt-full">{{ displayPrompt(event) }}</pre>
           </div>
-          <div class="space-y-5">
-            <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
+          <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
             <dt class="text-gray-500">{{ t('admin.promptAudit.events.decision') }}</dt><dd class="font-medium text-gray-900 dark:text-white">{{ formatDecisionAction(event.decision, event.action) }}</dd>
             <dt class="text-gray-500">{{ t('admin.promptAudit.events.user') }}</dt><dd>{{ event.snapshot.username || '—' }}</dd>
             <dt class="text-gray-500">{{ t('admin.promptAudit.events.email') }}</dt><dd>{{ event.snapshot.user_email || '—' }}</dd>
             <dt class="text-gray-500">{{ t('admin.promptAudit.events.apiKey') }}</dt><dd>{{ event.snapshot.api_key_name || '—' }}</dd>
             <dt class="text-gray-500">{{ t('admin.promptAudit.events.group') }}</dt><dd>{{ event.snapshot.group_name || '—' }}</dd>
             <dt class="text-gray-500">{{ t('admin.promptAudit.events.model') }}</dt><dd>{{ event.snapshot.model || '—' }}</dd>
-              <dt class="text-gray-500">{{ t('admin.promptAudit.events.categories') }}</dt><dd>{{ formatCategories(event.categories) }}</dd>
-              <dt class="text-gray-500">{{ t('admin.promptAudit.events.clientIP') }}</dt><dd class="break-all font-mono">{{ event.snapshot.client_ip || '—' }}</dd>
-            </dl>
-            <section v-if="event.snapshot.client_ip" class="border-t border-gray-200 pt-4 dark:border-dark-700" data-test="ip-notice-composer">
-              <label for="prompt-audit-ip-notice" class="text-sm font-medium text-gray-900 dark:text-white">{{ t('admin.promptAudit.events.ipNotice.title') }}</label>
-              <textarea
-                id="prompt-audit-ip-notice"
-                v-model="noticeMessage"
-                maxlength="1000"
-                rows="4"
-                class="form-input mt-2 w-full resize-y"
-                :placeholder="t('admin.promptAudit.events.ipNotice.placeholder')"
-                data-test="ip-notice-message"
-              />
-              <div class="mt-2 flex items-center justify-between gap-3">
-                <span class="text-xs text-gray-500 dark:text-dark-400">{{ noticeMessage.length }} / 1000</span>
-                <button type="button" class="btn btn-primary btn-sm" :disabled="noticeSending || !noticeMessage.trim()" data-test="queue-ip-notice" @click="queueNotice">
-                  {{ noticeSending ? t('admin.promptAudit.events.ipNotice.sending') : t('admin.promptAudit.events.ipNotice.send') }}
-                </button>
-              </div>
-            </section>
-          </div>
+            <dt class="text-gray-500">{{ t('admin.promptAudit.events.categories') }}</dt><dd>{{ formatCategories(event.categories) }}</dd>
+          </dl>
         </div>
 
         <div v-show="activeTab === 'risks'" class="space-y-5" role="tabpanel">
@@ -103,23 +82,12 @@ import BaseDialog from '@/components/common/BaseDialog.vue'
 import type { PromptAuditEvent, PromptIssueSummary } from '../types'
 import { SCANNER_CATALOG } from '../viewModel'
 
-const props = withDefaults(defineProps<{ show: boolean; event: PromptAuditEvent | null; loading: boolean; noticeSending?: boolean; noticeVersion?: number }>(), {
-  noticeSending: false,
-  noticeVersion: 0,
-})
-const emit = defineEmits<{ (event: 'close'): void; (event: 'queue-notice', message: string): void }>()
+const props = defineProps<{ show: boolean; event: PromptAuditEvent | null; loading: boolean }>()
+defineEmits<{ (event: 'close'): void }>()
 const { t } = useI18n()
 const tabs = ['summary', 'risks', 'technical'] as const
 const activeTab = ref<(typeof tabs)[number]>('summary')
-const noticeMessage = ref('')
-watch(() => props.event?.id, () => { activeTab.value = 'summary'; noticeMessage.value = '' })
-watch(() => props.noticeVersion, () => { noticeMessage.value = '' })
-
-function queueNotice() {
-  const message = noticeMessage.value.trim()
-  if (!message || props.noticeSending) return
-  emit('queue-notice', message)
-}
+watch(() => props.event?.id, () => { activeTab.value = 'summary' })
 
 const DECISIONS = new Set(['pass', 'flag', 'critical'])
 const ACTIONS = new Set(['Allow', 'Warn', 'Block'])

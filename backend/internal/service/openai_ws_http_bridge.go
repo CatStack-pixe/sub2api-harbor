@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
-	"github.com/Wei-Shaw/sub2api/internal/pkg/apicompat"
 	"github.com/gin-gonic/gin"
 	"github.com/tidwall/gjson"
 )
@@ -190,16 +189,14 @@ func (s *OpenAIGatewayService) proxyOpenAIWSHTTPBridgeTurn(
 
 	upstreamCtx, releaseUpstreamCtx := detachUpstreamContext(ctx)
 	var upstreamReq *http.Request
-	var clientToolMapping apicompat.ResponsesClientToolMapping
 	if account.Platform == PlatformGrok {
 		upstreamModel := resolveGrokWSUpstreamModel(account, body, originalModel)
 		grokIntentSourceBody := body
-		body, clientToolMapping, err = patchGrokResponsesBodyWithClientTools(body, upstreamModel)
+		body, err = patchGrokResponsesBody(body, upstreamModel)
 		if err != nil {
 			releaseUpstreamCtx()
 			return nil, err
 		}
-		setGrokResponsesClientToolMapping(c, clientToolMapping)
 		grokMixedCacheIntentBody := append([]byte(nil), body...)
 		body, err = applyGrokResponsesCacheIdentity(body, grokIntentSourceBody, grokCacheIdentity, account.IsGrokOAuth())
 		if err != nil {
@@ -332,14 +329,11 @@ func (s *OpenAIGatewayService) proxyOpenAIWSHTTPBridgeTurn(
 		return result
 	}
 
+	scanner := bufio.NewScanner(resp.Body)
 	maxLineSize := defaultMaxLineSize
 	if s.cfg != nil && s.cfg.Gateway.MaxLineSize > 0 {
 		maxLineSize = s.cfg.Gateway.MaxLineSize
 	}
-	if account.Platform == PlatformGrok && hasGrokResponsesClientToolMapping(clientToolMapping) {
-		resp.Body = newGrokResponsesClientToolStreamBody(resp.Body, clientToolMapping, maxLineSize)
-	}
-	scanner := bufio.NewScanner(resp.Body)
 	scanBuf := getSSEScannerBuf64K()
 	scanner.Buffer(scanBuf[:0], maxLineSize)
 	defer putSSEScannerBuf64K(scanBuf)
@@ -516,7 +510,7 @@ func resolveGrokWSCacheIdentity(c *gin.Context, account *Account, seedPayload, c
 		return "", err
 	}
 	upstreamModel := resolveGrokWSUpstreamModel(account, currentPayload, originalModel)
-	body, _, err = patchGrokResponsesBodyWithClientTools(body, upstreamModel)
+	body, err = patchGrokResponsesBody(body, upstreamModel)
 	if err != nil {
 		return "", err
 	}

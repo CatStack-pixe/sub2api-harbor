@@ -23,7 +23,10 @@ func AdaptResponsesClientTools(req map[string]any) (ResponsesClientToolMapping, 
 	if req == nil {
 		return ResponsesClientToolMapping{}, false, nil
 	}
-	tools, _ := req["tools"].([]any)
+	tools, ok := req["tools"].([]any)
+	if !ok || len(tools) == 0 {
+		return ResponsesClientToolMapping{}, false, nil
+	}
 
 	adapter := ResponsesClientToolMapping{CustomTools: make(map[string]bool)}
 	functionNames := make(map[string]bool)
@@ -112,7 +115,7 @@ func AdaptResponsesClientTools(req map[string]any) (ResponsesClientToolMapping, 
 	if changed {
 		req["tools"] = lowered
 	}
-	if rewriteClientToolHistory(req["input"]) {
+	if rewriteClientToolHistory(req["input"], &adapter) {
 		changed = true
 	}
 	if rewriteClientToolChoice(req, &adapter) {
@@ -135,7 +138,7 @@ func copyClientTool(tool map[string]any) map[string]any {
 	return copy
 }
 
-func rewriteClientToolHistory(value any) bool {
+func rewriteClientToolHistory(value any, adapter *ResponsesClientToolMapping) bool {
 	changed := false
 	var visit func(any)
 	visit = func(value any) {
@@ -147,33 +150,31 @@ func rewriteClientToolHistory(value any) bool {
 		case map[string]any:
 			typ := strings.TrimSpace(stringValue(typed["type"]))
 			switch typ {
-			case "function_call":
-				namespace := strings.TrimSpace(stringValue(typed["namespace"]))
-				name := strings.TrimSpace(stringValue(typed["name"]))
-				if namespace != "" && name != "" {
-					typed["name"] = flattenNamespaceToolName(namespace, name)
-					delete(typed, "namespace")
+			case "custom_tool_call":
+				if adapter.CustomTools[strings.TrimSpace(stringValue(typed["name"]))] {
+					typed["type"] = "function_call"
+					typed["arguments"] = customToolCallArguments(stringValue(typed["input"]))
+					delete(typed, "input")
 					changed = true
 				}
-			case "custom_tool_call":
-				typed["type"] = "function_call"
-				typed["arguments"] = customToolCallArguments(stringValue(typed["input"]))
-				delete(typed, "input")
-				changed = true
 			case "custom_tool_call_output":
 				typed["type"] = "function_call_output"
 				normalizeClientToolOutput(typed)
 				changed = true
 			case "tool_search_call":
-				typed["type"] = "function_call"
-				typed["name"] = toolSearchProxyName
-				typed["arguments"] = rawObjectString(typed["arguments"])
-				delete(typed, "execution")
-				changed = true
+				if adapter.ToolSearch {
+					typed["type"] = "function_call"
+					typed["name"] = toolSearchProxyName
+					typed["arguments"] = rawObjectString(typed["arguments"])
+					delete(typed, "execution")
+					changed = true
+				}
 			case "tool_search_output":
-				typed["type"] = "function_call_output"
-				normalizeClientToolOutput(typed)
-				changed = true
+				if adapter.ToolSearch {
+					typed["type"] = "function_call_output"
+					normalizeClientToolOutput(typed)
+					changed = true
+				}
 			}
 			for _, child := range typed {
 				visit(child)
@@ -429,7 +430,7 @@ func (r *ResponsesClientToolStreamRestorer) RestoreEvent(payload []byte) ([][]by
 	if err := json.Unmarshal(payload, &wire); err != nil {
 		return nil, false, err
 	}
-	if wire.Type == "response.completed" || wire.Type == "response.done" || wire.Type == "response.incomplete" || wire.Type == "response.failed" {
+	if wire.Type == "response.completed" || wire.Type == "response.incomplete" || wire.Type == "response.failed" {
 		restored, changed, err := RestoreResponsesClientToolPayload(payload, r.adapter)
 		if err != nil {
 			return nil, false, err

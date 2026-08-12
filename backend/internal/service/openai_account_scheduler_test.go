@@ -2673,15 +2673,6 @@ func TestOpenAIAccountScheduler_SkipsAccountBlockedForRequestedModel(t *testing.
 	require.True(t, scheduler.isAccountRequestCompatible(context.Background(), account, OpenAIAccountScheduleRequest{RequestedModel: "gpt-5.6-sol"}))
 }
 
-func TestOpenAIAccountScheduler_SkipsGrokAccountDuring429Cooldown(t *testing.T) {
-	account := &Account{ID: 21634, Platform: PlatformGrok, Type: AccountTypeOAuth, Status: StatusActive, Schedulable: true}
-	svc := &OpenAIGatewayService{}
-	svc.rateLimitGrok(context.Background(), account, time.Now().Add(12*time.Hour))
-	scheduler := &defaultOpenAIAccountScheduler{service: svc}
-
-	require.False(t, scheduler.isAccountRequestCompatible(context.Background(), account, OpenAIAccountScheduleRequest{RequestedModel: "grok-4.5"}))
-}
-
 func TestReportOpenAIAccountScheduleResult_SuccessClearsModelTransientState(t *testing.T) {
 	svc := &OpenAIGatewayService{openaiModelTransient: newOpenAIAccountModelTransientState(128)}
 	now := time.Now()
