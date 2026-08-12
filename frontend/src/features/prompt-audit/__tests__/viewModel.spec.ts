@@ -15,6 +15,7 @@ const config = (): PromptAuditConfig => ({
   blocking_enabled: false,
   blocking_latest_turn_only: false,
   store_pass_events: false,
+  capture_only: false,
   effective_mode: 'async_audit',
   strategy: 'priority',
   worker_count: 4,
@@ -69,6 +70,21 @@ describe('Prompt Audit view model', () => {
     expect(draftFingerprint(changed)).toBe(draftFingerprint(original))
     changed.queue_capacity += 1
     expect(draftFingerprint(changed)).not.toBe(draftFingerprint(original))
+  })
+
+  it('persists an empty selected-group scope and turns blocking off with audit disabled', () => {
+    const draft = configToDraft(config())
+    draft.enabled = false
+    draft.blocking_enabled = true
+    draft.all_groups = false
+    draft.group_ids = []
+
+    expect(buildUpdateRequest(draft)).toMatchObject({
+      enabled: false,
+      blocking_enabled: false,
+      all_groups: false,
+      group_ids: [],
+    })
   })
 
   it('requires a valid explicit range and sends canonical ISO timestamps for filter deletion', () => {

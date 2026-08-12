@@ -29,7 +29,7 @@ describe('Prompt Audit API', () => {
     expect(JSON.stringify(result)).not.toContain('api-canary-secret')
   })
 
-  it('passes a server preview token through the confirmed filter-delete contract', async () => {
+	it('passes a server preview token through the confirmed filter-delete contract', async () => {
     client.post.mockResolvedValue({ data: { deleted_events: 2, deleted_jobs: 2 } })
     const filters = emptyEventFilters()
     filters.start_at = '2026-07-15T00:00'
@@ -40,5 +40,13 @@ describe('Prompt Audit API', () => {
     expect(client.post).toHaveBeenCalledWith('/admin/prompt-audit/events/delete-by-filter', expect.objectContaining({
       snapshot_max_id: 10, filter_hash: 'a'.repeat(64), confirmation_token: 'opaque-token', confirm: true,
     }))
-  })
+	})
+
+	it('queues a one-time notice through the selected audit event', async () => {
+		client.post.mockResolvedValue({ data: { id: 11, client_ip: '203.0.113.10', status: 'pending' } })
+		const result = await promptAuditAPI.queueIPNotice(9, 'Please contact support')
+
+		expect(client.post).toHaveBeenCalledWith('/admin/prompt-audit/events/9/ip-notice', { message: 'Please contact support' })
+		expect(result).toMatchObject({ id: 11, client_ip: '203.0.113.10', status: 'pending' })
+	})
 })

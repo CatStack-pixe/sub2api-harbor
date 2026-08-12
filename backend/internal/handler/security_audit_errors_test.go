@@ -143,6 +143,31 @@ func TestPromptGuardWebSocketCloseMappingGolden(t *testing.T) {
 	require.Equal(t, securityaudit.ErrorCodeInvalidResponse, securityAuditWSCloseReason(promptGuardDecision(securityaudit.DecisionInvalid)))
 }
 
+func TestIPNoticeUsesProtocolErrorEnvelopesWithoutChangingTheMessage(t *testing.T) {
+	decision := &securityaudit.Decision{
+		Kind: securityaudit.DecisionBlock, HTTPStatus: http.StatusForbidden,
+		ErrorCode: securityaudit.ErrorCodeIPNotice, ClientMessage: "Please contact support",
+	}
+
+	c, recorder := securityAuditErrorTestContext(t)
+	(&GatewayHandler{}).openAISecurityAuditError(c, decision)
+	require.Equal(t, http.StatusForbidden, recorder.Code)
+	require.Contains(t, recorder.Body.String(), securityaudit.ErrorCodeIPNotice)
+	require.Contains(t, recorder.Body.String(), "Please contact support")
+
+	c, recorder = securityAuditErrorTestContext(t)
+	(&GatewayHandler{}).anthropicSecurityAuditError(c, decision)
+	require.Equal(t, http.StatusForbidden, recorder.Code)
+	require.Contains(t, recorder.Body.String(), securityaudit.ErrorCodeIPNotice)
+	require.Contains(t, recorder.Body.String(), "Please contact support")
+
+	c, recorder = securityAuditErrorTestContext(t)
+	googleSecurityAuditError(c, decision)
+	require.Equal(t, http.StatusForbidden, recorder.Code)
+	require.Contains(t, recorder.Body.String(), securityaudit.ErrorCodeIPNotice)
+	require.Contains(t, recorder.Body.String(), "Please contact support")
+}
+
 func TestLegacyModerationErrorKeepsExistingClientPriority(t *testing.T) {
 	legacy := &securityaudit.Decision{
 		Kind: securityaudit.DecisionBlock, HTTPStatus: http.StatusForbidden,

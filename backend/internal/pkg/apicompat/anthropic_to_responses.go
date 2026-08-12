@@ -70,9 +70,12 @@ func AnthropicToResponses(req *AnthropicRequest) (*ResponsesRequest, error) {
 
 	// Convert tool_choice
 	if len(req.ToolChoice) > 0 {
-		tc, err := convertAnthropicToolChoiceToResponses(req.ToolChoice)
+		tc, disableParallelToolUse, err := convertAnthropicToolChoiceToResponses(req.ToolChoice, req.Tools)
 		if err != nil {
 			return nil, fmt.Errorf("convert tool_choice: %w", err)
+		}
+		if disableParallelToolUse {
+			parallelToolCalls = false
 		}
 		out.ToolChoice = tc
 	}
@@ -85,31 +88,55 @@ func AnthropicToResponses(req *AnthropicRequest) (*ResponsesRequest, error) {
 //	{"type":"auto"}            → "auto"
 //	{"type":"any"}             → "required"
 //	{"type":"none"}            → "none"
-//	{"type":"tool","name":"X"} → {"type":"function","name":"X"}
-func convertAnthropicToolChoiceToResponses(raw json.RawMessage) (json.RawMessage, error) {
+//
+// A named tool maps to its converted built-in type when applicable; otherwise
+// it remains a named function. The bool result preserves
+// disable_parallel_tool_use for the top-level parallel_tool_calls setting.
+func convertAnthropicToolChoiceToResponses(raw json.RawMessage, tools []AnthropicTool) (json.RawMessage, bool, error) {
 	var tc struct {
-		Type string `json:"type"`
-		Name string `json:"name"`
+		Type                   string `json:"type"`
+		Name                   string `json:"name"`
+		DisableParallelToolUse bool   `json:"disable_parallel_tool_use"`
 	}
 	if err := json.Unmarshal(raw, &tc); err != nil {
-		return nil, err
+		return nil, false, err
 	}
 
 	switch tc.Type {
 	case "auto":
-		return json.Marshal("auto")
+		choice, err := json.Marshal("auto")
+		return choice, tc.DisableParallelToolUse, err
 	case "any":
-		return json.Marshal("required")
+		choice, err := json.Marshal("required")
+		return choice, tc.DisableParallelToolUse, err
 	case "none":
-		return json.Marshal("none")
+		choice, err := json.Marshal("none")
+		return choice, tc.DisableParallelToolUse, err
 	case "tool":
-		return json.Marshal(map[string]any{
+		matched := false
+		for _, tool := range tools {
+			if tool.Name != tc.Name {
+				continue
+			}
+			matched = true
+			converted := convertAnthropicToolToResponses(tool)
+			if converted.Type != "function" {
+				choice, err := json.Marshal(map[string]any{"type": converted.Type})
+				return choice, tc.DisableParallelToolUse, err
+			}
+			break
+		}
+		if !matched {
+			return nil, false, fmt.Errorf("tool_choice references undeclared tool %q", tc.Name)
+		}
+		choice, err := json.Marshal(map[string]any{
 			"type": "function",
 			"name": tc.Name,
 		})
+		return choice, tc.DisableParallelToolUse, err
 	default:
 		// Pass through unknown types as-is
-		return raw, nil
+		return raw, tc.DisableParallelToolUse, nil
 	}
 }
 
@@ -445,20 +472,24 @@ func mapAnthropicEffortToResponses(effort string) string {
 func convertAnthropicToolsToResponses(tools []AnthropicTool) []ResponsesTool {
 	var out []ResponsesTool
 	for _, t := range tools {
-		// Anthropic server tools like "web_search_20250305" → OpenAI {"type":"web_search"}
-		if strings.HasPrefix(t.Type, "web_search") {
-			out = append(out, ResponsesTool{Type: "web_search"})
-			continue
-		}
-		out = append(out, ResponsesTool{
-			Type:        "function",
-			Name:        t.Name,
-			Description: t.Description,
-			Parameters:  normalizeToolParameters(t.InputSchema),
-			Strict:      boolPtr(false),
-		})
+		out = append(out, convertAnthropicToolToResponses(t))
 	}
 	return out
+}
+
+func convertAnthropicToolToResponses(tool AnthropicTool) ResponsesTool {
+	// Anthropic server tools like "web_search_20250305" map to the matching
+	// built-in Responses tool type and do not carry a function name.
+	if strings.HasPrefix(tool.Type, "web_search") {
+		return ResponsesTool{Type: "web_search"}
+	}
+	return ResponsesTool{
+		Type:        "function",
+		Name:        tool.Name,
+		Description: tool.Description,
+		Parameters:  normalizeToolParameters(tool.InputSchema),
+		Strict:      boolPtr(false),
+	}
 }
 
 func boolPtr(v bool) *bool {

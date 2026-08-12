@@ -26,6 +26,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
+	"go.uber.org/zap"
 )
 
 func TestOpenAIHandleStreamingAwareError_JSONEscaping(t *testing.T) {
@@ -911,6 +912,34 @@ func TestOpenAIResponses_FunctionCallOutputHTTPGuidanceDoesNotSuggestPreviousRes
 	require.Equal(t, http.StatusBadRequest, w.Code)
 	require.Contains(t, w.Body.String(), "Responses WebSocket v2")
 	require.NotContains(t, w.Body.String(), "reuse previous_response_id")
+}
+
+func TestValidateFunctionCallOutputRequestRecognizesAllToolOutputsAndRejectsPartialContext(t *testing.T) {
+	tests := []struct {
+		name string
+		body string
+	}{
+		{
+			name: "custom_output_without_context",
+			body: `{"input":[{"type":"custom_tool_call_output","call_id":"call_custom","output":"ok"}]}`,
+		},
+		{
+			name: "tool_search_output_with_unrelated_context",
+			body: `{"input":[{"type":"function_call","call_id":"call_other"},{"type":"tool_search_output","call_id":"call_search","output":"ok"}]}`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(w)
+
+			ok := (&OpenAIGatewayHandler{}).validateFunctionCallOutputRequest(c, []byte(tt.body), zap.NewNop())
+
+			require.False(t, ok)
+			require.Equal(t, http.StatusBadRequest, w.Code)
+		})
+	}
 }
 
 func TestOpenAIResponsesWebSocket_SetsClientTransportWSWhenUpgradeValid(t *testing.T) {

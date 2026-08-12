@@ -43,7 +43,7 @@ func openPromptAuditIntegrationDB(t *testing.T) *sql.DB {
 		);
 	`)
 	require.NoError(t, err)
-	for _, name := range []string{"181_prompt_audit.sql", "182_prompt_audit_full_prompt.sql"} {
+	for _, name := range []string{"181_prompt_audit.sql", "182_prompt_audit_full_prompt.sql", "192_prompt_audit_ip_notices.sql"} {
 		migration, err := os.ReadFile(filepath.Join("..", "..", "migrations", name))
 		require.NoError(t, err)
 		// The migration runner can retry an interrupted deployment; the migration
@@ -60,7 +60,7 @@ func openPromptAuditIntegrationDB(t *testing.T) *sql.DB {
 
 func resetPromptAuditIntegrationDB(t *testing.T, db *sql.DB) {
 	t.Helper()
-	_, err := db.Exec(`TRUNCATE TABLE prompt_audit_events, prompt_audit_jobs, api_keys, users, groups, settings RESTART IDENTITY CASCADE`)
+	_, err := db.Exec(`TRUNCATE TABLE prompt_audit_ip_notices, prompt_audit_events, prompt_audit_jobs, api_keys, users, groups, settings RESTART IDENTITY CASCADE`)
 	require.NoError(t, err)
 }
 
@@ -73,7 +73,7 @@ func insertIdentity(t *testing.T, db *sql.DB, table string) int64 {
 
 func integrationSnapshot(seed string) PromptSnapshot {
 	return PromptSnapshot{
-		RequestID: "request-" + seed, UsernameSnapshot: "user-" + seed,
+		RequestID: "request-" + seed, ClientIP: "203.0.113.10", UsernameSnapshot: "user-" + seed,
 		UserEmailSnapshot: "user-" + seed + "@example.test", APIKeyNameSnapshot: "key-" + seed,
 		GroupName: "group-" + seed, Provider: "openai", Endpoint: "/v1/chat/completions",
 		Protocol: "openai_chat", Model: "gpt-test", PromptHash: strings.Repeat(seed[:1], 64),
@@ -99,6 +99,54 @@ func integrationResult(decision EventDecision) *NormalizedResult {
 		result.ScannerEvidence["pii"] = "redacted evidence"
 	}
 	return result
+}
+
+func TestPromptAuditIPNoticeReplacesPendingAndIsConsumedOnce(t *testing.T) {
+	db := openPromptAuditIntegrationDB(t)
+	repo := NewPostgreSQLRepository(db)
+	ctx := context.Background()
+	adminID := insertIdentity(t, db, "users")
+	snapshot := integrationSnapshot("notice")
+	event, err := repo.RecordBlocking(ctx, snapshot, 1, integrationResult(EventPass), true)
+	require.NoError(t, err)
+	require.NotNil(t, event)
+	require.Equal(t, snapshot.ClientIP, event.Snapshot.ClientIP)
+
+	first, err := repo.QueueIPNotice(ctx, event.ID, adminID, "first message")
+	require.NoError(t, err)
+	second, err := repo.QueueIPNotice(ctx, event.ID, adminID, "replacement message")
+	require.NoError(t, err)
+	require.Equal(t, first.ID, second.ID)
+	require.Equal(t, "replacement message", second.Message)
+
+	const callers = 8
+	results := make(chan *IPNotice, callers)
+	errs := make(chan error, callers)
+	var wg sync.WaitGroup
+	for i := 0; i < callers; i++ {
+		wg.Add(1)
+		go func(index int) {
+			defer wg.Done()
+			notice, consumeErr := repo.ConsumeIPNotice(ctx, snapshot.ClientIP, fmt.Sprintf("request-%d", index))
+			results <- notice
+			errs <- consumeErr
+		}(i)
+	}
+	wg.Wait()
+	close(results)
+	close(errs)
+	for consumeErr := range errs {
+		require.NoError(t, consumeErr)
+	}
+	delivered := 0
+	for notice := range results {
+		if notice != nil {
+			delivered++
+			require.Equal(t, "delivered", notice.Status)
+			require.Equal(t, "replacement message", notice.Message)
+		}
+	}
+	require.Equal(t, 1, delivered)
 }
 
 func TestPromptAuditMigrationSchemaAndLeakageGate(t *testing.T) {

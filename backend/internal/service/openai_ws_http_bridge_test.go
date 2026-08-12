@@ -511,6 +511,237 @@ func TestProxyOpenAIWSHTTPBridgeTurnForGrokDefaultsEmptyModelTo45(t *testing.T) 
 	require.Len(t, events, 2)
 }
 
+func TestProxyOpenAIWSHTTPBridgeTurnForGrokForcedCustomUsesRequiredSingleFunction(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	upstream := &httpUpstreamRecorder{resp: &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     http.Header{"Content-Type": []string{"text/event-stream"}},
+		Body: io.NopCloser(strings.NewReader(strings.Join([]string{
+			`data: {"type":"response.created","sequence_number":1,"response":{"id":"resp_grok_forced_custom","model":"grok-4.5"}}`,
+			"",
+			`data: {"type":"response.completed","sequence_number":2,"response":{"id":"resp_grok_forced_custom","object":"response","model":"grok-4.5","status":"completed","output":[{"type":"function_call","id":"item_custom","call_id":"call_custom","name":"apply_patch","arguments":"{\"input\":\"*** Begin Patch\"}","status":"completed"}],"usage":{"input_tokens":5,"output_tokens":2,"total_tokens":7}}}`,
+			"",
+		}, "\n"))),
+	}}
+	svc := &OpenAIGatewayService{
+		cfg:          &config.Config{Gateway: config.GatewayConfig{MaxLineSize: defaultMaxLineSize}},
+		httpUpstream: upstream,
+	}
+	account := &Account{
+		ID: 7402, Platform: PlatformGrok, Type: AccountTypeOAuth,
+		Status: StatusActive, Schedulable: true, Concurrency: 1,
+		Credentials: map[string]any{
+			"base_url": xai.DefaultCLIBaseURL, "subscription_tier": "free",
+		},
+	}
+	payload := []byte(`{
+		"type":"response.create","generate":true,"model":"grok","stream":true,
+		"input":[{"type":"message","role":"user","content":[{"type":"input_text","text":"apply this patch"}]}],
+		"tools":[
+			{"type":"custom","name":"apply_patch","description":"Apply a patch","format":{"type":"text"}},
+			{"type":"function","name":"lookup","parameters":{"type":"object"}},
+			{"type":"tool_search"}
+		],
+		"tool_choice":{"type":"custom","name":"apply_patch"}
+	}`)
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest(http.MethodGet, "/v1/responses", nil)
+	c.Set("api_key", &APIKey{ID: 7402})
+	var events [][]byte
+
+	result, err := svc.proxyOpenAIWSHTTPBridgeTurn(
+		context.Background(), c, account, "access-token", payload, len(payload),
+		"grok", "", "", "", "isolated-forced-custom-cache-id", 1,
+		func(message []byte) error {
+			events = append(events, append([]byte(nil), message...))
+			return nil
+		},
+	)
+
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	require.Equal(t, "apply this patch", gjson.GetBytes(upstream.lastBody, "input").String())
+	require.Equal(t, "required", gjson.GetBytes(upstream.lastBody, "tool_choice").String())
+	tools := gjson.GetBytes(upstream.lastBody, "tools").Array()
+	require.Len(t, tools, 1)
+	require.Equal(t, "function", tools[0].Get("type").String())
+	require.Equal(t, "apply_patch", tools[0].Get("name").String())
+	require.Equal(t, "isolated-forced-custom-cache-id", gjson.GetBytes(upstream.lastBody, "prompt_cache_key").String())
+	require.Equal(t, "isolated-forced-custom-cache-id", upstream.lastReq.Header.Get(grokConversationIDHeader))
+	require.Len(t, events, 2)
+	require.Equal(t, "custom_tool_call", gjson.GetBytes(events[1], "response.output.0.type").String())
+	require.Equal(t, "apply_patch", gjson.GetBytes(events[1], "response.output.0.name").String())
+}
+
+func TestProxyOpenAIWSHTTPBridgeTurnForGrokRestoresCodexClientToolRoundTrip(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	for _, tt := range []struct {
+		name   string
+		stream bool
+	}{
+		{name: "streaming client turn", stream: true},
+		{name: "non-streaming client turn", stream: false},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			upstream := &httpUpstreamRecorder{resp: &http.Response{
+				StatusCode: http.StatusOK,
+				Header:     http.Header{"Content-Type": []string{"text/event-stream"}},
+				Body:       io.NopCloser(strings.NewReader(grokWSClientToolProtocolUpstreamSSE())),
+			}}
+			svc := &OpenAIGatewayService{
+				cfg:          &config.Config{Gateway: config.GatewayConfig{MaxLineSize: defaultMaxLineSize}},
+				httpUpstream: upstream,
+			}
+			account := &Account{
+				ID:          7401,
+				Platform:    PlatformGrok,
+				Type:        AccountTypeAPIKey,
+				Status:      StatusActive,
+				Schedulable: true,
+				Concurrency: 1,
+				Credentials: map[string]any{"api_key": "xai-protocol-key", "base_url": "https://api.x.ai/v1"},
+			}
+			payload := grokWSClientToolProtocolRequest(tt.stream)
+			recorder := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(recorder)
+			c.Request = httptest.NewRequest(http.MethodGet, "/v1/responses", nil)
+			var events [][]byte
+
+			result, err := svc.proxyOpenAIWSHTTPBridgeTurn(
+				context.Background(), c, account, "xai-protocol-key", payload, len(payload),
+				"grok", "", "", "", "", 1,
+				func(message []byte) error {
+					events = append(events, append([]byte(nil), message...))
+					return nil
+				},
+			)
+
+			require.NoError(t, err)
+			require.NotNil(t, result)
+			require.Equal(t, "resp_protocol_stream", result.RequestID)
+			require.True(t, gjson.GetBytes(upstream.lastBody, "stream").Bool(), "the HTTP bridge always requests an SSE response")
+			assertGrokWSClientToolProtocolRequestLowered(t, upstream.lastBody)
+
+			mapping, ok := grokResponsesClientToolMapping(c)
+			require.True(t, ok)
+			require.True(t, mapping.CustomTools["apply_patch"])
+			require.True(t, mapping.ToolSearch)
+			require.Equal(t, "collaboration", mapping.NamespaceTools["collaboration__send_message"].Namespace)
+
+			require.Len(t, events, 11)
+			for index, event := range events {
+				require.Equal(t, 40+index, int(gjson.GetBytes(event, "sequence_number").Int()))
+			}
+			findEvent := func(eventType, path, value string) []byte {
+				t.Helper()
+				for _, event := range events {
+					if gjson.GetBytes(event, "type").String() != eventType {
+						continue
+					}
+					if path == "" || gjson.GetBytes(event, path).String() == value {
+						return event
+					}
+				}
+				t.Fatalf("missing restored event type=%q %s=%q", eventType, path, value)
+				return nil
+			}
+
+			customAdded := findEvent("response.output_item.added", "item.type", "custom_tool_call")
+			require.Equal(t, "apply_patch", gjson.GetBytes(customAdded, "item.name").String())
+			customInputDelta := findEvent("response.custom_tool_call_input.delta", "", "")
+			require.Equal(t, "*** Begin Patch", gjson.GetBytes(customInputDelta, "delta").String())
+			customInputDone := findEvent("response.custom_tool_call_input.done", "", "")
+			require.Equal(t, "*** Begin Patch", gjson.GetBytes(customInputDone, "input").String())
+			customDone := findEvent("response.output_item.done", "item.type", "custom_tool_call")
+			require.Equal(t, "*** Begin Patch", gjson.GetBytes(customDone, "item.input").String())
+
+			searchAdded := findEvent("response.output_item.added", "item.type", "tool_search_call")
+			require.Equal(t, "client", gjson.GetBytes(searchAdded, "item.execution").String())
+			searchDone := findEvent("response.output_item.done", "item.type", "tool_search_call")
+			require.Equal(t, "github", gjson.GetBytes(searchDone, "item.arguments.query").String())
+
+			namespaceAdded := findEvent("response.output_item.added", "item.namespace", "collaboration")
+			require.Equal(t, "send_message", gjson.GetBytes(namespaceAdded, "item.name").String())
+			namespaceArgumentsDone := findEvent("response.function_call_arguments.done", "name", "send_message")
+			require.False(t, gjson.GetBytes(namespaceArgumentsDone, "namespace").Exists())
+			namespaceDone := findEvent("response.output_item.done", "item.namespace", "collaboration")
+			require.Equal(t, "send_message", gjson.GetBytes(namespaceDone, "item.name").String())
+
+			for _, event := range events {
+				itemID := gjson.GetBytes(event, "item_id").String()
+				if itemID == "item_custom" || itemID == "item_search" {
+					require.NotContains(t, gjson.GetBytes(event, "type").String(), "function_call_arguments")
+				}
+			}
+			completed := findEvent("response.completed", "", "")
+			require.Equal(t, "custom_tool_call", gjson.GetBytes(completed, "response.output.0.type").String())
+			require.Equal(t, "tool_search_call", gjson.GetBytes(completed, "response.output.1.type").String())
+			require.Equal(t, "collaboration", gjson.GetBytes(completed, "response.output.2.namespace").String())
+			require.Equal(t, "send_message", gjson.GetBytes(completed, "response.output.2.name").String())
+		})
+	}
+}
+
+func grokWSClientToolProtocolRequest(stream bool) []byte {
+	return []byte(fmt.Sprintf(`{
+		"model":"grok","stream":%t,
+		"tools":[
+			{"type":"custom","name":"apply_patch","description":"apply a patch","format":{"type":"grammar","syntax":"lark","definition":"start: /.+/"}},
+			{"type":"tool_search"},
+			{"type":"namespace","name":"collaboration","tools":[{"type":"function","name":"send_message","parameters":{"type":"object","properties":{"target":{"type":"string"}}}}]}
+		],
+		"tool_choice":"auto",
+		"input":"continue"
+	}`, stream))
+}
+
+func assertGrokWSClientToolProtocolRequestLowered(t *testing.T, body []byte) {
+	t.Helper()
+	require.False(t, gjson.GetBytes(body, `tools.#(type=="custom")`).Exists())
+	require.False(t, gjson.GetBytes(body, `tools.#(type=="namespace")`).Exists())
+	require.False(t, gjson.GetBytes(body, `tools.#(type=="tool_search")`).Exists())
+	require.True(t, gjson.GetBytes(body, `tools.#(name=="apply_patch")`).Exists())
+	require.True(t, gjson.GetBytes(body, `tools.#(name=="tool_search")`).Exists())
+	require.True(t, gjson.GetBytes(body, `tools.#(name=="collaboration__send_message")`).Exists())
+	require.Equal(t, "auto", gjson.GetBytes(body, "tool_choice").String())
+}
+
+func grokWSClientToolProtocolUpstreamSSE() string {
+	return strings.Join([]string{
+		`data: {"type":"response.created","sequence_number":40,"response":{"id":"resp_protocol_stream","model":"grok-4.5"},"upstream_extension":{"preserved":true}}`,
+		"",
+		`data: {"type":"response.output_item.added","sequence_number":41,"output_index":0,"item":{"type":"function_call","id":"item_custom","call_id":"call_custom","name":"apply_patch","arguments":"","status":"in_progress"}}`,
+		"",
+		`data: {"type":"response.function_call_arguments.delta","sequence_number":42,"output_index":0,"item_id":"item_custom","delta":"{\"input\":\"*** Begin"}`,
+		"",
+		`data: {"type":"response.function_call_arguments.delta","sequence_number":43,"output_index":0,"item_id":"item_custom","delta":" Patch\"}"}`,
+		"",
+		`data: {"type":"response.function_call_arguments.done","sequence_number":44,"output_index":0,"item_id":"item_custom","call_id":"call_custom","name":"apply_patch","arguments":"{\"input\":\"*** Begin Patch\"}"}`,
+		"",
+		`data: {"type":"response.output_item.done","sequence_number":45,"output_index":0,"item":{"type":"function_call","id":"item_custom","call_id":"call_custom","name":"apply_patch","arguments":"{\"input\":\"*** Begin Patch\"}","status":"completed"}}`,
+		"",
+		`data: {"type":"response.output_item.added","sequence_number":46,"output_index":1,"item":{"type":"function_call","id":"item_namespace","call_id":"call_namespace","name":"collaboration__send_message","arguments":"","status":"in_progress"}}`,
+		"",
+		`data: {"type":"response.function_call_arguments.done","sequence_number":47,"output_index":1,"item_id":"item_namespace","call_id":"call_namespace","name":"collaboration__send_message","arguments":"{\"target\":\"root\"}"}`,
+		"",
+		`data: {"type":"response.output_item.done","sequence_number":48,"output_index":1,"item":{"type":"function_call","id":"item_namespace","call_id":"call_namespace","name":"collaboration__send_message","arguments":"{\"target\":\"root\"}","status":"completed"}}`,
+		"",
+		`data: {"type":"response.output_item.added","sequence_number":49,"output_index":2,"item":{"type":"function_call","id":"item_search","call_id":"call_search","name":"tool_search","arguments":"","status":"in_progress"}}`,
+		"",
+		`data: {"type":"response.function_call_arguments.delta","sequence_number":50,"output_index":2,"item_id":"item_search","delta":"{\"query\":\"github\"}"}`,
+		"",
+		`data: {"type":"response.function_call_arguments.done","sequence_number":51,"output_index":2,"item_id":"item_search","call_id":"call_search","name":"tool_search","arguments":"{\"query\":\"github\"}"}`,
+		"",
+		`data: {"type":"response.output_item.done","sequence_number":52,"output_index":2,"item":{"type":"function_call","id":"item_search","call_id":"call_search","name":"tool_search","arguments":"{\"query\":\"github\"}","status":"completed"}}`,
+		"",
+		`data: {"type":"response.completed","sequence_number":53,"response":{"id":"resp_protocol_stream","object":"response","model":"grok-4.5","status":"completed","output":[{"type":"function_call","id":"item_custom","call_id":"call_custom","name":"apply_patch","arguments":"{\"input\":\"*** Begin Patch\"}"},{"type":"function_call","id":"item_search","call_id":"call_search","name":"tool_search","arguments":"{\"query\":\"github\"}"},{"type":"function_call","id":"item_namespace","call_id":"call_namespace","name":"collaboration__send_message","arguments":"{\"target\":\"root\"}"}],"usage":{"input_tokens":11,"output_tokens":4,"total_tokens":15}}}`,
+		"",
+	}, "\n")
+}
+
 func TestProxyOpenAIWSHTTPBridgeTurnPromotesCodexAdditionalToolsForMixedCache(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
@@ -570,11 +801,14 @@ func TestProxyOpenAIWSHTTPBridgeTurnPromotesCodexAdditionalToolsForMixedCache(t 
 	require.Len(t, events, 2)
 	require.False(t, gjson.GetBytes(upstream.lastBody, `input.#(type=="additional_tools")`).Exists())
 	tools := gjson.GetBytes(upstream.lastBody, "tools").Array()
-	require.Len(t, tools, 3)
+	require.Len(t, tools, 4)
 	require.Equal(t, "function", tools[0].Get("type").String())
 	require.Equal(t, "lookup", tools[0].Get("name").String())
 	require.Equal(t, "web_search", tools[1].Get("type").String())
-	require.Equal(t, "x_search", tools[2].Get("type").String())
+	require.Equal(t, "function", tools[2].Get("type").String())
+	require.Equal(t, "apply_patch", tools[2].Get("name").String())
+	require.Equal(t, "string", tools[2].Get("parameters.properties.input.type").String())
+	require.Equal(t, "x_search", tools[3].Get("type").String())
 	require.False(t, gjson.GetBytes(upstream.lastBody, "tool_choice").Exists())
 	require.False(t, gjson.GetBytes(upstream.lastBody, `tools.#(type=="custom")`).Exists())
 	require.False(t, gjson.GetBytes(upstream.lastBody, `tools.#(type=="namespace")`).Exists())

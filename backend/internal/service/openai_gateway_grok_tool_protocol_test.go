@@ -48,8 +48,7 @@ func TestPatchGrokResponsesBodyWithClientToolsLowersCodexProtocol(t *testing.T) 
 	require.False(t, gjson.GetBytes(patched, `tools.#(type=="namespace")`).Exists())
 	require.False(t, gjson.GetBytes(patched, `tools.#(type=="tool_search")`).Exists())
 
-	require.Equal(t, "function", gjson.GetBytes(patched, "tool_choice.type").String())
-	require.Equal(t, "apply_patch", gjson.GetBytes(patched, "tool_choice.name").String())
+	require.Equal(t, "auto", gjson.GetBytes(patched, "tool_choice").String())
 	require.Equal(t, "function_call", gjson.GetBytes(patched, "input.0.type").String())
 	require.JSONEq(t, `{"input":"*** Begin Patch"}`, gjson.GetBytes(patched, "input.0.arguments").String())
 	require.False(t, gjson.GetBytes(patched, "input.0.input").Exists())
@@ -72,27 +71,21 @@ func TestPatchGrokResponsesBodyWithClientToolsRewritesEveryToolChoice(t *testing
 		name     string
 		choice   string
 		wantName string
-		wantType string
-		wantNoNS bool
 	}{
 		{
 			name:     "custom",
 			choice:   `{"type":"custom","name":"apply_patch"}`,
 			wantName: "apply_patch",
-			wantType: "function",
 		},
 		{
 			name:     "tool search",
 			choice:   `{"type":"tool_search"}`,
 			wantName: "tool_search",
-			wantType: "function",
 		},
 		{
 			name:     "namespace function",
 			choice:   `{"type":"function","namespace":"collaboration","name":"send_message"}`,
 			wantName: "collaboration__send_message",
-			wantType: "function",
-			wantNoNS: true,
 		},
 	}
 
@@ -111,13 +104,63 @@ func TestPatchGrokResponsesBodyWithClientToolsRewritesEveryToolChoice(t *testing
 
 			patched, _, err := patchGrokResponsesBodyWithClientTools(body, "grok-4.5")
 			require.NoError(t, err)
-			require.Equal(t, tt.wantType, gjson.GetBytes(patched, "tool_choice.type").String())
-			require.Equal(t, tt.wantName, gjson.GetBytes(patched, "tool_choice.name").String())
-			if tt.wantNoNS {
-				require.False(t, gjson.GetBytes(patched, "tool_choice.namespace").Exists())
-			}
+			require.Equal(t, "required", gjson.GetBytes(patched, "tool_choice").String())
+			tools := gjson.GetBytes(patched, "tools").Array()
+			require.Len(t, tools, 1)
+			require.Equal(t, "function", tools[0].Get("type").String())
+			require.Equal(t, tt.wantName, tools[0].Get("name").String())
 		})
 	}
+}
+
+func TestPatchGrokResponsesBodyWithClientToolsNormalizesForcedCustomToolTurn(t *testing.T) {
+	t.Parallel()
+
+	body := []byte(`{
+		"model":"grok",
+		"input":[{"type":"message","role":"user","content":[{"type":"input_text","text":"apply this patch"}]}],
+		"tools":[{"type":"custom","name":"apply_patch","description":"Apply a patch","format":{"type":"text"}}],
+		"tool_choice":{"type":"custom","name":"apply_patch"}
+	}`)
+
+	patched, mapping, err := patchGrokResponsesBodyWithClientTools(body, "grok-4.5")
+
+	require.NoError(t, err)
+	require.True(t, mapping.CustomTools["apply_patch"])
+	require.Equal(t, "apply this patch", gjson.GetBytes(patched, "input").String())
+	require.Equal(t, "function", gjson.GetBytes(patched, "tools.0.type").String())
+	require.Equal(t, "apply_patch", gjson.GetBytes(patched, "tools.0.name").String())
+	require.Equal(t, "required", gjson.GetBytes(patched, "tool_choice").String())
+}
+
+func TestPatchGrokResponsesBodyWithClientToolsForcedCustomPreservesOtherToolHistory(t *testing.T) {
+	t.Parallel()
+
+	body := []byte(`{
+		"model":"grok",
+		"input":[
+			{"type":"function_call","call_id":"old_lookup","name":"lookup","arguments":"{\"key\":\"alpha\"}"},
+			{"type":"function_call_output","call_id":"old_lookup","output":"done"},
+			{"type":"message","role":"user","content":"apply the next patch"}
+		],
+		"tools":[
+			{"type":"custom","name":"apply_patch","format":{"type":"text"}},
+			{"type":"function","name":"lookup","parameters":{"type":"object"}}
+		],
+		"tool_choice":{"type":"custom","name":"apply_patch"}
+	}`)
+
+	patched, mapping, err := patchGrokResponsesBodyWithClientTools(body, "grok-4.5")
+
+	require.NoError(t, err)
+	require.True(t, mapping.CustomTools["apply_patch"])
+	require.Equal(t, "required", gjson.GetBytes(patched, "tool_choice").String())
+	require.Len(t, gjson.GetBytes(patched, "tools").Array(), 1)
+	require.Equal(t, "apply_patch", gjson.GetBytes(patched, "tools.0.name").String())
+	require.True(t, gjson.GetBytes(patched, "input").IsArray())
+	require.Equal(t, "function_call", gjson.GetBytes(patched, "input.0.type").String())
+	require.Equal(t, "lookup", gjson.GetBytes(patched, "input.0.name").String())
+	require.Equal(t, "function_call_output", gjson.GetBytes(patched, "input.1.type").String())
 }
 
 func TestPatchGrokResponsesBodyWithClientToolsRejectsTrailingJSONDocument(t *testing.T) {
@@ -172,6 +215,60 @@ func TestForwardGrokResponsesClientToolNameConflictReturns400(t *testing.T) {
 	require.Equal(t, "tools", gjson.Get(recorder.Body.String(), "error.param").String())
 	require.Contains(t, gjson.Get(recorder.Body.String(), "error.message").String(), "conflicts")
 	require.Empty(t, upstream.requests, "an ambiguous request must not reach xAI")
+}
+
+func TestForwardGrokResponsesForcedCustomUsesRequiredSingleFunctionUpstream(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	body := []byte(`{
+		"model":"grok","stream":false,
+		"input":[{"type":"message","role":"user","content":[{"type":"input_text","text":"apply this patch"}]}],
+		"tools":[
+			{"type":"custom","name":"apply_patch","description":"Apply a patch","format":{"type":"text"}},
+			{"type":"function","name":"lookup","parameters":{"type":"object"}},
+			{"type":"tool_search"}
+		],
+		"tool_choice":{"type":"custom","name":"apply_patch"}
+	}`)
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", bytes.NewReader(body))
+	c.Request.Header.Set("Content-Type", "application/json")
+	c.Set("api_key", &APIKey{ID: 7105})
+
+	account := grokProtocolOAuthAccount(7105)
+	account.Credentials["subscription_tier"] = "free"
+	repo := &grokQuotaAccountRepo{mockAccountRepoForPlatform: &mockAccountRepoForPlatform{
+		accountsByID: map[int64]*Account{account.ID: account},
+	}}
+	upstream := &httpUpstreamRecorder{resp: &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     http.Header{"Content-Type": []string{"application/json"}},
+		Body: io.NopCloser(strings.NewReader(`{
+			"id":"resp_forced_custom","object":"response","model":"grok-4.5","status":"completed",
+			"output":[{"type":"function_call","id":"item_custom","call_id":"call_custom","name":"apply_patch","arguments":"{\"input\":\"*** Begin Patch\"}","status":"completed"}],
+			"usage":{"input_tokens":5,"output_tokens":2,"total_tokens":7}
+		}`)),
+	}}
+	svc := &OpenAIGatewayService{
+		httpUpstream:      upstream,
+		grokTokenProvider: NewGrokTokenProvider(repo, nil),
+		accountRepo:       repo,
+	}
+
+	result, err := svc.forwardGrokResponses(context.Background(), c, account, body, "grok", false, time.Now())
+
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	require.Equal(t, "apply this patch", gjson.GetBytes(upstream.lastBody, "input").String())
+	require.Equal(t, "required", gjson.GetBytes(upstream.lastBody, "tool_choice").String())
+	tools := gjson.GetBytes(upstream.lastBody, "tools").Array()
+	require.Len(t, tools, 1)
+	require.Equal(t, "function", tools[0].Get("type").String())
+	require.Equal(t, "apply_patch", tools[0].Get("name").String())
+	require.Equal(t, "custom_tool_call", gjson.Get(recorder.Body.String(), "output.0.type").String())
+	require.Equal(t, "apply_patch", gjson.Get(recorder.Body.String(), "output.0.name").String())
+	require.Equal(t, "*** Begin Patch", gjson.Get(recorder.Body.String(), "output.0.input").String())
 }
 
 func TestForwardGrokResponsesOAuthRestoresClientToolsNonStreaming(t *testing.T) {
@@ -403,7 +500,7 @@ func grokClientToolProtocolRequest(stream bool) []byte {
 			{"type":"tool_search"},
 			{"type":"namespace","name":"collaboration","tools":[{"type":"function","name":"send_message","description":"send a message","parameters":{"type":"object","properties":{"target":{"type":"string"}}}}]}
 		],
-		"tool_choice":{"type":"custom","name":"apply_patch"},
+		"tool_choice":"auto",
 		"input":[
 			{"type":"custom_tool_call","id":"old_custom","call_id":"old_custom_call","name":"apply_patch","input":"*** Begin Patch"},
 			{"type":"custom_tool_call_output","call_id":"old_custom_call","output":"Done!"},
@@ -445,8 +542,7 @@ func assertGrokProtocolRequestLowered(t *testing.T, body []byte) {
 	require.True(t, gjson.GetBytes(body, `tools.#(name=="apply_patch")`).Exists())
 	require.True(t, gjson.GetBytes(body, `tools.#(name=="tool_search")`).Exists())
 	require.True(t, gjson.GetBytes(body, `tools.#(name=="collaboration__send_message")`).Exists())
-	require.Equal(t, "function", gjson.GetBytes(body, "tool_choice.type").String())
-	require.Equal(t, "apply_patch", gjson.GetBytes(body, "tool_choice.name").String())
+	require.Equal(t, "auto", gjson.GetBytes(body, "tool_choice").String())
 	require.Equal(t, "function_call", gjson.GetBytes(body, "input.0.type").String())
 	require.Equal(t, "function_call_output", gjson.GetBytes(body, "input.1.type").String())
 	require.Equal(t, "function_call", gjson.GetBytes(body, "input.2.type").String())

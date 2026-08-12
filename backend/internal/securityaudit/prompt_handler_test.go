@@ -23,6 +23,7 @@ type fakePromptAdminService struct {
 	runtime      RuntimeSnapshot
 	list         func(context.Context, EventFilter, int, int) (*EventPage, error)
 	get          func(context.Context, int64) (*Event, error)
+	queueNotice  func(context.Context, int64, int64, string) (*IPNotice, error)
 	deleteOne    func(context.Context, int64) (*DeleteResult, error)
 	deleteIDs    func(context.Context, []int64) (*DeleteResult, error)
 	preview      func(context.Context, EventFilter, int64) (*DeletePreview, error)
@@ -56,6 +57,12 @@ func (s *fakePromptAdminService) GetEvent(ctx context.Context, id int64) (*Event
 		return nil, ErrEventNotFound
 	}
 	return s.get(ctx, id)
+}
+func (s *fakePromptAdminService) QueueIPNotice(ctx context.Context, eventID, actorID int64, message string) (*IPNotice, error) {
+	if s.queueNotice == nil {
+		return nil, errors.New("unexpected QueueIPNotice call")
+	}
+	return s.queueNotice(ctx, eventID, actorID, message)
 }
 func (s *fakePromptAdminService) DeleteEvent(ctx context.Context, id int64) (*DeleteResult, error) {
 	if s.deleteOne == nil {
@@ -98,6 +105,7 @@ func promptAdminRouter(service PromptAdminService) *gin.Engine {
 	group.GET("/runtime", handler.GetRuntime)
 	group.GET("/events", handler.ListEvents)
 	group.GET("/events/:id", handler.GetEvent)
+	group.POST("/events/:id/ip-notice", handler.QueueIPNotice)
 	group.DELETE("/events/:id", handler.DeleteEvent)
 	group.POST("/events/batch-delete", handler.BatchDelete)
 	group.POST("/events/delete-preview", handler.DeletePreview)
@@ -156,6 +164,26 @@ func TestPromptAdminConfigRequiresVersionMapsConflictAndNeverEchoesToken(t *test
 		require.NotContains(t, body, `"token":`)
 		require.Contains(t, body, `"has_token":true`)
 	})
+}
+
+func TestPromptAdminQueuesIPNoticeAndValidatesMessage(t *testing.T) {
+	const message = "Please contact support before continuing"
+	service := &fakePromptAdminService{queueNotice: func(_ context.Context, eventID, actorID int64, gotMessage string) (*IPNotice, error) {
+		require.Equal(t, int64(9), eventID)
+		require.Equal(t, int64(42), actorID)
+		require.Equal(t, message, gotMessage)
+		return &IPNotice{ID: 11, SourceEventID: &eventID, ClientIP: "203.0.113.10", Message: gotMessage, Status: "pending"}, nil
+	}}
+	response := promptAdminRequest(t, promptAdminRouter(service), http.MethodPost, "/admin/prompt-audit/events/9/ip-notice", map[string]any{"message": message})
+
+	require.Equal(t, http.StatusOK, response.Code)
+	require.Contains(t, response.Body.String(), message)
+
+	for _, invalid := range []string{"", strings.Repeat("x", MaxIPNoticeRunes+1)} {
+		response = promptAdminRequest(t, promptAdminRouter(service), http.MethodPost, "/admin/prompt-audit/events/9/ip-notice", map[string]any{"message": invalid})
+		require.Equal(t, http.StatusBadRequest, response.Code)
+		require.Contains(t, response.Body.String(), "prompt_audit_ip_notice_invalid_message")
+	}
 }
 
 func TestPromptAdminGetConfigReturnsSecretFreeUnavailableError(t *testing.T) {
