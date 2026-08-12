@@ -13,6 +13,7 @@ import (
 	"entgo.io/ent/schema/field"
 	"github.com/Wei-Shaw/sub2api/ent/account"
 	"github.com/Wei-Shaw/sub2api/ent/proxy"
+	"github.com/Wei-Shaw/sub2api/ent/proxygroup"
 )
 
 // ProxyCreate is the builder for creating a Proxy entity.
@@ -187,6 +188,20 @@ func (_c *ProxyCreate) SetNillableExpiryWarnDays(v *int) *ProxyCreate {
 	return _c
 }
 
+// SetProxyGroupID sets the "proxy_group_id" field.
+func (_c *ProxyCreate) SetProxyGroupID(v int64) *ProxyCreate {
+	_c.mutation.SetProxyGroupID(v)
+	return _c
+}
+
+// SetNillableProxyGroupID sets the "proxy_group_id" field if the given value is not nil.
+func (_c *ProxyCreate) SetNillableProxyGroupID(v *int64) *ProxyCreate {
+	if v != nil {
+		_c.SetProxyGroupID(*v)
+	}
+	return _c
+}
+
 // AddAccountIDs adds the "accounts" edge to the Account entity by IDs.
 func (_c *ProxyCreate) AddAccountIDs(ids ...int64) *ProxyCreate {
 	_c.mutation.AddAccountIDs(ids...)
@@ -205,6 +220,11 @@ func (_c *ProxyCreate) AddAccounts(v ...*Account) *ProxyCreate {
 // SetBackupProxy sets the "backup_proxy" edge to the Proxy entity.
 func (_c *ProxyCreate) SetBackupProxy(v *Proxy) *ProxyCreate {
 	return _c.SetBackupProxyID(v.ID)
+}
+
+// SetProxyGroup sets the "proxy_group" edge to the ProxyGroup entity.
+func (_c *ProxyCreate) SetProxyGroup(v *ProxyGroup) *ProxyCreate {
+	return _c.SetProxyGroupID(v.ID)
 }
 
 // Mutation returns the ProxyMutation object of the builder.
@@ -447,6 +467,23 @@ func (_c *ProxyCreate) createSpec() (*Proxy, *sqlgraph.CreateSpec) {
 			edge.Target.Nodes = append(edge.Target.Nodes, k)
 		}
 		_node.BackupProxyID = &nodes[0]
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.ProxyGroupIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   proxy.ProxyGroupTable,
+			Columns: []string{proxy.ProxyGroupColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(proxygroup.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_node.ProxyGroupID = &nodes[0]
 		_spec.Edges = append(_spec.Edges, edge)
 	}
 	return _node, _spec
@@ -696,6 +733,24 @@ func (u *ProxyUpsert) UpdateExpiryWarnDays() *ProxyUpsert {
 // AddExpiryWarnDays adds v to the "expiry_warn_days" field.
 func (u *ProxyUpsert) AddExpiryWarnDays(v int) *ProxyUpsert {
 	u.Add(proxy.FieldExpiryWarnDays, v)
+	return u
+}
+
+// SetProxyGroupID sets the "proxy_group_id" field.
+func (u *ProxyUpsert) SetProxyGroupID(v int64) *ProxyUpsert {
+	u.Set(proxy.FieldProxyGroupID, v)
+	return u
+}
+
+// UpdateProxyGroupID sets the "proxy_group_id" field to the value that was provided on create.
+func (u *ProxyUpsert) UpdateProxyGroupID() *ProxyUpsert {
+	u.SetExcluded(proxy.FieldProxyGroupID)
+	return u
+}
+
+// ClearProxyGroupID clears the value of the "proxy_group_id" field.
+func (u *ProxyUpsert) ClearProxyGroupID() *ProxyUpsert {
+	u.SetNull(proxy.FieldProxyGroupID)
 	return u
 }
 
@@ -972,6 +1027,27 @@ func (u *ProxyUpsertOne) AddExpiryWarnDays(v int) *ProxyUpsertOne {
 func (u *ProxyUpsertOne) UpdateExpiryWarnDays() *ProxyUpsertOne {
 	return u.Update(func(s *ProxyUpsert) {
 		s.UpdateExpiryWarnDays()
+	})
+}
+
+// SetProxyGroupID sets the "proxy_group_id" field.
+func (u *ProxyUpsertOne) SetProxyGroupID(v int64) *ProxyUpsertOne {
+	return u.Update(func(s *ProxyUpsert) {
+		s.SetProxyGroupID(v)
+	})
+}
+
+// UpdateProxyGroupID sets the "proxy_group_id" field to the value that was provided on create.
+func (u *ProxyUpsertOne) UpdateProxyGroupID() *ProxyUpsertOne {
+	return u.Update(func(s *ProxyUpsert) {
+		s.UpdateProxyGroupID()
+	})
+}
+
+// ClearProxyGroupID clears the value of the "proxy_group_id" field.
+func (u *ProxyUpsertOne) ClearProxyGroupID() *ProxyUpsertOne {
+	return u.Update(func(s *ProxyUpsert) {
+		s.ClearProxyGroupID()
 	})
 }
 
@@ -1414,6 +1490,27 @@ func (u *ProxyUpsertBulk) AddExpiryWarnDays(v int) *ProxyUpsertBulk {
 func (u *ProxyUpsertBulk) UpdateExpiryWarnDays() *ProxyUpsertBulk {
 	return u.Update(func(s *ProxyUpsert) {
 		s.UpdateExpiryWarnDays()
+	})
+}
+
+// SetProxyGroupID sets the "proxy_group_id" field.
+func (u *ProxyUpsertBulk) SetProxyGroupID(v int64) *ProxyUpsertBulk {
+	return u.Update(func(s *ProxyUpsert) {
+		s.SetProxyGroupID(v)
+	})
+}
+
+// UpdateProxyGroupID sets the "proxy_group_id" field to the value that was provided on create.
+func (u *ProxyUpsertBulk) UpdateProxyGroupID() *ProxyUpsertBulk {
+	return u.Update(func(s *ProxyUpsert) {
+		s.UpdateProxyGroupID()
+	})
+}
+
+// ClearProxyGroupID clears the value of the "proxy_group_id" field.
+func (u *ProxyUpsertBulk) ClearProxyGroupID() *ProxyUpsertBulk {
+	return u.Update(func(s *ProxyUpsert) {
+		s.ClearProxyGroupID()
 	})
 }
 

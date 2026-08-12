@@ -30,16 +30,15 @@ func (h *ProxyHandler) ExportData(c *gin.Context) {
 			return
 		}
 	} else {
-		protocol := c.Query("protocol")
-		status := c.Query("status")
-		search := strings.TrimSpace(c.Query("search"))
+		filters, filterErr := parseProxyListFilters(c)
+		if filterErr != nil {
+			response.BadRequest(c, filterErr.Error())
+			return
+		}
 		sortBy := c.DefaultQuery("sort_by", "id")
 		sortOrder := c.DefaultQuery("sort_order", "desc")
-		if len(search) > 100 {
-			search = search[:100]
-		}
 
-		proxies, err = h.listProxiesFiltered(ctx, protocol, status, search, sortBy, sortOrder)
+		proxies, err = h.listProxiesFiltered(ctx, filters, sortBy, sortOrder)
 		if err != nil {
 			response.ErrorFrom(c, err)
 			return
@@ -79,6 +78,7 @@ func (h *ProxyHandler) ExportData(c *gin.Context) {
 			FallbackMode:    p.FallbackMode,
 			BackupProxyName: backupProxyName,
 			ExpiryWarnDays:  p.ExpiryWarnDays,
+			ProxyGroupName:  p.ProxyGroupName,
 		})
 	}
 
@@ -111,13 +111,14 @@ func (h *ProxyHandler) ImportData(c *gin.Context) {
 	ctx := c.Request.Context()
 	result := DataImportResult{}
 
-	existingProxies, err := h.listProxiesFiltered(ctx, "", "", "", "id", "desc")
+	existingProxies, err := h.listProxiesFiltered(ctx, service.ProxyListFilters{}, "id", "desc")
 	if err != nil {
 		response.ErrorFrom(c, err)
 		return
 	}
 
 	proxyByKey := make(map[string]service.Proxy, len(existingProxies))
+	proxyGroupIDsByName := make(map[string]int64)
 	// proxyNameToID 用于 backup_proxy_name 反查：DB 已有 + 本批次新建均会写入
 	proxyNameToID := make(map[string]int64, len(existingProxies))
 	for i := range existingProxies {
@@ -147,11 +148,22 @@ func (h *ProxyHandler) ImportData(c *gin.Context) {
 			})
 			continue
 		}
+		proxyGroupID, groupErr := resolveImportedProxyGroup(ctx, h.adminService, item.ProxyGroupName, proxyGroupIDsByName)
+		if groupErr != nil {
+			result.ProxyFailed++
+			result.Errors = append(result.Errors, DataImportError{
+				Kind:     "proxy",
+				Name:     item.Name,
+				ProxyKey: key,
+				Message:  groupErr.Error(),
+			})
+			continue
+		}
 
 		normalizedStatus := normalizeProxyStatus(item.Status)
 		if existing, ok := proxyByKey[key]; ok {
 			result.ProxyReused++
-			if normalizedStatus != "" && normalizedStatus != existing.Status {
+			if normalizedStatus != "" && (normalizedStatus != existing.Status || !sameOptionalInt64(existing.ProxyGroupID, proxyGroupID)) {
 				// 已存在代理同步 status 时，同时保留/覆盖导入 item 的完整字段，
 				// 避免 UpdateProxy 零值覆盖有效期/fallback 配置。
 				var existingExpiresAt *time.Time
@@ -176,12 +188,14 @@ func (h *ProxyHandler) ImportData(c *gin.Context) {
 					BackupProxyID:  existingBackupProxyID,
 					ExpiryWarnDays: item.ExpiryWarnDays,
 					// 保留已存在代理的网络配置字段
-					Name:     existing.Name,
-					Protocol: existing.Protocol,
-					Host:     existing.Host,
-					Port:     existing.Port,
-					Username: existing.Username,
-					Password: existing.Password,
+					Name:            existing.Name,
+					Protocol:        existing.Protocol,
+					Host:            existing.Host,
+					Port:            existing.Port,
+					Username:        existing.Username,
+					Password:        existing.Password,
+					ProxyGroupID:    proxyGroupID,
+					ProxyGroupIDSet: true,
 				}
 				if _, err := h.adminService.UpdateProxy(ctx, existing.ID, updateInput); err != nil {
 					result.Errors = append(result.Errors, DataImportError{
@@ -232,6 +246,7 @@ func (h *ProxyHandler) ImportData(c *gin.Context) {
 			FallbackMode:   fallbackMode,
 			BackupProxyID:  backupProxyID,
 			ExpiryWarnDays: item.ExpiryWarnDays,
+			ProxyGroupID:   proxyGroupID,
 		})
 		if err != nil {
 			result.ProxyFailed++
@@ -253,17 +268,19 @@ func (h *ProxyHandler) ImportData(c *gin.Context) {
 		if normalizedStatus != "" && normalizedStatus != created.Status {
 			// 新建后同步 status 时，传入完整字段，避免零值覆盖刚创建的有效期/fallback 配置。
 			if _, err := h.adminService.UpdateProxy(ctx, created.ID, &service.UpdateProxyInput{
-				Status:         normalizedStatus,
-				ExpiresAt:      expiresAt,
-				FallbackMode:   fallbackMode,
-				BackupProxyID:  backupProxyID,
-				ExpiryWarnDays: item.ExpiryWarnDays,
-				Name:           created.Name,
-				Protocol:       created.Protocol,
-				Host:           created.Host,
-				Port:           created.Port,
-				Username:       created.Username,
-				Password:       created.Password,
+				Status:          normalizedStatus,
+				ExpiresAt:       expiresAt,
+				FallbackMode:    fallbackMode,
+				BackupProxyID:   backupProxyID,
+				ExpiryWarnDays:  item.ExpiryWarnDays,
+				Name:            created.Name,
+				Protocol:        created.Protocol,
+				Host:            created.Host,
+				Port:            created.Port,
+				Username:        created.Username,
+				Password:        created.Password,
+				ProxyGroupID:    proxyGroupID,
+				ProxyGroupIDSet: true,
 			}); err != nil {
 				result.Errors = append(result.Errors, DataImportError{
 					Kind:     "proxy",
@@ -324,7 +341,7 @@ func parseProxyIDs(c *gin.Context) ([]int64, error) {
 	return ids, nil
 }
 
-func (h *ProxyHandler) listProxiesFiltered(ctx context.Context, protocol, status, search, sortBy, sortOrder string) ([]service.Proxy, error) {
+func (h *ProxyHandler) listProxiesFiltered(ctx context.Context, filters service.ProxyListFilters, sortBy, sortOrder string) ([]service.Proxy, error) {
 	page := 1
 	pageSize := dataPageCap
 	var out []service.Proxy
@@ -332,7 +349,7 @@ func (h *ProxyHandler) listProxiesFiltered(ctx context.Context, protocol, status
 	useAccountCountSort := strings.EqualFold(sortBy, "account_count")
 	for {
 		if useAccountCountSort {
-			items, total, err := h.adminService.ListProxiesWithAccountCount(ctx, page, pageSize, protocol, status, search, sortBy, sortOrder)
+			items, total, err := h.adminService.ListProxiesWithAccountCount(ctx, page, pageSize, filters, sortBy, sortOrder)
 			if err != nil {
 				return nil, err
 			}
@@ -343,7 +360,7 @@ func (h *ProxyHandler) listProxiesFiltered(ctx context.Context, protocol, status
 				break
 			}
 		} else {
-			items, total, err := h.adminService.ListProxies(ctx, page, pageSize, protocol, status, search, sortBy, sortOrder)
+			items, total, err := h.adminService.ListProxies(ctx, page, pageSize, filters, sortBy, sortOrder)
 			if err != nil {
 				return nil, err
 			}

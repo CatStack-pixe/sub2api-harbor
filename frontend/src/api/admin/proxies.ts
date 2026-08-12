@@ -29,6 +29,8 @@ export async function list(
     protocol?: string
     status?: 'active' | 'inactive' | 'expired'
     search?: string
+    group_id?: number
+    ungrouped?: boolean
     sort_by?: string
     sort_order?: 'asc' | 'desc'
   },
@@ -223,12 +225,26 @@ export async function batchDelete(ids: number[]): Promise<{
   return data
 }
 
+export async function batchGroup(
+  ids: number[],
+  proxyGroupId: number | null
+): Promise<{ updated: number }> {
+  const uniqueIds = Array.from(new Set(ids))
+  const { data } = await apiClient.post<{ updated: number }>('/admin/proxies/batch-group', {
+    ids: uniqueIds,
+    proxy_group_id: proxyGroupId
+  })
+  return data
+}
+
 export async function exportData(options?: {
   ids?: number[]
   filters?: {
     protocol?: string
     status?: 'active' | 'inactive' | 'expired'
     search?: string
+    group_id?: number
+    ungrouped?: boolean
     sort_by?: string
     sort_order?: 'asc' | 'desc'
   }
@@ -237,10 +253,12 @@ export async function exportData(options?: {
   if (options?.ids && options.ids.length > 0) {
     params.ids = options.ids.join(',')
   } else if (options?.filters) {
-    const { protocol, status, search, sort_by, sort_order } = options.filters
+    const { protocol, status, search, group_id, ungrouped, sort_by, sort_order } = options.filters
     if (protocol) params.protocol = protocol
     if (status) params.status = status
     if (search) params.search = search
+    if (group_id) params.group_id = String(group_id)
+    if (ungrouped) params.ungrouped = 'true'
     if (sort_by) params.sort_by = sort_by
     if (sort_order) params.sort_order = sort_order
   }
@@ -270,6 +288,7 @@ export const proxiesAPI = {
   getProxyAccounts,
   batchCreate,
   batchDelete,
+  batchGroup,
   exportData,
   importData
 }

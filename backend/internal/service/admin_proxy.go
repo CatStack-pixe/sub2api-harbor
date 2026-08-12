@@ -15,18 +15,18 @@ import (
 )
 
 // Proxy management implementations
-func (s *adminServiceImpl) ListProxies(ctx context.Context, page, pageSize int, protocol, status, search string, sortBy, sortOrder string) ([]Proxy, int64, error) {
+func (s *adminServiceImpl) ListProxies(ctx context.Context, page, pageSize int, filters ProxyListFilters, sortBy, sortOrder string) ([]Proxy, int64, error) {
 	params := pagination.PaginationParams{Page: page, PageSize: pageSize, SortBy: sortBy, SortOrder: sortOrder}
-	proxies, result, err := s.proxyRepo.ListWithFilters(ctx, params, protocol, status, search)
+	proxies, result, err := s.proxyRepo.ListWithFilters(ctx, params, filters)
 	if err != nil {
 		return nil, 0, err
 	}
 	return proxies, result.Total, nil
 }
 
-func (s *adminServiceImpl) ListProxiesWithAccountCount(ctx context.Context, page, pageSize int, protocol, status, search string, sortBy, sortOrder string) ([]ProxyWithAccountCount, int64, error) {
+func (s *adminServiceImpl) ListProxiesWithAccountCount(ctx context.Context, page, pageSize int, filters ProxyListFilters, sortBy, sortOrder string) ([]ProxyWithAccountCount, int64, error) {
 	params := pagination.PaginationParams{Page: page, PageSize: pageSize, SortBy: sortBy, SortOrder: sortOrder}
-	proxies, result, err := s.proxyRepo.ListWithFiltersAndAccountCount(ctx, params, protocol, status, search)
+	proxies, result, err := s.proxyRepo.ListWithFiltersAndAccountCount(ctx, params, filters)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -56,6 +56,14 @@ func (s *adminServiceImpl) GetProxiesByIDs(ctx context.Context, ids []int64) ([]
 }
 
 func (s *adminServiceImpl) CreateProxy(ctx context.Context, input *CreateProxyInput) (*Proxy, error) {
+	var proxyGroupName string
+	if input.ProxyGroupID != nil {
+		group, err := s.proxyGroupRepo.GetByID(ctx, *input.ProxyGroupID)
+		if err != nil {
+			return nil, err
+		}
+		proxyGroupName = group.Name
+	}
 	// 规范化 fallback_mode
 	mode := input.FallbackMode
 	if mode == "" {
@@ -81,6 +89,8 @@ func (s *adminServiceImpl) CreateProxy(ctx context.Context, input *CreateProxyIn
 		FallbackMode:   mode,
 		BackupProxyID:  input.BackupProxyID,
 		ExpiryWarnDays: input.ExpiryWarnDays,
+		ProxyGroupID:   input.ProxyGroupID,
+		ProxyGroupName: proxyGroupName,
 	}
 	if err := s.proxyRepo.Create(ctx, proxy); err != nil {
 		return nil, err
@@ -91,6 +101,14 @@ func (s *adminServiceImpl) CreateProxy(ctx context.Context, input *CreateProxyIn
 }
 
 func (s *adminServiceImpl) UpdateProxy(ctx context.Context, id int64, input *UpdateProxyInput) (*Proxy, error) {
+	var proxyGroupName string
+	if input.ProxyGroupIDSet && input.ProxyGroupID != nil {
+		group, err := s.proxyGroupRepo.GetByID(ctx, *input.ProxyGroupID)
+		if err != nil {
+			return nil, err
+		}
+		proxyGroupName = group.Name
+	}
 	// 校验：backup_proxy_id 不能是自身
 	if input.BackupProxyID != nil && *input.BackupProxyID == id {
 		return nil, infraerrors.BadRequest("PROXY_BACKUP_SELF", "backup proxy cannot be itself")
@@ -139,6 +157,10 @@ func (s *adminServiceImpl) UpdateProxy(ctx context.Context, id int64, input *Upd
 	proxy.FallbackMode = mode
 	proxy.BackupProxyID = input.BackupProxyID
 	proxy.ExpiryWarnDays = input.ExpiryWarnDays
+	if input.ProxyGroupIDSet {
+		proxy.ProxyGroupID = input.ProxyGroupID
+		proxy.ProxyGroupName = proxyGroupName
+	}
 
 	if err := s.proxyRepo.Update(ctx, proxy); err != nil {
 		return nil, err

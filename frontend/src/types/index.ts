@@ -916,8 +916,28 @@ export interface Proxy {
   fallback_mode: 'none' | 'proxy' | 'direct'
   backup_proxy_id?: number | null
   expiry_warn_days: number
+  proxy_group_id?: number | null
+  proxy_group_name?: string | null
   created_at: string
   updated_at: string
+}
+
+export interface ProxyGroup {
+  id: number
+  name: string
+  total_count: number
+  active_count: number
+  inactive_count: number
+  created_at: string
+  updated_at: string
+}
+
+export interface CreateProxyGroupRequest {
+  name: string
+}
+
+export interface UpdateProxyGroupRequest {
+  name: string
 }
 
 export interface ProxyAccountSummary {
@@ -1472,6 +1492,7 @@ export interface CreateProxyRequest {
   fallback_mode?: 'none' | 'proxy' | 'direct'
   backup_proxy_id?: number | null
   expiry_warn_days?: number
+  proxy_group_id?: number | null
 }
 
 export interface UpdateProxyRequest {
@@ -1486,6 +1507,7 @@ export interface UpdateProxyRequest {
   fallback_mode?: 'none' | 'proxy' | 'direct'
   backup_proxy_id?: number | null
   expiry_warn_days?: number
+  proxy_group_id?: number | null
 }
 
 export interface AdminDataPayload {
@@ -1507,6 +1529,7 @@ export interface AdminDataProxy {
   username?: string | null
   password?: string | null
   status: 'active' | 'inactive'
+  proxy_group_name?: string | null
 }
 
 export interface AdminDataAccount {

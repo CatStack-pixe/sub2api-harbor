@@ -14,6 +14,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/account"
 	"github.com/Wei-Shaw/sub2api/ent/predicate"
 	"github.com/Wei-Shaw/sub2api/ent/proxy"
+	"github.com/Wei-Shaw/sub2api/ent/proxygroup"
 )
 
 // ProxyUpdate is the builder for updating Proxy entities.
@@ -247,6 +248,26 @@ func (_u *ProxyUpdate) AddExpiryWarnDays(v int) *ProxyUpdate {
 	return _u
 }
 
+// SetProxyGroupID sets the "proxy_group_id" field.
+func (_u *ProxyUpdate) SetProxyGroupID(v int64) *ProxyUpdate {
+	_u.mutation.SetProxyGroupID(v)
+	return _u
+}
+
+// SetNillableProxyGroupID sets the "proxy_group_id" field if the given value is not nil.
+func (_u *ProxyUpdate) SetNillableProxyGroupID(v *int64) *ProxyUpdate {
+	if v != nil {
+		_u.SetProxyGroupID(*v)
+	}
+	return _u
+}
+
+// ClearProxyGroupID clears the value of the "proxy_group_id" field.
+func (_u *ProxyUpdate) ClearProxyGroupID() *ProxyUpdate {
+	_u.mutation.ClearProxyGroupID()
+	return _u
+}
+
 // AddAccountIDs adds the "accounts" edge to the Account entity by IDs.
 func (_u *ProxyUpdate) AddAccountIDs(ids ...int64) *ProxyUpdate {
 	_u.mutation.AddAccountIDs(ids...)
@@ -265,6 +286,11 @@ func (_u *ProxyUpdate) AddAccounts(v ...*Account) *ProxyUpdate {
 // SetBackupProxy sets the "backup_proxy" edge to the Proxy entity.
 func (_u *ProxyUpdate) SetBackupProxy(v *Proxy) *ProxyUpdate {
 	return _u.SetBackupProxyID(v.ID)
+}
+
+// SetProxyGroup sets the "proxy_group" edge to the ProxyGroup entity.
+func (_u *ProxyUpdate) SetProxyGroup(v *ProxyGroup) *ProxyUpdate {
+	return _u.SetProxyGroupID(v.ID)
 }
 
 // Mutation returns the ProxyMutation object of the builder.
@@ -296,6 +322,12 @@ func (_u *ProxyUpdate) RemoveAccounts(v ...*Account) *ProxyUpdate {
 // ClearBackupProxy clears the "backup_proxy" edge to the Proxy entity.
 func (_u *ProxyUpdate) ClearBackupProxy() *ProxyUpdate {
 	_u.mutation.ClearBackupProxy()
+	return _u
+}
+
+// ClearProxyGroup clears the "proxy_group" edge to the ProxyGroup entity.
+func (_u *ProxyUpdate) ClearProxyGroup() *ProxyUpdate {
+	_u.mutation.ClearProxyGroup()
 	return _u
 }
 
@@ -514,6 +546,35 @@ func (_u *ProxyUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 			Bidi:    true,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(proxy.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.ProxyGroupCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   proxy.ProxyGroupTable,
+			Columns: []string{proxy.ProxyGroupColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(proxygroup.FieldID, field.TypeInt64),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.ProxyGroupIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   proxy.ProxyGroupTable,
+			Columns: []string{proxy.ProxyGroupColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(proxygroup.FieldID, field.TypeInt64),
 			},
 		}
 		for _, k := range nodes {
@@ -759,6 +820,26 @@ func (_u *ProxyUpdateOne) AddExpiryWarnDays(v int) *ProxyUpdateOne {
 	return _u
 }
 
+// SetProxyGroupID sets the "proxy_group_id" field.
+func (_u *ProxyUpdateOne) SetProxyGroupID(v int64) *ProxyUpdateOne {
+	_u.mutation.SetProxyGroupID(v)
+	return _u
+}
+
+// SetNillableProxyGroupID sets the "proxy_group_id" field if the given value is not nil.
+func (_u *ProxyUpdateOne) SetNillableProxyGroupID(v *int64) *ProxyUpdateOne {
+	if v != nil {
+		_u.SetProxyGroupID(*v)
+	}
+	return _u
+}
+
+// ClearProxyGroupID clears the value of the "proxy_group_id" field.
+func (_u *ProxyUpdateOne) ClearProxyGroupID() *ProxyUpdateOne {
+	_u.mutation.ClearProxyGroupID()
+	return _u
+}
+
 // AddAccountIDs adds the "accounts" edge to the Account entity by IDs.
 func (_u *ProxyUpdateOne) AddAccountIDs(ids ...int64) *ProxyUpdateOne {
 	_u.mutation.AddAccountIDs(ids...)
@@ -777,6 +858,11 @@ func (_u *ProxyUpdateOne) AddAccounts(v ...*Account) *ProxyUpdateOne {
 // SetBackupProxy sets the "backup_proxy" edge to the Proxy entity.
 func (_u *ProxyUpdateOne) SetBackupProxy(v *Proxy) *ProxyUpdateOne {
 	return _u.SetBackupProxyID(v.ID)
+}
+
+// SetProxyGroup sets the "proxy_group" edge to the ProxyGroup entity.
+func (_u *ProxyUpdateOne) SetProxyGroup(v *ProxyGroup) *ProxyUpdateOne {
+	return _u.SetProxyGroupID(v.ID)
 }
 
 // Mutation returns the ProxyMutation object of the builder.
@@ -808,6 +894,12 @@ func (_u *ProxyUpdateOne) RemoveAccounts(v ...*Account) *ProxyUpdateOne {
 // ClearBackupProxy clears the "backup_proxy" edge to the Proxy entity.
 func (_u *ProxyUpdateOne) ClearBackupProxy() *ProxyUpdateOne {
 	_u.mutation.ClearBackupProxy()
+	return _u
+}
+
+// ClearProxyGroup clears the "proxy_group" edge to the ProxyGroup entity.
+func (_u *ProxyUpdateOne) ClearProxyGroup() *ProxyUpdateOne {
+	_u.mutation.ClearProxyGroup()
 	return _u
 }
 
@@ -1056,6 +1148,35 @@ func (_u *ProxyUpdateOne) sqlSave(ctx context.Context) (_node *Proxy, err error)
 			Bidi:    true,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(proxy.FieldID, field.TypeInt64),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.ProxyGroupCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   proxy.ProxyGroupTable,
+			Columns: []string{proxy.ProxyGroupColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(proxygroup.FieldID, field.TypeInt64),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.ProxyGroupIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   proxy.ProxyGroupTable,
+			Columns: []string{proxy.ProxyGroupColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(proxygroup.FieldID, field.TypeInt64),
 			},
 		}
 		for _, k := range nodes {

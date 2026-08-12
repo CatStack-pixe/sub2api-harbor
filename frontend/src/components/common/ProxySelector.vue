@@ -38,12 +38,13 @@
             />
           </div>
           <button
-            v-if="proxies.length > 0"
+            v-if="matchingProxies.length > 0"
             type="button"
             @click.stop="handleBatchTest"
-            :disabled="batchTesting"
+            :disabled="batchTesting || matchingProxies.length > MAX_VISIBLE_PROXIES"
             class="batch-test-btn"
-            :title="t('admin.proxies.batchTest')"
+            :title="batchTestTitle"
+            data-testid="proxy-batch-test"
           >
             <svg v-if="batchTesting" class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
               <circle
@@ -64,6 +65,20 @@
           </button>
         </div>
 
+        <div class="select-filter-row">
+          <select
+            v-model="groupFilter"
+            class="select-group-filter"
+            data-testid="proxy-group-filter"
+            :aria-label="t('admin.proxies.proxyGroup')"
+            @click.stop
+          >
+            <option v-for="option in groupOptions" :key="option.value" :value="option.value">
+              {{ option.label }}
+            </option>
+          </select>
+        </div>
+
         <!-- Options list -->
         <div class="select-options">
           <!-- No Proxy option -->
@@ -77,14 +92,21 @@
 
           <!-- Proxy options -->
           <div
-            v-for="proxy in filteredProxies"
+            v-for="proxy in visibleProxies"
             :key="proxy.id"
             @click="selectOption(proxy.id)"
             :class="['select-option', modelValue === proxy.id && 'select-option-selected']"
+            data-testid="proxy-option"
           >
             <div class="min-w-0 flex-1">
               <div class="flex items-center gap-2">
                 <span class="truncate font-medium">{{ proxy.name }}</span>
+                <span
+                  v-if="proxy.proxy_group_name"
+                  class="inline-flex max-w-[7rem] flex-shrink-0 truncate rounded bg-primary-50 px-1.5 py-0.5 text-xs text-primary-700 dark:bg-primary-900/20 dark:text-primary-300"
+                >
+                  {{ proxy.proxy_group_name }}
+                </span>
                 <!-- Account count badge -->
                 <span
                   v-if="proxy.account_count !== undefined"
@@ -158,8 +180,20 @@
           </div>
 
           <!-- Empty state -->
-          <div v-if="filteredProxies.length === 0 && searchQuery" class="select-empty">
+          <div v-if="matchingProxies.length === 0" class="select-empty">
             {{ t('common.noOptionsFound') }}
+          </div>
+          <div
+            v-if="isResultLimited"
+            class="select-limit-hint"
+            data-testid="proxy-result-limit-hint"
+          >
+            {{
+              t('admin.proxies.resultLimitHint', {
+                shown: MAX_VISIBLE_PROXIES,
+                total: matchingProxies.length
+              })
+            }}
           </div>
         </div>
       </div>
@@ -204,6 +238,8 @@ const isOpen = ref(false)
 const searchQuery = ref('')
 const containerRef = ref<HTMLElement | null>(null)
 const searchInputRef = ref<HTMLInputElement | null>(null)
+const groupFilter = ref('all')
+const MAX_VISIBLE_PROXIES = 100
 
 // Test state
 const testResults = reactive<Record<number, ProxyTestResult>>({})
@@ -223,17 +259,67 @@ const selectedLabel = computed(() => {
   return `${proxy.name} (${proxy.protocol}://${proxy.host}:${proxy.port})`
 })
 
-const filteredProxies = computed(() => {
-  if (!searchQuery.value) {
-    return props.proxies
+const groupOptions = computed(() => {
+  const seen = new Set<number>()
+  const groups: Array<{ value: string; label: string }> = []
+  for (const proxy of props.proxies) {
+    if (!proxy.proxy_group_id || seen.has(proxy.proxy_group_id)) continue
+    seen.add(proxy.proxy_group_id)
+    groups.push({
+      value: `group:${proxy.proxy_group_id}`,
+      label: proxy.proxy_group_name || `#${proxy.proxy_group_id}`
+    })
   }
-  const query = searchQuery.value.toLowerCase()
+  return [
+    { value: 'all', label: t('admin.proxies.allProxyGroups') },
+    { value: 'ungrouped', label: t('admin.proxies.ungrouped') },
+    ...groups
+  ]
+})
+
+const matchingProxies = computed(() => {
+  const query = searchQuery.value.trim().toLowerCase()
   return props.proxies.filter((proxy) => {
+    if (groupFilter.value === 'ungrouped' && proxy.proxy_group_id != null) return false
+    if (groupFilter.value.startsWith('group:')) {
+      const groupId = Number(groupFilter.value.slice('group:'.length))
+      if (proxy.proxy_group_id !== groupId) return false
+    }
+    if (!query) return true
     const name = proxy.name.toLowerCase()
     const host = proxy.host.toLowerCase()
     return name.includes(query) || host.includes(query)
   })
 })
+
+const visibleProxies = computed(() => {
+  const visible = matchingProxies.value.slice(0, MAX_VISIBLE_PROXIES)
+  const selected = selectedProxy.value
+  if (
+    !selected ||
+    !matchingProxies.value.some((proxy) => proxy.id === selected.id) ||
+    visible.some((proxy) => proxy.id === selected.id)
+  ) {
+    return visible
+  }
+
+  if (visible.length >= MAX_VISIBLE_PROXIES) {
+    visible[visible.length - 1] = selected
+  } else {
+    visible.push(selected)
+  }
+  return visible
+})
+
+const isResultLimited = computed(() => {
+  return matchingProxies.value.length > MAX_VISIBLE_PROXIES
+})
+
+const batchTestTitle = computed(() =>
+  matchingProxies.value.length > MAX_VISIBLE_PROXIES
+    ? t('admin.proxies.batchTestLimitExceeded', { count: MAX_VISIBLE_PROXIES })
+    : t('admin.proxies.batchTest')
+)
 
 const toggle = () => {
   if (props.disabled) return
@@ -249,6 +335,7 @@ const selectOption = (value: number | null) => {
   emit('update:modelValue', value)
   isOpen.value = false
   searchQuery.value = ''
+  groupFilter.value = 'all'
 }
 
 const handleTestProxy = async (proxy: Proxy) => {
@@ -269,34 +356,50 @@ const handleTestProxy = async (proxy: Proxy) => {
 }
 
 const handleBatchTest = async () => {
-  if (batchTesting.value || props.proxies.length === 0) return
+  const targets = matchingProxies.value
+  if (
+    batchTesting.value ||
+    targets.length === 0 ||
+    targets.length > MAX_VISIBLE_PROXIES
+  ) {
+    return
+  }
 
   batchTesting.value = true
 
-  // Test all proxies in parallel
-  const testPromises = props.proxies.map(async (proxy) => {
-    testingProxyIds.add(proxy.id)
-    try {
-      const result = await adminAPI.proxies.testProxy(proxy.id)
-      testResults[proxy.id] = result
-    } catch (error: any) {
-      testResults[proxy.id] = {
-        success: false,
-        message: error.response?.data?.detail || 'Test failed'
+  let index = 0
+  const worker = async () => {
+    while (index < targets.length) {
+      const proxy = targets[index]
+      index++
+      testingProxyIds.add(proxy.id)
+      try {
+        const result = await adminAPI.proxies.testProxy(proxy.id)
+        testResults[proxy.id] = result
+      } catch (error: any) {
+        testResults[proxy.id] = {
+          success: false,
+          message: error.response?.data?.detail || t('admin.proxies.testFailed')
+        }
+      } finally {
+        testingProxyIds.delete(proxy.id)
       }
-    } finally {
-      testingProxyIds.delete(proxy.id)
     }
-  })
+  }
 
-  await Promise.all(testPromises)
-  batchTesting.value = false
+  try {
+    const workers = Array.from({ length: Math.min(5, targets.length) }, () => worker())
+    await Promise.all(workers)
+  } finally {
+    batchTesting.value = false
+  }
 }
 
 const handleClickOutside = (event: MouseEvent) => {
   if (containerRef.value && !containerRef.value.contains(event.target as Node)) {
     isOpen.value = false
     searchQuery.value = ''
+    groupFilter.value = 'all'
   }
 }
 
@@ -304,6 +407,7 @@ const handleEscape = (event: KeyboardEvent) => {
   if (event.key === 'Escape' && isOpen.value) {
     isOpen.value = false
     searchQuery.value = ''
+    groupFilter.value = 'all'
   }
 }
 
@@ -361,6 +465,16 @@ onUnmounted(() => {
   @apply border-b border-gray-100 dark:border-dark-700;
 }
 
+.select-filter-row {
+  @apply border-b border-gray-100 px-3 py-2 dark:border-dark-700;
+}
+
+.select-group-filter {
+  @apply w-full rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs;
+  @apply text-gray-700 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20;
+  @apply dark:border-dark-600 dark:bg-dark-800 dark:text-gray-200;
+}
+
 .select-search {
   @apply flex flex-1 items-center gap-2;
 }
@@ -403,6 +517,10 @@ onUnmounted(() => {
 .select-empty {
   @apply px-4 py-8 text-center text-sm;
   @apply text-gray-500 dark:text-dark-400;
+}
+
+.select-limit-hint {
+  @apply border-t border-gray-100 px-4 py-2 text-center text-xs text-gray-500 dark:border-dark-700 dark:text-dark-400;
 }
 
 .test-btn {

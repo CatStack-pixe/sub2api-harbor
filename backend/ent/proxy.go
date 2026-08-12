@@ -10,6 +10,7 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
 	"github.com/Wei-Shaw/sub2api/ent/proxy"
+	"github.com/Wei-Shaw/sub2api/ent/proxygroup"
 )
 
 // Proxy is the model entity for the Proxy schema.
@@ -45,6 +46,8 @@ type Proxy struct {
 	BackupProxyID *int64 `json:"backup_proxy_id,omitempty"`
 	// Days before expiry to flag as expiring-soon (per proxy).
 	ExpiryWarnDays int `json:"expiry_warn_days,omitempty"`
+	// Independent proxy group id; NULL means ungrouped.
+	ProxyGroupID *int64 `json:"proxy_group_id,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the ProxyQuery when eager-loading is set.
 	Edges        ProxyEdges `json:"edges"`
@@ -57,9 +60,11 @@ type ProxyEdges struct {
 	Accounts []*Account `json:"accounts,omitempty"`
 	// BackupProxy holds the value of the backup_proxy edge.
 	BackupProxy *Proxy `json:"backup_proxy,omitempty"`
+	// ProxyGroup holds the value of the proxy_group edge.
+	ProxyGroup *ProxyGroup `json:"proxy_group,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [2]bool
+	loadedTypes [3]bool
 }
 
 // AccountsOrErr returns the Accounts value or an error if the edge
@@ -82,12 +87,23 @@ func (e ProxyEdges) BackupProxyOrErr() (*Proxy, error) {
 	return nil, &NotLoadedError{edge: "backup_proxy"}
 }
 
+// ProxyGroupOrErr returns the ProxyGroup value or an error if the edge
+// was not loaded in eager-loading, or loaded but was not found.
+func (e ProxyEdges) ProxyGroupOrErr() (*ProxyGroup, error) {
+	if e.ProxyGroup != nil {
+		return e.ProxyGroup, nil
+	} else if e.loadedTypes[2] {
+		return nil, &NotFoundError{label: proxygroup.Label}
+	}
+	return nil, &NotLoadedError{edge: "proxy_group"}
+}
+
 // scanValues returns the types for scanning values from sql.Rows.
 func (*Proxy) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case proxy.FieldID, proxy.FieldPort, proxy.FieldBackupProxyID, proxy.FieldExpiryWarnDays:
+		case proxy.FieldID, proxy.FieldPort, proxy.FieldBackupProxyID, proxy.FieldExpiryWarnDays, proxy.FieldProxyGroupID:
 			values[i] = new(sql.NullInt64)
 		case proxy.FieldName, proxy.FieldProtocol, proxy.FieldHost, proxy.FieldUsername, proxy.FieldPassword, proxy.FieldStatus, proxy.FieldFallbackMode:
 			values[i] = new(sql.NullString)
@@ -203,6 +219,13 @@ func (_m *Proxy) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.ExpiryWarnDays = int(value.Int64)
 			}
+		case proxy.FieldProxyGroupID:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field proxy_group_id", values[i])
+			} else if value.Valid {
+				_m.ProxyGroupID = new(int64)
+				*_m.ProxyGroupID = value.Int64
+			}
 		default:
 			_m.selectValues.Set(columns[i], values[i])
 		}
@@ -224,6 +247,11 @@ func (_m *Proxy) QueryAccounts() *AccountQuery {
 // QueryBackupProxy queries the "backup_proxy" edge of the Proxy entity.
 func (_m *Proxy) QueryBackupProxy() *ProxyQuery {
 	return NewProxyClient(_m.config).QueryBackupProxy(_m)
+}
+
+// QueryProxyGroup queries the "proxy_group" edge of the Proxy entity.
+func (_m *Proxy) QueryProxyGroup() *ProxyGroupQuery {
+	return NewProxyClient(_m.config).QueryProxyGroup(_m)
 }
 
 // Update returns a builder for updating this Proxy.
@@ -300,6 +328,11 @@ func (_m *Proxy) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("expiry_warn_days=")
 	builder.WriteString(fmt.Sprintf("%v", _m.ExpiryWarnDays))
+	builder.WriteString(", ")
+	if v := _m.ProxyGroupID; v != nil {
+		builder.WriteString("proxy_group_id=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
 	builder.WriteByte(')')
 	return builder.String()
 }

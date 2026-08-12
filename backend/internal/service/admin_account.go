@@ -417,6 +417,15 @@ func buildAccountForCreate(input *CreateAccountInput, accountExtra map[string]an
 		Status:      StatusActive,
 		Schedulable: true,
 	}
+	if input.InitialStatus != "" {
+		if input.InitialStatus != StatusActive && input.InitialStatus != StatusDisabled {
+			return nil, fmt.Errorf("invalid initial account status %q", input.InitialStatus)
+		}
+		account.Status = input.InitialStatus
+	}
+	if input.InitialSchedulable != nil {
+		account.Schedulable = *input.InitialSchedulable
+	}
 	if input.ProbeEnabled != nil && *input.ProbeEnabled {
 		if !isUpstreamBillingProbeAccount(account) {
 			return nil, ErrUpstreamBillingProbeAccountInvalid

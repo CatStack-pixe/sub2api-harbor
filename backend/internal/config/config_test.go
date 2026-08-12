@@ -214,6 +214,28 @@ func TestLoadTrustedProxiesFromEnvironment(t *testing.T) {
 	require.True(t, cfg.Server.TrustedProxiesConfigured)
 }
 
+func TestLoadHeartbeatAllowedSourceIPsFromEnvironment(t *testing.T) {
+	resetViperWithJWTSecret(t)
+	t.Setenv("HEARTBEAT_PROVISIONING_ENABLED", "true")
+	t.Setenv("HEARTBEAT_PROVISIONING_VAULT_URL", "https://vault.example.test/api/hb/keys")
+	t.Setenv("HEARTBEAT_PROVISIONING_ALLOWED_SOURCE_IPS", "47.97.207.205, 2001:db8::1")
+
+	cfg, err := Load()
+	require.NoError(t, err)
+	require.True(t, cfg.HeartbeatProvisioning.Enabled)
+	require.Equal(t, []string{"47.97.207.205", "2001:db8::1"}, cfg.HeartbeatProvisioning.AllowedSourceIPs)
+}
+
+func TestLoadRejectsInvalidHeartbeatSourceIP(t *testing.T) {
+	resetViperWithJWTSecret(t)
+	viper.Set("heartbeat_provisioning.enabled", true)
+	viper.Set("heartbeat_provisioning.vault_url", "https://vault.example.test/api/hb/keys")
+	viper.Set("heartbeat_provisioning.allowed_source_ips", []string{"not-an-ip"})
+
+	_, err := Load()
+	require.ErrorContains(t, err, "heartbeat_provisioning.allowed_source_ips")
+}
+
 func TestLoadExplicitEmptyTrustedProxiesFromEnvironment(t *testing.T) {
 	resetViperWithJWTSecret(t)
 	t.Setenv("SERVER_TRUSTED_PROXIES", "")

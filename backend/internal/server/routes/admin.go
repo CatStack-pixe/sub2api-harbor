@@ -483,6 +483,14 @@ func registerGrokOAuthRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 }
 
 func registerProxyRoutes(admin *gin.RouterGroup, h *handler.Handlers, stepUpAuth middleware.StepUpAuthMiddleware) {
+	proxyGroups := admin.Group("/proxy-groups")
+	{
+		proxyGroups.GET("", h.Admin.Proxy.ListProxyGroups)
+		proxyGroups.POST("", h.Admin.Proxy.CreateProxyGroup)
+		proxyGroups.PUT("/:id", h.Admin.Proxy.UpdateProxyGroup)
+		proxyGroups.DELETE("/:id", h.Admin.Proxy.DeleteProxyGroup)
+	}
+
 	proxies := admin.Group("/proxies")
 	{
 		proxies.GET("", h.Admin.Proxy.List)
@@ -499,6 +507,7 @@ func registerProxyRoutes(admin *gin.RouterGroup, h *handler.Handlers, stepUpAuth
 		proxies.GET("/:id/stats", h.Admin.Proxy.GetStats)
 		proxies.GET("/:id/accounts", h.Admin.Proxy.GetProxyAccounts)
 		proxies.POST("/batch-delete", h.Admin.Proxy.BatchDelete)
+		proxies.POST("/batch-group", h.Admin.Proxy.BatchGroup)
 		proxies.POST("/batch", h.Admin.Proxy.BatchCreate)
 	}
 }

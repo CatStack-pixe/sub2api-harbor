@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"math"
+	"net/netip"
 	"net/textproto"
 	"net/url"
 	"os"
@@ -99,6 +100,7 @@ type Config struct {
 	Idempotency             IdempotencyConfig             `mapstructure:"idempotency"`
 	BatchImage              BatchImageConfig              `mapstructure:"batch_image"`
 	ImageStorage            ImageStorageConfig            `mapstructure:"image_storage"`
+	HeartbeatProvisioning   HeartbeatProvisioningConfig   `mapstructure:"heartbeat_provisioning"`
 }
 
 type LogConfig struct {
@@ -1673,6 +1675,23 @@ type UsageCleanupConfig struct {
 	TaskTimeoutSeconds int `mapstructure:"task_timeout_seconds"`
 }
 
+// HeartbeatProvisioningConfig controls the trusted DeepSeek heartbeat intake.
+// It is disabled by default and must be explicitly enabled in production.
+type HeartbeatProvisioningConfig struct {
+	Enabled              bool     `mapstructure:"enabled"`
+	VaultURL             string   `mapstructure:"vault_url"`
+	AllowInsecureVault   bool     `mapstructure:"allow_insecure_vault"`
+	AllowedSourceIPs     []string `mapstructure:"allowed_source_ips"`
+	DeepSeekGroupID      int64    `mapstructure:"deepseek_group_id"`
+	ProxyGroupID         int64    `mapstructure:"proxy_group_id"`
+	WorkerCount          int      `mapstructure:"worker_count"`
+	ProxyProbeWorkers    int      `mapstructure:"proxy_probe_workers"`
+	ProxyProbeSampleSize int      `mapstructure:"proxy_probe_sample_size"`
+	ProxyProbeTimeoutS   int      `mapstructure:"proxy_probe_timeout_seconds"`
+	ProxySweepTTLSecond  int      `mapstructure:"proxy_sweep_ttl_seconds"`
+	MaxAttempts          int      `mapstructure:"max_attempts"`
+}
+
 func NormalizeRunMode(value string) string {
 	normalized := strings.ToLower(strings.TrimSpace(value))
 	switch normalized {
@@ -1718,6 +1737,7 @@ func load(allowMissingJWTSecret bool) (*Config, error) {
 	}
 	trustedProxiesEnv, trustedProxiesEnvConfigured := os.LookupEnv("SERVER_TRUSTED_PROXIES")
 	forwardedClientIPHeadersEnv, forwardedClientIPHeadersEnvConfigured := os.LookupEnv("SECURITY_FORWARDED_CLIENT_IP_HEADERS")
+	heartbeatSourceIPsEnv, heartbeatSourceIPsEnvConfigured := os.LookupEnv("HEARTBEAT_PROVISIONING_ALLOWED_SOURCE_IPS")
 	trustedProxiesConfigured := viper.InConfig("server.trusted_proxies") ||
 		viper.IsSet("server.trusted_proxies") || trustedProxiesEnvConfigured
 
@@ -1730,6 +1750,9 @@ func load(allowMissingJWTSecret bool) (*Config, error) {
 	}
 	if forwardedClientIPHeadersEnvConfigured {
 		cfg.Security.ForwardedClientIPHeaders = normalizeStringSlice(strings.Split(forwardedClientIPHeadersEnv, ","))
+	}
+	if heartbeatSourceIPsEnvConfigured {
+		cfg.HeartbeatProvisioning.AllowedSourceIPs = normalizeStringSlice(strings.Split(heartbeatSourceIPsEnv, ","))
 	}
 	cfg.Server.TrustedProxiesConfigured = trustedProxiesConfigured
 	if cfg.Gateway.OpenAIScheduler.StickyEscapeTTFTMs == 0 {
@@ -2246,6 +2269,21 @@ func setDefaults() {
 	viper.SetDefault("usage_cleanup.batch_size", 5000)
 	viper.SetDefault("usage_cleanup.worker_interval_seconds", 10)
 	viper.SetDefault("usage_cleanup.task_timeout_seconds", 1800)
+
+	// Trusted external DeepSeek heartbeat intake. Disabled until a deployment
+	// explicitly enables it and provides a vault URL and source allowlist.
+	viper.SetDefault("heartbeat_provisioning.enabled", false)
+	viper.SetDefault("heartbeat_provisioning.vault_url", "")
+	viper.SetDefault("heartbeat_provisioning.allow_insecure_vault", false)
+	viper.SetDefault("heartbeat_provisioning.allowed_source_ips", []string{})
+	viper.SetDefault("heartbeat_provisioning.deepseek_group_id", int64(12))
+	viper.SetDefault("heartbeat_provisioning.proxy_group_id", int64(1))
+	viper.SetDefault("heartbeat_provisioning.worker_count", 2)
+	viper.SetDefault("heartbeat_provisioning.proxy_probe_workers", 10)
+	viper.SetDefault("heartbeat_provisioning.proxy_probe_sample_size", 100)
+	viper.SetDefault("heartbeat_provisioning.proxy_probe_timeout_seconds", 5)
+	viper.SetDefault("heartbeat_provisioning.proxy_sweep_ttl_seconds", 300)
+	viper.SetDefault("heartbeat_provisioning.max_attempts", 5)
 
 	// Idempotency
 	viper.SetDefault("idempotency.observe_only", true)
@@ -3124,6 +3162,26 @@ func (c *Config) Validate() error {
 		}
 		if c.UsageCleanup.TaskTimeoutSeconds < 0 {
 			return fmt.Errorf("usage_cleanup.task_timeout_seconds must be non-negative")
+		}
+	}
+	if c.HeartbeatProvisioning.Enabled {
+		vaultURL, err := url.Parse(strings.TrimSpace(c.HeartbeatProvisioning.VaultURL))
+		if err != nil || vaultURL.Host == "" || (vaultURL.Scheme != "https" && (vaultURL.Scheme != "http" || !c.HeartbeatProvisioning.AllowInsecureVault)) {
+			return fmt.Errorf("heartbeat_provisioning.vault_url must use HTTPS unless heartbeat_provisioning.allow_insecure_vault=true")
+		}
+		if len(c.HeartbeatProvisioning.AllowedSourceIPs) == 0 {
+			return fmt.Errorf("heartbeat_provisioning.allowed_source_ips is required when enabled")
+		}
+		for _, rawIP := range c.HeartbeatProvisioning.AllowedSourceIPs {
+			if _, err := netip.ParseAddr(strings.TrimSpace(rawIP)); err != nil {
+				return fmt.Errorf("heartbeat_provisioning.allowed_source_ips contains an invalid IP address")
+			}
+		}
+		if c.HeartbeatProvisioning.DeepSeekGroupID <= 0 || c.HeartbeatProvisioning.ProxyGroupID <= 0 ||
+			c.HeartbeatProvisioning.WorkerCount <= 0 || c.HeartbeatProvisioning.ProxyProbeWorkers <= 0 ||
+			c.HeartbeatProvisioning.ProxyProbeSampleSize <= 0 || c.HeartbeatProvisioning.ProxyProbeTimeoutS <= 0 ||
+			c.HeartbeatProvisioning.ProxySweepTTLSecond <= 0 || c.HeartbeatProvisioning.MaxAttempts <= 0 {
+			return fmt.Errorf("heartbeat_provisioning numeric settings must be positive when enabled")
 		}
 	}
 	if c.Idempotency.DefaultTTLSeconds <= 0 {
