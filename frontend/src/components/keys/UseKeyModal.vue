@@ -1558,42 +1558,6 @@ function generateOpenCodeConfig(platform: string, baseUrl: string, apiKey: strin
       limit: { context: 131072, output: 8192 }
     }
   }
-  const agnesModels = {
-    'agnes-2.0-flash': {
-      name: 'Agnes 2.0 Flash',
-      limit: { context: 524288, output: 65536 },
-      modalities: { input: ['text', 'image'], output: ['text'] }
-    }
-  }
-  const deepseekModels = {
-    'deepseek-v4-pro': {
-      name: 'DeepSeek V4 Pro',
-      limit: { context: 1000000, output: 384000 }
-    },
-    'deepseek-v4-flash': {
-      name: 'DeepSeek V4 Flash',
-      limit: { context: 1000000, output: 384000 }
-    }
-  }
-  const nvidiaModels = {
-    'nvidia/llama-3.1-nemotron-nano-8b-v1': {
-      name: 'NVIDIA Llama 3.1 Nemotron Nano',
-      limit: { context: 128000, output: 32768 }
-    },
-    'meta/llama-3.1-8b-instruct': {
-      name: 'Llama 3.1 8B Instruct',
-      limit: { context: 131072, output: 8192 }
-    },
-    'meta/llama-3.1-70b-instruct': {
-      name: 'Llama 3.1 70B Instruct',
-      limit: { context: 131072, output: 8192 }
-    },
-    'meta/llama-3.3-70b-instruct': {
-      name: 'Llama 3.3 70B Instruct',
-      limit: { context: 131072, output: 8192 }
-    }
-  }
-
   if (platform === 'gemini') {
     provider[platform].npm = '@ai-sdk/google'
     provider[platform].models = geminiModels

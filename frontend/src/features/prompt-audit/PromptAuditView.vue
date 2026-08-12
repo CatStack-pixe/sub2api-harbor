@@ -320,15 +320,6 @@ function setBlocking(value: boolean) {
   if (value && !draft.value.blocking_enabled) { showBlockingConfirmation.value = true; return }
   replaceDraft({ ...draft.value, blocking_enabled: value })
 }
-function setCaptureOnly(value: boolean) {
-  if (!draft.value) return
-  replaceDraft({
-    ...draft.value,
-    capture_only: value,
-    blocking_enabled: value ? false : draft.value.blocking_enabled,
-    store_pass_events: value ? true : draft.value.store_pass_events,
-  })
-}
 function confirmBlocking() {
   showBlockingConfirmation.value = false
   if (draft.value) replaceDraft({ ...draft.value, blocking_enabled: true })
