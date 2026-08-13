@@ -16,6 +16,8 @@ import (
 
 const heartbeatRequestBodyLimit = 1 << 20
 
+const heartbeatLegacyTimestampLayout = "2006-01-02T15:04:05.999999999"
+
 type HeartbeatHandler struct {
 	provisioning *service.HeartbeatProvisioningService
 }
@@ -31,10 +33,37 @@ type heartbeatRequest struct {
 }
 
 type heartbeatKey struct {
-	Fingerprint string  `json:"fp"`
-	Provider    string  `json:"provider"`
-	Balance     float64 `json:"balance"`
-	CheckedAt   string  `json:"checked_at"`
+	Fingerprint      string  `json:"fp"`
+	Provider         string  `json:"provider"`
+	Balance          float64 `json:"balance"`
+	CheckedAt        string  `json:"checked_at"`
+	BalanceCheckedAt string  `json:"balance_checked_at"`
+}
+
+func parseHeartbeatCheckedAt(value string) (time.Time, error) {
+	raw := strings.TrimSpace(value)
+	if parsed, err := time.Parse(time.RFC3339Nano, raw); err == nil {
+		return parsed, nil
+	}
+	// Older key-checker clients emitted UTC timestamps without an explicit
+	// offset. Keep accepting that wire format while making the interpretation
+	// deterministic and documenting RFC3339 as the preferred format.
+	if parsed, err := time.ParseInLocation(heartbeatLegacyTimestampLayout, raw, time.UTC); err == nil {
+		return parsed, nil
+	}
+	return time.Time{}, errors.New("invalid heartbeat checked_at")
+}
+
+func (key heartbeatKey) parseCheckedAt() (time.Time, error) {
+	checkedAt := strings.TrimSpace(key.CheckedAt)
+	balanceCheckedAt := strings.TrimSpace(key.BalanceCheckedAt)
+	if checkedAt != "" && balanceCheckedAt != "" && checkedAt != balanceCheckedAt {
+		return time.Time{}, errors.New("conflicting heartbeat checked_at values")
+	}
+	if checkedAt == "" {
+		checkedAt = balanceCheckedAt
+	}
+	return parseHeartbeatCheckedAt(checkedAt)
 }
 
 func (h *HeartbeatHandler) Handle(c *gin.Context) {
@@ -61,9 +90,10 @@ func (h *HeartbeatHandler) Handle(c *gin.Context) {
 	}
 	keys := make([]service.HeartbeatKeyInput, 0, len(request.Keys))
 	for _, key := range request.Keys {
-		checkedAt, err := time.Parse(time.RFC3339Nano, strings.TrimSpace(key.CheckedAt))
+		checkedAt, err := key.parseCheckedAt()
 		if err != nil {
-			checkedAt = time.Time{}
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid heartbeat"})
+			return
 		}
 		keys = append(keys, service.HeartbeatKeyInput{
 			Fingerprint: key.Fingerprint,
