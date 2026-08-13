@@ -207,10 +207,9 @@ func (h *GrokOAuthHandler) RefreshAccountToken(c *gin.Context) {
 	if baseURL := strings.TrimSpace(account.GetCredential("base_url")); baseURL != "" {
 		newCredentials["base_url"] = baseURL
 	}
-	updatedAccount, err := h.adminService.UpdateAccount(c.Request.Context(), accountID, &service.UpdateAccountInput{
-		Credentials: newCredentials,
-		ProviderManagedCredentials: true,
-	})
+	updateInput := &service.UpdateAccountInput{Credentials: newCredentials}
+	updateInput.ProviderManagedCredentials = true
+	updatedAccount, err := h.adminService.UpdateAccount(c.Request.Context(), accountID, updateInput)
 	if err != nil {
 		response.ErrorFrom(c, err)
 		return

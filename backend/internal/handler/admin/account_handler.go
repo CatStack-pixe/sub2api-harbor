@@ -1319,10 +1319,9 @@ func (h *AccountHandler) refreshSingleAccount(ctx context.Context, account *serv
 		}
 	}
 
-	updatedAccount, err := h.adminService.UpdateAccount(ctx, account.ID, &service.UpdateAccountInput{
-		Credentials: newCredentials,
-		ProviderManagedCredentials: account.Platform == service.PlatformGrok,
-	})
+	updateInput := &service.UpdateAccountInput{Credentials: newCredentials}
+	updateInput.ProviderManagedCredentials = account.Platform == service.PlatformGrok
+	updatedAccount, err := h.adminService.UpdateAccount(ctx, account.ID, updateInput)
 	if err != nil {
 		return nil, "", err
 	}
