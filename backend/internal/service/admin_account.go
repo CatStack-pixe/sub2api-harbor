@@ -552,6 +552,11 @@ func (s *adminServiceImpl) CreateAccount(ctx context.Context, input *CreateAccou
 	if err := NormalizeHeaderOverrideCredentials(input.Credentials); err != nil {
 		return nil, err
 	}
+	input.Credentials = sanitizeProviderManagedCredentials(
+		input.Platform,
+		input.Credentials,
+		input.ProviderManagedCredentials,
+	)
 	// Never persist ephemeral SSO/password secrets after OAuth conversion.
 	input.Credentials = SanitizeStoredCredentials(input.Platform, input.Credentials)
 
@@ -660,9 +665,22 @@ func (s *adminServiceImpl) UpdateAccount(ctx context.Context, id int64, input *U
 	if account.IsCredentialShadow() && input.Credentials != nil {
 		account.Credentials = sanitizeSparkShadowCredentials(input.Credentials)
 	} else if len(input.Credentials) > 0 {
+		existingCredentials := account.Credentials
+		input.Credentials = sanitizeProviderManagedCredentials(
+			account.Platform,
+			input.Credentials,
+			input.ProviderManagedCredentials,
+		)
 		// 敏感子键采用"incoming 没提供就保留"的合并语义：前端响应已脱敏，
 		// 全对象 PUT 编辑时不会再带回 token，避免覆盖时清空已有凭证。
 		account.Credentials = MergePreservingSensitiveCreds(account.Credentials, input.Credentials)
+		if account.Platform == PlatformGrok && !input.ProviderManagedCredentials {
+			for _, key := range []string{"subscription_tier", "entitlement_status"} {
+				if value, ok := existingCredentials[key]; ok {
+					account.Credentials[key] = value
+				}
+			}
+		}
 		// 校验并规范化请求头覆写配置（header 名小写化、格式检查）
 		if err := NormalizeHeaderOverrideCredentials(account.Credentials); err != nil {
 			return nil, err
@@ -1117,6 +1135,13 @@ func (s *adminServiceImpl) BulkUpdateAccounts(ctx context.Context, input *BulkUp
 	// only when platform is known Grok — empty platform still strips password/*).
 	if input.Credentials != nil {
 		input.Credentials = SanitizeStoredCredentials("", input.Credentials)
+		for _, account := range cachedTargets {
+			if account != nil && account.Platform == PlatformGrok {
+				delete(input.Credentials, "subscription_tier")
+				delete(input.Credentials, "entitlement_status")
+				break
+			}
+		}
 	}
 
 	// Prepare bulk updates for columns and JSONB fields.

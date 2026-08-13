@@ -49,6 +49,7 @@ func cloneGroupForDuplicateTest(group *Group) *Group {
 	cloned.DailyLimitUSD = cloneGroupValuePointer(group.DailyLimitUSD)
 	cloned.WeeklyLimitUSD = cloneGroupValuePointer(group.WeeklyLimitUSD)
 	cloned.MonthlyLimitUSD = cloneGroupValuePointer(group.MonthlyLimitUSD)
+	cloned.ModelPricing = cloneGroupModelPricing(group.ModelPricing)
 	cloned.ImagePrice1K = cloneGroupValuePointer(group.ImagePrice1K)
 	cloned.ImagePrice2K = cloneGroupValuePointer(group.ImagePrice2K)
 	cloned.ImagePrice4K = cloneGroupValuePointer(group.ImagePrice4K)
@@ -118,6 +119,71 @@ func (r *duplicateGroupRepoStub) CreateFromSource(_ context.Context, group *Grou
 
 func groupDuplicateTestPointer[T any](value T) *T { return &value }
 
+func TestCloneGroupForDuplicateDeepCopiesGroupModelPricing(t *testing.T) {
+	source := &Group{
+		Name:                      "priced group",
+		LongContextPricingEnabled: true,
+		ModelPricing: []ChannelModelPricing{
+			{
+				Models:           []string{"gpt-5.4"},
+				InputPrice:       groupDuplicateTestPointer(1.0),
+				OutputPrice:      groupDuplicateTestPointer(2.0),
+				CacheWritePrice:  groupDuplicateTestPointer(3.0),
+				CacheReadPrice:   groupDuplicateTestPointer(4.0),
+				ImageInputPrice:  groupDuplicateTestPointer(5.0),
+				ImageOutputPrice: groupDuplicateTestPointer(6.0),
+				PerRequestPrice:  groupDuplicateTestPointer(7.0),
+				Intervals: []PricingInterval{
+					{
+						MaxTokens:       groupDuplicateTestPointer(200000),
+						InputPrice:      groupDuplicateTestPointer(8.0),
+						OutputPrice:     groupDuplicateTestPointer(9.0),
+						CacheWritePrice: groupDuplicateTestPointer(10.0),
+						CacheReadPrice:  groupDuplicateTestPointer(11.0),
+						PerRequestPrice: groupDuplicateTestPointer(12.0),
+					},
+				},
+			},
+		},
+	}
+
+	duplicate := cloneGroupForDuplicate(source, "operation")
+
+	require.True(t, duplicate.LongContextPricingEnabled)
+	require.Equal(t, source.ModelPricing, duplicate.ModelPricing)
+	duplicate.LongContextPricingEnabled = false
+	duplicate.ModelPricing[0].Models[0] = "changed"
+	*duplicate.ModelPricing[0].InputPrice = 101
+	*duplicate.ModelPricing[0].OutputPrice = 102
+	*duplicate.ModelPricing[0].CacheWritePrice = 103
+	*duplicate.ModelPricing[0].CacheReadPrice = 104
+	*duplicate.ModelPricing[0].ImageInputPrice = 105
+	*duplicate.ModelPricing[0].ImageOutputPrice = 106
+	*duplicate.ModelPricing[0].PerRequestPrice = 107
+	*duplicate.ModelPricing[0].Intervals[0].MaxTokens = 300000
+	*duplicate.ModelPricing[0].Intervals[0].InputPrice = 108
+	*duplicate.ModelPricing[0].Intervals[0].OutputPrice = 109
+	*duplicate.ModelPricing[0].Intervals[0].CacheWritePrice = 110
+	*duplicate.ModelPricing[0].Intervals[0].CacheReadPrice = 111
+	*duplicate.ModelPricing[0].Intervals[0].PerRequestPrice = 112
+
+	require.True(t, source.LongContextPricingEnabled)
+	require.Equal(t, "gpt-5.4", source.ModelPricing[0].Models[0])
+	require.Equal(t, 1.0, *source.ModelPricing[0].InputPrice)
+	require.Equal(t, 2.0, *source.ModelPricing[0].OutputPrice)
+	require.Equal(t, 3.0, *source.ModelPricing[0].CacheWritePrice)
+	require.Equal(t, 4.0, *source.ModelPricing[0].CacheReadPrice)
+	require.Equal(t, 5.0, *source.ModelPricing[0].ImageInputPrice)
+	require.Equal(t, 6.0, *source.ModelPricing[0].ImageOutputPrice)
+	require.Equal(t, 7.0, *source.ModelPricing[0].PerRequestPrice)
+	require.Equal(t, 200000, *source.ModelPricing[0].Intervals[0].MaxTokens)
+	require.Equal(t, 8.0, *source.ModelPricing[0].Intervals[0].InputPrice)
+	require.Equal(t, 9.0, *source.ModelPricing[0].Intervals[0].OutputPrice)
+	require.Equal(t, 10.0, *source.ModelPricing[0].Intervals[0].CacheWritePrice)
+	require.Equal(t, 11.0, *source.ModelPricing[0].Intervals[0].CacheReadPrice)
+	require.Equal(t, 12.0, *source.ModelPricing[0].Intervals[0].PerRequestPrice)
+}
+
 func TestDuplicateGroupCopiesConfigurationDeeplyAndResetsRuntimeState(t *testing.T) {
 	createdAt := time.Date(2026, time.July, 1, 2, 3, 4, 0, time.UTC)
 	source := &Group{
@@ -137,6 +203,24 @@ func TestDuplicateGroupCopiesConfigurationDeeplyAndResetsRuntimeState(t *testing
 		DailyLimitUSD:                groupDuplicateTestPointer(11.0),
 		WeeklyLimitUSD:               groupDuplicateTestPointer(22.0),
 		MonthlyLimitUSD:              groupDuplicateTestPointer(33.0),
+		LongContextPricingEnabled:    true,
+		ModelPricing: []ChannelModelPricing{
+			{
+				Platform:    PlatformOpenAI,
+				Models:      []string{"gpt-5.4", "gpt-5-mini"},
+				BillingMode: BillingModeToken,
+				InputPrice:  groupDuplicateTestPointer(1.25e-6),
+				OutputPrice: groupDuplicateTestPointer(5e-6),
+				Intervals: []PricingInterval{
+					{
+						MinTokens:   0,
+						MaxTokens:   groupDuplicateTestPointer(200000),
+						InputPrice:  groupDuplicateTestPointer(1.25e-6),
+						OutputPrice: groupDuplicateTestPointer(5e-6),
+					},
+				},
+			},
+		},
 		DefaultValidityDays:          91,
 		AllowImageGeneration:         true,
 		AllowBatchImageGeneration:    true,
@@ -210,6 +294,8 @@ func TestDuplicateGroupCopiesConfigurationDeeplyAndResetsRuntimeState(t *testing
 	require.Equal(t, source.Platform, duplicate.Platform)
 	require.Equal(t, source.RateMultiplier, duplicate.RateMultiplier)
 	require.Equal(t, source.PeakRateMultiplier, duplicate.PeakRateMultiplier)
+	require.Equal(t, source.LongContextPricingEnabled, duplicate.LongContextPricingEnabled)
+	require.Equal(t, source.ModelPricing, duplicate.ModelPricing)
 	require.Equal(t, source.DefaultValidityDays, duplicate.DefaultValidityDays)
 	require.Equal(t, source.ImagePrice4K, duplicate.ImagePrice4K)
 	require.Equal(t, source.VideoModelPrices, duplicate.VideoModelPrices)
@@ -237,6 +323,11 @@ func TestDuplicateGroupCopiesConfigurationDeeplyAndResetsRuntimeState(t *testing
 	duplicate.ModelsListConfig.Models[0] = "changed"
 	duplicate.ModelsListConfig.ModelMapping["deepseek-v4-pro"] = "changed"
 	duplicate.ReasoningEffortMappings[0].To = "changed"
+	duplicate.LongContextPricingEnabled = false
+	duplicate.ModelPricing[0].Models[0] = "changed"
+	*duplicate.ModelPricing[0].InputPrice = 999
+	*duplicate.ModelPricing[0].Intervals[0].MaxTokens = 999
+	*duplicate.ModelPricing[0].Intervals[0].OutputPrice = 999
 	*duplicate.DailyLimitUSD = 999
 	require.Equal(t, int64(13), source.ModelRouting["gpt-*"][0])
 	require.Equal(t, 0.14, source.VideoModelPrices[VideoPriceFamilyGrokImagineVideo15][VideoBillingResolution720P])
@@ -245,6 +336,11 @@ func TestDuplicateGroupCopiesConfigurationDeeplyAndResetsRuntimeState(t *testing
 	require.Equal(t, "gpt-5.4", source.ModelsListConfig.Models[0])
 	require.Equal(t, "agnes-2.5-pro-alpha", source.ModelsListConfig.ModelMapping["deepseek-v4-pro"])
 	require.Equal(t, "xhigh", source.ReasoningEffortMappings[0].To)
+	require.True(t, source.LongContextPricingEnabled)
+	require.Equal(t, "gpt-5.4", source.ModelPricing[0].Models[0])
+	require.Equal(t, 1.25e-6, *source.ModelPricing[0].InputPrice)
+	require.Equal(t, 200000, *source.ModelPricing[0].Intervals[0].MaxTokens)
+	require.Equal(t, 5e-6, *source.ModelPricing[0].Intervals[0].OutputPrice)
 	require.Equal(t, 11.0, *source.DailyLimitUSD)
 }
 

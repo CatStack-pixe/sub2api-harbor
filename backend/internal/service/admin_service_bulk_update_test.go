@@ -18,6 +18,7 @@ type accountRepoStubForBulkUpdate struct {
 	accountRepoStub
 	bulkUpdateErr       error
 	bulkUpdateIDs       []int64
+	bulkUpdate          AccountBulkUpdate
 	bindGroupErrByID    map[int64]error
 	bindGroupsCalls     []int64
 	bindGroupsByAccount map[int64][]int64
@@ -50,8 +51,9 @@ type accountRepoStubForBulkUpdate struct {
 	}
 }
 
-func (s *accountRepoStubForBulkUpdate) BulkUpdate(_ context.Context, ids []int64, _ AccountBulkUpdate) (int64, error) {
+func (s *accountRepoStubForBulkUpdate) BulkUpdate(_ context.Context, ids []int64, update AccountBulkUpdate) (int64, error) {
 	s.bulkUpdateIDs = append([]int64{}, ids...)
+	s.bulkUpdate = update
 	if s.bulkUpdateErr != nil {
 		return 0, s.bulkUpdateErr
 	}
@@ -264,6 +266,32 @@ func TestAdminService_BulkUpdateAccountsRejectsInvalidDeepSeekCredentials(t *tes
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "DEEPSEEK_API_KEY_REQUIRED")
 	require.Empty(t, repo.bulkUpdateIDs)
+}
+
+func TestAdminService_BulkUpdateAccountsStripsGrokProviderManagedCredentials(t *testing.T) {
+	repo := &accountRepoStubForBulkUpdate{
+		getByIDsAccounts: []*Account{{
+			ID:       1,
+			Platform: PlatformGrok,
+			Type:     AccountTypeOAuth,
+		}},
+	}
+	svc := &adminServiceImpl{accountRepo: repo}
+
+	result, err := svc.BulkUpdateAccounts(context.Background(), &BulkUpdateAccountsInput{
+		AccountIDs: []int64{1},
+		Credentials: map[string]any{
+			"base_url":           "https://api.x.ai/v1",
+			"subscription_tier":  "supergrok_heavy",
+			"entitlement_status": "active",
+		},
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	require.Equal(t, "https://api.x.ai/v1", repo.bulkUpdate.Credentials["base_url"])
+	require.NotContains(t, repo.bulkUpdate.Credentials, "subscription_tier")
+	require.NotContains(t, repo.bulkUpdate.Credentials, "entitlement_status")
 }
 
 func TestAdminService_BulkUpdateAccounts_NilGroupRepoReturnsError(t *testing.T) {

@@ -12,7 +12,13 @@ import (
 type updateAccountCredsRepoStub struct {
 	mockAccountRepoForGemini
 	account     *Account
+	created     *Account
 	updateCalls int
+}
+
+func (r *updateAccountCredsRepoStub) Create(_ context.Context, account *Account) error {
+	r.created = account
+	return nil
 }
 
 func (r *updateAccountCredsRepoStub) GetByID(ctx context.Context, id int64) (*Account, error) {
@@ -114,4 +120,86 @@ func TestUpdateAccount_EmptyCredentialsSkipsUpdate(t *testing.T) {
 
 	require.Equal(t, "rt-existing", repo.account.Credentials["refresh_token"], "空 credentials 不应触碰已有 token")
 	require.Equal(t, "renamed", repo.account.Name)
+}
+
+func TestCreateAccount_StripsClientManagedGrokTier(t *testing.T) {
+	tests := []struct {
+		name            string
+		trusted         bool
+		wantTier        string
+		wantEntitlement string
+	}{
+		{name: "generic admin input", wantTier: "", wantEntitlement: ""},
+		{name: "provider OAuth input", trusted: true, wantTier: "supergrok_heavy", wantEntitlement: "active"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo := &updateAccountCredsRepoStub{}
+			svc := &adminServiceImpl{accountRepo: repo}
+
+			created, err := svc.CreateAccount(context.Background(), &CreateAccountInput{
+				Name:     "grok-oauth",
+				Platform: PlatformGrok,
+				Type:     AccountTypeOAuth,
+				Credentials: map[string]any{
+					"access_token":       "token",
+					"subscription_tier":  "supergrok_heavy",
+					"entitlement_status": "active",
+				},
+				SkipDefaultGroupBind:       true,
+				ProviderManagedCredentials: tt.trusted,
+			})
+
+			require.NoError(t, err)
+			require.NotNil(t, created)
+			require.NotNil(t, repo.created)
+			require.Equal(t, tt.wantTier, repo.created.GetCredential("subscription_tier"))
+			require.Equal(t, tt.wantEntitlement, repo.created.GetCredential("entitlement_status"))
+		})
+	}
+}
+
+func TestUpdateAccount_OnlyProviderFlowCanChangeGrokTier(t *testing.T) {
+	tests := []struct {
+		name            string
+		trusted         bool
+		wantTier        string
+		wantEntitlement string
+	}{
+		{name: "generic admin input preserves stored provider state", wantTier: "free", wantEntitlement: "inactive"},
+		{name: "provider OAuth input replaces provider state", trusted: true, wantTier: "supergrok_heavy", wantEntitlement: "active"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo := &updateAccountCredsRepoStub{account: &Account{
+				ID:       205,
+				Platform: PlatformGrok,
+				Type:     AccountTypeOAuth,
+				Status:   StatusActive,
+				Credentials: map[string]any{
+					"access_token":       "old-token",
+					"subscription_tier":  "free",
+					"entitlement_status": "inactive",
+				},
+			}}
+			svc := &adminServiceImpl{accountRepo: repo}
+
+			updated, err := svc.UpdateAccount(context.Background(), 205, &UpdateAccountInput{
+				Credentials: map[string]any{
+					"access_token":       "new-token",
+					"subscription_tier":  "supergrok_heavy",
+					"entitlement_status": "active",
+				},
+				ProviderManagedCredentials: tt.trusted,
+			})
+
+			require.NoError(t, err)
+			require.NotNil(t, updated)
+			require.Equal(t, tt.wantTier, updated.GetCredential("subscription_tier"))
+			require.Equal(t, tt.wantEntitlement, updated.GetCredential("entitlement_status"))
+			require.Equal(t, "new-token", updated.GetCredential("access_token"))
+		})
+	}
 }

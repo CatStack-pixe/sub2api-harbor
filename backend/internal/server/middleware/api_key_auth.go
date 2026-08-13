@@ -14,6 +14,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/ctxkey"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/ip"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/xai"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 
 	"github.com/gin-gonic/gin"
@@ -543,6 +544,9 @@ func defaultAPIKeyRestrictedModel(c *gin.Context) string {
 		if strings.HasSuffix(path, suffix) {
 			return "gpt-image-2"
 		}
+	}
+	if path == "/web_search" || path == "/x_search" || path == "/v1/web_search" || path == "/v1/x_search" {
+		return xai.ResolveDefaultTextModel(xai.RuntimeModelMappingOptions().DefaultText)
 	}
 	return ""
 }
