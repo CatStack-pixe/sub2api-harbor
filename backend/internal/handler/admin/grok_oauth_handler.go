@@ -208,7 +208,8 @@ func (h *GrokOAuthHandler) RefreshAccountToken(c *gin.Context) {
 		newCredentials["base_url"] = baseURL
 	}
 	updatedAccount, err := h.adminService.UpdateAccount(c.Request.Context(), accountID, &service.UpdateAccountInput{
-		Credentials: newCredentials,
+		Credentials:                 newCredentials,
+		ProviderManagedCredentials: true,
 	})
 	if err != nil {
 		response.ErrorFrom(c, err)
@@ -299,14 +300,15 @@ func (h *GrokOAuthHandler) CreateAccountFromOAuth(c *gin.Context) {
 	}
 
 	account, err := h.adminService.CreateAccount(c.Request.Context(), &service.CreateAccountInput{
-		Name:        name,
-		Platform:    service.PlatformGrok,
-		Type:        service.AccountTypeOAuth,
-		Credentials: credentials,
-		ProxyID:     req.ProxyID,
-		Concurrency: req.Concurrency,
-		Priority:    req.Priority,
-		GroupIDs:    req.GroupIDs,
+		Name:                       name,
+		Platform:                   service.PlatformGrok,
+		Type:                       service.AccountTypeOAuth,
+		Credentials:                credentials,
+		ProxyID:                    req.ProxyID,
+		Concurrency:                req.Concurrency,
+		Priority:                   req.Priority,
+		GroupIDs:                   req.GroupIDs,
+		ProviderManagedCredentials: true,
 	})
 	if err != nil {
 		response.ErrorFrom(c, err)
@@ -430,20 +432,21 @@ func (h *GrokOAuthHandler) createAccountFromSSOToken(ctx context.Context, req Gr
 	name := grokSSOImportAccountName(req.Name, tokenInfo, index, total)
 	expiresAt, autoPauseOnExpired := grokSSOImportExpiry(req.ExpiresAt, req.AutoPauseOnExpired, tokenInfo)
 	account, err := h.adminService.CreateAccount(ctx, &service.CreateAccountInput{
-		Name:               name,
-		Notes:              req.Notes,
-		Platform:           service.PlatformGrok,
-		Type:               service.AccountTypeOAuth,
-		Credentials:        credentials,
-		Extra:              cloneGrokSSOMap(req.Extra),
-		ProxyID:            req.ProxyID,
-		Concurrency:        req.Concurrency,
-		LoadFactor:         req.LoadFactor,
-		Priority:           req.Priority,
-		RateMultiplier:     req.RateMultiplier,
-		GroupIDs:           append([]int64(nil), req.GroupIDs...),
-		ExpiresAt:          expiresAt,
-		AutoPauseOnExpired: autoPauseOnExpired,
+		Name:                       name,
+		Notes:                      req.Notes,
+		Platform:                   service.PlatformGrok,
+		Type:                       service.AccountTypeOAuth,
+		Credentials:                credentials,
+		Extra:                      cloneGrokSSOMap(req.Extra),
+		ProxyID:                    req.ProxyID,
+		Concurrency:                req.Concurrency,
+		LoadFactor:                 req.LoadFactor,
+		Priority:                   req.Priority,
+		RateMultiplier:             req.RateMultiplier,
+		GroupIDs:                   append([]int64(nil), req.GroupIDs...),
+		ExpiresAt:                  expiresAt,
+		AutoPauseOnExpired:         autoPauseOnExpired,
+		ProviderManagedCredentials: true,
 	})
 	if err != nil {
 		return grokSSOImportWorkerResult{item: GrokSSOToOAuthItemResult{Index: index, Name: name, Email: tokenInfo.Email, Error: grokSSOImportErrorMessage(err)}}

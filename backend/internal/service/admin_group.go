@@ -323,6 +323,10 @@ func (s *adminServiceImpl) CreateGroup(ctx context.Context, input *CreateGroupIn
 	if err != nil {
 		return nil, err
 	}
+	longContextPricingEnabled := true
+	if input.LongContextPricingEnabled != nil {
+		longContextPricingEnabled = *input.LongContextPricingEnabled
+	}
 	maxReasoningEffort, err := normalizeMaxReasoningEffortForPlatform(platform, input.MaxReasoningEffort)
 	if err != nil {
 		return nil, infraerrors.Newf(http.StatusBadRequest, "INVALID_MAX_REASONING_EFFORT", "%v", err)
@@ -481,7 +485,7 @@ func (s *adminServiceImpl) CreateGroup(ctx context.Context, input *CreateGroupIn
 		DailyLimitUSD:                   dailyLimit,
 		WeeklyLimitUSD:                  weeklyLimit,
 		MonthlyLimitUSD:                 monthlyLimit,
-		LongContextPricingEnabled:       input.LongContextPricingEnabled,
+		LongContextPricingEnabled:       longContextPricingEnabled,
 		ModelPricing:                    modelPricing,
 		AllowImageGeneration:            allowImageGeneration,
 		AllowBatchImageGeneration:       allowBatchImageGeneration,
@@ -673,7 +677,8 @@ func (s *adminServiceImpl) UpdateGroup(ctx context.Context, id int64, input *Upd
 		if err := ValidateGroupPlatform(nextPlatform); err != nil {
 			return nil, err
 		}
-		if nextPlatform == PlatformDeepSeek || group.Platform == PlatformDeepSeek {
+		if nextPlatform == PlatformDeepSeek || group.Platform == PlatformDeepSeek ||
+			nextPlatform == PlatformNvidia || group.Platform == PlatformNvidia {
 			if err := validateGroupAccountPlatforms(ctx, s.accountRepo, nextPlatform, id); err != nil {
 				return nil, err
 			}
@@ -697,6 +702,12 @@ func (s *adminServiceImpl) UpdateGroup(ctx context.Context, id int64, input *Upd
 	}
 	if input.ModelPricing != nil {
 		modelPricing, normalizeErr := normalizeGroupModelPricing(group.Platform, *input.ModelPricing)
+		if normalizeErr != nil {
+			return nil, normalizeErr
+		}
+		group.ModelPricing = modelPricing
+	} else if group.Platform != previousPlatform && len(group.ModelPricing) > 0 {
+		modelPricing, normalizeErr := normalizeGroupModelPricing(group.Platform, group.ModelPricing)
 		if normalizeErr != nil {
 			return nil, normalizeErr
 		}
@@ -1014,9 +1025,7 @@ func normalizeGroupModelPricing(platform string, pricing []ChannelModelPricing) 
 		out[i] = pricing[i].Clone()
 		out[i].ID = 0
 		out[i].ChannelID = 0
-		if strings.TrimSpace(out[i].Platform) == "" {
-			out[i].Platform = platform
-		}
+		out[i].Platform = platform
 		for j := range out[i].Models {
 			out[i].Models[j] = strings.TrimSpace(out[i].Models[j])
 		}

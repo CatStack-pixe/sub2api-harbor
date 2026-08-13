@@ -217,7 +217,7 @@ type CreateGroupInput struct {
 	DailyLimitUSD             *float64 // 日限额 (USD)
 	WeeklyLimitUSD            *float64 // 周限额 (USD)
 	MonthlyLimitUSD           *float64 // 月限额 (USD)
-	LongContextPricingEnabled bool
+	LongContextPricingEnabled *bool
 	ModelPricing              []ChannelModelPricing
 	// 图片生成计费配置（仅 antigravity 平台使用）
 	AllowImageGeneration         bool
@@ -382,6 +382,8 @@ type CreateAccountInput struct {
 	// and schedulable defaults.
 	InitialStatus      string
 	InitialSchedulable *bool
+	// ProviderManagedCredentials allows trusted OAuth flows to persist provider-derived metadata.
+	ProviderManagedCredentials bool
 }
 
 // ShadowOptions is the input for CreateShadow.
@@ -411,6 +413,8 @@ type UpdateAccountInput struct {
 	ProbeEnabled          *bool
 	RateSyncEnabled       *bool
 	SkipMixedChannelCheck bool // 跳过混合渠道检查（用户已确认风险）
+	// ProviderManagedCredentials allows trusted OAuth flows to update provider-derived metadata.
+	ProviderManagedCredentials bool
 }
 
 // BulkUpdateAccountsInput describes the payload for bulk updating accounts.

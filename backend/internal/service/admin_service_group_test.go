@@ -359,6 +359,37 @@ func TestAdminService_CreateGroup_DefaultsGrokMediaGenerationEnabled(t *testing.
 	require.True(t, group.AllowImageGeneration)
 }
 
+func TestAdminService_CreateGroup_LongContextPricingDefaultsEnabled(t *testing.T) {
+	disabled := false
+	tests := []struct {
+		name  string
+		value *bool
+		want  bool
+	}{
+		{name: "omitted defaults enabled", want: true},
+		{name: "explicit false remains disabled", value: &disabled, want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo := &groupRepoStubForAdmin{}
+			svc := &adminServiceImpl{groupRepo: repo}
+
+			group, err := svc.CreateGroup(context.Background(), &CreateGroupInput{
+				Name:                      "long-context",
+				Platform:                  PlatformOpenAI,
+				RateMultiplier:            1,
+				LongContextPricingEnabled: tt.value,
+			})
+
+			require.NoError(t, err)
+			require.NotNil(t, group)
+			require.Equal(t, tt.want, group.LongContextPricingEnabled)
+			require.Equal(t, tt.want, repo.created.LongContextPricingEnabled)
+		})
+	}
+}
+
 func TestAdminService_CreateGroup_PreservesNonGrokImageGenerationDisabled(t *testing.T) {
 	repo := &groupRepoStubForAdmin{}
 	svc := &adminServiceImpl{groupRepo: repo}
@@ -591,6 +622,39 @@ func TestAdminService_UpdateGroup_DisablesBatchImageWhenPlatformChangesFromGemin
 	require.Equal(t, PlatformOpenAI, repo.updated.Platform)
 	require.False(t, repo.updated.AllowBatchImageGeneration)
 	require.False(t, group.AllowBatchImageGeneration)
+}
+
+func TestAdminService_UpdateGroup_RebindsModelPricingToChangedPlatform(t *testing.T) {
+	existingGroup := &Group{
+		ID:       1,
+		Name:     "existing-openai",
+		Platform: PlatformOpenAI,
+		Status:   StatusActive,
+		ModelPricing: []ChannelModelPricing{
+			{ID: 9, ChannelID: 10, Platform: PlatformOpenAI, Models: []string{"grok-4.6"}},
+		},
+	}
+	repo := &groupRepoStubForAdmin{getByID: existingGroup}
+	svc := &adminServiceImpl{groupRepo: repo}
+
+	group, err := svc.UpdateGroup(context.Background(), 1, &UpdateGroupInput{Platform: PlatformGrok})
+
+	require.NoError(t, err)
+	require.NotNil(t, group)
+	require.Len(t, group.ModelPricing, 1)
+	require.Equal(t, PlatformGrok, group.ModelPricing[0].Platform)
+	require.Zero(t, group.ModelPricing[0].ID)
+	require.Zero(t, group.ModelPricing[0].ChannelID)
+}
+
+func TestNormalizeGroupModelPricing_UsesOwningGroupPlatform(t *testing.T) {
+	pricing, err := normalizeGroupModelPricing(PlatformGrok, []ChannelModelPricing{
+		{Platform: PlatformOpenAI, Models: []string{"grok-4.6"}},
+	})
+
+	require.NoError(t, err)
+	require.Len(t, pricing, 1)
+	require.Equal(t, PlatformGrok, pricing[0].Platform)
 }
 
 func TestAdminService_UpdateGroup_ClearsDescriptionWhenEmptyString(t *testing.T) {

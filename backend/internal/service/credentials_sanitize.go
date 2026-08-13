@@ -19,3 +19,15 @@ func SanitizeStoredCredentials(platform string, creds map[string]any) map[string
 	}
 	return creds
 }
+
+// sanitizeProviderManagedCredentials prevents generic account CRUD from
+// accepting provider-derived Grok OAuth state. Trusted OAuth exchange and
+// refresh flows opt in explicitly after deriving these values from tokens.
+func sanitizeProviderManagedCredentials(platform string, creds map[string]any, trusted bool) map[string]any {
+	if creds == nil || trusted || platform != PlatformGrok {
+		return creds
+	}
+	delete(creds, "subscription_tier")
+	delete(creds, "entitlement_status")
+	return creds
+}
