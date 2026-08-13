@@ -318,6 +318,50 @@ func TestAPIKeyService_SnapshotRoundTrip_PreservesReasoningEffortPolicy(t *testi
 	require.Equal(t, apiKey.Group.ReasoningEffortMappings, roundTrip.Group.ReasoningEffortMappings)
 }
 
+func TestAPIKeyService_SnapshotRoundTrip_PreservesGroupModelPricing(t *testing.T) {
+	svc := &APIKeyService{}
+	groupID := int64(9)
+	zero := 0.0
+	maxTokens := 200_000
+	apiKey := &APIKey{
+		ID:      1,
+		UserID:  2,
+		GroupID: &groupID,
+		Key:     "k-group-pricing",
+		Status:  StatusActive,
+		User:    &User{ID: 2, Status: StatusActive, Role: RoleUser, Balance: 10, Concurrency: 3},
+		Group: &Group{
+			ID:                        groupID,
+			Name:                      "grok",
+			Platform:                  PlatformGrok,
+			Status:                    StatusActive,
+			SubscriptionType:          SubscriptionTypeStandard,
+			RateMultiplier:            1,
+			LongContextPricingEnabled: false,
+			ModelPricing: []ChannelModelPricing{{
+				Platform:    PlatformGrok,
+				Models:      []string{"grok-4.6"},
+				BillingMode: BillingModeToken,
+				InputPrice:  &zero,
+				Intervals: []PricingInterval{{
+					MinTokens: 0,
+					MaxTokens: &maxTokens,
+				}},
+			}},
+		},
+	}
+
+	snapshot := svc.snapshotFromAPIKey(context.Background(), apiKey)
+	require.Equal(t, apiKeyAuthSnapshotVersion, snapshot.Version)
+	roundTrip := svc.snapshotToAPIKey(apiKey.Key, snapshot)
+
+	require.NotNil(t, roundTrip)
+	require.NotNil(t, roundTrip.Group)
+	require.False(t, roundTrip.Group.LongContextPricingEnabled)
+	require.Equal(t, apiKey.Group.ModelPricing, roundTrip.Group.ModelPricing)
+	require.NotSame(t, &apiKey.Group.ModelPricing[0], &roundTrip.Group.ModelPricing[0])
+}
+
 func TestAPIKeyService_GetByKey_IgnoresLegacyAuthCacheSnapshotWithoutMessagesDispatchConfig(t *testing.T) {
 	cache := &authCacheStub{}
 	var repoCalls int32

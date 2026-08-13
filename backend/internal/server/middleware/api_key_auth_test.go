@@ -17,6 +17,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/ctxkey"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/xai"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
@@ -1680,6 +1681,60 @@ func TestAPIKeyAuthModelRestrictionCoversLiveAndDefaultImages(t *testing.T) {
 		require.Equal(t, http.StatusForbidden, w.Code)
 		require.Contains(t, w.Body.String(), "gpt-image-2")
 	})
+}
+
+func TestAPIKeyAuthModelRestrictionCoversStandaloneSearchDefaults(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	xai.SetRuntimeModelMappingOptions(xai.ModelMappingOptions{})
+	t.Cleanup(func() { xai.SetRuntimeModelMappingOptions(xai.ModelMappingOptions{}) })
+
+	user := &service.User{ID: 18, Role: service.RoleUser, Status: service.StatusActive, Balance: 10, Concurrency: 3}
+	groupID := int64(44)
+	group := &service.Group{ID: groupID, Name: "grok", Status: service.StatusActive, Platform: service.PlatformGrok, Hydrated: true}
+	keys := map[string]*service.APIKey{
+		"search-key": {
+			ID: 103, UserID: user.ID, Key: "search-key", Status: service.StatusActive, GroupID: &groupID,
+			ModelWhitelist: []string{xai.DefaultTextModel}, User: user, Group: group,
+		},
+		"blocked-key": {
+			ID: 104, UserID: user.ID, Key: "blocked-key", Status: service.StatusActive, GroupID: &groupID,
+			ModelWhitelist: []string{"grok-4.6"}, User: user, Group: group,
+		},
+	}
+	repo := &stubApiKeyRepo{getByKey: func(_ context.Context, key string) (*service.APIKey, error) {
+		apiKey, ok := keys[key]
+		if !ok {
+			return nil, service.ErrAPIKeyNotFound
+		}
+		clone := *apiKey
+		return &clone, nil
+	}}
+	cfg := &config.Config{RunMode: config.RunModeSimple}
+	router := gin.New()
+	router.Use(gin.HandlerFunc(NewAPIKeyAuthMiddleware(service.NewAPIKeyService(repo, nil, nil, nil, nil, nil, cfg), nil, cfg)))
+	ok := func(c *gin.Context) { c.Status(http.StatusOK) }
+	for _, path := range []string{"/web_search", "/x_search", "/v1/web_search", "/v1/x_search"} {
+		router.POST(path, ok)
+	}
+
+	request := func(path, key string) *httptest.ResponseRecorder {
+		w := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodPost, path, strings.NewReader(`{"query":"release notes"}`))
+		req.Header.Set("x-api-key", key)
+		req.Header.Set("content-type", "application/json")
+		router.ServeHTTP(w, req)
+		return w
+	}
+	for _, path := range []string{"/web_search", "/x_search", "/v1/web_search", "/v1/x_search"} {
+		t.Run("allows default model "+path, func(t *testing.T) {
+			require.Equal(t, http.StatusOK, request(path, "search-key").Code)
+		})
+		t.Run("rejects non-whitelisted default "+path, func(t *testing.T) {
+			w := request(path, "blocked-key")
+			require.Equal(t, http.StatusForbidden, w.Code)
+			require.Contains(t, w.Body.String(), xai.DefaultTextModel)
+		})
+	}
 }
 
 func newAuthTestRouter(apiKeyService *service.APIKeyService, subscriptionService *service.SubscriptionService, cfg *config.Config) *gin.Engine {

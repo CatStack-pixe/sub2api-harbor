@@ -14,7 +14,7 @@ import (
 	"github.com/dgraph-io/ristretto"
 )
 
-const apiKeyAuthSnapshotVersion = 21 // v21: include model whitelist, Grok billing fields, and Agnes group mappings
+const apiKeyAuthSnapshotVersion = 22 // v22: preserve group model pricing and long-context policy
 
 type apiKeyAuthCacheConfig struct {
 	l1Size        int
@@ -389,6 +389,8 @@ func (s *APIKeyService) snapshotFromAPIKey(ctx context.Context, apiKey *APIKey) 
 			DailyLimitUSD:                   apiKey.Group.DailyLimitUSD,
 			WeeklyLimitUSD:                  apiKey.Group.WeeklyLimitUSD,
 			MonthlyLimitUSD:                 apiKey.Group.MonthlyLimitUSD,
+			LongContextPricingEnabled:       apiKey.Group.LongContextPricingEnabled,
+			ModelPricing:                    cloneChannelModelPricing(apiKey.Group.ModelPricing),
 			AllowImageGeneration:            apiKey.Group.AllowImageGeneration,
 			AllowBatchImageGeneration:       apiKey.Group.AllowBatchImageGeneration,
 			ImageRateIndependent:            apiKey.Group.ImageRateIndependent,
@@ -485,6 +487,8 @@ func (s *APIKeyService) snapshotToAPIKey(key string, snapshot *APIKeyAuthSnapsho
 			DailyLimitUSD:                   snapshot.Group.DailyLimitUSD,
 			WeeklyLimitUSD:                  snapshot.Group.WeeklyLimitUSD,
 			MonthlyLimitUSD:                 snapshot.Group.MonthlyLimitUSD,
+			LongContextPricingEnabled:       snapshot.Group.LongContextPricingEnabled,
+			ModelPricing:                    cloneChannelModelPricing(snapshot.Group.ModelPricing),
 			AllowImageGeneration:            snapshot.Group.AllowImageGeneration,
 			AllowBatchImageGeneration:       snapshot.Group.AllowBatchImageGeneration,
 			ImageRateIndependent:            snapshot.Group.ImageRateIndependent,
@@ -529,4 +533,15 @@ func (s *APIKeyService) snapshotToAPIKey(key string, snapshot *APIKeyAuthSnapsho
 	}
 	s.compileAPIKeyIPRules(apiKey)
 	return apiKey
+}
+
+func cloneChannelModelPricing(pricing []ChannelModelPricing) []ChannelModelPricing {
+	if pricing == nil {
+		return nil
+	}
+	cloned := make([]ChannelModelPricing, len(pricing))
+	for i := range pricing {
+		cloned[i] = pricing[i].Clone()
+	}
+	return cloned
 }
