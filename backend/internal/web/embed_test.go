@@ -530,6 +530,8 @@ func TestFrontendServer_Middleware(t *testing.T) {
 			"/health",
 			"/responses",
 			"/responses/compact",
+			"/web_search",
+			"/x_search",
 		}
 
 		for _, path := range apiPaths {
@@ -547,6 +549,36 @@ func TestFrontendServer_Middleware(t *testing.T) {
 				router.ServeHTTP(w, req)
 
 				assert.True(t, nextCalled, "next handler should be called for API route")
+			})
+		}
+	})
+
+	t.Run("skips_root_search_post_routes", func(t *testing.T) {
+		provider := &mockSettingsProvider{
+			settings: map[string]string{"test": "value"},
+		}
+
+		server, err := NewFrontendServer(provider)
+		require.NoError(t, err)
+
+		for _, path := range []string{"/web_search", "/x_search"} {
+			t.Run(path, func(t *testing.T) {
+				router := gin.New()
+				router.Use(server.Middleware())
+				nextCalled := false
+				router.POST(path, func(c *gin.Context) {
+					nextCalled = true
+					c.JSON(http.StatusUnauthorized, gin.H{"error": "missing API key"})
+				})
+
+				w := httptest.NewRecorder()
+				req := httptest.NewRequest(http.MethodPost, path, strings.NewReader(`{"query":"test"}`))
+				req.Header.Set("Content-Type", "application/json")
+				router.ServeHTTP(w, req)
+
+				assert.True(t, nextCalled, "next handler should be called for root search API route")
+				assert.Equal(t, http.StatusUnauthorized, w.Code)
+				assert.Contains(t, w.Header().Get("Content-Type"), "application/json")
 			})
 		}
 	})
