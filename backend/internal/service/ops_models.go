@@ -48,10 +48,10 @@ type OpsErrorLog struct {
 	ResolvedByUserName string     `json:"resolved_by_user_name"`
 	ResolvedStatusRaw  string     `json:"-"`
 
-	ClientRequestID	string  `json:"client_request_id"`
-	RequestID		string  `json:"request_id"`
-	SessionID		*string `json:"session_id,omitempty"`
-	Message			string  `json:"message"`
+	ClientRequestID string  `json:"client_request_id"`
+	RequestID       string  `json:"request_id"`
+	SessionID       *string `json:"session_id,omitempty"`
+	Message         string  `json:"message"`
 
 	UserID      *int64 `json:"user_id"`
 	UserEmail   string `json:"user_email"`

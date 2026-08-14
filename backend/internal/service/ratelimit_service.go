@@ -267,12 +267,12 @@ func (s *RateLimitService) tryPoolModeInsufficientBalance(ctx context.Context, a
 	account.TempUnschedulableUntil = cloneTimePtr(&until)
 	account.TempUnschedulableReason = poolModeInsufficientBalanceReason
 	state := &TempUnschedState{
-		UntilUnix:		until.Unix(),
-		TriggeredAtUnix:	now.Unix(),
-		StatusCode:		statusCode,
-		MatchedKeyword:	"insufficient account balance",
-		RuleIndex:		-1,
-		ErrorMessage:	truncateTempUnschedMessage(responseBody, tempUnschedMessageMaxBytes),
+		UntilUnix:       until.Unix(),
+		TriggeredAtUnix: now.Unix(),
+		StatusCode:      statusCode,
+		MatchedKeyword:  "insufficient account balance",
+		RuleIndex:       -1,
+		ErrorMessage:    truncateTempUnschedMessage(responseBody, tempUnschedMessageMaxBytes),
 	}
 
 	s.notifyAccountSchedulingBlocked(account, until, poolModeInsufficientBalanceReason)
