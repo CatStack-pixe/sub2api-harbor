@@ -33,7 +33,7 @@ jobs:
           cache-dependency-path: backend/go.sum
       - name: Verify Go version
         run: |
-          go version | grep -q 'go1.26.5'
+          go version | grep -q 'go1.26.6'
       - name: Generate dependency injection code
         working-directory: backend
         run: go generate ./ent ./cmd/server
@@ -103,7 +103,7 @@ jobs:
           cache-dependency-path: backend/go.sum
       - name: Verify Go version
         run: |
-          go version | grep -q 'go1.26.5'
+          go version | grep -q 'go1.26.6'
       - name: Generate dependency injection code
         working-directory: backend
         run: go generate ./ent ./cmd/server
