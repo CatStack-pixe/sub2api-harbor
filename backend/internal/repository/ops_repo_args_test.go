@@ -21,6 +21,29 @@ func TestOpsInsertErrorLogArgsPreservesExplicitZeroUpstreamStatus(t *testing.T) 
 	require.Zero(t, encoded.Int64)
 }
 
+func TestOpsInsertErrorLogArgsPreservesNullableSessionID(t *testing.T) {
+	validSession := "session-123"
+	cases := []struct {
+		name  string
+		input *string
+		valid bool
+		value string
+	}{
+		{name: "absent", input: nil},
+		{name: "present", input: &validSession, valid: true, value: validSession},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			args := opsInsertErrorLogArgs(&service.OpsInsertErrorLogInput{SessionID: tc.input})
+			encoded, ok := args[2].(sql.NullString)
+			require.True(t, ok)
+			require.Equal(t, tc.valid, encoded.Valid)
+			require.Equal(t, tc.value, encoded.String)
+		})
+	}
+}
+
 func TestOpsNullableIntPointerDistinguishesNilZeroAndStatus(t *testing.T) {
 	missing := opsNullableIntPointer(nil).(sql.NullInt64)
 	require.False(t, missing.Valid)

@@ -73,6 +73,33 @@ func TestOpsErrorLogQueueByteBudget(t *testing.T) {
 	}
 }
 
+func TestApplyOpsSessionID(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	t.Run("stores sanitized explicit session", func(t *testing.T) {
+		ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+		ctx.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", nil)
+		ctx.Request.Header.Set("X-Session-Id", "  error-session-123  ")
+		entry := &service.OpsInsertErrorLogInput{}
+
+		applyOpsSessionID(ctx, entry)
+
+		require.NotNil(t, entry.SessionID)
+		require.Equal(t, "error-session-123", *entry.SessionID)
+	})
+
+	t.Run("leaves invalid session null", func(t *testing.T) {
+		ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+		ctx.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", nil)
+		ctx.Request.Header.Set("X-Session-Id", "bad\r\nvalue")
+		entry := &service.OpsInsertErrorLogInput{}
+
+		applyOpsSessionID(ctx, entry)
+
+		require.Nil(t, entry.SessionID)
+	})
+}
+
 func TestEstimateOpsErrorLogJobBytesIncludesVariablePayloads(t *testing.T) {
 	base := estimateOpsErrorLogJobBytes(&service.OpsInsertErrorLogInput{})
 	message := "upstream message"
