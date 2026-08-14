@@ -1015,6 +1015,14 @@ export default {
         longContextHint: 'When checked, official/preset long-context tiers apply. When unchecked, token models stay on the first-tier base rate.',
         add: 'Add model price'
       },
+      globalPrompt: {
+        title: 'Group Global Prompt',
+        hint: 'Prepended to supported text requests before client instructions. It is sent upstream and is not a security boundary.',
+        enabled: 'Enabled',
+        disabled: 'Disabled',
+        placeholder: 'Enter group-wide instructions',
+        tooLong: 'Global prompt must be at most {max} bytes.'
+      },
       voicePricing: {
         title: 'Grok Voice Pricing',
         description: 'Optional per-group prices for Voice realtime / TTS / STT (USD). Leave empty to leave unpriced.',

@@ -26,7 +26,7 @@ jobs:
           go version | grep -q 'go1.26.5'
       - name: Generate dependency injection code
         working-directory: backend
-        run: go generate ./cmd/server
+        run: go generate ./ent ./cmd/server
       - name: Run govulncheck
         working-directory: backend
         run: |

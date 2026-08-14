@@ -89,7 +89,13 @@ func (r *apiKeyRepository) GetByID(ctx context.Context, id int64) (*service.APIK
 		}
 		return nil, err
 	}
-	return apiKeyEntityToService(m), nil
+	out := apiKeyEntityToService(m)
+	if out != nil && out.Group != nil {
+		if err := hydrateGroupGlobalPrompt(ctx, r.sql, out.Group); err != nil {
+			return nil, err
+		}
+	}
+	return out, nil
 }
 
 // GetKeyAndOwnerID 根据 API Key ID 获取其 key 与所有者（用户）ID。
@@ -127,7 +133,13 @@ func (r *apiKeyRepository) GetByKey(ctx context.Context, key string) (*service.A
 		}
 		return nil, err
 	}
-	return apiKeyEntityToService(m), nil
+	out := apiKeyEntityToService(m)
+	if out != nil && out.Group != nil {
+		if err := hydrateGroupGlobalPrompt(ctx, r.sql, out.Group); err != nil {
+			return nil, err
+		}
+	}
+	return out, nil
 }
 
 func (r *apiKeyRepository) GetByKeyForAuth(ctx context.Context, key string) (*service.APIKey, error) {
@@ -238,7 +250,13 @@ func (r *apiKeyRepository) GetByKeyForAuth(ctx context.Context, key string) (*se
 		}
 		return nil, err
 	}
-	return apiKeyEntityToService(m), nil
+	out := apiKeyEntityToService(m)
+	if out != nil && out.Group != nil {
+		if err := hydrateGroupGlobalPrompt(ctx, r.sql, out.Group); err != nil {
+			return nil, err
+		}
+	}
+	return out, nil
 }
 
 func (r *apiKeyRepository) Update(ctx context.Context, key *service.APIKey, fields service.APIKeyUpdateFields) error {

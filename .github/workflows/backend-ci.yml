@@ -36,7 +36,7 @@ jobs:
           go version | grep -q 'go1.26.5'
       - name: Generate dependency injection code
         working-directory: backend
-        run: go generate ./cmd/server
+        run: go generate ./ent ./cmd/server
       - name: Unit tests
         working-directory: backend
         run: make test-unit
@@ -106,7 +106,7 @@ jobs:
           go version | grep -q 'go1.26.5'
       - name: Generate dependency injection code
         working-directory: backend
-        run: go generate ./cmd/server
+        run: go generate ./ent ./cmd/server
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v9
         with:

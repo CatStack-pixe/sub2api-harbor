@@ -6,7 +6,7 @@ project_name: sub2api
 before:
   hooks:
     - go mod tidy -C backend
-    - go generate -C backend ./cmd/server
+    - go generate -C backend ./ent ./cmd/server
 
 builds:
   - id: sub2api

@@ -1557,6 +1557,21 @@
         </div>
 
         <!-- Grok Voice 显式定价（仅 grok 平台） -->
+        <div class="border-t border-gray-200 pt-4 mt-4 dark:border-dark-400">
+          <div class="flex items-center justify-between gap-4">
+            <div>
+              <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t("admin.groups.globalPrompt.title") }}</h4>
+              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t("admin.groups.globalPrompt.hint") }}</p>
+            </div>
+            <label class="flex shrink-0 items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+              <input v-model="createForm.global_prompt_enabled" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
+              {{ createForm.global_prompt_enabled ? t("admin.groups.globalPrompt.enabled") : t("admin.groups.globalPrompt.disabled") }}
+            </label>
+          </div>
+          <textarea v-model="createForm.global_prompt" :disabled="!createForm.global_prompt_enabled" rows="5" class="input mt-3" :placeholder="t('admin.groups.globalPrompt.placeholder')"></textarea>
+          <p class="mt-1 text-right text-xs text-gray-500 dark:text-gray-400">{{ groupGlobalPromptByteLength(createForm.global_prompt) }} / {{ groupGlobalPromptMaxBytes }}</p>
+        </div>
+
         <div
           v-if="createForm.platform === 'grok'"
           class="border-t border-gray-200 dark:border-dark-400 pt-4 mt-4"
@@ -3328,6 +3343,21 @@
         </div>
 
         <!-- Grok Voice 显式定价（仅 grok 平台） -->
+        <div class="border-t border-gray-200 pt-4 mt-4 dark:border-dark-400">
+          <div class="flex items-center justify-between gap-4">
+            <div>
+              <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t("admin.groups.globalPrompt.title") }}</h4>
+              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t("admin.groups.globalPrompt.hint") }}</p>
+            </div>
+            <label class="flex shrink-0 items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+              <input v-model="editForm.global_prompt_enabled" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
+              {{ editForm.global_prompt_enabled ? t("admin.groups.globalPrompt.enabled") : t("admin.groups.globalPrompt.disabled") }}
+            </label>
+          </div>
+          <textarea v-model="editForm.global_prompt" :disabled="!editForm.global_prompt_enabled" rows="5" class="input mt-3" :placeholder="t('admin.groups.globalPrompt.placeholder')"></textarea>
+          <p class="mt-1 text-right text-xs text-gray-500 dark:text-gray-400">{{ groupGlobalPromptByteLength(editForm.global_prompt) }} / {{ groupGlobalPromptMaxBytes }}</p>
+        </div>
+
         <div
           v-if="editForm.platform === 'grok'"
           class="border-t border-gray-200 dark:border-dark-400 pt-4 mt-4"
@@ -5123,6 +5153,10 @@ const editModelsListSelectedCount = computed(
   () => editModelsListState.items.filter((item) => item.selected).length,
 );
 
+const groupGlobalPromptMaxBytes = 32 * 1024;
+const groupGlobalPromptByteLength = (value: string): number =>
+  new TextEncoder().encode(value).length;
+
 const createForm = reactive({
   name: "",
   description: "",
@@ -5135,6 +5169,8 @@ const createForm = reactive({
   monthly_limit_usd: null as number | null,
   long_context_pricing_enabled: true,
   model_pricing: [] as PricingFormEntry[],
+  global_prompt_enabled: false,
+  global_prompt: "",
   // 图片生成计费配置
   allow_image_generation: false,
   allow_batch_image_generation: false,
@@ -5498,6 +5534,8 @@ const editForm = reactive({
   monthly_limit_usd: null as number | null,
   long_context_pricing_enabled: true,
   model_pricing: [] as PricingFormEntry[],
+  global_prompt_enabled: false,
+  global_prompt: "",
   // 图片生成计费配置
   allow_image_generation: false,
   allow_batch_image_generation: false,
@@ -5972,6 +6010,8 @@ const closeCreateModal = () => {
   createForm.video_model_prices = createVideoModelPricesForm();
   createForm.long_context_pricing_enabled = true;
   createForm.model_pricing = [];
+  createForm.global_prompt_enabled = false;
+  createForm.global_prompt = "";
   createForm.web_search_price_per_call = null;
   createForm.search_price_per_1k = null;
   createForm.audio_realtime_price_per_min = null;
@@ -6047,6 +6087,17 @@ const validateProfitControlForm = (form: ProfitControlFormState): boolean => {
 const handleCreateGroup = async () => {
   if (!createForm.name.trim()) {
     appStore.showError(t("admin.groups.nameRequired"));
+    return;
+  }
+  if (
+    groupGlobalPromptByteLength(createForm.global_prompt) >
+    groupGlobalPromptMaxBytes
+  ) {
+    appStore.showError(
+      t("admin.groups.globalPrompt.tooLong", {
+        max: groupGlobalPromptMaxBytes.toLocaleString(),
+      }),
+    );
     return;
   }
   if (
@@ -6200,6 +6251,8 @@ const handleEdit = async (group: AdminGroup) => {
   editForm.long_context_pricing_enabled =
     group.long_context_pricing_enabled ?? true;
   editForm.model_pricing = groupPricingFromAPI(group.model_pricing);
+  editForm.global_prompt_enabled = group.global_prompt_enabled ?? false;
+  editForm.global_prompt = group.global_prompt ?? "";
   editForm.allow_image_generation = group.allow_image_generation ?? false;
   editForm.allow_batch_image_generation =
     group.allow_batch_image_generation ?? false;
@@ -6306,6 +6359,8 @@ const closeEditModal = () => {
   editForm.video_model_prices = createVideoModelPricesForm();
   editForm.long_context_pricing_enabled = true;
   editForm.model_pricing = [];
+  editForm.global_prompt_enabled = false;
+  editForm.global_prompt = "";
   editForm.web_search_price_per_call = null;
   editForm.search_price_per_1k = null;
   editForm.audio_realtime_price_per_min = null;
@@ -6320,6 +6375,17 @@ const handleUpdateGroup = async () => {
   if (!editingGroup.value) return;
   if (!editForm.name.trim()) {
     appStore.showError(t("admin.groups.nameRequired"));
+    return;
+  }
+  if (
+    groupGlobalPromptByteLength(editForm.global_prompt) >
+    groupGlobalPromptMaxBytes
+  ) {
+    appStore.showError(
+      t("admin.groups.globalPrompt.tooLong", {
+        max: groupGlobalPromptMaxBytes.toLocaleString(),
+      }),
+    );
     return;
   }
   if (
