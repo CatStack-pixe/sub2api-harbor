@@ -64,6 +64,8 @@ type OpsRepository interface {
 type OpsInsertErrorLogInput struct {
 	RequestID       string
 	ClientRequestID string
+	// SessionID is the sanitized explicit client session identifier, when provided.
+	SessionID *string
 
 	UserID    *int64
 	APIKeyID  *int64

@@ -3006,8 +3006,16 @@ type cyberPolicyOpsErrorMeta struct {
 	AccountID       int64
 	GroupID         *int64
 	ClientIP        string
+	SessionID       string
 	CreatedAt       time.Time
 	SessionBlockKey string
+}
+
+func optionalSessionID(value string) *string {
+	if value == "" {
+		return nil
+	}
+	return &value
 }
 
 // buildCyberPolicyOpsErrorEntry builds the ops_error_logs entry for an upstream
@@ -3018,6 +3026,7 @@ func buildCyberPolicyOpsErrorEntry(meta cyberPolicyOpsErrorMeta, mark *service.C
 	entry := &service.OpsInsertErrorLogInput{
 		RequestID:         meta.RequestID,
 		ClientRequestID:   meta.ClientRequestID,
+		SessionID:         optionalSessionID(meta.SessionID),
 		Platform:          meta.Platform,
 		Model:             meta.Model,
 		RequestPath:       meta.RequestPath,
@@ -3066,6 +3075,7 @@ func buildCyberSessionBlockedOpsEntry(meta cyberPolicyOpsErrorMeta) *service.Ops
 	entry := &service.OpsInsertErrorLogInput{
 		RequestID:         meta.RequestID,
 		ClientRequestID:   meta.ClientRequestID,
+		SessionID:         optionalSessionID(meta.SessionID),
 		Platform:          meta.Platform,
 		Model:             meta.Model,
 		RequestPath:       meta.RequestPath,
@@ -3186,6 +3196,7 @@ func (h *OpenAIGatewayHandler) enqueueCyberSessionBlockedOpsEntry(c *gin.Context
 	meta.APIKeyID = apiKey.ID
 	meta.GroupID = apiKey.GroupID
 	meta.APIKeyPrefix = keyPrefix(apiKey.Key, 8)
+	meta.SessionID = service.ExtractClientSessionID(c)
 	if apiKey.User != nil {
 		meta.UserID = apiKey.User.ID
 	}
@@ -3277,6 +3288,7 @@ func (h *OpenAIGatewayHandler) recordCyberPolicyIfMarked(c *gin.Context, apiKey 
 		GroupID:         groupID,
 		ClientIP:        clientIPStr,
 		CreatedAt:       time.Now(),
+		SessionID:       sessionID,
 	}
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
