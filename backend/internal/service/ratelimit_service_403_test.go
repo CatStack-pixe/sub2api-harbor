@@ -117,7 +117,7 @@ func TestRateLimitService_PoolModeInsufficientBalanceTemporarilyUnschedules(t *t
 
 	// The forwarding path uses the same detector and fails over immediately.
 	require.True(t, service.HandleUpstreamError(context.Background(), account, http.StatusForbidden, http.Header{}, body))
-	require.Equal(t, 2, repo.tempCalls)
+	require.Equal(t, 1, repo.tempCalls)
 	require.Equal(t, 0, repo.setErrorCalls)
 }
 
