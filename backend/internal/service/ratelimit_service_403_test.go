@@ -86,3 +86,94 @@ func TestRateLimitService_HandleUpstreamError_OpenAI403ThresholdDisables(t *test
 	require.Contains(t, repo.lastErrorMsg, "workspace forbidden by policy")
 	require.Contains(t, repo.lastErrorMsg, "consecutive_403=3/3")
 }
+
+func poolModeInsufficientBalanceAccount(customCodes bool) *Account {
+	return &Account{
+		ID:       303,
+		Platform: PlatformAnthropic,
+		Type:     AccountTypeAPIKey,
+		Credentials: map[string]any{
+			"pool_mode":                   true,
+			"custom_error_codes_enabled": customCodes,
+		},
+	}
+}
+
+func TestRateLimitService_PoolModeInsufficientBalanceTemporarilyUnschedules(t *testing.T) {
+	repo := &rateLimitAccountRepoStub{}
+	blocker := &runtimeBlockRecorder{}
+	service := NewRateLimitService(repo, nil, &config.Config{}, nil, nil)
+	service.SetAccountRuntimeBlocker(blocker)
+	account := poolModeInsufficientBalanceAccount(false)
+	body := []byte(`{"error":{"message":"Insufficient Account Balance for this request"}}`)
+
+	require.Equal(t, ErrorPolicyTempUnscheduled, service.CheckErrorPolicy(context.Background(), account, http.StatusForbidden, body))
+	require.Equal(t, 1, repo.tempCalls)
+	require.Equal(t, poolModeInsufficientBalanceReason, repo.lastTempReason)
+	require.Equal(t, 0, repo.setErrorCalls)
+	require.Len(t, blocker.accounts, 1)
+	require.Equal(t, poolModeInsufficientBalanceReason, blocker.reasons[0])
+	require.True(t, blocker.until[0].After(time.Now().Add(29*time.Minute)))
+
+	// The forwarding path uses the same detector and fails over immediately.
+	require.True(t, service.HandleUpstreamError(context.Background(), account, http.StatusForbidden, http.Header{}, body))
+	require.Equal(t, 1, repo.tempCalls)
+	require.Equal(t, 0, repo.setErrorCalls)
+}
+
+func TestRateLimitService_PoolModeInsufficientBalanceNarrowMatching(t *testing.T) {
+	tests := []struct {
+		name       string
+		account    *Account
+		statusCode int
+		body       []byte
+		wantPolicy ErrorPolicyResult
+		wantCalls  int
+	}{
+		{
+			name:       "generic pool 403 remains skipped",
+			account:    poolModeInsufficientBalanceAccount(false),
+			statusCode: http.StatusForbidden,
+			body:       []byte(`{"error":{"message":"forbidden"}}`),
+			wantPolicy: ErrorPolicySkipped,
+		},
+		{
+			name:       "custom error codes take precedence",
+			account:    poolModeInsufficientBalanceAccount(true),
+			statusCode: http.StatusForbidden,
+			body:       []byte(`{"error":{"message":"insufficient account balance"}}`),
+			wantPolicy: ErrorPolicyMatched,
+		},
+		{
+			name:       "non pool account unchanged",
+			account: &Account{ID: 304, Platform: PlatformAnthropic, Type: AccountTypeAPIKey},
+			statusCode: http.StatusForbidden,
+			body:       []byte(`insufficient account balance`),
+			wantPolicy: ErrorPolicyNone,
+		},
+		{
+			name:       "other balance wording unchanged",
+			account:    poolModeInsufficientBalanceAccount(false),
+			statusCode: http.StatusForbidden,
+			body:       []byte(`{"error":{"message":"insufficient balance"}}`),
+			wantPolicy: ErrorPolicySkipped,
+		},
+		{
+			name:       "other status unchanged",
+			account:    poolModeInsufficientBalanceAccount(false),
+			statusCode: http.StatusTooManyRequests,
+			body:       []byte(`insufficient account balance`),
+			wantPolicy: ErrorPolicySkipped,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			repo := &rateLimitAccountRepoStub{}
+			service := NewRateLimitService(repo, nil, &config.Config{}, nil, nil)
+			require.Equal(t, tc.wantPolicy, service.CheckErrorPolicy(context.Background(), tc.account, tc.statusCode, tc.body))
+			require.Equal(t, tc.wantCalls, repo.tempCalls)
+			require.Equal(t, 0, repo.setErrorCalls)
+		})
+	}
+}

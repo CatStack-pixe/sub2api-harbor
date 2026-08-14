@@ -934,6 +934,7 @@ func OpsErrorLoggerMiddleware(ops *service.OpsService) gin.HandlerFunc {
 				CreatedAt: time.Now(),
 			}
 			applyOpsLatencyFieldsFromContext(c, entry)
+			applyOpsSessionID(c, entry)
 			applyOpsUpstreamFieldsFromContext(c, entry)
 
 			if apiKey != nil {
@@ -1072,6 +1073,7 @@ func OpsErrorLoggerMiddleware(ops *service.OpsService) gin.HandlerFunc {
 			CreatedAt: time.Now(),
 		}
 		applyOpsLatencyFieldsFromContext(c, entry)
+		applyOpsSessionID(c, entry)
 		applyOpsUpstreamFieldsFromContext(c, entry)
 
 		if apiKey != nil {
@@ -1222,6 +1224,7 @@ func logOpsStreamError(c *gin.Context, ops *service.OpsService, wireStatus int) 
 		CreatedAt: time.Now(),
 	}
 	applyOpsLatencyFieldsFromContext(c, entry)
+	applyOpsSessionID(c, entry)
 
 	if apiKey != nil {
 		entry.APIKeyID = &apiKey.ID
@@ -1250,6 +1253,15 @@ func isCountTokensRequest(c *gin.Context) bool {
 		return false
 	}
 	return strings.Contains(c.Request.URL.Path, "/count_tokens")
+}
+
+func applyOpsSessionID(c *gin.Context, entry *service.OpsInsertErrorLogInput) {
+	if c == nil || entry == nil {
+		return
+	}
+	if sessionID := service.ExtractClientSessionID(c); sessionID != "" {
+		entry.SessionID = &sessionID
+	}
 }
 
 func applyOpsLatencyFieldsFromContext(c *gin.Context, entry *service.OpsInsertErrorLogInput) {
