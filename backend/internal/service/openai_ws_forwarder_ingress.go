@@ -217,6 +217,26 @@ func (s *OpenAIGatewayService) ProxyResponsesWebSocketFromClient(
 				nil,
 			)
 		}
+		if eventType == "response.create" && hooks != nil && hooks.MutateRequestPayload != nil {
+			mutated, mutateErr := hooks.MutateRequestPayload(turn, normalized)
+			if mutateErr != nil {
+				return openAIWSClientPayload{}, NewOpenAIWSClientCloseError(
+					coderws.StatusPolicyViolation,
+					"failed to mutate websocket request payload",
+					mutateErr,
+				)
+			}
+			mutated = bytes.TrimSpace(mutated)
+			if len(mutated) == 0 || !gjson.ValidBytes(mutated) {
+				return openAIWSClientPayload{}, NewOpenAIWSClientCloseError(
+					coderws.StatusPolicyViolation,
+					"invalid mutated websocket request payload",
+					errors.New("mutated payload is not valid JSON"),
+				)
+			}
+			normalized = mutated
+			values = gjson.GetManyBytes(normalized, "type", "model", "prompt_cache_key", "previous_response_id")
+		}
 		if hooks != nil && (hooks.MaxReasoningEffort != "" || len(hooks.ReasoningEffortMappings) > 0) {
 			if capped, changed := ApplyOpenAIReasoningEffortPolicy(normalized, hooks.MaxReasoningEffort, hooks.ReasoningEffortMappings); changed {
 				normalized = capped

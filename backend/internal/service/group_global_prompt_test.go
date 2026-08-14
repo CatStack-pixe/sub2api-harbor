@@ -54,6 +54,7 @@ func TestApplyGroupGlobalPromptPreservesProtocolSpecificInstructions(t *testing.
 		protocol        string
 		body            string
 		serverPath      string
+		serverValue     string
 		clientPath      string
 		clientValue     string
 		additionalCheck func(t *testing.T, body []byte)
@@ -63,6 +64,7 @@ func TestApplyGroupGlobalPromptPreservesProtocolSpecificInstructions(t *testing.
 			protocol:    GlobalPromptProtocolAnthropic,
 			body:        `{"system":"client","messages":[{"role":"user","content":"hello"}]}`,
 			serverPath:  "system.0.text",
+			serverValue: "server",
 			clientPath:  "system.1.text",
 			clientValue: "client",
 		},
@@ -71,6 +73,7 @@ func TestApplyGroupGlobalPromptPreservesProtocolSpecificInstructions(t *testing.
 			protocol:    GlobalPromptProtocolResponses,
 			body:        `{"instructions":"client","input":"hello"}`,
 			serverPath:  "instructions",
+			serverValue: "server\n\nclient",
 			clientPath:  "instructions",
 			clientValue: "server\n\nclient",
 		},
@@ -79,6 +82,7 @@ func TestApplyGroupGlobalPromptPreservesProtocolSpecificInstructions(t *testing.
 			protocol:    GlobalPromptProtocolGemini,
 			body:        `{"systemInstruction":{"role":"system","parts":[{"text":"client"}]},"contents":[{"role":"user","parts":[{"text":"hello"}]}]}`,
 			serverPath:  "systemInstruction.parts.0.text",
+			serverValue: "server",
 			clientPath:  "systemInstruction.parts.1.text",
 			clientValue: "client",
 			additionalCheck: func(t *testing.T, body []byte) {
@@ -92,7 +96,7 @@ func TestApplyGroupGlobalPromptPreservesProtocolSpecificInstructions(t *testing.
 			updated, changed, err := ApplyGroupGlobalPrompt([]byte(tt.body), tt.protocol, group)
 			require.NoError(t, err)
 			require.True(t, changed)
-			require.Equal(t, "server", gjson.GetBytes(updated, tt.serverPath).String())
+			require.Equal(t, tt.serverValue, gjson.GetBytes(updated, tt.serverPath).String())
 			require.Equal(t, tt.clientValue, gjson.GetBytes(updated, tt.clientPath).String())
 			if tt.additionalCheck != nil {
 				tt.additionalCheck(t, updated)

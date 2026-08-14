@@ -2056,6 +2056,14 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 			InitialRequestModel:     reqModel,
 			MaxReasoningEffort:      maxReasoningEffort,
 			ReasoningEffortMappings: reasoningEffortMappings,
+			MutateRequestPayload: func(_ int, payload []byte) ([]byte, error) {
+				updated, _, err := service.ApplyGroupGlobalPrompt(
+					payload,
+					service.GlobalPromptProtocolResponses,
+					apiKey.Group,
+				)
+				return updated, err
+			},
 			BeforeRequest: func(turn int, payload []byte, originalModel string) error {
 				c.Set(securityAuditWSTurnContextKey, turn)
 				if turn == 1 {

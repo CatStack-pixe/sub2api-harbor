@@ -461,11 +461,29 @@ func TestPassthroughLifecycle_TerminalSwitchesToInterTurnIdleTimeout(t *testing.
 	cfg.Gateway.OpenAIWS.IngressInterTurnIdleTimeoutSeconds = 2
 	upstream := newStagedPassthroughConn()
 	upstream.Send(`{"type":"response.completed","response":{"id":"resp_idle_first","model":"gpt-5.1","usage":{"input_tokens":1,"output_tokens":1}}}`)
-	server, serverErr := startPassthroughLifecycleServer(t, controlCtx, newPassthroughLifecycleService(cfg, upstream), passthroughLifecycleAccount())
+	hooks := &OpenAIWSIngressHooks{
+		MutateRequestPayload: func(_ int, payload []byte) ([]byte, error) {
+			updated, _, err := ApplyGroupGlobalPrompt(
+				payload,
+				GlobalPromptProtocolResponses,
+				&Group{GlobalPromptEnabled: true, GlobalPrompt: "server policy"},
+			)
+			return updated, err
+		},
+	}
+	server, serverErr := startPassthroughHookRecordingServer(
+		t,
+		controlCtx,
+		newPassthroughLifecycleService(cfg, upstream),
+		passthroughLifecycleAccount(),
+		hooks,
+	)
 	defer server.Close()
 	clientConn := dialPassthroughLifecycleClient(t, server)
 	defer func() { _ = clientConn.CloseNow() }()
-	require.Equal(t, "response.create", gjson.GetBytes(requirePassthroughUpstreamWrite(t, upstream, 3*time.Second), "type").String())
+	firstForwarded := requirePassthroughUpstreamWrite(t, upstream, 3*time.Second)
+	require.Equal(t, "response.create", gjson.GetBytes(firstForwarded, "type").String())
+	require.Equal(t, "server policy", gjson.GetBytes(firstForwarded, "instructions").String())
 
 	completed, err := readPassthroughLifecycleFrame(t, clientConn, 3*time.Second)
 	require.NoError(t, err)
@@ -475,7 +493,9 @@ func TestPassthroughLifecycle_TerminalSwitchesToInterTurnIdleTimeout(t *testing.
 	err = clientConn.Write(writeCtx, coderws.MessageText, []byte(`{"type":"response.create","model":"gpt-5.1","previous_response_id":"resp_idle_first"}`))
 	cancelWrite()
 	require.NoError(t, err)
-	require.Equal(t, "response.create", gjson.GetBytes(requirePassthroughUpstreamWrite(t, upstream, 3*time.Second), "type").String())
+	secondForwarded := requirePassthroughUpstreamWrite(t, upstream, 3*time.Second)
+	require.Equal(t, "response.create", gjson.GetBytes(secondForwarded, "type").String())
+	require.Equal(t, "server policy", gjson.GetBytes(secondForwarded, "instructions").String())
 	upstream.Send(`{"type":"response.completed","response":{"id":"resp_idle_second","model":"gpt-5.1","usage":{"input_tokens":1,"output_tokens":1}}}`)
 	completed, err = readPassthroughLifecycleFrame(t, clientConn, 3*time.Second)
 	require.NoError(t, err)

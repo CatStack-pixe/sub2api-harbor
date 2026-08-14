@@ -1007,6 +1007,14 @@ func TestOpenAIGatewayService_ProxyResponsesWebSocketFromClient_PassthroughModeR
 	serverErrCh := make(chan error, 1)
 	resultCh := make(chan *OpenAIForwardResult, 1)
 	hooks := &OpenAIWSIngressHooks{
+		MutateRequestPayload: func(_ int, payload []byte) ([]byte, error) {
+			updated, _, err := ApplyGroupGlobalPrompt(
+				payload,
+				GlobalPromptProtocolResponses,
+				&Group{GlobalPromptEnabled: true, GlobalPrompt: "server policy"},
+			)
+			return updated, err
+		},
 		AfterTurn: func(_ int, result *OpenAIForwardResult, turnErr error) {
 			if turnErr == nil && result != nil {
 				resultCh <- result
@@ -1099,6 +1107,7 @@ func TestOpenAIGatewayService_ProxyResponsesWebSocketFromClient_PassthroughModeR
 
 	require.Equal(t, 1, captureDialer.DialCount(), "passthrough 模式应直接建立上游 websocket")
 	require.Len(t, upstreamConn.writes, 1, "passthrough 模式应透传首条 response.create")
+	require.Equal(t, "server policy", upstreamConn.writes[0]["instructions"])
 }
 
 func TestOpenAIGatewayService_ProxyResponsesWebSocketFromClient_PassthroughHeadersUsePromptCacheAndTurnState(t *testing.T) {
@@ -1290,6 +1299,14 @@ func TestOpenAIGatewayService_ProxyResponsesWebSocketFromClient_HTTPBridgeModeRe
 	serverErrCh := make(chan error, 1)
 	resultCh := make(chan *OpenAIForwardResult, 1)
 	hooks := &OpenAIWSIngressHooks{
+		MutateRequestPayload: func(_ int, payload []byte) ([]byte, error) {
+			updated, _, err := ApplyGroupGlobalPrompt(
+				payload,
+				GlobalPromptProtocolResponses,
+				&Group{GlobalPromptEnabled: true, GlobalPrompt: "server policy"},
+			)
+			return updated, err
+		},
 		AfterTurn: func(_ int, result *OpenAIForwardResult, turnErr error) {
 			if turnErr == nil && result != nil {
 				resultCh <- result
@@ -1382,6 +1399,7 @@ func TestOpenAIGatewayService_ProxyResponsesWebSocketFromClient_HTTPBridgeModeRe
 	}
 
 	require.NotNil(t, upstream.lastReq, "http_bridge 模式应调用 HTTP 上游")
+	require.Equal(t, "server policy", gjson.GetBytes(upstream.lastBody, "instructions").String())
 }
 
 func TestOpenAIGatewayService_ProxyResponsesWebSocketFromClient_ModeOffReturnsPolicyViolation(t *testing.T) {
