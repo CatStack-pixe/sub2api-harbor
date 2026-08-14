@@ -1414,10 +1414,12 @@ func defaultModelIDsForPlatform(platform string) []string {
 		return service.DeepSeekDefaultModelIDs()
 	case service.PlatformNvidia:
 		return service.NvidiaDefaultModelIDs()
+	case service.PlatformTokenRhythm:
+		return openai.DefaultModelIDs()
 	case service.PlatformComposite:
 		ids := make([]string, 0)
 		seen := make(map[string]struct{})
-	for _, concretePlatform := range []string{service.PlatformAnthropic, service.PlatformGemini, service.PlatformOpenAI, service.PlatformAntigravity, service.PlatformGrok, service.PlatformAgnes, service.PlatformDeepSeek, service.PlatformNvidia, service.PlatformTokenRhythm} {
+		for _, concretePlatform := range []string{service.PlatformAnthropic, service.PlatformGemini, service.PlatformOpenAI, service.PlatformAntigravity, service.PlatformGrok, service.PlatformAgnes, service.PlatformDeepSeek, service.PlatformNvidia, service.PlatformTokenRhythm} {
 			for _, id := range defaultModelIDsForPlatform(concretePlatform) {
 				if _, ok := seen[id]; ok {
 					continue

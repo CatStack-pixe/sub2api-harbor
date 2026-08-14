@@ -31,11 +31,11 @@ const (
 )
 
 const (
-	AgnesDefaultBaseURL    = "https://apihub.agnes-ai.com/v1"
-	AgnesDefaultModel      = "agnes-2.0-flash"
-	DeepSeekDefaultBaseURL = "https://api.deepseek.com"
-	NvidiaDefaultBaseURL   = "https://integrate.api.nvidia.com/v1"
-	NvidiaDefaultModel     = "nvidia/llama-3.1-nemotron-nano-8b-v1"
+	AgnesDefaultBaseURL       = "https://apihub.agnes-ai.com/v1"
+	AgnesDefaultModel         = "agnes-2.0-flash"
+	DeepSeekDefaultBaseURL    = "https://api.deepseek.com"
+	NvidiaDefaultBaseURL      = "https://integrate.api.nvidia.com/v1"
+	NvidiaDefaultModel        = "nvidia/llama-3.1-nemotron-nano-8b-v1"
 	TokenRhythmDefaultBaseURL = "https://tokenrhythm.studio/v1"
 )
 
