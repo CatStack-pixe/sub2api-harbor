@@ -7,10 +7,10 @@ import (
 )
 
 const (
-	GlobalPromptProtocolAnthropic = "anthropic"
+	GlobalPromptProtocolAnthropic  = "anthropic"
 	GlobalPromptProtocolOpenAIChat = "openai_chat"
-	GlobalPromptProtocolResponses = "responses"
-	GlobalPromptProtocolGemini = "gemini"
+	GlobalPromptProtocolResponses  = "responses"
+	GlobalPromptProtocolGemini     = "gemini"
 )
 
 // ApplyGroupGlobalPrompt prepends a group's static instruction to a supported

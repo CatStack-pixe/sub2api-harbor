@@ -3,9 +3,9 @@ package repository
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/Wei-Shaw/sub2api/internal/service"
-	"github.com/lib/pq"
 )
 
 func hydrateGroupGlobalPrompt(ctx context.Context, sqlq sqlExecutor, groups ...*service.Group) error {
@@ -27,10 +27,17 @@ func hydrateGroupGlobalPrompt(ctx context.Context, sqlq sqlExecutor, groups ...*
 	if len(ids) == 0 {
 		return nil
 	}
-	rows, err := sqlq.QueryContext(ctx,
-		`SELECT id, global_prompt_enabled, global_prompt FROM groups WHERE id = ANY($1)`,
-		pq.Array(ids),
+	placeholders := make([]string, len(ids))
+	args := make([]any, len(ids))
+	for i, id := range ids {
+		placeholders[i] = fmt.Sprintf("$%d", i+1)
+		args[i] = id
+	}
+	query := fmt.Sprintf(
+		`SELECT id, global_prompt_enabled, global_prompt FROM groups WHERE id IN (%s)`,
+		strings.Join(placeholders, ", "),
 	)
+	rows, err := sqlq.QueryContext(ctx, query, args...)
 	if err != nil {
 		return fmt.Errorf("load group global prompts: %w", err)
 	}
