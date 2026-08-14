@@ -202,6 +202,20 @@
             <PlatformIcon platform="nvidia" size="sm" />
             NVIDIA
           </button>
+          <button
+            type="button"
+            data-testid="tokenrhythm-platform"
+            @click="form.platform = 'tokenrhythm'"
+            :class="[
+              'flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium transition-all',
+              form.platform === 'tokenrhythm'
+                ? 'bg-white text-teal-700 shadow-sm dark:bg-dark-600 dark:text-teal-300'
+                : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200'
+            ]"
+          >
+            <PlatformIcon platform="tokenrhythm" size="sm" />
+            TokenRhythm
+          </button>
         </div>
       </div>
 
@@ -449,6 +463,26 @@
             <div>
               <span class="block text-sm font-medium text-gray-900 dark:text-white">API Key</span>
               <span class="text-xs text-gray-500 dark:text-gray-400">NVIDIA NIM API</span>
+            </div>
+          </button>
+        </div>
+      </div>
+
+      <div v-if="form.platform === 'tokenrhythm'">
+        <label class="input-label">{{ t('admin.accounts.accountType') }}</label>
+        <div class="mt-2 grid grid-cols-1 gap-3" data-tour="account-form-type">
+          <button
+            type="button"
+            data-testid="tokenrhythm-account-type-api-key"
+            @click="accountCategory = 'apikey'"
+            class="flex items-center gap-3 rounded-lg border-2 border-teal-500 bg-teal-50 p-3 text-left dark:bg-teal-900/20"
+          >
+            <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-teal-600 text-white">
+              <Icon name="key" size="sm" />
+            </div>
+            <div>
+              <span class="block text-sm font-medium text-gray-900 dark:text-white">API Key</span>
+              <span class="text-xs text-gray-500 dark:text-gray-400">TokenRhythm API</span>
             </div>
           </button>
         </div>
@@ -1222,6 +1256,7 @@
             v-model="apiKeyBaseUrl"
             type="text"
             class="input"
+            :readonly="form.platform === 'tokenrhythm'"
             :placeholder="
               form.platform === 'openai'
                 ? 'https://api.openai.com'
@@ -1231,6 +1266,8 @@
                     ? 'https://api.x.ai/v1'
                     : form.platform === 'agnes'
                       ? 'https://apihub.agnes-ai.com/v1'
+                      : form.platform === 'tokenrhythm'
+                        ? 'https://tokenrhythm.studio/v1'
                       : form.platform === 'nvidia'
                         ? 'https://integrate.api.nvidia.com/v1'
                         : form.platform === 'deepseek'
@@ -1271,9 +1308,23 @@
           <p v-if="apiKeyHint" class="input-hint">{{ apiKeyHint }}</p>
         </div>
 
+        <div v-if="form.platform === 'tokenrhythm'">
+          <label class="input-label">{{ t('admin.accounts.tokenrhythm.cookie') }}</label>
+          <textarea
+            v-model="tokenRhythmCookie"
+            required
+            rows="3"
+            class="input font-mono"
+            autocomplete="off"
+            spellcheck="false"
+            :placeholder="t('admin.accounts.tokenrhythm.cookiePlaceholder')"
+          ></textarea>
+          <p class="input-hint">{{ t('admin.accounts.tokenrhythm.cookieHint') }}</p>
+        </div>
+
         <!-- 上游倍率自动探测：支持的 API-key 平台可用，DeepSeek 使用独立余额探测。 -->
         <div
-          v-if="form.platform !== 'deepseek'"
+          v-if="form.platform !== 'deepseek' && form.platform !== 'tokenrhythm'"
           class="flex items-center justify-between gap-4 border-t border-gray-200 pt-4 dark:border-dark-600"
         >
           <div>
@@ -3781,6 +3832,7 @@ const baseUrlHint = computed(() => {
   if (form.platform === 'grok') return ''
   if (form.platform === 'agnes') return ''
   if (form.platform === 'deepseek') return t('admin.accounts.deepseek.baseUrlHint')
+  if (form.platform === 'tokenrhythm') return t('admin.accounts.tokenrhythm.baseUrlHint')
   if (form.platform === 'nvidia') return t('admin.accounts.nvidia.baseUrlHint')
   return t('admin.accounts.baseUrlHint')
 })
@@ -3791,6 +3843,7 @@ const apiKeyHint = computed(() => {
   if (form.platform === 'grok') return ''
   if (form.platform === 'agnes') return ''
   if (form.platform === 'deepseek') return t('admin.accounts.deepseek.apiKeyHint')
+  if (form.platform === 'tokenrhythm') return t('admin.accounts.tokenrhythm.apiKeyHint')
   if (form.platform === 'nvidia') return t('admin.accounts.nvidia.apiKeyHint')
   return t('admin.accounts.apiKeyHint')
 })
@@ -3872,6 +3925,7 @@ const accountCategory = ref<'oauth-based' | 'apikey' | 'bedrock' | 'service_acco
 const addMethod = ref<AddMethod>('oauth') // For oauth-based: 'oauth' or 'setup-token'
 const apiKeyBaseUrl = ref('https://api.anthropic.com')
 const apiKeyValue = ref('')
+const tokenRhythmCookie = ref('')
 const upstreamBillingAutoProbeEnabled = ref(true)
 
 const syncPreviewCredentials = computed(() => {
@@ -4376,9 +4430,11 @@ watch(
           ? 'https://generativelanguage.googleapis.com'
           : newPlatform === 'grok'
             ? 'https://api.x.ai/v1'
-            : newPlatform === 'agnes'
-              ? 'https://apihub.agnes-ai.com/v1'
-              : newPlatform === 'nvidia'
+              : newPlatform === 'agnes'
+                ? 'https://apihub.agnes-ai.com/v1'
+                : newPlatform === 'tokenrhythm'
+                  ? 'https://tokenrhythm.studio/v1'
+                : newPlatform === 'nvidia'
                 ? 'https://integrate.api.nvidia.com/v1'
                 : newPlatform === 'deepseek'
                 ? 'https://api.deepseek.com'
@@ -4430,6 +4486,14 @@ watch(
       form.concurrency = 10
       form.load_factor = null
     }
+    if (newPlatform === 'tokenrhythm') {
+      accountCategory.value = 'apikey'
+      modelRestrictionMode.value = 'whitelist'
+      allowedModels.value = []
+      form.concurrency = 10
+      form.load_factor = null
+    }
+    tokenRhythmCookie.value = ''
     if (newPlatform !== 'gemini' && newPlatform !== 'anthropic' && accountCategory.value === 'service_account') {
       accountCategory.value = 'oauth-based'
     }
@@ -4849,6 +4913,7 @@ const resetForm = () => {
   addMethod.value = 'oauth'
   apiKeyBaseUrl.value = 'https://api.anthropic.com'
   apiKeyValue.value = ''
+  tokenRhythmCookie.value = ''
   upstreamBillingAutoProbeEnabled.value = true
   editQuotaLimit.value = null
   editQuotaDailyLimit.value = null
@@ -5296,9 +5361,11 @@ const handleSubmit = async () => {
         ? 'https://generativelanguage.googleapis.com'
         : form.platform === 'grok'
           ? 'https://api.x.ai/v1'
-            : form.platform === 'agnes'
-              ? 'https://apihub.agnes-ai.com/v1'
-              : form.platform === 'nvidia'
+              : form.platform === 'agnes'
+                ? 'https://apihub.agnes-ai.com/v1'
+                : form.platform === 'tokenrhythm'
+                  ? 'https://tokenrhythm.studio/v1'
+                : form.platform === 'nvidia'
                 ? 'https://integrate.api.nvidia.com/v1'
                 : form.platform === 'deepseek'
                   ? 'https://api.deepseek.com'
@@ -5308,6 +5375,13 @@ const handleSubmit = async () => {
   const credentials: Record<string, unknown> = {
     base_url: apiKeyBaseUrl.value.trim() || defaultBaseUrl,
     api_key: apiKeyValue.value.trim()
+  }
+  if (form.platform === 'tokenrhythm') {
+    if (!tokenRhythmCookie.value.trim()) {
+      appStore.showError(t('admin.accounts.tokenrhythm.cookieRequired'))
+      return
+    }
+    credentials.tokenrhythm_cookie = tokenRhythmCookie.value.trim()
   }
   if (form.platform === 'gemini') {
     credentials.tier_id = geminiTierAIStudio.value
@@ -5368,7 +5442,7 @@ const handleSubmit = async () => {
     ...form,
     group_ids: form.group_ids,
     extra,
-    upstream_billing_probe_enabled: form.platform === 'deepseek' ? undefined : upstreamBillingAutoProbeEnabled.value,
+    upstream_billing_probe_enabled: (form.platform === 'deepseek' || form.platform === 'tokenrhythm') ? undefined : upstreamBillingAutoProbeEnabled.value,
     auto_pause_on_expired: autoPauseOnExpired.value
   })
 }
@@ -5500,7 +5574,7 @@ const createAccountAndFinish = async (
     // 上游倍率探测对支持的 API-key 平台开放（antigravity upstream 走本 helper）；
     // DeepSeek 使用独立余额探测，非 apikey 类型（bedrock/oauth）不传。
     upstream_billing_probe_enabled:
-      type === 'apikey' && form.platform !== 'deepseek' ? upstreamBillingAutoProbeEnabled.value : undefined,
+    type === 'apikey' && form.platform !== 'deepseek' && form.platform !== 'tokenrhythm' ? upstreamBillingAutoProbeEnabled.value : undefined,
     auto_pause_on_expired: autoPauseOnExpired.value
   })
 }

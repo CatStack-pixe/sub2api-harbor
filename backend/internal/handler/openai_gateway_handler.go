@@ -164,12 +164,12 @@ func wrapUsageRecordTaskContext(parent context.Context, task service.UsageRecord
 
 func openAICompatibleRequestPlatform(ctx context.Context, apiKey *service.APIKey) string {
 	if platform, ok := service.ResolvedTargetPlatformFromContext(ctx); ok {
-		if platform == service.PlatformGrok || platform == service.PlatformAgnes || platform == service.PlatformDeepSeek || platform == service.PlatformNvidia {
+		if platform == service.PlatformGrok || platform == service.PlatformAgnes || platform == service.PlatformDeepSeek || platform == service.PlatformNvidia || platform == service.PlatformTokenRhythm {
 			return platform
 		}
 		return service.PlatformOpenAI
 	}
-	if apiKey != nil && apiKey.Group != nil && (apiKey.Group.Platform == service.PlatformGrok || apiKey.Group.Platform == service.PlatformAgnes || apiKey.Group.Platform == service.PlatformDeepSeek || apiKey.Group.Platform == service.PlatformNvidia) {
+	if apiKey != nil && apiKey.Group != nil && (apiKey.Group.Platform == service.PlatformGrok || apiKey.Group.Platform == service.PlatformAgnes || apiKey.Group.Platform == service.PlatformDeepSeek || apiKey.Group.Platform == service.PlatformNvidia || apiKey.Group.Platform == service.PlatformTokenRhythm) {
 		return apiKey.Group.Platform
 	}
 	return service.PlatformOpenAI
@@ -186,14 +186,14 @@ func allowOpenAICompatibleMessagesDispatch(apiKey *service.APIKey) bool {
 	if apiKey == nil || apiKey.Group == nil {
 		return true
 	}
-	if apiKey.Group.Platform == service.PlatformGrok || apiKey.Group.Platform == service.PlatformAgnes || apiKey.Group.Platform == service.PlatformNvidia {
+	if apiKey.Group.Platform == service.PlatformGrok || apiKey.Group.Platform == service.PlatformAgnes || apiKey.Group.Platform == service.PlatformNvidia || apiKey.Group.Platform == service.PlatformTokenRhythm {
 		return true
 	}
 	return apiKey.Group.AllowMessagesDispatch
 }
 
 func openAICompatibleTextTargetAllowed(c *gin.Context, apiKey *service.APIKey, model string) bool {
-	return compositeTargetPlatformAllowed(c, apiKey, model, service.PlatformOpenAI, service.PlatformGrok, service.PlatformAgnes, service.PlatformDeepSeek, service.PlatformNvidia)
+	return compositeTargetPlatformAllowed(c, apiKey, model, service.PlatformOpenAI, service.PlatformGrok, service.PlatformAgnes, service.PlatformDeepSeek, service.PlatformNvidia, service.PlatformTokenRhythm)
 }
 
 // NewOpenAIGatewayHandler creates a new OpenAIGatewayHandler

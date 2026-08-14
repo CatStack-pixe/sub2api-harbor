@@ -279,19 +279,23 @@ func (a *Account) IsNvidia() bool {
 	return a != nil && a.Platform == PlatformNvidia
 }
 
+func (a *Account) IsTokenRhythm() bool {
+	return a != nil && a.Platform == PlatformTokenRhythm
+}
+
 func (a *Account) IsGrokOAuth() bool {
 	return a.IsGrok() && a.Type == AccountTypeOAuth
 }
 
 func (a *Account) IsOpenAICompatible() bool {
-	return a != nil && (a.Platform == PlatformOpenAI || a.Platform == PlatformGrok || a.Platform == PlatformAgnes || a.Platform == PlatformDeepSeek || a.Platform == PlatformNvidia)
+	return a != nil && (a.Platform == PlatformOpenAI || a.Platform == PlatformGrok || a.Platform == PlatformAgnes || a.Platform == PlatformDeepSeek || a.Platform == PlatformNvidia || a.Platform == PlatformTokenRhythm)
 }
 
 // ShouldUseOpenAIResponsesAPI reports whether this OpenAI-compatible account
 // accepts native Responses requests. Agnes currently documents Chat
 // Completions only, so Responses and Messages requests must use the bridge.
 func (a *Account) ShouldUseOpenAIResponsesAPI() bool {
-	return a != nil && !a.IsAgnes() && !a.IsDeepSeek() && !a.IsNvidia() && openai_compat.ShouldUseResponsesAPI(a.Extra)
+	return a != nil && !a.IsAgnes() && !a.IsDeepSeek() && !a.IsNvidia() && !a.IsTokenRhythm() && openai_compat.ShouldUseResponsesAPI(a.Extra)
 }
 
 func (a *Account) GeminiOAuthType() string {
@@ -1301,7 +1305,7 @@ func (a *Account) IsOpenAIApiKey() bool {
 }
 
 func (a *Account) GetOpenAIBaseURL() string {
-	if !a.IsOpenAI() && !a.IsAgnes() && !a.IsDeepSeek() && !a.IsNvidia() {
+	if !a.IsOpenAI() && !a.IsAgnes() && !a.IsDeepSeek() && !a.IsNvidia() && !a.IsTokenRhythm() {
 		return ""
 	}
 	if a.Type == AccountTypeAPIKey {
@@ -1318,6 +1322,9 @@ func (a *Account) GetOpenAIBaseURL() string {
 	}
 	if a.IsNvidia() {
 		return NvidiaDefaultBaseURL
+	}
+	if a.IsTokenRhythm() {
+		return TokenRhythmDefaultBaseURL
 	}
 	return "https://api.openai.com"
 }
@@ -1426,7 +1433,7 @@ func (a *Account) GetOpenAIIDToken() string {
 }
 
 func (a *Account) GetOpenAIApiKey() string {
-	if a == nil || a.Type != AccountTypeAPIKey || (!a.IsOpenAI() && !a.IsAgnes() && !a.IsDeepSeek() && !a.IsNvidia()) {
+	if a == nil || a.Type != AccountTypeAPIKey || (!a.IsOpenAI() && !a.IsAgnes() && !a.IsDeepSeek() && !a.IsNvidia() && !a.IsTokenRhythm()) {
 		return ""
 	}
 	return a.GetCredential("api_key")
@@ -1948,7 +1955,13 @@ func (a *Account) IsOpenAIOAuthPassthroughEnabled() bool {
 // 字段：accounts.extra.anthropic_passthrough。
 // 字段缺失或类型不正确时，按 false（关闭）处理。
 func (a *Account) IsAnthropicAPIKeyPassthroughEnabled() bool {
-	if a == nil || a.Platform != PlatformAnthropic || a.Type != AccountTypeAPIKey || a.Extra == nil {
+	if a == nil || a.Type != AccountTypeAPIKey {
+		return false
+	}
+	if a.IsTokenRhythm() {
+		return true
+	}
+	if a.Platform != PlatformAnthropic || a.Extra == nil {
 		return false
 	}
 	enabled, ok := a.Extra["anthropic_passthrough"].(bool)

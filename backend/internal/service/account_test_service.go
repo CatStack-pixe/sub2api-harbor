@@ -290,6 +290,9 @@ func (s *AccountTestService) TestAccountConnection(c *gin.Context, accountID int
 	if account.IsNvidia() {
 		return s.testNvidiaAccountConnection(c, account, modelID, prompt)
 	}
+	if account.IsTokenRhythm() {
+		return s.testTokenRhythmAccountConnection(c, account, modelID, prompt)
+	}
 
 	if account.IsOpenAI() || account.IsAgnes() {
 		return s.testOpenAIAccountConnection(c, account, modelID, prompt, normalizeAccountTestMode(mode))
@@ -340,6 +343,23 @@ func (s *AccountTestService) testNvidiaAccountConnection(c *gin.Context, account
 	baseURL, err := s.validateUpstreamBaseURL(account.GetOpenAIBaseURL())
 	if err != nil {
 		return s.sendErrorAndEnd(c, fmt.Sprintf("Invalid NVIDIA base URL: %s", err.Error()))
+	}
+	return s.testOpenAIChatCompletionsConnection(c, account, testModelID, prompt, baseURL, authToken)
+}
+
+func (s *AccountTestService) testTokenRhythmAccountConnection(c *gin.Context, account *Account, modelID string, prompt string) error {
+	testModelID := strings.TrimSpace(modelID)
+	if testModelID == "" {
+		testModelID = "gpt-4o-mini"
+	}
+	testModelID = account.GetMappedModel(testModelID)
+	authToken := strings.TrimSpace(account.GetOpenAIApiKey())
+	if authToken == "" {
+		return s.sendErrorAndEnd(c, "No TokenRhythm API key available")
+	}
+	baseURL, err := s.validateUpstreamBaseURL(account.GetOpenAIBaseURL())
+	if err != nil {
+		return s.sendErrorAndEnd(c, fmt.Sprintf("Invalid TokenRhythm base URL: %s", err.Error()))
 	}
 	return s.testOpenAIChatCompletionsConnection(c, account, testModelID, prompt, baseURL, authToken)
 }

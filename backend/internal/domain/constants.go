@@ -26,6 +26,7 @@ const (
 	PlatformAgnes       = "agnes"
 	PlatformDeepSeek    = "deepseek"
 	PlatformNvidia      = "nvidia"
+	PlatformTokenRhythm = "tokenrhythm"
 	PlatformComposite   = "composite"
 )
 
@@ -35,6 +36,7 @@ const (
 	DeepSeekDefaultBaseURL = "https://api.deepseek.com"
 	NvidiaDefaultBaseURL   = "https://integrate.api.nvidia.com/v1"
 	NvidiaDefaultModel     = "nvidia/llama-3.1-nemotron-nano-8b-v1"
+	TokenRhythmDefaultBaseURL = "https://tokenrhythm.studio/v1"
 )
 
 // Account type constants

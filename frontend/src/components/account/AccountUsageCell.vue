@@ -547,6 +547,12 @@
       :auto-load="shouldAutoLoadDeepSeekBalance"
       :refresh-token="manualRefreshToken"
     />
+    <TokenRhythmBalanceCell
+      v-else-if="account.platform === 'tokenrhythm'"
+      :account="account"
+      :auto-load="shouldAutoLoadTokenRhythmBalance"
+      :refresh-token="manualRefreshToken"
+    />
     <AccountQuotaInfo v-else-if="account.platform === 'gemini'" :account="account" />
     <!-- Key/Bedrock accounts: show today stats + optional quota bars -->
     <div v-else class="space-y-1">
@@ -632,6 +638,7 @@ import AccountQuotaInfo from './AccountQuotaInfo.vue'
 import OpenAIQuotaResetCell from './OpenAIQuotaResetCell.vue'
 import GrokQuotaProbeCell from './GrokQuotaProbeCell.vue'
 import DeepSeekBalanceCell from './DeepSeekBalanceCell.vue'
+import TokenRhythmBalanceCell from './TokenRhythmBalanceCell.vue'
 import OllamaCloudUsageCell from './OllamaCloudUsageCell.vue'
 
 // Module-level cache shared across all AccountUsageCell instances
@@ -756,8 +763,14 @@ const shouldAutoLoadDeepSeekBalance = computed(() => {
   )
 })
 
+const shouldAutoLoadTokenRhythmBalance = computed(() => {
+  return props.account.platform === 'tokenrhythm' && props.pageVisible && (
+    isDesktopViewport.value || isRowVisible.value
+  )
+})
+
 const shouldLazyLoadOnMobile = computed(() => {
-  return (shouldFetchUsage.value || props.account.platform === 'deepseek') && !isDesktopViewport.value
+  return (shouldFetchUsage.value || props.account.platform === 'deepseek' || props.account.platform === 'tokenrhythm') && !isDesktopViewport.value
 })
 
 // Antigravity quota types (用于 API 返回的数据)
@@ -1382,7 +1395,7 @@ const detachVisibilityObserver = () => {
 const attachVisibilityObserver = () => {
   detachVisibilityObserver()
   if (!shouldLazyLoadOnMobile.value) return
-  if (props.account.platform !== 'deepseek' && hasEnteredViewport.value) return
+  if (props.account.platform !== 'deepseek' && props.account.platform !== 'tokenrhythm' && hasEnteredViewport.value) return
   if (typeof window === 'undefined' || typeof IntersectionObserver === 'undefined') {
     hasEnteredViewport.value = true
     isRowVisible.value = true
@@ -1393,10 +1406,10 @@ const attachVisibilityObserver = () => {
 
   visibilityObserver = new IntersectionObserver((entries) => {
     const isIntersecting = entries.some((entry) => entry.isIntersecting)
-    if (props.account.platform === 'deepseek') isRowVisible.value = isIntersecting
+    if (props.account.platform === 'deepseek' || props.account.platform === 'tokenrhythm') isRowVisible.value = isIntersecting
     if (!isIntersecting) return
     hasEnteredViewport.value = true
-    if (props.account.platform !== 'deepseek') detachVisibilityObserver()
+    if (props.account.platform !== 'deepseek' && props.account.platform !== 'tokenrhythm') detachVisibilityObserver()
     flushPendingAutoLoad()
   }, {
     root: null,

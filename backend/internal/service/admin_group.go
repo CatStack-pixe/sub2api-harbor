@@ -282,7 +282,7 @@ func defaultAllowImageGenerationForPlatform(platform string) bool {
 func compositeDefaultModelsListCandidateIDs() []string {
 	seen := make(map[string]struct{})
 	ids := make([]string, 0)
-	for _, platform := range []string{PlatformAnthropic, PlatformGemini, PlatformOpenAI, PlatformAntigravity, PlatformGrok, PlatformAgnes, PlatformDeepSeek, PlatformNvidia} {
+	for _, platform := range []string{PlatformAnthropic, PlatformGemini, PlatformOpenAI, PlatformAntigravity, PlatformGrok, PlatformAgnes, PlatformDeepSeek, PlatformNvidia, PlatformTokenRhythm} {
 		for _, id := range defaultModelsListCandidateIDs(platform) {
 			if _, ok := seen[id]; ok {
 				continue
@@ -683,7 +683,8 @@ func (s *adminServiceImpl) UpdateGroup(ctx context.Context, id int64, input *Upd
 			return nil, err
 		}
 		if nextPlatform == PlatformDeepSeek || group.Platform == PlatformDeepSeek ||
-			nextPlatform == PlatformNvidia || group.Platform == PlatformNvidia {
+			nextPlatform == PlatformNvidia || group.Platform == PlatformNvidia ||
+			nextPlatform == PlatformTokenRhythm || group.Platform == PlatformTokenRhythm {
 			if err := validateGroupAccountPlatforms(ctx, s.accountRepo, nextPlatform, id); err != nil {
 				return nil, err
 			}

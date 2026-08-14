@@ -4858,6 +4858,7 @@ const platformOptions = computed(() => [
   { value: "agnes", label: "Agnes" },
   { value: "deepseek", label: "DeepSeek" },
   { value: "nvidia", label: "NVIDIA" },
+  { value: "tokenrhythm", label: "TokenRhythm" },
   { value: "composite", label: "Composite" },
 ]);
 
@@ -4871,6 +4872,7 @@ const platformFilterOptions = computed(() => [
   { value: "agnes", label: "Agnes" },
   { value: "deepseek", label: "DeepSeek" },
   { value: "nvidia", label: "NVIDIA" },
+  { value: "tokenrhythm", label: "TokenRhythm" },
   { value: "composite", label: "Composite" },
 ]);
 
@@ -4883,6 +4885,7 @@ const compositeRoutePlatformOptions = computed(() => [
   { value: "agnes", label: "Agnes" },
   { value: "deepseek", label: "DeepSeek" },
   { value: "nvidia", label: "NVIDIA" },
+  { value: "tokenrhythm", label: "TokenRhythm" },
 ]);
 
 const compositeRouteEndpointOptions = computed(() => [

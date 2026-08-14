@@ -373,7 +373,11 @@ func (s *GatewayService) buildCountTokensRequestAnthropicAPIKeyPassthrough(
 		if err != nil {
 			return nil, err
 		}
-		targetURL = validatedURL + "/v1/messages/count_tokens?beta=true"
+		if account.IsTokenRhythm() {
+			targetURL = strings.TrimRight(validatedURL, "/") + "/messages/count_tokens"
+		} else {
+			targetURL = validatedURL + "/v1/messages/count_tokens?beta=true"
+		}
 	}
 	body = sanitizeCountTokensRequestBody(body)
 

@@ -15,7 +15,7 @@ import (
 func ValidateAccountPlatform(platform string) error {
 	switch strings.TrimSpace(platform) {
 	case PlatformAnthropic, PlatformOpenAI, PlatformGemini, PlatformAntigravity,
-		PlatformGrok, PlatformAgnes, PlatformDeepSeek, PlatformNvidia:
+		PlatformGrok, PlatformAgnes, PlatformDeepSeek, PlatformNvidia, PlatformTokenRhythm:
 		return nil
 	default:
 		return infraerrors.BadRequest("UNSUPPORTED_ACCOUNT_PLATFORM", "unsupported account platform")
@@ -25,7 +25,7 @@ func ValidateAccountPlatform(platform string) error {
 func ValidateGroupPlatform(platform string) error {
 	switch strings.TrimSpace(platform) {
 	case PlatformAnthropic, PlatformOpenAI, PlatformGemini, PlatformAntigravity,
-		PlatformGrok, PlatformAgnes, PlatformDeepSeek, PlatformNvidia, PlatformComposite:
+		PlatformGrok, PlatformAgnes, PlatformDeepSeek, PlatformNvidia, PlatformTokenRhythm, PlatformComposite:
 		return nil
 	default:
 		return infraerrors.BadRequest("UNSUPPORTED_GROUP_PLATFORM", "unsupported group platform")
@@ -35,8 +35,8 @@ func ValidateGroupPlatform(platform string) error {
 func accountCanBindToGroupPlatform(accountPlatform, groupPlatform string) bool {
 	accountPlatform = strings.TrimSpace(accountPlatform)
 	groupPlatform = strings.TrimSpace(groupPlatform)
-	if accountPlatform != PlatformDeepSeek && accountPlatform != PlatformNvidia &&
-		groupPlatform != PlatformDeepSeek && groupPlatform != PlatformNvidia {
+	if accountPlatform != PlatformDeepSeek && accountPlatform != PlatformNvidia && accountPlatform != PlatformTokenRhythm &&
+		groupPlatform != PlatformDeepSeek && groupPlatform != PlatformNvidia && groupPlatform != PlatformTokenRhythm {
 		return true
 	}
 	return groupPlatform == PlatformComposite || accountPlatform == groupPlatform
@@ -85,7 +85,7 @@ func validateAccountCredentials(platform, accountType string, credentials map[st
 	if err := ValidateAccountPlatform(platform); err != nil {
 		return err
 	}
-	if platform != PlatformDeepSeek && platform != PlatformNvidia {
+	if platform != PlatformDeepSeek && platform != PlatformNvidia && platform != PlatformTokenRhythm {
 		return nil
 	}
 	platformName := "DeepSeek"
@@ -94,12 +94,32 @@ func validateAccountCredentials(platform, accountType string, credentials map[st
 		platformName = "NVIDIA"
 		errorPrefix = "NVIDIA"
 	}
+	if platform == PlatformTokenRhythm {
+		platformName = "TokenRhythm"
+		errorPrefix = "TOKENRHYTHM"
+	}
 	if accountType != AccountTypeAPIKey {
 		return infraerrors.BadRequest(errorPrefix+"_ACCOUNT_TYPE_UNSUPPORTED", platformName+" accounts must use the apikey account type")
 	}
 	apiKey, _ := credentials["api_key"].(string)
 	if strings.TrimSpace(apiKey) == "" {
 		return infraerrors.BadRequest(errorPrefix+"_API_KEY_REQUIRED", platformName+" api_key is required")
+	}
+	if platform == PlatformTokenRhythm {
+		if rawBaseURL, exists := credentials["base_url"]; exists && rawBaseURL != nil {
+			baseURL, ok := rawBaseURL.(string)
+			if !ok {
+				return infraerrors.BadRequest(errorPrefix+"_BASE_URL_INVALID", platformName+" base_url is fixed")
+			}
+			trimmedBaseURL := strings.TrimSpace(baseURL)
+			if trimmedBaseURL != "" && strings.TrimRight(trimmedBaseURL, "/") != TokenRhythmDefaultBaseURL {
+				return infraerrors.BadRequest(errorPrefix+"_BASE_URL_INVALID", platformName+" base_url is fixed")
+			}
+		}
+		if _, _, err := TokenRhythmCookieCredentials(credentials); err != nil {
+			return infraerrors.BadRequest(errorPrefix+"_COOKIE_INVALID", err.Error())
+		}
+		return nil
 	}
 	if rawBaseURL, exists := credentials["base_url"]; exists && rawBaseURL != nil {
 		baseURL, ok := rawBaseURL.(string)

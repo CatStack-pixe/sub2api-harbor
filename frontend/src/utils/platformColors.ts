@@ -5,7 +5,7 @@
  * instead of defining their own color mappings.
  */
 
-export type Platform = 'anthropic' | 'openai' | 'antigravity' | 'gemini' | 'grok' | 'agnes' | 'deepseek' | 'nvidia' | 'composite'
+export type Platform = 'anthropic' | 'openai' | 'antigravity' | 'gemini' | 'grok' | 'agnes' | 'deepseek' | 'nvidia' | 'tokenrhythm' | 'composite'
 
 // ── Badge (bg + text + border, for inline badges with border) ───────
 const BADGE: Record<Platform, string> = {
@@ -17,6 +17,7 @@ const BADGE: Record<Platform, string> = {
   agnes: 'bg-cyan-500/10 text-cyan-700 border-cyan-500/30 dark:text-cyan-300',
   deepseek: 'bg-indigo-500/10 text-indigo-700 border-indigo-500/30 dark:text-indigo-300',
   nvidia: 'bg-lime-500/10 text-lime-700 border-lime-500/30 dark:text-lime-300',
+  tokenrhythm: 'bg-teal-500/10 text-teal-700 border-teal-500/30 dark:text-teal-300',
   composite: 'bg-cyan-500/10 text-cyan-700 border-cyan-500/30 dark:text-cyan-300',
 }
 const BADGE_DEFAULT = 'bg-slate-500/10 text-slate-600 border-slate-500/30 dark:text-slate-400'
@@ -31,6 +32,7 @@ const BADGE_LIGHT: Record<Platform, string> = {
   agnes: 'bg-cyan-500/10 text-cyan-700 dark:bg-cyan-500/10 dark:text-cyan-300',
   deepseek: 'bg-indigo-500/10 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-300',
   nvidia: 'bg-lime-500/10 text-lime-700 dark:bg-lime-500/10 dark:text-lime-300',
+  tokenrhythm: 'bg-teal-500/10 text-teal-700 dark:bg-teal-500/10 dark:text-teal-300',
   composite: 'bg-cyan-500/10 text-cyan-700 dark:bg-cyan-500/10 dark:text-cyan-300',
 }
 
@@ -44,6 +46,7 @@ const BORDER: Record<Platform, string> = {
   agnes: 'border-cyan-500/20 dark:border-cyan-500/20',
   deepseek: 'border-indigo-500/20 dark:border-indigo-500/20',
   nvidia: 'border-lime-500/20 dark:border-lime-500/20',
+  tokenrhythm: 'border-teal-500/20 dark:border-teal-500/20',
   composite: 'border-cyan-500/20 dark:border-cyan-500/20',
 }
 const BORDER_DEFAULT = 'border-gray-200 dark:border-dark-700'
@@ -58,6 +61,7 @@ const BORDER_STRONG: Record<Platform, string> = {
   agnes: 'border-cyan-500/35 dark:border-cyan-500/30',
   deepseek: 'border-indigo-500/35 dark:border-indigo-500/30',
   nvidia: 'border-lime-500/35 dark:border-lime-500/30',
+  tokenrhythm: 'border-teal-500/35 dark:border-teal-500/30',
   composite: 'border-cyan-500/35 dark:border-cyan-500/30',
 }
 const BORDER_STRONG_DEFAULT = 'border-gray-300 dark:border-dark-600'
@@ -73,6 +77,7 @@ const ACCENT: Record<Platform, string> = {
   agnes: '#0891b2', // cyan-600
   deepseek: '#4f46e5', // indigo-600
   nvidia: '#76b900', // NVIDIA green
+  tokenrhythm: '#0d9488', // teal-600
   composite: '#06b6d4', // cyan-500
 }
 const ACCENT_DEFAULT = '#14b8a6' // primary-500 (teal)
@@ -87,6 +92,7 @@ const ACCENT_BAR: Record<Platform, string> = {
   agnes: 'bg-gradient-to-r from-cyan-500 to-teal-600',
   deepseek: 'bg-gradient-to-r from-indigo-500 to-blue-600',
   nvidia: 'bg-gradient-to-r from-lime-500 to-green-600',
+  tokenrhythm: 'bg-gradient-to-r from-teal-500 to-emerald-600',
   composite: 'bg-gradient-to-r from-slate-500 to-cyan-500',
 }
 const ACCENT_BAR_DEFAULT = 'bg-gradient-to-r from-primary-400 to-primary-500'
@@ -101,6 +107,7 @@ const TEXT: Record<Platform, string> = {
   agnes: 'text-cyan-700 dark:text-cyan-300',
   deepseek: 'text-indigo-700 dark:text-indigo-300',
   nvidia: 'text-lime-700 dark:text-lime-300',
+  tokenrhythm: 'text-teal-700 dark:text-teal-300',
   composite: 'text-cyan-700 dark:text-cyan-300',
 }
 const TEXT_DEFAULT = 'text-primary-600 dark:text-primary-400'
@@ -115,6 +122,7 @@ const ICON: Record<Platform, string> = {
   agnes: 'text-cyan-600 dark:text-cyan-300',
   deepseek: 'text-indigo-600 dark:text-indigo-300',
   nvidia: 'text-lime-600 dark:text-lime-300',
+  tokenrhythm: 'text-teal-600 dark:text-teal-300',
   composite: 'text-cyan-600 dark:text-cyan-300',
 }
 const ICON_DEFAULT = 'text-primary-500 dark:text-primary-400'
@@ -129,6 +137,7 @@ const BUTTON: Record<Platform, string> = {
   agnes: 'bg-cyan-700 text-white hover:bg-cyan-800 active:bg-cyan-900 dark:bg-cyan-600 dark:hover:bg-cyan-500',
   deepseek: 'bg-indigo-600 text-white hover:bg-indigo-700 active:bg-indigo-800 dark:bg-indigo-600/80 dark:hover:bg-indigo-600',
   nvidia: 'bg-lime-600 text-white hover:bg-lime-700 active:bg-lime-800 dark:bg-lime-600/80 dark:hover:bg-lime-600',
+  tokenrhythm: 'bg-teal-600 text-white hover:bg-teal-700 active:bg-teal-800 dark:bg-teal-600/80 dark:hover:bg-teal-600',
   composite: 'bg-cyan-700 text-white hover:bg-cyan-800 active:bg-cyan-900 dark:bg-cyan-600 dark:hover:bg-cyan-500',
 }
 const BUTTON_DEFAULT = 'bg-primary-500 text-white hover:bg-primary-600 dark:bg-primary-600 dark:hover:bg-primary-500'
@@ -143,6 +152,7 @@ const DISCOUNT: Record<Platform, string> = {
   agnes: 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/40 dark:text-cyan-300',
   deepseek: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300',
   nvidia: 'bg-lime-100 text-lime-800 dark:bg-lime-900/40 dark:text-lime-300',
+  tokenrhythm: 'bg-teal-100 text-teal-800 dark:bg-teal-900/40 dark:text-teal-300',
   composite: 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/40 dark:text-cyan-300',
 }
 const DISCOUNT_DEFAULT = 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300'
@@ -157,6 +167,7 @@ const GRADIENT: Record<Platform, string> = {
   agnes: 'from-cyan-600 to-teal-700',
   deepseek: 'from-indigo-600 to-blue-700',
   nvidia: 'from-lime-600 to-green-700',
+  tokenrhythm: 'from-teal-600 to-emerald-700',
   composite: 'from-slate-600 to-cyan-600',
 }
 const GRADIENT_DEFAULT = 'from-primary-500 to-primary-600'
@@ -171,6 +182,7 @@ const GRADIENT_TEXT: Record<Platform, string> = {
   agnes: 'text-cyan-100',
   deepseek: 'text-indigo-100',
   nvidia: 'text-lime-100',
+  tokenrhythm: 'text-teal-100',
   composite: 'text-cyan-100',
 }
 const GRADIENT_TEXT_DEFAULT = 'text-primary-100'
@@ -184,6 +196,7 @@ const GRADIENT_SUBTEXT: Record<Platform, string> = {
   agnes: 'text-cyan-200',
   deepseek: 'text-indigo-200',
   nvidia: 'text-lime-200',
+  tokenrhythm: 'text-teal-200',
   composite: 'text-cyan-200',
 }
 const GRADIENT_SUBTEXT_DEFAULT = 'text-primary-200'
@@ -191,7 +204,7 @@ const GRADIENT_SUBTEXT_DEFAULT = 'text-primary-200'
 // ── Public API ──────────────────────────────────────────────────────
 
 function isPlatform(p: string): p is Platform {
-  return p === 'anthropic' || p === 'openai' || p === 'antigravity' || p === 'gemini' || p === 'grok' || p === 'agnes' || p === 'deepseek' || p === 'nvidia' || p === 'composite'
+  return p === 'anthropic' || p === 'openai' || p === 'antigravity' || p === 'gemini' || p === 'grok' || p === 'agnes' || p === 'deepseek' || p === 'nvidia' || p === 'tokenrhythm' || p === 'composite'
 }
 
 export function platformBadgeClass(p: string): string {
@@ -256,6 +269,7 @@ export function platformLabel(p: string): string {
     case 'agnes': return 'Agnes'
     case 'deepseek': return 'DeepSeek'
     case 'nvidia': return 'NVIDIA'
+    case 'tokenrhythm': return 'TokenRhythm'
     case 'composite': return 'Composite'
     default: return p || 'API'
   }

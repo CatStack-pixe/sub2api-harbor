@@ -528,6 +528,7 @@ import TLSFingerprintProfilesModal from '@/components/admin/TLSFingerprintProfil
 import { fetchAllAccountIds } from '@/utils/accountSelection'
 import { buildGrokUsageRefreshKey, buildOpenAIUsageRefreshKey } from '@/utils/accountUsageRefresh'
 import { invalidateDeepSeekBalanceCache } from '@/utils/deepSeekBalanceQuery'
+import { invalidateTokenRhythmBalanceCache } from '@/utils/tokenRhythmBalanceQuery'
 import { formatDateTime, formatRelativeTime } from '@/utils/format'
 import { proxyExpiryBadgeClass, proxyExpiryLabelKey } from '@/utils/proxyExpiry'
 import { extractApiErrorMessage } from '@/utils/apiError'
@@ -700,6 +701,7 @@ const pendingTodayStatsRefresh = ref(false)
 const usageManualRefreshToken = ref(0)
 const documentVisibility = useDocumentVisibility()
 invalidateDeepSeekBalanceCache()
+invalidateTokenRhythmBalanceCache()
 
 const desktopViewportQuery = '(min-width: 768px)'
 const isDesktopViewport = ref(

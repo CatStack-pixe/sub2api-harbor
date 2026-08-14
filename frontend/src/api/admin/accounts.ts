@@ -563,6 +563,33 @@ export async function getDeepSeekBalance(id: number, signal?: AbortSignal): Prom
   return data
 }
 
+export interface TokenRhythmBalanceResult {
+  is_available: boolean
+  available_balance_cny?: number
+  balance_cny?: number
+  frozen_balance_cny?: number
+  expiring_balance_cny?: number
+  cost_cny?: number
+  calls?: number
+  success_calls?: number
+  error_calls?: number
+  aborted_calls?: number
+  input_tokens?: number
+  output_tokens?: number
+  currency?: string
+  next_expiry_at?: string | null
+  fetched_at?: number
+  status_code?: number
+}
+
+export async function getTokenRhythmBalance(id: number, signal?: AbortSignal): Promise<TokenRhythmBalanceResult> {
+  const { data } = await apiClient.get<TokenRhythmBalanceResult>(
+    `/admin/tokenrhythm/accounts/${id}/balance`,
+    { signal }
+  )
+  return data
+}
+
 /**
  * Sync live supported models from the account's upstream model-list endpoint
  * @param id - Account ID
@@ -1032,6 +1059,7 @@ export const accountsAPI = {
   setSchedulable,
   getAvailableModels,
   getDeepSeekBalance,
+  getTokenRhythmBalance,
   syncUpstreamModels,
   syncUpstreamModelsPreview,
   generateAuthUrl,

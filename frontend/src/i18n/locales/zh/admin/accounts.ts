@@ -310,6 +310,7 @@ export default {
         agnes: 'Agnes',
         deepseek: 'DeepSeek',
         nvidia: 'NVIDIA',
+        tokenrhythm: 'TokenRhythm',
       },
       types: {
         oauth: 'OAuth',
@@ -411,6 +412,9 @@ export default {
         deepseekProbeTooltip: '查询 DeepSeek 账号余额',
         deepseekUnavailable: '余额不可用',
         deepseekNoBalance: '暂无余额数据',
+        tokenrhythmProbe: '余额',
+        tokenrhythmProbeTooltip: '查询 TokenRhythm 账号余额',
+        tokenrhythmNoBalance: '暂无可用余额数据',
         gemini3Pro: 'G3P',
         gemini3Flash: 'G3F',
         gemini3Image: 'G31FI',
@@ -693,6 +697,15 @@ export default {
       deepseek: {
         baseUrlHint: '留空使用官方 DeepSeek API',
         apiKeyHint: '您的 DeepSeek API Key'
+      },
+      tokenrhythm: {
+        baseUrlHint: 'TokenRhythm 使用固定的官方 OpenAI 兼容接口。',
+        apiKeyHint: '您的 TokenRhythm API Key',
+        cookie: '完整 Cookie 请求头',
+        cookiePlaceholder: 'tr_session=sess_...; tr_csrf=...',
+        cookieHint: '仅用于余额查询，服务端只保存必需的 TokenRhythm Cookie。',
+        cookieEditHint: '留空保留已存的余额查询 Cookie；粘贴新的完整 Cookie 请求头可替换。',
+        cookieRequired: '查询 TokenRhythm 余额需要提供 Cookie 请求头。'
       },
       nvidia: {
         baseUrlHint: 'OpenAI 兼容的 NVIDIA NIM 接口，默认地址已包含 /v1。',
