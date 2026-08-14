@@ -142,7 +142,7 @@ func TestRateLimitService_PoolModeInsufficientBalanceNarrowMatching(t *testing.T
 			account:    poolModeInsufficientBalanceAccount(true),
 			statusCode: http.StatusForbidden,
 			body:       []byte(`{"error":{"message":"insufficient account balance"}}`),
-			wantPolicy: ErrorPolicySkipped,
+			wantPolicy: ErrorPolicyMatched,
 		},
 		{
 			name:       "non pool account unchanged",
