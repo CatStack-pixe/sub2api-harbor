@@ -212,6 +212,12 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 		googleError(c, http.StatusBadRequest, "Request body is empty")
 		return
 	}
+	if updated, changed, promptErr := service.ApplyGroupGlobalPrompt(body, service.GlobalPromptProtocolGemini, apiKey.Group); promptErr != nil {
+		googleError(c, http.StatusBadRequest, promptErr.Error())
+		return
+	} else if changed {
+		body = updated
+	}
 
 	setOpsRequestContext(c, modelName, stream)
 	setOpsEndpointContext(c, "", int16(service.RequestTypeFromLegacy(stream, false)))

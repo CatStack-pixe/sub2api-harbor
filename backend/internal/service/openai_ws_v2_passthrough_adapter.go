@@ -1,6 +1,7 @@
 package service
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -686,6 +687,17 @@ func (s *OpenAIGatewayService) proxyResponsesWebSocketV2Passthrough(
 			firstClientMessage = capped
 		}
 	}
+	if hooks != nil && hooks.MutateRequestPayload != nil {
+		mutated, mutateErr := hooks.MutateRequestPayload(1, firstClientMessage)
+		if mutateErr != nil {
+			return NewOpenAIWSClientCloseError(coderws.StatusPolicyViolation, "failed to mutate websocket request payload", mutateErr)
+		}
+		mutated = bytes.TrimSpace(mutated)
+		if len(mutated) == 0 || !gjson.ValidBytes(mutated) {
+			return NewOpenAIWSClientCloseError(coderws.StatusPolicyViolation, "invalid mutated websocket request payload", errors.New("mutated payload is not valid JSON"))
+		}
+		firstClientMessage = mutated
+	}
 	requestModel := strings.TrimSpace(gjson.GetBytes(firstClientMessage, "model").String())
 	requestPreviousResponseID := strings.TrimSpace(gjson.GetBytes(firstClientMessage, "previous_response_id").String())
 	logOpenAIWSV2Passthrough(
@@ -970,6 +982,17 @@ func (s *OpenAIGatewayService) proxyResponsesWebSocketV2Passthrough(
 			turnNo := int(completedTurns.Load()) + 1
 			if turnNo < 2 {
 				turnNo = 2
+			}
+			if isResponseCreate && hooks != nil && hooks.MutateRequestPayload != nil {
+				mutated, mutateErr := hooks.MutateRequestPayload(turnNo, payload)
+				if mutateErr != nil {
+					return payload, nil, NewOpenAIWSClientCloseError(coderws.StatusPolicyViolation, "failed to mutate websocket request payload", mutateErr)
+				}
+				mutated = bytes.TrimSpace(mutated)
+				if len(mutated) == 0 || !gjson.ValidBytes(mutated) {
+					return payload, nil, NewOpenAIWSClientCloseError(coderws.StatusPolicyViolation, "invalid mutated websocket request payload", errors.New("mutated payload is not valid JSON"))
+				}
+				payload = mutated
 			}
 			requestModelForThisFrame := ""
 			if isResponseCreate {

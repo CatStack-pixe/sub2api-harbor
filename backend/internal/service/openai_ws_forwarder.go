@@ -221,6 +221,9 @@ type OpenAIWSIngressHooks struct {
 	ReasoningEffortMappings []ReasoningEffortMapping
 	BeforeTurn              func(turn int) error
 	BeforeRequest           func(turn int, payload []byte, originalModel string) error
+	// MutateRequestPayload rewrites each response.create payload before it is
+	// audited, policy-checked, and forwarded upstream.
+	MutateRequestPayload func(turn int, payload []byte) ([]byte, error)
 	// MapRequestModel resolves the current turn's client model to the model
 	// that must be written into the upstream response.create frame.
 	MapRequestModel func(turn int, originalModel string) (string, error)

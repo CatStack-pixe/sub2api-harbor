@@ -204,6 +204,8 @@ func TestDuplicateGroupCopiesConfigurationDeeplyAndResetsRuntimeState(t *testing
 		WeeklyLimitUSD:               groupDuplicateTestPointer(22.0),
 		MonthlyLimitUSD:              groupDuplicateTestPointer(33.0),
 		LongContextPricingEnabled:    true,
+		GlobalPromptEnabled:          true,
+		GlobalPrompt:                 "Follow the group policy.",
 		ModelPricing: []ChannelModelPricing{
 			{
 				Platform:    PlatformOpenAI,
@@ -295,6 +297,8 @@ func TestDuplicateGroupCopiesConfigurationDeeplyAndResetsRuntimeState(t *testing
 	require.Equal(t, source.RateMultiplier, duplicate.RateMultiplier)
 	require.Equal(t, source.PeakRateMultiplier, duplicate.PeakRateMultiplier)
 	require.Equal(t, source.LongContextPricingEnabled, duplicate.LongContextPricingEnabled)
+	require.Equal(t, source.GlobalPromptEnabled, duplicate.GlobalPromptEnabled)
+	require.Equal(t, source.GlobalPrompt, duplicate.GlobalPrompt)
 	require.Equal(t, source.ModelPricing, duplicate.ModelPricing)
 	require.Equal(t, source.DefaultValidityDays, duplicate.DefaultValidityDays)
 	require.Equal(t, source.ImagePrice4K, duplicate.ImagePrice4K)
@@ -324,6 +328,7 @@ func TestDuplicateGroupCopiesConfigurationDeeplyAndResetsRuntimeState(t *testing
 	duplicate.ModelsListConfig.ModelMapping["deepseek-v4-pro"] = "changed"
 	duplicate.ReasoningEffortMappings[0].To = "changed"
 	duplicate.LongContextPricingEnabled = false
+	duplicate.GlobalPrompt = "changed"
 	duplicate.ModelPricing[0].Models[0] = "changed"
 	*duplicate.ModelPricing[0].InputPrice = 999
 	*duplicate.ModelPricing[0].Intervals[0].MaxTokens = 999
@@ -337,6 +342,8 @@ func TestDuplicateGroupCopiesConfigurationDeeplyAndResetsRuntimeState(t *testing
 	require.Equal(t, "agnes-2.5-pro-alpha", source.ModelsListConfig.ModelMapping["deepseek-v4-pro"])
 	require.Equal(t, "xhigh", source.ReasoningEffortMappings[0].To)
 	require.True(t, source.LongContextPricingEnabled)
+	require.True(t, source.GlobalPromptEnabled)
+	require.Equal(t, "Follow the group policy.", source.GlobalPrompt)
 	require.Equal(t, "gpt-5.4", source.ModelPricing[0].Models[0])
 	require.Equal(t, 1.25e-6, *source.ModelPricing[0].InputPrice)
 	require.Equal(t, 200000, *source.ModelPricing[0].Intervals[0].MaxTokens)

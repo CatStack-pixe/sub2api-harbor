@@ -8,7 +8,7 @@
 # =============================================================================
 
 ARG NODE_IMAGE=node:24-alpine
-ARG GOLANG_IMAGE=golang:1.26.5-alpine
+ARG GOLANG_IMAGE=golang:1.26.6-alpine
 ARG ALPINE_IMAGE=alpine:3.21
 ARG POSTGRES_IMAGE=postgres:18-alpine
 ARG GOPROXY=https://goproxy.cn,direct
@@ -81,7 +81,7 @@ RUN --mount=type=cache,id=sub2api-gomod,target=/go/pkg/mod \
 COPY backend/ ./
 
 # Keep generated dependency-injection wiring in sync for source builds.
-RUN go generate ./cmd/server
+RUN go generate ./ent ./cmd/server
 
 # Copy frontend dist from previous stage (must be after backend copy to avoid being overwritten)
 COPY --from=frontend-builder /app/backend/internal/web/dist ./internal/web/dist

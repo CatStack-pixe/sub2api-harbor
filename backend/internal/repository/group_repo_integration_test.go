@@ -57,6 +57,8 @@ func (s *GroupRepoSuite) TestCreate() {
 		IsExclusive:      false,
 		Status:           service.StatusActive,
 		SubscriptionType: service.SubscriptionTypeStandard,
+		GlobalPromptEnabled: true,
+		GlobalPrompt:        "Follow the group policy.",
 	}
 
 	err := s.repo.Create(s.ctx, group)
@@ -66,6 +68,8 @@ func (s *GroupRepoSuite) TestCreate() {
 	got, err := s.repo.GetByID(s.ctx, group.ID)
 	s.Require().NoError(err, "GetByID")
 	s.Require().Equal("test-create", got.Name)
+	s.Require().True(got.GlobalPromptEnabled)
+	s.Require().Equal("Follow the group policy.", got.GlobalPrompt)
 }
 
 func (s *GroupRepoSuite) TestCreateFromSourcePreservesPriorityAndFiltersIneligibleAccounts() {
@@ -76,6 +80,8 @@ func (s *GroupRepoSuite) TestCreateFromSourcePreservesPriorityAndFiltersIneligib
 		Status:           service.StatusActive,
 		SubscriptionType: service.SubscriptionTypeStandard,
 		RequireOAuthOnly: true,
+		GlobalPromptEnabled: true,
+		GlobalPrompt:        "Source policy.",
 	}
 	s.Require().NoError(s.repo.Create(s.ctx, source))
 
@@ -118,6 +124,8 @@ func (s *GroupRepoSuite) TestCreateFromSourcePreservesPriorityAndFiltersIneligib
 		Status:               "inactive",
 		SubscriptionType:     source.SubscriptionType,
 		RequireOAuthOnly:     true,
+		GlobalPromptEnabled: source.GlobalPromptEnabled,
+		GlobalPrompt:        source.GlobalPrompt,
 		DuplicateOperationID: strings.Repeat("a", 64),
 	}
 	s.Require().NoError(s.repo.CreateFromSource(s.ctx, duplicate, source.ID))
@@ -141,6 +149,8 @@ func (s *GroupRepoSuite) TestCreateFromSourcePreservesPriorityAndFiltersIneligib
 	recovered, err := s.repo.FindByDuplicateOperationID(s.ctx, duplicate.DuplicateOperationID)
 	s.Require().NoError(err)
 	s.Require().Equal(duplicate.ID, recovered.ID)
+	s.Require().True(recovered.GlobalPromptEnabled)
+	s.Require().Equal("Source policy.", recovered.GlobalPrompt)
 
 	var outboxCount int
 	s.Require().NoError(scanSingleRow(

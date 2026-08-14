@@ -58,6 +58,12 @@ func (h *GatewayHandler) ChatCompletions(c *gin.Context) {
 		h.chatCompletionsErrorResponse(c, http.StatusBadRequest, "invalid_request_error", "Request body is empty")
 		return
 	}
+	if updated, changed, promptErr := service.ApplyGroupGlobalPrompt(body, service.GlobalPromptProtocolOpenAIChat, apiKey.Group); promptErr != nil {
+		h.chatCompletionsErrorResponse(c, http.StatusBadRequest, "invalid_request_error", promptErr.Error())
+		return
+	} else if changed {
+		body = updated
+	}
 
 	setOpsRequestContext(c, "", false)
 

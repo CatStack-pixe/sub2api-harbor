@@ -44,8 +44,27 @@ func newGroupRepositoryWithSQL(client *dbent.Client, sqlq sqlExecutor) *groupRep
 }
 
 func (r *groupRepository) Create(ctx context.Context, groupIn *service.Group) error {
-	if err := createGroupRecord(ctx, r.client, groupIn); err != nil {
+	tx, err := r.client.Tx(ctx)
+	if err != nil && !errors.Is(err, dbent.ErrTxStarted) {
 		return err
+	}
+
+	txClient := r.client
+	if err == nil {
+		defer func() { _ = tx.Rollback() }()
+		txClient = tx.Client()
+	}
+
+	if err := createGroupRecord(ctx, txClient, groupIn); err != nil {
+		return err
+	}
+	if err := persistGroupGlobalPrompt(ctx, txClient, groupIn); err != nil {
+		return err
+	}
+	if tx != nil {
+		if err := tx.Commit(); err != nil {
+			return err
+		}
 	}
 	if err := enqueueSchedulerOutbox(ctx, r.sql, service.SchedulerOutboxEventGroupChanged, nil, &groupIn.ID, nil); err != nil {
 		logger.LegacyPrintf("repository.group", "[SchedulerOutbox] enqueue group create failed: group=%d err=%v", groupIn.ID, err)
@@ -155,7 +174,11 @@ func (r *groupRepository) FindByDuplicateOperationID(ctx context.Context, operat
 	if err != nil {
 		return nil, fmt.Errorf("find group duplicate operation: %w", err)
 	}
-	return groupEntityToService(row), nil
+	result := groupEntityToService(row)
+	if err := hydrateGroupGlobalPrompt(ctx, r.sql, result); err != nil {
+		return nil, err
+	}
+	return result, nil
 }
 
 // CreateFromSource atomically persists a copied group, clones the source
@@ -179,6 +202,9 @@ func (r *groupRepository) CreateFromSource(ctx context.Context, groupIn *service
 	}
 
 	if err := createGroupRecord(ctx, txClient, groupIn); err != nil {
+		return err
+	}
+	if err := persistGroupGlobalPrompt(ctx, txClient, groupIn); err != nil {
 		return err
 	}
 	result, err := txClient.ExecContext(
@@ -219,6 +245,9 @@ func (r *groupRepository) GetByID(ctx context.Context, id int64) (*service.Group
 	if err != nil {
 		return nil, err
 	}
+	if err := hydrateGroupGlobalPrompt(ctx, r.sql, out); err != nil {
+		return nil, err
+	}
 	counts, err := r.loadAccountCounts(ctx, []int64{out.ID})
 	if err == nil {
 		c := counts[out.ID]
@@ -237,7 +266,8 @@ func (r *groupRepository) GetByIDLite(ctx context.Context, id int64) (*service.G
 	if err != nil {
 		return nil, translatePersistenceError(err, service.ErrGroupNotFound, nil)
 	}
-	return groupEntityToService(m), nil
+	result := groupEntityToService(m)
+	return result, nil
 }
 
 func (r *groupRepository) Update(ctx context.Context, groupIn *service.Group) error {
@@ -245,7 +275,18 @@ func (r *groupRepository) Update(ctx context.Context, groupIn *service.Group) er
 	if err != nil {
 		return fmt.Errorf("marshal group model pricing: %w", err)
 	}
-	builder := r.client.Group.UpdateOneID(groupIn.ID).
+	tx, err := r.client.Tx(ctx)
+	if err != nil && !errors.Is(err, dbent.ErrTxStarted) {
+		return err
+	}
+
+	txClient := r.client
+	if err == nil {
+		defer func() { _ = tx.Rollback() }()
+		txClient = tx.Client()
+	}
+
+	builder := txClient.Group.UpdateOneID(groupIn.ID).
 		SetName(groupIn.Name).
 		SetDescription(groupIn.Description).
 		SetPlatform(groupIn.Platform).
@@ -395,6 +436,14 @@ func (r *groupRepository) Update(ctx context.Context, groupIn *service.Group) er
 		return translatePersistenceError(err, service.ErrGroupNotFound, service.ErrGroupExists)
 	}
 	groupIn.UpdatedAt = updated.UpdatedAt
+	if err := persistGroupGlobalPrompt(ctx, txClient, groupIn); err != nil {
+		return err
+	}
+	if tx != nil {
+		if err := tx.Commit(); err != nil {
+			return err
+		}
+	}
 	if err := enqueueSchedulerOutbox(ctx, r.sql, service.SchedulerOutboxEventGroupChanged, nil, &groupIn.ID, nil); err != nil {
 		logger.LegacyPrintf("repository.group", "[SchedulerOutbox] enqueue group update failed: group=%d err=%v", groupIn.ID, err)
 	}
@@ -462,6 +511,13 @@ func (r *groupRepository) ListWithFilters(ctx context.Context, params pagination
 		g := groupEntityToService(groups[i])
 		outGroups = append(outGroups, *g)
 		groupIDs = append(groupIDs, g.ID)
+	}
+	groupPtrs := make([]*service.Group, len(outGroups))
+	for i := range outGroups {
+		groupPtrs[i] = &outGroups[i]
+	}
+	if err := hydrateGroupGlobalPrompt(ctx, r.sql, groupPtrs...); err != nil {
+		return nil, nil, err
 	}
 
 	counts, err := r.loadAccountCounts(ctx, groupIDs)
@@ -560,6 +616,13 @@ func (r *groupRepository) listWithAccountCountSort(ctx context.Context, q *dbent
 			outGroups[idx] = *g
 		}
 	}
+	groupPtrs := make([]*service.Group, len(outGroups))
+	for i := range outGroups {
+		groupPtrs[i] = &outGroups[i]
+	}
+	if err := hydrateGroupGlobalPrompt(ctx, r.sql, groupPtrs...); err != nil {
+		return nil, nil, err
+	}
 
 	return outGroups, paginationResultFromTotal(int64(total), params), nil
 }
@@ -634,6 +697,13 @@ func (r *groupRepository) ListActive(ctx context.Context) ([]service.Group, erro
 		outGroups = append(outGroups, *g)
 		groupIDs = append(groupIDs, g.ID)
 	}
+	groupPtrs := make([]*service.Group, len(outGroups))
+	for i := range outGroups {
+		groupPtrs[i] = &outGroups[i]
+	}
+	if err := hydrateGroupGlobalPrompt(ctx, r.sql, groupPtrs...); err != nil {
+		return nil, err
+	}
 
 	counts, err := r.loadAccountCounts(ctx, groupIDs)
 	if err == nil {
@@ -706,6 +776,13 @@ func (r *groupRepository) ListActiveByPlatform(ctx context.Context, platform str
 		g := groupEntityToService(groups[i])
 		outGroups = append(outGroups, *g)
 		groupIDs = append(groupIDs, g.ID)
+	}
+	groupPtrs := make([]*service.Group, len(outGroups))
+	for i := range outGroups {
+		groupPtrs[i] = &outGroups[i]
+	}
+	if err := hydrateGroupGlobalPrompt(ctx, r.sql, groupPtrs...); err != nil {
+		return nil, err
 	}
 
 	counts, err := r.loadAccountCounts(ctx, groupIDs)

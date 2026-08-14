@@ -311,6 +311,9 @@ func groupSupportsOAuthOnlyFilter(platform string) bool {
 }
 
 func (s *adminServiceImpl) CreateGroup(ctx context.Context, input *CreateGroupInput) (*Group, error) {
+	if err := ValidateGroupGlobalPrompt(input.GlobalPrompt); err != nil {
+		return nil, err
+	}
 	if input.RateMultiplier <= 0 {
 		return nil, errors.New("rate_multiplier must be > 0")
 	}
@@ -487,6 +490,8 @@ func (s *adminServiceImpl) CreateGroup(ctx context.Context, input *CreateGroupIn
 		MonthlyLimitUSD:                 monthlyLimit,
 		LongContextPricingEnabled:       longContextPricingEnabled,
 		ModelPricing:                    modelPricing,
+		GlobalPromptEnabled:             input.GlobalPromptEnabled && strings.TrimSpace(input.GlobalPrompt) != "",
+		GlobalPrompt:                    strings.TrimSpace(input.GlobalPrompt),
 		AllowImageGeneration:            allowImageGeneration,
 		AllowBatchImageGeneration:       allowBatchImageGeneration,
 		ImageRateIndependent:            input.ImageRateIndependent,
@@ -712,6 +717,18 @@ func (s *adminServiceImpl) UpdateGroup(ctx context.Context, id int64, input *Upd
 			return nil, normalizeErr
 		}
 		group.ModelPricing = modelPricing
+	}
+	if input.GlobalPrompt != nil {
+		if err := ValidateGroupGlobalPrompt(*input.GlobalPrompt); err != nil {
+			return nil, err
+		}
+		group.GlobalPrompt = strings.TrimSpace(*input.GlobalPrompt)
+	}
+	if input.GlobalPromptEnabled != nil {
+		group.GlobalPromptEnabled = *input.GlobalPromptEnabled
+	}
+	if strings.TrimSpace(group.GlobalPrompt) == "" {
+		group.GlobalPromptEnabled = false
 	}
 
 	// 订阅相关字段

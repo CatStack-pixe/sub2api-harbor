@@ -157,6 +157,12 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 		h.errorResponse(c, http.StatusBadRequest, "invalid_request_error", "Request body is empty")
 		return
 	}
+	if updated, changed, promptErr := service.ApplyGroupGlobalPrompt(body, service.GlobalPromptProtocolAnthropic, apiKey.Group); promptErr != nil {
+		h.errorResponse(c, http.StatusBadRequest, "invalid_request_error", promptErr.Error())
+		return
+	} else if changed {
+		body = updated
+	}
 
 	setOpsRequestContext(c, "", false)
 

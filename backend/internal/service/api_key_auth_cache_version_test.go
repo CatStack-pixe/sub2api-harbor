@@ -74,3 +74,18 @@ func TestAPIKeyService_RejectsV17AuthSnapshotWithoutAgnesGroupModelMapping(t *te
 		t.Fatal("expected v17 auth snapshot to be rejected after Agnes group model mapping was added")
 	}
 }
+
+func TestAPIKeyService_RejectsV22AuthSnapshotWithoutGroupGlobalPrompt(t *testing.T) {
+	svc := &APIKeyService{}
+
+	apiKey, ok, err := svc.applyAuthCacheEntry("k-legacy-group-prompt", &APIKeyAuthCacheEntry{
+		Snapshot: &APIKeyAuthSnapshot{Version: 22},
+	})
+
+	if err != nil {
+		t.Fatalf("expected stale snapshot to be ignored without error, got %v", err)
+	}
+	if ok || apiKey != nil {
+		t.Fatal("expected v22 auth snapshot to be rejected after group global prompt was added")
+	}
+}

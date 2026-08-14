@@ -362,6 +362,38 @@ func TestAPIKeyService_SnapshotRoundTrip_PreservesGroupModelPricing(t *testing.T
 	require.NotSame(t, &apiKey.Group.ModelPricing[0], &roundTrip.Group.ModelPricing[0])
 }
 
+func TestAPIKeyService_SnapshotRoundTrip_PreservesGroupGlobalPrompt(t *testing.T) {
+	svc := &APIKeyService{}
+	groupID := int64(9)
+	apiKey := &APIKey{
+		ID:      1,
+		UserID:  2,
+		GroupID: &groupID,
+		Key:     "k-group-prompt",
+		Status:  StatusActive,
+		User:    &User{ID: 2, Status: StatusActive, Role: RoleUser, Balance: 10, Concurrency: 3},
+		Group: &Group{
+			ID:                  groupID,
+			Name:                "openai",
+			Platform:            PlatformOpenAI,
+			Status:              StatusActive,
+			SubscriptionType:    SubscriptionTypeStandard,
+			RateMultiplier:      1,
+			GlobalPromptEnabled: true,
+			GlobalPrompt:        "Follow the group policy.",
+		},
+	}
+
+	snapshot := svc.snapshotFromAPIKey(context.Background(), apiKey)
+	require.Equal(t, apiKeyAuthSnapshotVersion, snapshot.Version)
+	roundTrip := svc.snapshotToAPIKey(apiKey.Key, snapshot)
+
+	require.NotNil(t, roundTrip)
+	require.NotNil(t, roundTrip.Group)
+	require.True(t, roundTrip.Group.GlobalPromptEnabled)
+	require.Equal(t, apiKey.Group.GlobalPrompt, roundTrip.Group.GlobalPrompt)
+}
+
 func TestAPIKeyService_GetByKey_IgnoresLegacyAuthCacheSnapshotWithoutMessagesDispatchConfig(t *testing.T) {
 	cache := &authCacheStub{}
 	var repoCalls int32

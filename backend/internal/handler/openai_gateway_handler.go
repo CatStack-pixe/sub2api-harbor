@@ -281,6 +281,12 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 		h.errorResponse(c, http.StatusBadRequest, "invalid_request_error", "Request body is empty")
 		return
 	}
+	if updated, changed, promptErr := service.ApplyGroupGlobalPrompt(body, service.GlobalPromptProtocolResponses, apiKey.Group); promptErr != nil {
+		h.errorResponse(c, http.StatusBadRequest, "invalid_request_error", promptErr.Error())
+		return
+	} else if changed {
+		body = updated
+	}
 
 	setOpsRequestContext(c, "", false)
 	sessionHashBody := body
@@ -945,6 +951,12 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 	if len(body) == 0 {
 		h.anthropicErrorResponse(c, http.StatusBadRequest, "invalid_request_error", "Request body is empty")
 		return
+	}
+	if updated, changed, promptErr := service.ApplyGroupGlobalPrompt(body, service.GlobalPromptProtocolAnthropic, apiKey.Group); promptErr != nil {
+		h.anthropicErrorResponse(c, http.StatusBadRequest, "invalid_request_error", promptErr.Error())
+		return
+	} else if changed {
+		body = updated
 	}
 
 	if !gjson.ValidBytes(body) {
@@ -2044,6 +2056,14 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 			InitialRequestModel:     reqModel,
 			MaxReasoningEffort:      maxReasoningEffort,
 			ReasoningEffortMappings: reasoningEffortMappings,
+			MutateRequestPayload: func(_ int, payload []byte) ([]byte, error) {
+				updated, _, err := service.ApplyGroupGlobalPrompt(
+					payload,
+					service.GlobalPromptProtocolResponses,
+					apiKey.Group,
+				)
+				return updated, err
+			},
 			BeforeRequest: func(turn int, payload []byte, originalModel string) error {
 				c.Set(securityAuditWSTurnContextKey, turn)
 				if turn == 1 {

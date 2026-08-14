@@ -606,6 +606,8 @@ export interface Group {
 
 export interface AdminGroup extends Group {
   model_pricing: import('@/api/admin/channels').ChannelModelPricing[]
+  global_prompt_enabled: boolean
+  global_prompt?: string
   // 分组利润控制（支持的 token 计费平台分组可启用；margin/buffer 为小数存储）。
   // 仅管理员可见：与 rate_multiplier 相乘即可反推上游成本上限，不得下放到 Group。
   profit_control_enabled: boolean
@@ -775,6 +777,8 @@ export interface CreateGroupRequest {
   monthly_limit_usd?: number | null
   long_context_pricing_enabled?: boolean
   model_pricing?: import('@/api/admin/channels').ChannelModelPricing[]
+  global_prompt_enabled?: boolean
+  global_prompt?: string
   allow_image_generation?: boolean
   allow_batch_image_generation?: boolean
   image_rate_independent?: boolean
@@ -837,6 +841,8 @@ export interface UpdateGroupRequest {
   monthly_limit_usd?: number | null
   long_context_pricing_enabled?: boolean
   model_pricing?: import('@/api/admin/channels').ChannelModelPricing[]
+  global_prompt_enabled?: boolean
+  global_prompt?: string
   allow_image_generation?: boolean
   allow_batch_image_generation?: boolean
   image_rate_independent?: boolean

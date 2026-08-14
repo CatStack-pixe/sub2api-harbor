@@ -14,7 +14,7 @@ import (
 	"github.com/dgraph-io/ristretto"
 )
 
-const apiKeyAuthSnapshotVersion = 22 // v22: preserve group model pricing and long-context policy
+const apiKeyAuthSnapshotVersion = 23 // v23: preserve group global prompt policy
 
 type apiKeyAuthCacheConfig struct {
 	l1Size        int
@@ -391,6 +391,8 @@ func (s *APIKeyService) snapshotFromAPIKey(ctx context.Context, apiKey *APIKey) 
 			MonthlyLimitUSD:                 apiKey.Group.MonthlyLimitUSD,
 			LongContextPricingEnabled:       apiKey.Group.LongContextPricingEnabled,
 			ModelPricing:                    cloneChannelModelPricing(apiKey.Group.ModelPricing),
+			GlobalPromptEnabled:             apiKey.Group.GlobalPromptEnabled,
+			GlobalPrompt:                    apiKey.Group.GlobalPrompt,
 			AllowImageGeneration:            apiKey.Group.AllowImageGeneration,
 			AllowBatchImageGeneration:       apiKey.Group.AllowBatchImageGeneration,
 			ImageRateIndependent:            apiKey.Group.ImageRateIndependent,
@@ -489,6 +491,8 @@ func (s *APIKeyService) snapshotToAPIKey(key string, snapshot *APIKeyAuthSnapsho
 			MonthlyLimitUSD:                 snapshot.Group.MonthlyLimitUSD,
 			LongContextPricingEnabled:       snapshot.Group.LongContextPricingEnabled,
 			ModelPricing:                    cloneChannelModelPricing(snapshot.Group.ModelPricing),
+			GlobalPromptEnabled:             snapshot.Group.GlobalPromptEnabled,
+			GlobalPrompt:                    snapshot.Group.GlobalPrompt,
 			AllowImageGeneration:            snapshot.Group.AllowImageGeneration,
 			AllowBatchImageGeneration:       snapshot.Group.AllowBatchImageGeneration,
 			ImageRateIndependent:            snapshot.Group.ImageRateIndependent,

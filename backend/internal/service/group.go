@@ -15,6 +15,15 @@ type OpenAIMessagesDispatchModelConfig = domain.OpenAIMessagesDispatchModelConfi
 type GroupModelsListConfig = domain.GroupModelsListConfig
 type ReasoningEffortMapping = domain.ReasoningEffortMapping
 
+const MaxGroupGlobalPromptBytes = 32 * 1024
+
+func ValidateGroupGlobalPrompt(prompt string) error {
+	if len(prompt) > MaxGroupGlobalPromptBytes {
+		return fmt.Errorf("global_prompt must be at most %d bytes", MaxGroupGlobalPromptBytes)
+	}
+	return nil
+}
+
 type Group struct {
 	ID             int64
 	Name           string
@@ -74,6 +83,8 @@ type Group struct {
 	// Token intervals are selected only when LongContextPricingEnabled is true.
 	LongContextPricingEnabled bool
 	ModelPricing              []ChannelModelPricing
+	GlobalPromptEnabled       bool
+	GlobalPrompt              string
 
 	// Claude Code 客户端限制
 	ClaudeCodeOnly  bool

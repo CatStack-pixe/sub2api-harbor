@@ -1012,6 +1012,14 @@ export default {
         longContextHint: '勾选后按官方/预设阶梯计费；关闭则始终按第一档基础价。',
         add: '添加模型价格'
       },
+      globalPrompt: {
+        title: '分组全局提示词',
+        hint: '会在支持的文本请求中前置于客户端指令，并发送给上游；它不是安全边界。',
+        enabled: '已启用',
+        disabled: '未启用',
+        placeholder: '输入分组统一要求',
+        tooLong: '全局提示词不能超过 {max} 字节。'
+      },
       voicePricing: {
         title: 'Grok Voice 定价',
         description: '分组级 Voice realtime / TTS / STT 单价（USD）。留空表示未配置。',

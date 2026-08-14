@@ -141,6 +141,8 @@ func cloneGroupForDuplicate(source *Group, operationID string) *Group {
 		MonthlyLimitUSD:                 cloneGroupValuePointer(source.MonthlyLimitUSD),
 		LongContextPricingEnabled:       source.LongContextPricingEnabled,
 		ModelPricing:                    cloneGroupModelPricing(source.ModelPricing),
+		GlobalPromptEnabled:             source.GlobalPromptEnabled,
+		GlobalPrompt:                    source.GlobalPrompt,
 		DefaultValidityDays:             source.DefaultValidityDays,
 		AllowImageGeneration:            source.AllowImageGeneration,
 		AllowBatchImageGeneration:       source.AllowBatchImageGeneration,
