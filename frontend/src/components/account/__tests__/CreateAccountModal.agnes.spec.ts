@@ -24,6 +24,16 @@ describe('CreateAccountModal DeepSeek account type', () => {
     expect(source).toContain("newPlatform === 'deepseek'")
     expect(source).toContain("? 'https://api.deepseek.com'")
     expect(source).toContain('allowedModels.value = [...getModelsByPlatform(newPlatform)]')
-    expect(source).toContain("form.platform === 'deepseek' ? undefined")
+    expect(source).toContain("form.platform === 'deepseek' || form.platform === 'tokenrhythm'")
+  })
+})
+
+describe('CreateAccountModal TokenRhythm account type', () => {
+  it('uses a fixed API endpoint and requires a Cookie for balance queries', () => {
+    expect(source).toContain('data-testid="tokenrhythm-platform"')
+    expect(source).toContain('data-testid="tokenrhythm-account-type-api-key"')
+    expect(source).toContain("newPlatform === 'tokenrhythm'")
+    expect(source).toContain("'https://tokenrhythm.studio/v1'")
+    expect(source).toContain('credentials.tokenrhythm_cookie = tokenRhythmCookie.value.trim()')
   })
 })

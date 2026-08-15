@@ -107,6 +107,7 @@ export default {
         agnes: 'Agnes',
         deepseek: 'DeepSeek',
         nvidia: 'NVIDIA',
+        tokenrhythm: 'TokenRhythm',
       },
       types: {
         oauth: 'OAuth',
@@ -619,6 +620,15 @@ export default {
       deepseek: {
         baseUrlHint: 'Leave default for the official DeepSeek API',
         apiKeyHint: 'Your DeepSeek API Key'
+      },
+      tokenrhythm: {
+        baseUrlHint: 'TokenRhythm uses its fixed official OpenAI-compatible endpoint.',
+        apiKeyHint: 'Your TokenRhythm API Key',
+        cookie: 'Full Cookie header',
+        cookiePlaceholder: 'tr_session=sess_...; tr_csrf=...',
+        cookieHint: 'Used only for the balance query. The server stores only the required TokenRhythm cookies.',
+        cookieEditHint: 'Leave empty to keep the stored balance-query cookie. Paste a new full Cookie header to replace it.',
+        cookieRequired: 'A TokenRhythm Cookie header is required to query the account balance.'
       },
       nvidia: {
         baseUrlHint: 'OpenAI-compatible NVIDIA NIM endpoint. The default includes /v1.',
@@ -1468,6 +1478,9 @@ export default {
         deepseekProbeTooltip: 'Query the DeepSeek account balance',
         deepseekUnavailable: 'Balance unavailable',
         deepseekNoBalance: 'No balance data',
+        tokenrhythmProbe: 'Balance',
+        tokenrhythmProbeTooltip: 'Query the TokenRhythm account balance',
+        tokenrhythmNoBalance: 'No available balance data',
         passiveSampled: 'Passive',
         activeQuery: 'Query'
       },

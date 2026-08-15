@@ -144,6 +144,8 @@ func openAICompatibleSelectionErrorForLog(err error, platform string) error {
 		provider = "DeepSeek"
 	case service.PlatformNvidia:
 		provider = "NVIDIA"
+	case service.PlatformTokenRhythm:
+		provider = "TokenRhythm"
 	default:
 		return err
 	}

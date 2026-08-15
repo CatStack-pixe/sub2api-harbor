@@ -80,6 +80,9 @@ func TestDedicatedAccountGroupPlatformIsolation(t *testing.T) {
 	require.False(t, accountCanBindToGroupPlatform(PlatformNvidia, PlatformOpenAI))
 	require.False(t, accountCanBindToGroupPlatform(PlatformOpenAI, PlatformNvidia))
 	require.True(t, accountCanBindToGroupPlatform(PlatformOpenAI, PlatformOpenAI))
+	require.True(t, accountCanBindToGroupPlatform(PlatformTokenRhythm, PlatformTokenRhythm))
+	require.True(t, accountCanBindToGroupPlatform(PlatformTokenRhythm, PlatformComposite))
+	require.False(t, accountCanBindToGroupPlatform(PlatformTokenRhythm, PlatformOpenAI))
 }
 
 func TestDeepSeekAccountCompatibilityCapabilities(t *testing.T) {

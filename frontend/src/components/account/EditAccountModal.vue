@@ -34,6 +34,7 @@
             v-model="editBaseUrl"
             type="text"
             class="input"
+            :readonly="account.platform === 'tokenrhythm'"
             :placeholder="
               account.platform === 'openai'
                 ? 'https://api.openai.com'
@@ -45,6 +46,8 @@
                       ? 'https://api.x.ai/v1'
                       : account.platform === 'agnes'
                         ? 'https://apihub.agnes-ai.com/v1'
+                        : account.platform === 'tokenrhythm'
+                          ? 'https://tokenrhythm.studio/v1'
                         : account.platform === 'nvidia'
                           ? 'https://integrate.api.nvidia.com/v1'
                           : account.platform === 'deepseek'
@@ -88,6 +91,19 @@
             "
           />
           <p class="input-hint">{{ t('admin.accounts.leaveEmptyToKeep') }}</p>
+        </div>
+
+        <div v-if="account.platform === 'tokenrhythm'">
+          <label class="input-label">{{ t('admin.accounts.tokenrhythm.cookie') }}</label>
+          <textarea
+            v-model="tokenRhythmCookie"
+            rows="3"
+            class="input font-mono"
+            autocomplete="off"
+            spellcheck="false"
+            :placeholder="t('admin.accounts.tokenrhythm.cookiePlaceholder')"
+          ></textarea>
+          <p class="input-hint">{{ t('admin.accounts.tokenrhythm.cookieEditHint') }}</p>
         </div>
 
         <!-- Model Restriction Section (不适用于 Antigravity) -->
@@ -2820,6 +2836,7 @@ const baseUrlHint = computed(() => {
   if (props.account.platform === 'grok') return ''
   if (props.account.platform === 'agnes') return ''
   if (props.account.platform === 'deepseek') return t('admin.accounts.deepseek.baseUrlHint')
+  if (props.account.platform === 'tokenrhythm') return t('admin.accounts.tokenrhythm.baseUrlHint')
   if (props.account.platform === 'nvidia') return t('admin.accounts.nvidia.baseUrlHint')
   return t('admin.accounts.baseUrlHint')
 })
@@ -2844,6 +2861,7 @@ interface TempUnschedRuleForm {
 const submitting = ref(false)
 const editBaseUrl = ref('https://api.anthropic.com')
 const editApiKey = ref('')
+const tokenRhythmCookie = ref('')
 // Bedrock credentials
 const editBedrockAccessKeyId = ref('')
 const editBedrockSecretAccessKey = ref('')
@@ -3290,6 +3308,7 @@ const defaultBaseUrl = computed(() => {
   if (props.account?.platform === 'agnes') return 'https://apihub.agnes-ai.com/v1'
   if (props.account?.platform === 'nvidia') return 'https://integrate.api.nvidia.com/v1'
   if (props.account?.platform === 'deepseek') return 'https://api.deepseek.com'
+  if (props.account?.platform === 'tokenrhythm') return 'https://tokenrhythm.studio/v1'
   return 'https://api.anthropic.com'
 })
 
@@ -3441,7 +3460,7 @@ const syncFormFromAccount = (newAccount: Account | null) => {
 	autoPause7dThreshold.value = typeof extra?.auto_pause_7d_threshold === 'number' ? extra.auto_pause_7d_threshold * 100 : null
 	autoPause5hDisabled.value = extra?.auto_pause_5h_disabled === true
 	autoPause7dDisabled.value = extra?.auto_pause_7d_disabled === true
-	upstreamBillingAutoProbeEnabled.value = newAccount.platform !== 'deepseek' && extra?.upstream_billing_probe_enabled === true
+	upstreamBillingAutoProbeEnabled.value = newAccount.platform !== 'deepseek' && newAccount.platform !== 'tokenrhythm' && extra?.upstream_billing_probe_enabled === true
   upstreamBillingRateSyncEnabled.value =
     upstreamBillingAutoProbeEnabled.value && extra?.upstream_billing_rate_sync_enabled === true
 
@@ -3648,12 +3667,15 @@ const syncFormFromAccount = (newAccount: Account | null) => {
             ? 'https://api.x.ai/v1'
             : newAccount.platform === 'agnes'
               ? 'https://apihub.agnes-ai.com/v1'
+              : newAccount.platform === 'tokenrhythm'
+                ? 'https://tokenrhythm.studio/v1'
               : newAccount.platform === 'nvidia'
                 ? 'https://integrate.api.nvidia.com/v1'
                 : newAccount.platform === 'deepseek'
                   ? 'https://api.deepseek.com'
                 : 'https://api.anthropic.com'
     editBaseUrl.value = (credentials.base_url as string) || platformDefaultUrl
+    tokenRhythmCookie.value = ''
 
     // Load model mappings and detect mode
     loadModelRestrictionFromMapping(credentials.model_mapping as Record<string, unknown> | undefined)
@@ -3725,6 +3747,8 @@ const syncFormFromAccount = (newAccount: Account | null) => {
             ? 'https://api.x.ai/v1'
             : newAccount.platform === 'agnes'
               ? 'https://apihub.agnes-ai.com/v1'
+              : newAccount.platform === 'tokenrhythm'
+                ? 'https://tokenrhythm.studio/v1'
               : newAccount.platform === 'nvidia'
                 ? 'https://integrate.api.nvidia.com/v1'
                 : newAccount.platform === 'deepseek'
@@ -3748,6 +3772,7 @@ const syncFormFromAccount = (newAccount: Account | null) => {
     selectedErrorCodes.value = []
   }
   editApiKey.value = ''
+  tokenRhythmCookie.value = ''
 }
 
 async function loadTLSProfiles() {
@@ -4307,7 +4332,7 @@ const handleSubmit = async () => {
       updatePayload.load_factor = 0
     }
     updatePayload.auto_pause_on_expired = autoPauseOnExpired.value
-    if (props.account.type === 'apikey' && props.account.platform !== 'deepseek') {
+    if (props.account.type === 'apikey' && props.account.platform !== 'deepseek' && props.account.platform !== 'tokenrhythm') {
       updatePayload.upstream_billing_probe_enabled = upstreamBillingAutoProbeEnabled.value
       updatePayload.upstream_billing_rate_sync_enabled = upstreamBillingRateSyncEnabled.value
       if (upstreamBillingRateSyncEnabled.value) {
@@ -4339,6 +4364,10 @@ const handleSubmit = async () => {
       } else if (!hasExistingApiKey) {
         appStore.showError(t('admin.accounts.apiKeyIsRequired'))
         return
+      }
+
+      if (props.account.platform === 'tokenrhythm' && tokenRhythmCookie.value.trim()) {
+        newCredentials.tokenrhythm_cookie = tokenRhythmCookie.value.trim()
       }
 
       // Add model mapping if configured（OpenAI 开启自动透传时保留现有映射，不再编辑）

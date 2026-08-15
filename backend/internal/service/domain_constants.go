@@ -38,20 +38,22 @@ const (
 
 // Platform constants
 const (
-	PlatformAnthropic      = domain.PlatformAnthropic
-	PlatformOpenAI         = domain.PlatformOpenAI
-	PlatformGemini         = domain.PlatformGemini
-	PlatformAntigravity    = domain.PlatformAntigravity
-	PlatformGrok           = domain.PlatformGrok
-	PlatformAgnes          = domain.PlatformAgnes
-	PlatformDeepSeek       = domain.PlatformDeepSeek
-	PlatformNvidia         = domain.PlatformNvidia
-	PlatformComposite      = domain.PlatformComposite
-	AgnesDefaultBaseURL    = domain.AgnesDefaultBaseURL
-	AgnesDefaultModel      = domain.AgnesDefaultModel
-	DeepSeekDefaultBaseURL = domain.DeepSeekDefaultBaseURL
-	NvidiaDefaultBaseURL   = domain.NvidiaDefaultBaseURL
-	NvidiaDefaultModel     = domain.NvidiaDefaultModel
+	PlatformAnthropic         = domain.PlatformAnthropic
+	PlatformOpenAI            = domain.PlatformOpenAI
+	PlatformGemini            = domain.PlatformGemini
+	PlatformAntigravity       = domain.PlatformAntigravity
+	PlatformGrok              = domain.PlatformGrok
+	PlatformAgnes             = domain.PlatformAgnes
+	PlatformDeepSeek          = domain.PlatformDeepSeek
+	PlatformNvidia            = domain.PlatformNvidia
+	PlatformTokenRhythm       = domain.PlatformTokenRhythm
+	PlatformComposite         = domain.PlatformComposite
+	AgnesDefaultBaseURL       = domain.AgnesDefaultBaseURL
+	AgnesDefaultModel         = domain.AgnesDefaultModel
+	DeepSeekDefaultBaseURL    = domain.DeepSeekDefaultBaseURL
+	NvidiaDefaultBaseURL      = domain.NvidiaDefaultBaseURL
+	NvidiaDefaultModel        = domain.NvidiaDefaultModel
+	TokenRhythmDefaultBaseURL = domain.TokenRhythmDefaultBaseURL
 	// PlatformKiro is retained for unsupported-platform threshold tests and legacy
 	// account rows. Scheduling-threshold evaluation never pauses kiro accounts.
 	PlatformKiro = "kiro"
@@ -69,6 +71,7 @@ var AllowedQuotaPlatforms = []string{
 	PlatformAgnes,
 	PlatformDeepSeek,
 	PlatformNvidia,
+	PlatformTokenRhythm,
 }
 
 // DeepSeekDefaultModelIDs are the public DeepSeek V4 model IDs shown in default selections.

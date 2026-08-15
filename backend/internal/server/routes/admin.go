@@ -60,6 +60,7 @@ func RegisterAdminRoutes(
 
 		// DeepSeek API
 		registerDeepSeekRoutes(admin, h)
+		registerTokenRhythmRoutes(admin, h)
 
 		// 代理管理
 		registerProxyRoutes(admin, h, stepUpAuth)
@@ -131,6 +132,13 @@ func registerDeepSeekRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 	deepseek := admin.Group("/deepseek")
 	{
 		deepseek.GET("/accounts/:id/balance", h.Admin.Account.GetDeepSeekBalance)
+	}
+}
+
+func registerTokenRhythmRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
+	tokenRhythm := admin.Group("/tokenrhythm")
+	{
+		tokenRhythm.GET("/accounts/:id/balance", h.Admin.Account.GetTokenRhythmBalance)
 	}
 }
 

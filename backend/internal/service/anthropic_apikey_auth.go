@@ -16,7 +16,13 @@ const (
 // Anthropic API-key accounts. Missing or invalid values keep the historical
 // x-api-key behavior.
 func (a *Account) GetAnthropicAPIKeyAuthScheme() string {
-	if a == nil || a.Platform != PlatformAnthropic || a.Type != AccountTypeAPIKey {
+	if a == nil || a.Type != AccountTypeAPIKey {
+		return AnthropicAPIKeyAuthSchemeXAPIKey
+	}
+	if a.IsTokenRhythm() {
+		return AnthropicAPIKeyAuthSchemeAuthorizationBearer
+	}
+	if a.Platform != PlatformAnthropic {
 		return AnthropicAPIKeyAuthSchemeXAPIKey
 	}
 
