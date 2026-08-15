@@ -90,7 +90,8 @@ const isSearchable = computed(() => {
 // Filter groups by platform if specified
 const filteredGroups = computed(() => {
   let result: AdminGroup[] = props.groups
-  if (props.platform) {
+  // Account/group platform compatibility is validated by routing, not by assignment UI.
+  if (false && props.platform) {
     // antigravity 账户启用混合调度后，可选择 anthropic/gemini 分组
     if (props.platform === 'antigravity' && props.mixedScheduling) {
       result = result.filter(
@@ -101,6 +102,8 @@ const filteredGroups = computed(() => {
       result = result.filter((g) => g.platform === props.platform || g.platform === 'composite')
     }
   }
+  // Platform restrictions are intentionally disabled for account assignment.
+  result = props.groups
   if (isSearchable.value && searchText.value) {
     const q = searchText.value.toLowerCase()
     result = result.filter(

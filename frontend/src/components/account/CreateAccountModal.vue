@@ -1286,10 +1286,13 @@
       <div v-if="form.type === 'apikey' && form.platform !== 'antigravity'" class="space-y-4">
         <div>
           <label class="input-label">{{ t('admin.accounts.baseUrl') }}</label>
-          <select v-if="form.platform === 'kimi'" v-model="apiKeyBaseUrl" class="input" data-testid="kimi-base-url">
-            <option value="https://api.moonshot.cn/v1">{{ t('admin.accounts.kimi.chinaRegion') }}</option>
-            <option value="https://api.moonshot.ai/v1">{{ t('admin.accounts.kimi.internationalRegion') }}</option>
-          </select>
+          <template v-if="form.platform === 'kimi'">
+            <input v-model="apiKeyBaseUrl" list="kimi-base-url-presets" type="text" class="input" data-testid="kimi-base-url" placeholder="https://api.moonshot.cn/v1" />
+            <datalist id="kimi-base-url-presets">
+              <option value="https://api.moonshot.cn/v1">{{ t('admin.accounts.kimi.chinaRegion') }}</option>
+              <option value="https://api.moonshot.ai/v1">{{ t('admin.accounts.kimi.internationalRegion') }}</option>
+            </datalist>
+          </template>
           <input
             v-else
             v-model="apiKeyBaseUrl"

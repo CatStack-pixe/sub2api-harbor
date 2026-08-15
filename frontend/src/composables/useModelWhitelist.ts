@@ -188,8 +188,13 @@ const yiModels = [
 
 // Moonshot/Kimi
 const moonshotModels = [
-  'moonshot-v1-8k', 'moonshot-v1-32k', 'moonshot-v1-128k',
-  'kimi-latest'
+  'kimi-k3', 'kimi-k2.6', 'kimi-k2.5', 'kimi-k2-thinking',
+  'moonshot-v1-8k', 'moonshot-v1-32k', 'moonshot-v1-128k', 'kimi-latest'
+]
+
+// TokenRhythm is OpenAI-compatible; keep only channel-neutral IDs as fallback.
+const tokenRhythmModels = [
+  'gpt-4o', 'gpt-4o-mini', 'gpt-4.1', 'gpt-5', 'gpt-5-mini'
 ]
 
 // 字节跳动 豆包
@@ -253,6 +258,7 @@ const allModelsList: string[] = [
   ...cohereModels,
   ...yiModels,
   ...moonshotModels,
+  ...tokenRhythmModels,
   ...doubaoModels,
   ...minimaxModels,
   ...baiduModels,
@@ -439,6 +445,8 @@ export function getModelsByPlatform(platform: string): string[] {
     case 'cohere': return cohereModels
     case 'yi': return yiModels
     case 'moonshot': return moonshotModels
+    case 'kimi': return moonshotModels
+    case 'tokenrhythm': return tokenRhythmModels
     case 'doubao': return doubaoModels
     case 'minimax': return minimaxModels
     case 'baidu': return baiduModels

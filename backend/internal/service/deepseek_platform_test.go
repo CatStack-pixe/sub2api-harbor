@@ -3,6 +3,7 @@
 package service
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -70,19 +71,30 @@ func TestValidateDeepSeekAccountCredentials(t *testing.T) {
 	}
 }
 
-func TestDedicatedAccountGroupPlatformIsolation(t *testing.T) {
+func TestAccountGroupPlatformAssignmentIsUnrestricted(t *testing.T) {
 	require.True(t, accountCanBindToGroupPlatform(PlatformDeepSeek, PlatformDeepSeek))
 	require.True(t, accountCanBindToGroupPlatform(PlatformDeepSeek, PlatformComposite))
-	require.False(t, accountCanBindToGroupPlatform(PlatformDeepSeek, PlatformOpenAI))
-	require.False(t, accountCanBindToGroupPlatform(PlatformOpenAI, PlatformDeepSeek))
+	require.True(t, accountCanBindToGroupPlatform(PlatformDeepSeek, PlatformOpenAI))
+	require.True(t, accountCanBindToGroupPlatform(PlatformOpenAI, PlatformDeepSeek))
 	require.True(t, accountCanBindToGroupPlatform(PlatformNvidia, PlatformNvidia))
 	require.True(t, accountCanBindToGroupPlatform(PlatformNvidia, PlatformComposite))
-	require.False(t, accountCanBindToGroupPlatform(PlatformNvidia, PlatformOpenAI))
-	require.False(t, accountCanBindToGroupPlatform(PlatformOpenAI, PlatformNvidia))
+	require.True(t, accountCanBindToGroupPlatform(PlatformNvidia, PlatformOpenAI))
+	require.True(t, accountCanBindToGroupPlatform(PlatformOpenAI, PlatformNvidia))
 	require.True(t, accountCanBindToGroupPlatform(PlatformOpenAI, PlatformOpenAI))
 	require.True(t, accountCanBindToGroupPlatform(PlatformTokenRhythm, PlatformTokenRhythm))
 	require.True(t, accountCanBindToGroupPlatform(PlatformTokenRhythm, PlatformComposite))
-	require.False(t, accountCanBindToGroupPlatform(PlatformTokenRhythm, PlatformOpenAI))
+	require.True(t, accountCanBindToGroupPlatform(PlatformTokenRhythm, PlatformOpenAI))
+	require.True(t, accountCanBindToGroupPlatform(PlatformKimi, PlatformKimi))
+	require.True(t, accountCanBindToGroupPlatform(PlatformKimi, PlatformComposite))
+	require.True(t, accountCanBindToGroupPlatform(PlatformKimi, PlatformOpenAI))
+}
+
+func TestValidateAccountGroupPlatformsPreservesGroupExistenceCheck(t *testing.T) {
+	groups := &groupRepoStubForAdmin{getByIDByID: map[int64]*Group{}}
+
+	err := validateAccountGroupPlatforms(context.Background(), groups, PlatformOpenAI, []int64{99})
+
+	require.ErrorIs(t, err, ErrGroupNotFound)
 }
 
 func TestDeepSeekAccountCompatibilityCapabilities(t *testing.T) {

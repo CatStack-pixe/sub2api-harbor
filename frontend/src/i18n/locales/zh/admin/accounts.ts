@@ -713,7 +713,7 @@ export default {
         cookieRequired: '查询 TokenRhythm 余额需要提供 Cookie 请求头。'
       },
       kimi: {
-        baseUrlHint: '选择签发此 API Key 的 Kimi API 区域。',
+        baseUrlHint: '可使用预设地址，也可填写自定义 OpenAI 兼容 Base URL；自定义地址不支持 Kimi 官方余额查询。',
         apiKeyHint: '您的 Kimi Open Platform API Key',
         chinaRegion: '中国区：api.moonshot.cn',
         internationalRegion: '国际区：api.moonshot.ai'

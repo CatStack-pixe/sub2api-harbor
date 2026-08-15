@@ -89,6 +89,12 @@ func KimiDefaultModelIDs() []string {
 	return []string{"kimi-k2.6", "kimi-k2.5"}
 }
 
+// TokenRhythmDefaultModelIDs are OpenAI-compatible fallbacks used until the
+// upstream model list is synchronized.
+func TokenRhythmDefaultModelIDs() []string {
+	return []string{"gpt-4o", "gpt-4o-mini", "gpt-4.1", "gpt-5", "gpt-5-mini"}
+}
+
 // AllowedSchedulingThresholdPlatforms 是允许设置账号自动停调阈值的平台列表。
 // 仅 openai / anthropic / grok 有原生用量窗口可供评估；其他平台写入阈值无效果。
 var AllowedSchedulingThresholdPlatforms = []string{
