@@ -21,22 +21,22 @@ const (
 // TokenRhythmBalanceResult is a safe, administrator-facing view of the
 // provider usage summary. It intentionally never contains session cookies.
 type TokenRhythmBalanceResult struct {
-	IsAvailable        bool    `json:"is_available"`
-	BalanceCNY         float64 `json:"balance_cny"`
+	IsAvailable          bool    `json:"is_available"`
+	BalanceCNY           float64 `json:"balance_cny"`
 	AvailableBalanceCNY float64 `json:"available_balance_cny"`
-	FrozenBalanceCNY   float64 `json:"frozen_balance_cny"`
-	ExpiringBalanceCNY float64 `json:"expiring_balance_cny"`
-	CostCNY            float64 `json:"cost_cny"`
-	Currency           string  `json:"currency"`
-	NextExpiryAt       string  `json:"next_expiry_at,omitempty"`
-	Calls              int64   `json:"calls"`
-	SuccessCalls       int64   `json:"success_calls"`
-	ErrorCalls         int64   `json:"error_calls"`
-	AbortedCalls       int64   `json:"aborted_calls"`
-	InputTokens        int64   `json:"input_tokens"`
-	OutputTokens       int64   `json:"output_tokens"`
-	StatusCode         int     `json:"status_code,omitempty"`
-	FetchedAt          int64   `json:"fetched_at"`
+	FrozenBalanceCNY    float64 `json:"frozen_balance_cny"`
+	ExpiringBalanceCNY  float64 `json:"expiring_balance_cny"`
+	CostCNY             float64 `json:"cost_cny"`
+	Currency            string  `json:"currency"`
+	NextExpiryAt        string  `json:"next_expiry_at,omitempty"`
+	Calls               int64   `json:"calls"`
+	SuccessCalls        int64   `json:"success_calls"`
+	ErrorCalls          int64   `json:"error_calls"`
+	AbortedCalls        int64   `json:"aborted_calls"`
+	InputTokens         int64   `json:"input_tokens"`
+	OutputTokens        int64   `json:"output_tokens"`
+	StatusCode          int     `json:"status_code,omitempty"`
+	FetchedAt           int64   `json:"fetched_at"`
 }
 
 type tokenRhythmBalanceWire struct {
