@@ -72,21 +72,14 @@ func TestValidateDeepSeekAccountCredentials(t *testing.T) {
 }
 
 func TestAccountGroupPlatformAssignmentIsUnrestricted(t *testing.T) {
-	require.True(t, accountCanBindToGroupPlatform(PlatformDeepSeek, PlatformDeepSeek))
-	require.True(t, accountCanBindToGroupPlatform(PlatformDeepSeek, PlatformComposite))
-	require.True(t, accountCanBindToGroupPlatform(PlatformDeepSeek, PlatformOpenAI))
-	require.True(t, accountCanBindToGroupPlatform(PlatformOpenAI, PlatformDeepSeek))
-	require.True(t, accountCanBindToGroupPlatform(PlatformNvidia, PlatformNvidia))
-	require.True(t, accountCanBindToGroupPlatform(PlatformNvidia, PlatformComposite))
-	require.True(t, accountCanBindToGroupPlatform(PlatformNvidia, PlatformOpenAI))
-	require.True(t, accountCanBindToGroupPlatform(PlatformOpenAI, PlatformNvidia))
-	require.True(t, accountCanBindToGroupPlatform(PlatformOpenAI, PlatformOpenAI))
-	require.True(t, accountCanBindToGroupPlatform(PlatformTokenRhythm, PlatformTokenRhythm))
-	require.True(t, accountCanBindToGroupPlatform(PlatformTokenRhythm, PlatformComposite))
-	require.True(t, accountCanBindToGroupPlatform(PlatformTokenRhythm, PlatformOpenAI))
-	require.True(t, accountCanBindToGroupPlatform(PlatformKimi, PlatformKimi))
-	require.True(t, accountCanBindToGroupPlatform(PlatformKimi, PlatformComposite))
-	require.True(t, accountCanBindToGroupPlatform(PlatformKimi, PlatformOpenAI))
+	groups := &groupRepoStubForAdmin{getByIDByID: map[int64]*Group{
+		1: {ID: 1, Platform: PlatformOpenAI},
+		2: {ID: 2, Platform: PlatformComposite},
+	}}
+
+	require.NoError(t, validateAccountGroupPlatforms(context.Background(), groups, PlatformDeepSeek, []int64{1, 2}))
+	require.NoError(t, validateAccountGroupPlatforms(context.Background(), groups, PlatformKimi, []int64{1, 2}))
+	require.NoError(t, validateAccountGroupPlatforms(context.Background(), groups, PlatformTokenRhythm, []int64{1, 2}))
 }
 
 func TestValidateAccountGroupPlatformsPreservesGroupExistenceCheck(t *testing.T) {

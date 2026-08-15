@@ -31,12 +31,6 @@ func ValidateGroupPlatform(platform string) error {
 	}
 }
 
-func accountCanBindToGroupPlatform(accountPlatform, groupPlatform string) bool {
-	// Accounts and groups may be assigned independently; routing decides whether
-	// a request is compatible at selection time.
-	return true
-}
-
 func validateAccountGroupPlatforms(ctx context.Context, groups GroupRepository, accountPlatform string, groupIDs []int64) error {
 	if groups == nil || len(groupIDs) == 0 {
 		return nil
