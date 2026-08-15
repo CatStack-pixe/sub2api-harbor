@@ -21,8 +21,8 @@ const (
 // TokenRhythmBalanceResult is a safe, administrator-facing view of the
 // provider usage summary. It intentionally never contains session cookies.
 type TokenRhythmBalanceResult struct {
-	IsAvailable          bool    `json:"is_available"`
-	BalanceCNY           float64 `json:"balance_cny"`
+	IsAvailable         bool    `json:"is_available"`
+	BalanceCNY          float64 `json:"balance_cny"`
 	AvailableBalanceCNY float64 `json:"available_balance_cny"`
 	FrozenBalanceCNY    float64 `json:"frozen_balance_cny"`
 	ExpiringBalanceCNY  float64 `json:"expiring_balance_cny"`
@@ -43,19 +43,19 @@ type tokenRhythmBalanceWire struct {
 	Code    json.RawMessage `json:"code"`
 	Message string          `json:"message"`
 	Data    struct {
-		Calls                int64   `json:"calls"`
-		SuccessCalls         int64   `json:"successCalls"`
-		ErrorCalls           int64   `json:"errorCalls"`
-		AbortedCalls         int64   `json:"abortedCalls"`
-		InputTokens          int64   `json:"inputTokens"`
-		OutputTokens         int64   `json:"outputTokens"`
-		CostCNY              float64 `json:"costCny"`
-		BalanceCNY           float64 `json:"balanceCny"`
-		FrozenBalanceCNY     float64 `json:"frozenBalanceCny"`
-		AvailableBalanceCNY  float64 `json:"availableBalanceCny"`
-		ExpiringBalanceCNY   float64 `json:"expiringBalanceCny"`
-		NextExpiryAt         string  `json:"nextExpiryAt"`
-		Currency             string  `json:"currency"`
+		Calls               int64   `json:"calls"`
+		SuccessCalls        int64   `json:"successCalls"`
+		ErrorCalls          int64   `json:"errorCalls"`
+		AbortedCalls        int64   `json:"abortedCalls"`
+		InputTokens         int64   `json:"inputTokens"`
+		OutputTokens        int64   `json:"outputTokens"`
+		CostCNY             float64 `json:"costCny"`
+		BalanceCNY          float64 `json:"balanceCny"`
+		FrozenBalanceCNY    float64 `json:"frozenBalanceCny"`
+		AvailableBalanceCNY float64 `json:"availableBalanceCny"`
+		ExpiringBalanceCNY  float64 `json:"expiringBalanceCny"`
+		NextExpiryAt        string  `json:"nextExpiryAt"`
+		Currency            string  `json:"currency"`
 	} `json:"data"`
 }
 
