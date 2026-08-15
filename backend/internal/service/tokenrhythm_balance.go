@@ -39,23 +39,45 @@ type TokenRhythmBalanceResult struct {
 	FetchedAt           int64   `json:"fetched_at"`
 }
 
+// tokenRhythmAmount accepts the number and quoted-number forms returned by
+// the usage endpoint. The provider currently returns quoted amounts in live
+// responses even though its documented example uses JSON numbers.
+type tokenRhythmAmount float64
+
+func (amount *tokenRhythmAmount) UnmarshalJSON(raw []byte) error {
+	value := strings.TrimSpace(string(raw))
+	if value == "null" {
+		*amount = 0
+		return nil
+	}
+	if unquoted, err := strconv.Unquote(value); err == nil {
+		value = strings.TrimSpace(unquoted)
+	}
+	parsed, err := strconv.ParseFloat(value, 64)
+	if err != nil {
+		return fmt.Errorf("parse TokenRhythm amount %q: %w", value, err)
+	}
+	*amount = tokenRhythmAmount(parsed)
+	return nil
+}
+
 type tokenRhythmBalanceWire struct {
 	Code    json.RawMessage `json:"code"`
 	Message string          `json:"message"`
 	Data    struct {
-		Calls               int64   `json:"calls"`
-		SuccessCalls        int64   `json:"successCalls"`
-		ErrorCalls          int64   `json:"errorCalls"`
-		AbortedCalls        int64   `json:"abortedCalls"`
-		InputTokens         int64   `json:"inputTokens"`
-		OutputTokens        int64   `json:"outputTokens"`
-		CostCNY             float64 `json:"costCny"`
-		BalanceCNY          float64 `json:"balanceCny"`
-		FrozenBalanceCNY    float64 `json:"frozenBalanceCny"`
-		AvailableBalanceCNY float64 `json:"availableBalanceCny"`
-		ExpiringBalanceCNY  float64 `json:"expiringBalanceCny"`
-		NextExpiryAt        string  `json:"nextExpiryAt"`
-		Currency            string  `json:"currency"`
+		Calls               int64             `json:"calls"`
+		SuccessCalls        int64             `json:"successCalls"`
+		ErrorCalls          int64             `json:"errorCalls"`
+		AbortedCalls        int64             `json:"abortedCalls"`
+		InputTokens         int64             `json:"inputTokens"`
+		OutputTokens        int64             `json:"outputTokens"`
+		CostCNY             tokenRhythmAmount `json:"costCny"`
+		BalanceCNY          tokenRhythmAmount `json:"balanceCny"`
+		FrozenBalanceCNY    tokenRhythmAmount `json:"frozenBalanceCny"`
+		AvailableBalanceCNY tokenRhythmAmount `json:"availableBalanceCny"`
+		ExpiringBalanceCNY  tokenRhythmAmount `json:"expiringBalanceCny"`
+		NextExpiryAt        string            `json:"nextExpiryAt"`
+		Currency            string            `json:"currency"`
 	} `json:"data"`
 }
 
@@ -74,11 +96,11 @@ func ParseTokenRhythmBalanceResponse(body []byte) (*TokenRhythmBalanceResult, er
 
 	return &TokenRhythmBalanceResult{
 		IsAvailable:         true,
-		BalanceCNY:          wire.Data.BalanceCNY,
-		AvailableBalanceCNY: wire.Data.AvailableBalanceCNY,
-		FrozenBalanceCNY:    wire.Data.FrozenBalanceCNY,
-		ExpiringBalanceCNY:  wire.Data.ExpiringBalanceCNY,
-		CostCNY:             wire.Data.CostCNY,
+		BalanceCNY:          float64(wire.Data.BalanceCNY),
+		AvailableBalanceCNY: float64(wire.Data.AvailableBalanceCNY),
+		FrozenBalanceCNY:    float64(wire.Data.FrozenBalanceCNY),
+		ExpiringBalanceCNY:  float64(wire.Data.ExpiringBalanceCNY),
+		CostCNY:             float64(wire.Data.CostCNY),
 		Currency:            strings.TrimSpace(wire.Data.Currency),
 		NextExpiryAt:        strings.TrimSpace(wire.Data.NextExpiryAt),
 		Calls:               wire.Data.Calls,
