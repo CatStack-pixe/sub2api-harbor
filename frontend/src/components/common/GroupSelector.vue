@@ -87,23 +87,9 @@ const isSearchable = computed(() => {
   return props.searchable
 })
 
-// Filter groups by platform if specified
+// Groups are intentionally not filtered by account platform.
 const filteredGroups = computed(() => {
   let result: AdminGroup[] = props.groups
-  // Account/group platform compatibility is validated by routing, not by assignment UI.
-  if (false && props.platform) {
-    // antigravity 账户启用混合调度后，可选择 anthropic/gemini 分组
-    if (props.platform === 'antigravity' && props.mixedScheduling) {
-      result = result.filter(
-        (g) => g.platform === 'antigravity' || g.platform === 'anthropic' || g.platform === 'gemini' || g.platform === 'composite'
-      )
-    } else {
-      // 默认：只能选择同 platform 的分组；composite 分组可接收任意具体平台账号
-      result = result.filter((g) => g.platform === props.platform || g.platform === 'composite')
-    }
-  }
-  // Platform restrictions are intentionally disabled for account assignment.
-  result = props.groups
   if (isSearchable.value && searchText.value) {
     const q = searchText.value.toLowerCase()
     result = result.filter(
