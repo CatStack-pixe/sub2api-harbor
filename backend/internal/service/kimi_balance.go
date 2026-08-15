@@ -110,10 +110,10 @@ func (s *AccountTestService) FetchKimiBalance(ctx context.Context, accountID int
 		resp, err = s.httpUpstream.DoWithTLS(req, proxyURL, account.ID, account.Concurrency, s.tlsFPProfileService.ResolveTLSProfile(account))
 	}
 	if err != nil {
-		return nil, fmt.Errorf("Kimi balance request failed: %w", err)
+		return nil, fmt.Errorf("kimi balance request failed: %w", err)
 	}
 	if resp == nil {
-		return nil, fmt.Errorf("Kimi balance request returned no response")
+		return nil, fmt.Errorf("kimi balance request returned no response")
 	}
 	defer func() { _ = resp.Body.Close() }()
 	body, err := io.ReadAll(io.LimitReader(resp.Body, kimiBalanceBodyLimit+1))
@@ -121,7 +121,7 @@ func (s *AccountTestService) FetchKimiBalance(ctx context.Context, accountID int
 		return nil, fmt.Errorf("read Kimi balance response: %w", err)
 	}
 	if int64(len(body)) > kimiBalanceBodyLimit {
-		return nil, fmt.Errorf("Kimi balance response exceeds %d bytes", kimiBalanceBodyLimit)
+		return nil, fmt.Errorf("kimi balance response exceeds %d bytes", kimiBalanceBodyLimit)
 	}
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
 		return nil, infraerrors.Newf(resp.StatusCode, "KIMI_BALANCE_UPSTREAM_ERROR", "Kimi balance request failed with HTTP %d", resp.StatusCode)
