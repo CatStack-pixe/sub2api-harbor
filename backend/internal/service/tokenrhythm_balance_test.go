@@ -75,6 +75,18 @@ func TestParseTokenRhythmBalanceResponse(t *testing.T) {
 	require.Equal(t, http.StatusUnauthorized, infraerrors.Code(err))
 }
 
+func TestParseTokenRhythmBalanceResponseAcceptsQuotedAmounts(t *testing.T) {
+	result, err := ParseTokenRhythmBalanceResponse([]byte(`{
+		"code":0,
+		"data":{"costCny":"0.00654720","balanceCny":"67.99345280","frozenBalanceCny":"0.00000000","availableBalanceCny":"67.99345280","expiringBalanceCny":"67.99345280","currency":"CNY"}
+	}`))
+	require.NoError(t, err)
+	require.Equal(t, 67.9934528, result.BalanceCNY)
+	require.Equal(t, 67.9934528, result.AvailableBalanceCNY)
+	require.Zero(t, result.FrozenBalanceCNY)
+	require.Equal(t, 0.0065472, result.CostCNY)
+}
+
 func TestFetchTokenRhythmBalanceDoesNotMutateSchedulingState(t *testing.T) {
 	account := &Account{
 		ID:         941,
