@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
+import * as XLSX from 'xlsx'
 import ImportDataModal from '@/components/admin/account/ImportDataModal.vue'
 
 const showError = vi.fn()
@@ -51,6 +52,17 @@ const setInputFiles = (element: Element, files: File[]) => {
     value: files,
     configurable: true
   })
+}
+
+const makeXlsxFile = (rows: Record<string, unknown>[]) => {
+  const workbook = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(rows), 'Accounts')
+  const content = XLSX.write(workbook, { type: 'array', bookType: 'xlsx' }) as ArrayBuffer
+  const file = new File([content], 'tokenrhythm.xlsx', {
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+  })
+  Object.defineProperty(file, 'arrayBuffer', { value: () => Promise.resolve(content) })
+  return file
 }
 
 describe('ImportDataModal', () => {
@@ -173,6 +185,46 @@ describe('ImportDataModal', () => {
       skip_default_group_bind: true
     })
     expect(showSuccess).toHaveBeenCalledWith('admin.accounts.dataImportSuccess')
+  })
+
+  it('imports successful TokenRhythm spreadsheet rows without a default group', async () => {
+    const { adminAPI } = await import('@/api/admin')
+    vi.mocked(adminAPI.accounts.importData).mockResolvedValue({
+      proxy_created: 0,
+      proxy_reused: 0,
+      proxy_failed: 0,
+      account_created: 1,
+      account_failed: 0
+    })
+    const wrapper = mountModal()
+    const input = wrapper.find('input[type="file"]')
+    setInputFiles(input.element, [makeXlsxFile([
+      { '电话号码': '13800000000', 'API Key': 'key-value', Cookie: 'tr_session=session; tr_csrf=csrf', '状态': '成功', '备注': 'imported' },
+      { '电话号码': '13900000000', 'API Key': '', Cookie: 'ignored', '状态': '成功' },
+      { '电话号码': '13700000000', 'API Key': 'ignored', Cookie: 'ignored', '状态': '失败' }
+    ])])
+
+    await input.trigger('change')
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    expect(adminAPI.accounts.importData).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        proxies: [],
+        accounts: [expect.objectContaining({
+          name: '13800000000',
+          notes: 'imported',
+          platform: 'tokenrhythm',
+          type: 'apikey',
+          credentials: expect.objectContaining({
+            api_key: 'key-value',
+            tokenrhythm_cookie: 'tr_session=session; tr_csrf=csrf'
+          })
+        })]
+      }),
+      skip_default_group_bind: true
+    })
+    expect(showWarning).toHaveBeenCalledWith('Skipped 2 invalid or unsuccessful spreadsheet rows.')
   })
 
   it('部分成功时关闭弹窗仍通知父组件刷新', async () => {

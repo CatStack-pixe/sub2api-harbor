@@ -19,13 +19,15 @@ func TestKimiAccountCredentialsAndBaseURLs(t *testing.T) {
 		{"api_key": "kimi-key"},
 		{"api_key": "kimi-key", "base_url": KimiDefaultBaseURL},
 		{"api_key": "kimi-key", "base_url": KimiInternationalBaseURL + "/"},
+		{"api_key": "kimi-key", "base_url": "https://relay.example/v1"},
 	} {
 		require.NoError(t, validateAccountCredentials(PlatformKimi, AccountTypeAPIKey, credentials))
 	}
 
 	for _, credentials := range []map[string]any{
 		{},
-		{"api_key": "kimi-key", "base_url": "https://relay.example/v1"},
+		{"api_key": "kimi-key", "base_url": "relay.example/v1"},
+		{"api_key": "kimi-key", "base_url": "ftp://relay.example/v1"},
 		{"api_key": "kimi-key", "base_url": 42},
 	} {
 		err := validateAccountCredentials(PlatformKimi, AccountTypeAPIKey, credentials)
