@@ -30,7 +30,12 @@
       <div v-if="account.type === 'apikey'" class="space-y-4">
         <div>
           <label class="input-label">{{ t('admin.accounts.baseUrl') }}</label>
+          <select v-if="account.platform === 'kimi'" v-model="editBaseUrl" class="input" data-testid="kimi-base-url">
+            <option value="https://api.moonshot.cn/v1">{{ t('admin.accounts.kimi.chinaRegion') }}</option>
+            <option value="https://api.moonshot.ai/v1">{{ t('admin.accounts.kimi.internationalRegion') }}</option>
+          </select>
           <input
+            v-else
             v-model="editBaseUrl"
             type="text"
             class="input"
@@ -87,6 +92,8 @@
                           ? 'nvapi-...'
                           : account.platform === 'deepseek'
                           ? 'sk-...'
+                          : account.platform === 'kimi'
+                            ? 'sk-...'
                           : 'sk-ant-...'
             "
           />
@@ -2836,6 +2843,7 @@ const baseUrlHint = computed(() => {
   if (props.account.platform === 'grok') return ''
   if (props.account.platform === 'agnes') return ''
   if (props.account.platform === 'deepseek') return t('admin.accounts.deepseek.baseUrlHint')
+  if (props.account.platform === 'kimi') return t('admin.accounts.kimi.baseUrlHint')
   if (props.account.platform === 'tokenrhythm') return t('admin.accounts.tokenrhythm.baseUrlHint')
   if (props.account.platform === 'nvidia') return t('admin.accounts.nvidia.baseUrlHint')
   return t('admin.accounts.baseUrlHint')
@@ -3308,6 +3316,7 @@ const defaultBaseUrl = computed(() => {
   if (props.account?.platform === 'agnes') return 'https://apihub.agnes-ai.com/v1'
   if (props.account?.platform === 'nvidia') return 'https://integrate.api.nvidia.com/v1'
   if (props.account?.platform === 'deepseek') return 'https://api.deepseek.com'
+  if (props.account?.platform === 'kimi') return 'https://api.moonshot.cn/v1'
   if (props.account?.platform === 'tokenrhythm') return 'https://tokenrhythm.studio/v1'
   return 'https://api.anthropic.com'
 })
@@ -3460,7 +3469,7 @@ const syncFormFromAccount = (newAccount: Account | null) => {
 	autoPause7dThreshold.value = typeof extra?.auto_pause_7d_threshold === 'number' ? extra.auto_pause_7d_threshold * 100 : null
 	autoPause5hDisabled.value = extra?.auto_pause_5h_disabled === true
 	autoPause7dDisabled.value = extra?.auto_pause_7d_disabled === true
-	upstreamBillingAutoProbeEnabled.value = newAccount.platform !== 'deepseek' && newAccount.platform !== 'tokenrhythm' && extra?.upstream_billing_probe_enabled === true
+	upstreamBillingAutoProbeEnabled.value = newAccount.platform !== 'deepseek' && newAccount.platform !== 'kimi' && newAccount.platform !== 'tokenrhythm' && extra?.upstream_billing_probe_enabled === true
   upstreamBillingRateSyncEnabled.value =
     upstreamBillingAutoProbeEnabled.value && extra?.upstream_billing_rate_sync_enabled === true
 
@@ -3669,6 +3678,8 @@ const syncFormFromAccount = (newAccount: Account | null) => {
               ? 'https://apihub.agnes-ai.com/v1'
               : newAccount.platform === 'tokenrhythm'
                 ? 'https://tokenrhythm.studio/v1'
+              : newAccount.platform === 'kimi'
+                ? 'https://api.moonshot.cn/v1'
               : newAccount.platform === 'nvidia'
                 ? 'https://integrate.api.nvidia.com/v1'
                 : newAccount.platform === 'deepseek'
@@ -3749,6 +3760,8 @@ const syncFormFromAccount = (newAccount: Account | null) => {
               ? 'https://apihub.agnes-ai.com/v1'
               : newAccount.platform === 'tokenrhythm'
                 ? 'https://tokenrhythm.studio/v1'
+              : newAccount.platform === 'kimi'
+                ? 'https://api.moonshot.cn/v1'
               : newAccount.platform === 'nvidia'
                 ? 'https://integrate.api.nvidia.com/v1'
                 : newAccount.platform === 'deepseek'
@@ -4332,7 +4345,7 @@ const handleSubmit = async () => {
       updatePayload.load_factor = 0
     }
     updatePayload.auto_pause_on_expired = autoPauseOnExpired.value
-    if (props.account.type === 'apikey' && props.account.platform !== 'deepseek' && props.account.platform !== 'tokenrhythm') {
+    if (props.account.type === 'apikey' && props.account.platform !== 'deepseek' && props.account.platform !== 'kimi' && props.account.platform !== 'tokenrhythm') {
       updatePayload.upstream_billing_probe_enabled = upstreamBillingAutoProbeEnabled.value
       updatePayload.upstream_billing_rate_sync_enabled = upstreamBillingRateSyncEnabled.value
       if (upstreamBillingRateSyncEnabled.value) {

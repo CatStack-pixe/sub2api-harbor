@@ -106,6 +106,7 @@ export default {
         grok: 'Grok',
         agnes: 'Agnes',
         deepseek: 'DeepSeek',
+        kimi: 'Kimi',
         nvidia: 'NVIDIA',
         tokenrhythm: 'TokenRhythm',
       },
@@ -620,6 +621,12 @@ export default {
       deepseek: {
         baseUrlHint: 'Leave default for the official DeepSeek API',
         apiKeyHint: 'Your DeepSeek API Key'
+      },
+      kimi: {
+        baseUrlHint: 'Choose the Kimi API region that issued this API Key.',
+        apiKeyHint: 'Your Kimi Open Platform API Key',
+        chinaRegion: 'China: api.moonshot.cn',
+        internationalRegion: 'International: api.moonshot.ai'
       },
       tokenrhythm: {
         baseUrlHint: 'TokenRhythm uses its fixed official OpenAI-compatible endpoint.',
@@ -1478,6 +1485,10 @@ export default {
         deepseekProbeTooltip: 'Query the DeepSeek account balance',
         deepseekUnavailable: 'Balance unavailable',
         deepseekNoBalance: 'No balance data',
+        kimiProbe: 'Balance',
+        kimiProbeTooltip: 'Query the Kimi account balance',
+        kimiUnavailable: 'Balance unavailable',
+        kimiNoBalance: 'No available balance data',
         tokenrhythmProbe: 'Balance',
         tokenrhythmProbeTooltip: 'Query the TokenRhythm account balance',
         tokenrhythmNoBalance: 'No available balance data',

@@ -18,6 +18,7 @@ const allNullQuotas: DefaultPlatformQuotasMap = {
   grok: { daily: null, weekly: null, monthly: null },
   agnes: { daily: null, weekly: null, monthly: null },
   deepseek: { daily: null, weekly: null, monthly: null },
+  kimi: { daily: null, weekly: null, monthly: null },
   nvidia: { daily: null, weekly: null, monthly: null },
   tokenrhythm: { daily: null, weekly: null, monthly: null },
 }
@@ -244,13 +245,14 @@ describe("normalizePlatformQuotasMap", () => {
     expect(result.grok).toEqual({ daily: null, weekly: null, monthly: null });
     expect(result.agnes).toEqual({ daily: null, weekly: null, monthly: null });
     expect(result.deepseek).toEqual({ daily: null, weekly: null, monthly: null });
+    expect(result.kimi).toEqual({ daily: null, weekly: null, monthly: null });
     expect(result.nvidia).toEqual({ daily: null, weekly: null, monthly: null });
     expect(result.tokenrhythm).toEqual({ daily: null, weekly: null, monthly: null });
   });
 
   it("无参数时返回全平台全 null", () => {
     const result = normalizePlatformQuotasMap();
-    expect(Object.keys(result)).toHaveLength(9);
+    expect(Object.keys(result)).toHaveLength(10);
     for (const v of Object.values(result)) {
       expect(v).toEqual({ daily: null, weekly: null, monthly: null });
     }
@@ -298,7 +300,7 @@ describe("sanitizePlatformQuotasMap", () => {
 
   it("缺失平台填充为全 null", () => {
     const result = sanitizePlatformQuotasMap({});
-    expect(Object.keys(result)).toHaveLength(9);
+    expect(Object.keys(result)).toHaveLength(10);
     for (const v of Object.values(result)) {
       expect(v).toEqual({ daily: null, weekly: null, monthly: null });
     }

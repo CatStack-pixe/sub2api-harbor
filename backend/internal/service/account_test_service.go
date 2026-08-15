@@ -293,6 +293,9 @@ func (s *AccountTestService) TestAccountConnection(c *gin.Context, accountID int
 	if account.IsTokenRhythm() {
 		return s.testTokenRhythmAccountConnection(c, account, modelID, prompt)
 	}
+	if account.IsKimi() {
+		return s.testKimiAccountConnection(c, account, modelID, prompt)
+	}
 
 	if account.IsOpenAI() || account.IsAgnes() {
 		return s.testOpenAIAccountConnection(c, account, modelID, prompt, normalizeAccountTestMode(mode))
@@ -360,6 +363,23 @@ func (s *AccountTestService) testTokenRhythmAccountConnection(c *gin.Context, ac
 	baseURL, err := s.validateUpstreamBaseURL(account.GetOpenAIBaseURL())
 	if err != nil {
 		return s.sendErrorAndEnd(c, fmt.Sprintf("Invalid TokenRhythm base URL: %s", err.Error()))
+	}
+	return s.testOpenAIChatCompletionsConnection(c, account, testModelID, prompt, baseURL, authToken)
+}
+
+func (s *AccountTestService) testKimiAccountConnection(c *gin.Context, account *Account, modelID string, prompt string) error {
+	testModelID := strings.TrimSpace(modelID)
+	if testModelID == "" {
+		testModelID = KimiDefaultModelIDs()[0]
+	}
+	testModelID = account.GetMappedModel(testModelID)
+	authToken := strings.TrimSpace(account.GetOpenAIApiKey())
+	if authToken == "" {
+		return s.sendErrorAndEnd(c, "No Kimi API key available")
+	}
+	baseURL, err := s.validateUpstreamBaseURL(account.GetOpenAIBaseURL())
+	if err != nil {
+		return s.sendErrorAndEnd(c, fmt.Sprintf("Invalid Kimi base URL: %s", err.Error()))
 	}
 	return s.testOpenAIChatCompletionsConnection(c, account, testModelID, prompt, baseURL, authToken)
 }

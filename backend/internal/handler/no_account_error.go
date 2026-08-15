@@ -146,6 +146,8 @@ func openAICompatibleSelectionErrorForLog(err error, platform string) error {
 		provider = "NVIDIA"
 	case service.PlatformTokenRhythm:
 		provider = "TokenRhythm"
+	case service.PlatformKimi:
+		provider = "Kimi"
 	default:
 		return err
 	}

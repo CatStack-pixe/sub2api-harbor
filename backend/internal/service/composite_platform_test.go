@@ -31,6 +31,8 @@ func TestDetectModelPlatform(t *testing.T) {
 		{name: "deepseek prefix", model: "deepseek/deepseek-chat", platform: PlatformDeepSeek, ok: true},
 		{name: "nvidia model", model: "nvidia/llama-3.1-nemotron-nano-8b-v1", platform: PlatformNvidia, ok: true},
 		{name: "nvidia prefix", model: "nvidia/meta/llama-3.3-70b-instruct", platform: PlatformNvidia, ok: true},
+		{name: "kimi", model: "kimi-k3", platform: PlatformKimi, ok: true},
+		{name: "kimi prefix", model: "kimi/kimi-k2.5", platform: PlatformKimi, ok: true},
 		{name: "unknown", model: "llama-4-maverick", ok: false},
 	}
 
@@ -65,7 +67,7 @@ func TestCompositeGroupSchedulerHasAllCanonicalPlatformBuckets(t *testing.T) {
 		platforms = append(platforms, platform)
 	}
 	require.ElementsMatch(t,
-		[]string{PlatformAnthropic, PlatformGemini, PlatformOpenAI, PlatformAntigravity, PlatformGrok, PlatformAgnes, PlatformDeepSeek, PlatformNvidia, PlatformTokenRhythm},
+		[]string{PlatformAnthropic, PlatformGemini, PlatformOpenAI, PlatformAntigravity, PlatformGrok, PlatformAgnes, PlatformDeepSeek, PlatformNvidia, PlatformTokenRhythm, PlatformKimi},
 		platforms,
 	)
 }

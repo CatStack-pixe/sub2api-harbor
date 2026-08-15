@@ -164,12 +164,12 @@ func wrapUsageRecordTaskContext(parent context.Context, task service.UsageRecord
 
 func openAICompatibleRequestPlatform(ctx context.Context, apiKey *service.APIKey) string {
 	if platform, ok := service.ResolvedTargetPlatformFromContext(ctx); ok {
-		if platform == service.PlatformGrok || platform == service.PlatformAgnes || platform == service.PlatformDeepSeek || platform == service.PlatformNvidia || platform == service.PlatformTokenRhythm {
+		if platform == service.PlatformGrok || platform == service.PlatformAgnes || platform == service.PlatformDeepSeek || platform == service.PlatformNvidia || platform == service.PlatformTokenRhythm || platform == service.PlatformKimi {
 			return platform
 		}
 		return service.PlatformOpenAI
 	}
-	if apiKey != nil && apiKey.Group != nil && (apiKey.Group.Platform == service.PlatformGrok || apiKey.Group.Platform == service.PlatformAgnes || apiKey.Group.Platform == service.PlatformDeepSeek || apiKey.Group.Platform == service.PlatformNvidia || apiKey.Group.Platform == service.PlatformTokenRhythm) {
+	if apiKey != nil && apiKey.Group != nil && (apiKey.Group.Platform == service.PlatformGrok || apiKey.Group.Platform == service.PlatformAgnes || apiKey.Group.Platform == service.PlatformDeepSeek || apiKey.Group.Platform == service.PlatformNvidia || apiKey.Group.Platform == service.PlatformTokenRhythm || apiKey.Group.Platform == service.PlatformKimi) {
 		return apiKey.Group.Platform
 	}
 	return service.PlatformOpenAI
@@ -193,7 +193,7 @@ func allowOpenAICompatibleMessagesDispatch(apiKey *service.APIKey) bool {
 }
 
 func openAICompatibleTextTargetAllowed(c *gin.Context, apiKey *service.APIKey, model string) bool {
-	return compositeTargetPlatformAllowed(c, apiKey, model, service.PlatformOpenAI, service.PlatformGrok, service.PlatformAgnes, service.PlatformDeepSeek, service.PlatformNvidia, service.PlatformTokenRhythm)
+	return compositeTargetPlatformAllowed(c, apiKey, model, service.PlatformOpenAI, service.PlatformGrok, service.PlatformAgnes, service.PlatformDeepSeek, service.PlatformNvidia, service.PlatformTokenRhythm, service.PlatformKimi)
 }
 
 // NewOpenAIGatewayHandler creates a new OpenAIGatewayHandler

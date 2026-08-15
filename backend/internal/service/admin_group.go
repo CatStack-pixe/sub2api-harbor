@@ -262,6 +262,8 @@ func defaultModelsListCandidateIDs(platform string) []string {
 		return DeepSeekDefaultModelIDs()
 	case PlatformNvidia:
 		return NvidiaDefaultModelIDs()
+	case PlatformKimi:
+		return KimiDefaultModelIDs()
 	case PlatformComposite:
 		return compositeDefaultModelsListCandidateIDs()
 	default:
@@ -282,7 +284,7 @@ func defaultAllowImageGenerationForPlatform(platform string) bool {
 func compositeDefaultModelsListCandidateIDs() []string {
 	seen := make(map[string]struct{})
 	ids := make([]string, 0)
-	for _, platform := range []string{PlatformAnthropic, PlatformGemini, PlatformOpenAI, PlatformAntigravity, PlatformGrok, PlatformAgnes, PlatformDeepSeek, PlatformNvidia, PlatformTokenRhythm} {
+	for _, platform := range []string{PlatformAnthropic, PlatformGemini, PlatformOpenAI, PlatformAntigravity, PlatformGrok, PlatformAgnes, PlatformDeepSeek, PlatformNvidia, PlatformTokenRhythm, PlatformKimi} {
 		for _, id := range defaultModelsListCandidateIDs(platform) {
 			if _, ok := seen[id]; ok {
 				continue
@@ -684,7 +686,8 @@ func (s *adminServiceImpl) UpdateGroup(ctx context.Context, id int64, input *Upd
 		}
 		if nextPlatform == PlatformDeepSeek || group.Platform == PlatformDeepSeek ||
 			nextPlatform == PlatformNvidia || group.Platform == PlatformNvidia ||
-			nextPlatform == PlatformTokenRhythm || group.Platform == PlatformTokenRhythm {
+			nextPlatform == PlatformTokenRhythm || group.Platform == PlatformTokenRhythm ||
+			nextPlatform == PlatformKimi || group.Platform == PlatformKimi {
 			if err := validateGroupAccountPlatforms(ctx, s.accountRepo, nextPlatform, id); err != nil {
 				return nil, err
 			}

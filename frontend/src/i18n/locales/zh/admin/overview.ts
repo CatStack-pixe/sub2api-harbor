@@ -884,6 +884,7 @@ export default {
         grok: 'Grok',
         agnes: 'Agnes',
         deepseek: 'DeepSeek',
+        kimi: 'Kimi',
         nvidia: 'NVIDIA',
         composite: 'Composite',
       },

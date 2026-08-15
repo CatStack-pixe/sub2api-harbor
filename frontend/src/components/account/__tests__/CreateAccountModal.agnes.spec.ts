@@ -24,7 +24,7 @@ describe('CreateAccountModal DeepSeek account type', () => {
     expect(source).toContain("newPlatform === 'deepseek'")
     expect(source).toContain("? 'https://api.deepseek.com'")
     expect(source).toContain('allowedModels.value = [...getModelsByPlatform(newPlatform)]')
-    expect(source).toContain("form.platform === 'deepseek' || form.platform === 'tokenrhythm'")
+    expect(source).toContain("form.platform === 'deepseek' || form.platform === 'kimi' || form.platform === 'tokenrhythm'")
   })
 })
 
@@ -35,5 +35,16 @@ describe('CreateAccountModal TokenRhythm account type', () => {
     expect(source).toContain("newPlatform === 'tokenrhythm'")
     expect(source).toContain("'https://tokenrhythm.studio/v1'")
     expect(source).toContain('credentials.tokenrhythm_cookie = tokenRhythmCookie.value.trim()')
+  })
+})
+
+describe('CreateAccountModal Kimi account type', () => {
+  it('offers API-key setup with the supported official regions', () => {
+    expect(source).toContain('data-testid="kimi-platform"')
+    expect(source).toContain('data-testid="kimi-account-type-api-key"')
+    expect(source).toContain("newPlatform === 'kimi'")
+    expect(source).toContain('data-testid="kimi-base-url"')
+    expect(source).toContain('https://api.moonshot.cn/v1')
+    expect(source).toContain('https://api.moonshot.ai/v1')
   })
 })

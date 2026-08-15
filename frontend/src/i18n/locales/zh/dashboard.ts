@@ -455,6 +455,7 @@ export default {
       grok: 'Grok',
       agnes: 'Agnes',
       deepseek: 'DeepSeek',
+      kimi: 'Kimi',
       nvidia: 'NVIDIA'
     },
     extraModelsHeader: '附加模型',
