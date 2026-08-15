@@ -97,27 +97,24 @@ func TestUpdateGroupWithoutChannelCacheInvalidator(t *testing.T) {
 	require.Equal(t, PlatformOpenAI, got.Platform)
 }
 
-func TestUpdateGroupValidatesBoundAccountsWhenSwitchingToOrFromNvidia(t *testing.T) {
+func TestUpdateGroupAllowsCrossPlatformBoundAccounts(t *testing.T) {
 	tests := []struct {
 		name            string
 		fromPlatform    string
 		toPlatform      string
 		accountPlatform string
-		wantError       bool
 	}{
 		{
-			name:            "switching to NVIDIA rejects an OpenAI account",
+			name:            "switching to NVIDIA keeps an OpenAI account bound",
 			fromPlatform:    PlatformOpenAI,
 			toPlatform:      PlatformNvidia,
 			accountPlatform: PlatformOpenAI,
-			wantError:       true,
 		},
 		{
-			name:            "switching from NVIDIA rejects an NVIDIA account on OpenAI",
+			name:            "switching from NVIDIA keeps an NVIDIA account bound",
 			fromPlatform:    PlatformNvidia,
 			toPlatform:      PlatformOpenAI,
 			accountPlatform: PlatformNvidia,
-			wantError:       true,
 		},
 		{
 			name:            "switching to NVIDIA accepts an NVIDIA account",
@@ -143,13 +140,7 @@ func TestUpdateGroupValidatesBoundAccountsWhenSwitchingToOrFromNvidia(t *testing
 
 			got, err := svc.UpdateGroup(context.Background(), 7, &UpdateGroupInput{Platform: tt.toPlatform})
 
-			require.Equal(t, 1, accountRepo.listByGroupCalls)
-			if tt.wantError {
-				require.ErrorContains(t, err, "cannot remain bound")
-				require.Nil(t, got)
-				require.Nil(t, repo.updated)
-				return
-			}
+			require.Zero(t, accountRepo.listByGroupCalls)
 			require.NoError(t, err)
 			require.NotNil(t, got)
 			require.Equal(t, tt.toPlatform, got.Platform)

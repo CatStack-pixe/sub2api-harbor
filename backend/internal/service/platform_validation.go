@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"fmt"
 	"net/url"
 	"strings"
 
@@ -32,16 +31,6 @@ func ValidateGroupPlatform(platform string) error {
 	}
 }
 
-func accountCanBindToGroupPlatform(accountPlatform, groupPlatform string) bool {
-	accountPlatform = strings.TrimSpace(accountPlatform)
-	groupPlatform = strings.TrimSpace(groupPlatform)
-	if accountPlatform != PlatformDeepSeek && accountPlatform != PlatformNvidia && accountPlatform != PlatformTokenRhythm && accountPlatform != PlatformKimi &&
-		groupPlatform != PlatformDeepSeek && groupPlatform != PlatformNvidia && groupPlatform != PlatformTokenRhythm && groupPlatform != PlatformKimi {
-		return true
-	}
-	return groupPlatform == PlatformComposite || accountPlatform == groupPlatform
-}
-
 func validateAccountGroupPlatforms(ctx context.Context, groups GroupRepository, accountPlatform string, groupIDs []int64) error {
 	if groups == nil || len(groupIDs) == 0 {
 		return nil
@@ -51,30 +40,8 @@ func validateAccountGroupPlatforms(ctx context.Context, groups GroupRepository, 
 		if err != nil {
 			return err
 		}
-		if group != nil && !accountCanBindToGroupPlatform(accountPlatform, group.Platform) {
-			return infraerrors.BadRequest(
-				"ACCOUNT_GROUP_PLATFORM_MISMATCH",
-				fmt.Sprintf("account platform %q cannot be bound to group platform %q", accountPlatform, group.Platform),
-			)
-		}
-	}
-	return nil
-}
-
-func validateGroupAccountPlatforms(ctx context.Context, accounts AccountRepository, groupPlatform string, groupID int64) error {
-	if accounts == nil || groupID <= 0 {
-		return nil
-	}
-	boundAccounts, err := accounts.ListByGroup(ctx, groupID)
-	if err != nil {
-		return err
-	}
-	for _, account := range boundAccounts {
-		if !accountCanBindToGroupPlatform(account.Platform, groupPlatform) {
-			return infraerrors.BadRequest(
-				"ACCOUNT_GROUP_PLATFORM_MISMATCH",
-				fmt.Sprintf("account platform %q cannot remain bound to group platform %q", account.Platform, groupPlatform),
-			)
+		if group == nil {
+			return ErrGroupNotFound
 		}
 	}
 	return nil
@@ -128,8 +95,14 @@ func validateAccountCredentials(platform, accountType string, credentials map[st
 	if platform == PlatformKimi {
 		if rawBaseURL, exists := credentials["base_url"]; exists && rawBaseURL != nil {
 			baseURL, ok := rawBaseURL.(string)
-			if !ok || (strings.TrimSpace(baseURL) != "" && !isKimiBaseURL(baseURL)) {
-				return infraerrors.BadRequest(errorPrefix+"_BASE_URL_INVALID", platformName+" base_url must be an official Kimi API URL")
+			if !ok {
+				return infraerrors.BadRequest(errorPrefix+"_BASE_URL_INVALID", platformName+" base_url must be an absolute URL")
+			}
+			if strings.TrimSpace(baseURL) != "" {
+				parsed, err := url.ParseRequestURI(strings.TrimSpace(baseURL))
+				if err != nil || parsed.Scheme == "" || parsed.Host == "" || (parsed.Scheme != "http" && parsed.Scheme != "https") {
+					return infraerrors.BadRequest(errorPrefix+"_BASE_URL_INVALID", platformName+" base_url must be an absolute http(s) URL")
+				}
 			}
 		}
 		return nil

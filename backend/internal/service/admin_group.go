@@ -264,6 +264,8 @@ func defaultModelsListCandidateIDs(platform string) []string {
 		return NvidiaDefaultModelIDs()
 	case PlatformKimi:
 		return KimiDefaultModelIDs()
+	case PlatformTokenRhythm:
+		return TokenRhythmDefaultModelIDs()
 	case PlatformComposite:
 		return compositeDefaultModelsListCandidateIDs()
 	default:
@@ -683,14 +685,6 @@ func (s *adminServiceImpl) UpdateGroup(ctx context.Context, id int64, input *Upd
 		nextPlatform := strings.TrimSpace(input.Platform)
 		if err := ValidateGroupPlatform(nextPlatform); err != nil {
 			return nil, err
-		}
-		if nextPlatform == PlatformDeepSeek || group.Platform == PlatformDeepSeek ||
-			nextPlatform == PlatformNvidia || group.Platform == PlatformNvidia ||
-			nextPlatform == PlatformTokenRhythm || group.Platform == PlatformTokenRhythm ||
-			nextPlatform == PlatformKimi || group.Platform == PlatformKimi {
-			if err := validateGroupAccountPlatforms(ctx, s.accountRepo, nextPlatform, id); err != nil {
-				return nil, err
-			}
 		}
 		group.Platform = nextPlatform
 	}

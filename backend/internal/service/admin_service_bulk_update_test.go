@@ -219,7 +219,7 @@ func TestAdminService_BulkUpdateAccounts_PartialFailureIDs(t *testing.T) {
 	require.Len(t, result.Results, 3)
 }
 
-func TestAdminService_BulkUpdateAccountsRejectsDeepSeekPlatformMismatch(t *testing.T) {
+func TestAdminService_BulkUpdateAccountsAllowsCrossPlatformGroup(t *testing.T) {
 	repo := &accountRepoStubForBulkUpdate{
 		getByIDsAccounts: []*Account{{ID: 1, Platform: PlatformOpenAI}},
 	}
@@ -237,11 +237,11 @@ func TestAdminService_BulkUpdateAccountsRejectsDeepSeekPlatformMismatch(t *testi
 		SkipMixedChannelCheck: true,
 	})
 
-	require.Nil(t, result)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "ACCOUNT_GROUP_PLATFORM_MISMATCH")
-	require.Empty(t, repo.bulkUpdateIDs)
-	require.Empty(t, repo.bindGroupsCalls)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	require.Equal(t, 1, result.Success)
+	require.Equal(t, []int64{1}, result.SuccessIDs)
+	require.Equal(t, []int64{1}, repo.bindGroupsCalls)
 }
 
 func TestAdminService_BulkUpdateAccountsRejectsInvalidDeepSeekCredentials(t *testing.T) {

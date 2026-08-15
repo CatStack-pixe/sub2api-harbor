@@ -33,7 +33,7 @@
               {{ selectedFilesLabel || t('admin.accounts.dataImportSelectFile') }}
             </div>
             <div class="text-xs text-gray-500 dark:text-dark-400">
-              JSON (.json)
+              JSON / Excel (.json, .xlsx)
               <span v-if="files.length > 1"> · {{ fileListTitle }}</span>
             </div>
           </div>
@@ -45,7 +45,7 @@
           ref="fileInput"
           type="file"
           class="hidden"
-          accept="application/json,.json"
+          accept="application/json,.json,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,.xlsx"
           multiple
           @change="handleFileChange"
         />
@@ -102,6 +102,7 @@ import BaseDialog from '@/components/common/BaseDialog.vue'
 import { adminAPI } from '@/api/admin'
 import { useAppStore } from '@/stores/app'
 import type { AdminDataImportResult, AdminDataPayload } from '@/types'
+import * as XLSX from 'xlsx'
 
 interface Props {
   show: boolean
@@ -174,10 +175,15 @@ const isJsonFile = (sourceFile: File) => {
   return name.endsWith('.json') || sourceFile.type === 'application/json'
 }
 
+const isXlsxFile = (sourceFile: File) => {
+  const name = sourceFile.name.toLowerCase()
+  return name.endsWith('.xlsx') || sourceFile.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+}
+
 const setSelectedFiles = (sourceFiles: FileList | File[] | null | undefined) => {
   if (importing.value) return
   const incoming = Array.from(sourceFiles || [])
-  const picked = incoming.filter(isJsonFile)
+  const picked = incoming.filter((file) => isJsonFile(file) || isXlsxFile(file))
   if (!picked.length) {
     appStore.showError(t('admin.accounts.dataImportSelectFile'))
     return
@@ -222,6 +228,73 @@ const readFileAsText = async (sourceFile: File): Promise<string> => {
     reader.onerror = () => reject(reader.error || new Error('Failed to read file'))
     reader.readAsText(sourceFile)
   })
+}
+
+const readFileAsArrayBuffer = async (sourceFile: File): Promise<ArrayBuffer> => {
+  if (typeof sourceFile.arrayBuffer === 'function') return sourceFile.arrayBuffer()
+  return await new Promise<ArrayBuffer>((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(reader.result as ArrayBuffer)
+    reader.onerror = () => reject(reader.error || new Error('Failed to read file'))
+    reader.readAsArrayBuffer(sourceFile)
+  })
+}
+
+const cellText = (value: unknown) => String(value ?? '').trim()
+
+const xlsxToDataPayload = async (sourceFile: File): Promise<{ payload: AdminDataPayload; skipped: number }> => {
+  const workbook = XLSX.read(await readFileAsArrayBuffer(sourceFile), { type: 'array', cellDates: false })
+  const firstSheet = workbook.Sheets[workbook.SheetNames[0] || '']
+  if (!firstSheet) throw new Error('The workbook has no worksheets')
+  const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(firstSheet, { defval: '' })
+  const normalize = (value: string) => value.replace(/[\s_()-]/g, '').toLowerCase()
+  const get = (row: Record<string, unknown>, names: string[]) => {
+    const wanted = new Set(names.map(normalize))
+    const key = Object.keys(row).find((candidate) => wanted.has(normalize(candidate)))
+    return key ? cellText(row[key]) : ''
+  }
+  const accounts: AdminDataPayload['accounts'] = []
+  let skipped = 0
+  for (const row of rows) {
+    const status = get(row, ['状态', 'status']).toLowerCase()
+    const apiKey = get(row, ['API Key', 'APIKey', 'api_key'])
+    const cookie = get(row, ['Cookie', 'cookie'])
+    if (status !== '成功' && status !== 'success') {
+      skipped += 1
+      continue
+    }
+    if (!apiKey || !cookie) {
+      skipped += 1
+      continue
+    }
+    const phone = get(row, ['电话号码', '手机号', 'phone', 'phone_number'])
+    const notes = get(row, ['备注', 'notes', 'remark'])
+    accounts.push({
+      name: phone || `tokenrhythm-${accounts.length + 1}`,
+      notes: notes || null,
+      platform: 'tokenrhythm',
+      type: 'apikey',
+      credentials: {
+        api_key: apiKey,
+        base_url: 'https://tokenrhythm.studio/v1',
+        tokenrhythm_cookie: cookie,
+      },
+      concurrency: 1,
+      priority: 0,
+      rate_multiplier: 1,
+      auto_pause_on_expired: true,
+    })
+  }
+  return {
+    skipped,
+    payload: {
+      type: 'sub2api-data',
+      version: 1,
+      exported_at: new Date().toISOString(),
+      proxies: [],
+      accounts,
+    },
+  }
 }
 
 const SUPPORTED_DATA_TYPES = ['sub2api-data', 'sub2api-bundle']
@@ -275,7 +348,19 @@ const handleImport = async () => {
   importing.value = true
   try {
     const dataPayloads: AdminDataPayload[] = []
+    let spreadsheetSkipped = 0
     for (const sourceFile of files.value) {
+      if (isXlsxFile(sourceFile)) {
+        try {
+          const converted = await xlsxToDataPayload(sourceFile)
+          spreadsheetSkipped += converted.skipped
+          dataPayloads.push(converted.payload)
+        } catch (error) {
+          appStore.showError(t('admin.accounts.dataImportParseFailedFile', { name: sourceFile.name }))
+          return
+        }
+        continue
+      }
       let parsed: unknown
       try {
         parsed = JSON.parse(await readFileAsText(sourceFile))
@@ -293,12 +378,20 @@ const handleImport = async () => {
     }
     const dataPayload = mergeDataPayloads(dataPayloads)
 
+    if (dataPayload.accounts.length === 0) {
+      appStore.showError(t('admin.accounts.dataImportInvalidFile', { name: files.value[0]?.name || '' }))
+      return
+    }
+
     const res = await adminAPI.accounts.importData({
       data: dataPayload,
       skip_default_group_bind: true
     })
 
     result.value = res
+    if (spreadsheetSkipped > 0) {
+      appStore.showWarning(`Skipped ${spreadsheetSkipped} invalid or unsuccessful spreadsheet rows.`)
+    }
 
     const msgParams: Record<string, unknown> = {
       account_created: res.account_created,

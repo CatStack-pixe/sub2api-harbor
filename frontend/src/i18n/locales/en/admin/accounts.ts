@@ -623,7 +623,7 @@ export default {
         apiKeyHint: 'Your DeepSeek API Key'
       },
       kimi: {
-        baseUrlHint: 'Choose the Kimi API region that issued this API Key.',
+        baseUrlHint: 'Use a preset or enter a custom OpenAI-compatible Base URL. Balance lookup is available only for official Kimi URLs.',
         apiKeyHint: 'Your Kimi Open Platform API Key',
         chinaRegion: 'China: api.moonshot.cn',
         internationalRegion: 'International: api.moonshot.ai'

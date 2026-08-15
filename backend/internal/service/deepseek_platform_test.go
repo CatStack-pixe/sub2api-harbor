@@ -3,6 +3,7 @@
 package service
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -70,19 +71,23 @@ func TestValidateDeepSeekAccountCredentials(t *testing.T) {
 	}
 }
 
-func TestDedicatedAccountGroupPlatformIsolation(t *testing.T) {
-	require.True(t, accountCanBindToGroupPlatform(PlatformDeepSeek, PlatformDeepSeek))
-	require.True(t, accountCanBindToGroupPlatform(PlatformDeepSeek, PlatformComposite))
-	require.False(t, accountCanBindToGroupPlatform(PlatformDeepSeek, PlatformOpenAI))
-	require.False(t, accountCanBindToGroupPlatform(PlatformOpenAI, PlatformDeepSeek))
-	require.True(t, accountCanBindToGroupPlatform(PlatformNvidia, PlatformNvidia))
-	require.True(t, accountCanBindToGroupPlatform(PlatformNvidia, PlatformComposite))
-	require.False(t, accountCanBindToGroupPlatform(PlatformNvidia, PlatformOpenAI))
-	require.False(t, accountCanBindToGroupPlatform(PlatformOpenAI, PlatformNvidia))
-	require.True(t, accountCanBindToGroupPlatform(PlatformOpenAI, PlatformOpenAI))
-	require.True(t, accountCanBindToGroupPlatform(PlatformTokenRhythm, PlatformTokenRhythm))
-	require.True(t, accountCanBindToGroupPlatform(PlatformTokenRhythm, PlatformComposite))
-	require.False(t, accountCanBindToGroupPlatform(PlatformTokenRhythm, PlatformOpenAI))
+func TestAccountGroupPlatformAssignmentIsUnrestricted(t *testing.T) {
+	groups := &groupRepoStubForAdmin{getByIDByID: map[int64]*Group{
+		1: {ID: 1, Platform: PlatformOpenAI},
+		2: {ID: 2, Platform: PlatformComposite},
+	}}
+
+	require.NoError(t, validateAccountGroupPlatforms(context.Background(), groups, PlatformDeepSeek, []int64{1, 2}))
+	require.NoError(t, validateAccountGroupPlatforms(context.Background(), groups, PlatformKimi, []int64{1, 2}))
+	require.NoError(t, validateAccountGroupPlatforms(context.Background(), groups, PlatformTokenRhythm, []int64{1, 2}))
+}
+
+func TestValidateAccountGroupPlatformsPreservesGroupExistenceCheck(t *testing.T) {
+	groups := &groupRepoStubForAdmin{getByIDByID: map[int64]*Group{}}
+
+	err := validateAccountGroupPlatforms(context.Background(), groups, PlatformOpenAI, []int64{99})
+
+	require.ErrorIs(t, err, ErrGroupNotFound)
 }
 
 func TestDeepSeekAccountCompatibilityCapabilities(t *testing.T) {
