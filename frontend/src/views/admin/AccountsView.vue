@@ -529,6 +529,7 @@ import { fetchAllAccountIds } from '@/utils/accountSelection'
 import { buildGrokUsageRefreshKey, buildOpenAIUsageRefreshKey } from '@/utils/accountUsageRefresh'
 import { invalidateDeepSeekBalanceCache } from '@/utils/deepSeekBalanceQuery'
 import { invalidateTokenRhythmBalanceCache } from '@/utils/tokenRhythmBalanceQuery'
+import { invalidateKimiBalanceCache } from '@/utils/kimiBalanceQuery'
 import { formatDateTime, formatRelativeTime } from '@/utils/format'
 import { proxyExpiryBadgeClass, proxyExpiryLabelKey } from '@/utils/proxyExpiry'
 import { extractApiErrorMessage } from '@/utils/apiError'
@@ -702,6 +703,7 @@ const usageManualRefreshToken = ref(0)
 const documentVisibility = useDocumentVisibility()
 invalidateDeepSeekBalanceCache()
 invalidateTokenRhythmBalanceCache()
+invalidateKimiBalanceCache()
 
 const desktopViewportQuery = '(min-width: 768px)'
 const isDesktopViewport = ref(
@@ -1806,6 +1808,7 @@ const handleBulkDelete = async () => {
       appStore.showSuccess(t('admin.accounts.bulkActions.deleteSuccess', { count: result.success }))
       clearSelection()
     }
+    invalidateKimiBalanceCache()
     await reload()
   } catch (error) {
     console.error('Failed to bulk delete accounts:', error)
@@ -2187,6 +2190,7 @@ const handleProbeUpstreamBilling = async (account: Account) => {
   }
 }
 const handleAccountUpdated = (updatedAccount: Account) => {
+  if (updatedAccount.platform === 'kimi') invalidateKimiBalanceCache(updatedAccount.id)
   patchAccountInList(updatedAccount)
   enterAutoRefreshSilentWindow()
 }
@@ -2375,7 +2379,7 @@ const confirmCreateSparkShadow = async () => {
   }
 }
 const handleDelete = (a: Account) => { deletingAcc.value = a; showDeleteDialog.value = true }
-const confirmDelete = async () => { if(!deletingAcc.value) return; try { await adminAPI.accounts.delete(deletingAcc.value.id); showDeleteDialog.value = false; deletingAcc.value = null; reload() } catch (error) { console.error('Failed to delete account:', error) } }
+const confirmDelete = async () => { if(!deletingAcc.value) return; try { const account = deletingAcc.value; await adminAPI.accounts.delete(account.id); if (account.platform === 'kimi') invalidateKimiBalanceCache(account.id); showDeleteDialog.value = false; deletingAcc.value = null; reload() } catch (error) { console.error('Failed to delete account:', error) } }
 const handleToggleSchedulable = async (a: Account) => {
   const nextSchedulable = !a.schedulable
   togglingSchedulable.value = a.id

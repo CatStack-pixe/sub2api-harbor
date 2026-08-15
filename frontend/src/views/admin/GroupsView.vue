@@ -150,6 +150,8 @@
                           ? 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-300'
                           : value === 'deepseek'
                             ? 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300'
+                          : value === 'kimi'
+                            ? 'bg-sky-100 text-sky-800 dark:bg-sky-900/30 dark:text-sky-300'
                           : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
               ]"
             >
@@ -4091,6 +4093,8 @@
                               ? 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-300'
                               : group.platform === 'deepseek'
                                 ? 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300'
+                              : group.platform === 'kimi'
+                                ? 'bg-sky-100 text-sky-800 dark:bg-sky-900/30 dark:text-sky-300'
                               : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
                   ]"
                 >
@@ -4857,6 +4861,7 @@ const platformOptions = computed(() => [
   { value: "grok", label: "Grok" },
   { value: "agnes", label: "Agnes" },
   { value: "deepseek", label: "DeepSeek" },
+  { value: "kimi", label: "Kimi" },
   { value: "nvidia", label: "NVIDIA" },
   { value: "tokenrhythm", label: "TokenRhythm" },
   { value: "composite", label: "Composite" },
@@ -4871,6 +4876,7 @@ const platformFilterOptions = computed(() => [
   { value: "grok", label: "Grok" },
   { value: "agnes", label: "Agnes" },
   { value: "deepseek", label: "DeepSeek" },
+  { value: "kimi", label: "Kimi" },
   { value: "nvidia", label: "NVIDIA" },
   { value: "tokenrhythm", label: "TokenRhythm" },
   { value: "composite", label: "Composite" },
@@ -4884,6 +4890,7 @@ const compositeRoutePlatformOptions = computed(() => [
   { value: "grok", label: "Grok" },
   { value: "agnes", label: "Agnes" },
   { value: "deepseek", label: "DeepSeek" },
+  { value: "kimi", label: "Kimi" },
   { value: "nvidia", label: "NVIDIA" },
   { value: "tokenrhythm", label: "TokenRhythm" },
 ]);

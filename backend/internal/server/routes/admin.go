@@ -61,6 +61,7 @@ func RegisterAdminRoutes(
 		// DeepSeek API
 		registerDeepSeekRoutes(admin, h)
 		registerTokenRhythmRoutes(admin, h)
+		registerKimiRoutes(admin, h)
 
 		// 代理管理
 		registerProxyRoutes(admin, h, stepUpAuth)
@@ -139,6 +140,13 @@ func registerTokenRhythmRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 	tokenRhythm := admin.Group("/tokenrhythm")
 	{
 		tokenRhythm.GET("/accounts/:id/balance", h.Admin.Account.GetTokenRhythmBalance)
+	}
+}
+
+func registerKimiRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
+	kimi := admin.Group("/kimi")
+	{
+		kimi.GET("/accounts/:id/balance", h.Admin.Account.GetKimiBalance)
 	}
 }
 

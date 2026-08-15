@@ -309,6 +309,7 @@ export default {
         grok: 'Grok',
         agnes: 'Agnes',
         deepseek: 'DeepSeek',
+        kimi: 'Kimi',
         nvidia: 'NVIDIA',
         tokenrhythm: 'TokenRhythm',
       },
@@ -415,6 +416,10 @@ export default {
         tokenrhythmProbe: '余额',
         tokenrhythmProbeTooltip: '查询 TokenRhythm 账号余额',
         tokenrhythmNoBalance: '暂无可用余额数据',
+        kimiProbe: '余额',
+        kimiProbeTooltip: '查询 Kimi 账号余额',
+        kimiUnavailable: '余额不可用',
+        kimiNoBalance: '暂无可用余额数据',
         gemini3Pro: 'G3P',
         gemini3Flash: 'G3F',
         gemini3Image: 'G31FI',
@@ -706,6 +711,12 @@ export default {
         cookieHint: '仅用于余额查询，服务端只保存必需的 TokenRhythm Cookie。',
         cookieEditHint: '留空保留已存的余额查询 Cookie；粘贴新的完整 Cookie 请求头可替换。',
         cookieRequired: '查询 TokenRhythm 余额需要提供 Cookie 请求头。'
+      },
+      kimi: {
+        baseUrlHint: '选择签发此 API Key 的 Kimi API 区域。',
+        apiKeyHint: '您的 Kimi Open Platform API Key',
+        chinaRegion: '中国区：api.moonshot.cn',
+        internationalRegion: '国际区：api.moonshot.ai'
       },
       nvidia: {
         baseUrlHint: 'OpenAI 兼容的 NVIDIA NIM 接口，默认地址已包含 /v1。',

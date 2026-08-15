@@ -27,6 +27,7 @@ const (
 	PlatformDeepSeek    = "deepseek"
 	PlatformNvidia      = "nvidia"
 	PlatformTokenRhythm = "tokenrhythm"
+	PlatformKimi        = "kimi"
 	PlatformComposite   = "composite"
 )
 
@@ -37,6 +38,8 @@ const (
 	NvidiaDefaultBaseURL      = "https://integrate.api.nvidia.com/v1"
 	NvidiaDefaultModel        = "nvidia/llama-3.1-nemotron-nano-8b-v1"
 	TokenRhythmDefaultBaseURL = "https://tokenrhythm.studio/v1"
+	KimiDefaultBaseURL        = "https://api.moonshot.cn/v1"
+	KimiInternationalBaseURL  = "https://api.moonshot.ai/v1"
 )
 
 // Account type constants

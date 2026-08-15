@@ -14,3 +14,11 @@ describe('DeepSeek platform display', () => {
     expect(platformBadgeClass('deepseek')).not.toBe(platformBadgeClass('unknown'))
   })
 })
+
+describe('Kimi platform display', () => {
+  it('has a distinct label and sky visual treatment', () => {
+    expect(platformLabel('kimi')).toBe('Kimi')
+    expect(platformBadgeClass('kimi')).toContain('sky')
+    expect(platformIconClass('kimi')).toContain('sky')
+  })
+})

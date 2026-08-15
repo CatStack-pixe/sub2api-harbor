@@ -537,6 +537,7 @@ const baseSettingsResponse = {
     grok:        { daily: null, weekly: null, monthly: null },
     agnes:       { daily: null, weekly: null, monthly: null },
     deepseek:    { daily: null, weekly: null, monthly: null },
+    kimi:        { daily: null, weekly: null, monthly: null },
     nvidia:      { daily: null, weekly: null, monthly: null },
   },
 };
@@ -1818,7 +1819,7 @@ describe("admin SettingsView platform quota matrix", () => {
     // 应携带嵌套对象，而非扁平字段
     expect(payload).toHaveProperty("default_platform_quotas");
     const quotas = payload["default_platform_quotas"] as Record<string, unknown>;
-    const platforms = ["anthropic", "openai", "gemini", "antigravity", "grok", "agnes", "deepseek", "nvidia"];
+    const platforms = ["anthropic", "openai", "gemini", "antigravity", "grok", "agnes", "deepseek", "kimi", "nvidia"];
     for (const p of platforms) {
       expect(quotas).toHaveProperty(p);
       const pq = quotas[p] as Record<string, unknown>;
@@ -1859,6 +1860,7 @@ describe("admin SettingsView platform quota matrix", () => {
     expect(quotas["antigravity"]).toEqual({ daily: null, weekly: null, monthly: null });
     expect(quotas["agnes"]).toEqual({ daily: null, weekly: null, monthly: null });
     expect(quotas["deepseek"]).toEqual({ daily: null, weekly: null, monthly: null });
+    expect(quotas["kimi"]).toEqual({ daily: null, weekly: null, monthly: null });
     expect(quotas["nvidia"]).toEqual({ daily: null, weekly: null, monthly: null });
   });
 

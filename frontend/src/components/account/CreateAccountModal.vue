@@ -190,6 +190,20 @@
           </button>
           <button
             type="button"
+            data-testid="kimi-platform"
+            @click="form.platform = 'kimi'"
+            :class="[
+              'flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium transition-all',
+              form.platform === 'kimi'
+                ? 'bg-white text-sky-700 shadow-sm dark:bg-dark-600 dark:text-sky-300'
+                : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200'
+            ]"
+          >
+            <PlatformIcon platform="kimi" size="sm" />
+            Kimi
+          </button>
+          <button
+            type="button"
             data-testid="nvidia-platform"
             @click="form.platform = 'nvidia'"
             :class="[
@@ -443,6 +457,26 @@
             <div>
               <span class="block text-sm font-medium text-gray-900 dark:text-white">API Key</span>
               <span class="text-xs text-gray-500 dark:text-gray-400">DeepSeek API</span>
+            </div>
+          </button>
+        </div>
+      </div>
+
+      <div v-if="form.platform === 'kimi'">
+        <label class="input-label">{{ t('admin.accounts.accountType') }}</label>
+        <div class="mt-2 grid grid-cols-1 gap-3" data-tour="account-form-type">
+          <button
+            type="button"
+            data-testid="kimi-account-type-api-key"
+            @click="accountCategory = 'apikey'"
+            class="flex items-center gap-3 rounded-lg border-2 border-sky-500 bg-sky-50 p-3 text-left dark:bg-sky-900/20"
+          >
+            <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-sky-600 text-white">
+              <Icon name="key" size="sm" />
+            </div>
+            <div>
+              <span class="block text-sm font-medium text-gray-900 dark:text-white">API Key</span>
+              <span class="text-xs text-gray-500 dark:text-gray-400">Kimi Open Platform</span>
             </div>
           </button>
         </div>
@@ -1252,7 +1286,12 @@
       <div v-if="form.type === 'apikey' && form.platform !== 'antigravity'" class="space-y-4">
         <div>
           <label class="input-label">{{ t('admin.accounts.baseUrl') }}</label>
+          <select v-if="form.platform === 'kimi'" v-model="apiKeyBaseUrl" class="input" data-testid="kimi-base-url">
+            <option value="https://api.moonshot.cn/v1">{{ t('admin.accounts.kimi.chinaRegion') }}</option>
+            <option value="https://api.moonshot.ai/v1">{{ t('admin.accounts.kimi.internationalRegion') }}</option>
+          </select>
           <input
+            v-else
             v-model="apiKeyBaseUrl"
             type="text"
             class="input"
@@ -1302,6 +1341,8 @@
                         ? 'nvapi-...'
                         : form.platform === 'deepseek'
                         ? 'sk-...'
+                        : form.platform === 'kimi'
+                          ? 'sk-...'
                         : 'sk-ant-...'
             "
           />
@@ -1324,7 +1365,7 @@
 
         <!-- 上游倍率自动探测：支持的 API-key 平台可用，DeepSeek 使用独立余额探测。 -->
         <div
-          v-if="form.platform !== 'deepseek' && form.platform !== 'tokenrhythm'"
+          v-if="form.platform !== 'deepseek' && form.platform !== 'kimi' && form.platform !== 'tokenrhythm'"
           class="flex items-center justify-between gap-4 border-t border-gray-200 pt-4 dark:border-dark-600"
         >
           <div>
@@ -3832,6 +3873,7 @@ const baseUrlHint = computed(() => {
   if (form.platform === 'grok') return ''
   if (form.platform === 'agnes') return ''
   if (form.platform === 'deepseek') return t('admin.accounts.deepseek.baseUrlHint')
+  if (form.platform === 'kimi') return t('admin.accounts.kimi.baseUrlHint')
   if (form.platform === 'tokenrhythm') return t('admin.accounts.tokenrhythm.baseUrlHint')
   if (form.platform === 'nvidia') return t('admin.accounts.nvidia.baseUrlHint')
   return t('admin.accounts.baseUrlHint')
@@ -3843,6 +3885,7 @@ const apiKeyHint = computed(() => {
   if (form.platform === 'grok') return ''
   if (form.platform === 'agnes') return ''
   if (form.platform === 'deepseek') return t('admin.accounts.deepseek.apiKeyHint')
+  if (form.platform === 'kimi') return t('admin.accounts.kimi.apiKeyHint')
   if (form.platform === 'tokenrhythm') return t('admin.accounts.tokenrhythm.apiKeyHint')
   if (form.platform === 'nvidia') return t('admin.accounts.nvidia.apiKeyHint')
   return t('admin.accounts.apiKeyHint')
@@ -4434,6 +4477,8 @@ watch(
                 ? 'https://apihub.agnes-ai.com/v1'
                 : newPlatform === 'tokenrhythm'
                   ? 'https://tokenrhythm.studio/v1'
+                : newPlatform === 'kimi'
+                  ? 'https://api.moonshot.cn/v1'
                 : newPlatform === 'nvidia'
                 ? 'https://integrate.api.nvidia.com/v1'
                 : newPlatform === 'deepseek'
@@ -4476,6 +4521,13 @@ watch(
       accountCategory.value = 'apikey'
       modelRestrictionMode.value = 'whitelist'
       allowedModels.value = [...getModelsByPlatform(newPlatform)]
+      form.concurrency = 10
+      form.load_factor = null
+    }
+    if (newPlatform === 'kimi') {
+      accountCategory.value = 'apikey'
+      modelRestrictionMode.value = 'whitelist'
+      allowedModels.value = []
       form.concurrency = 10
       form.load_factor = null
     }
@@ -5365,6 +5417,8 @@ const handleSubmit = async () => {
                 ? 'https://apihub.agnes-ai.com/v1'
                 : form.platform === 'tokenrhythm'
                   ? 'https://tokenrhythm.studio/v1'
+                : form.platform === 'kimi'
+                  ? 'https://api.moonshot.cn/v1'
                 : form.platform === 'nvidia'
                 ? 'https://integrate.api.nvidia.com/v1'
                 : form.platform === 'deepseek'
@@ -5442,7 +5496,7 @@ const handleSubmit = async () => {
     ...form,
     group_ids: form.group_ids,
     extra,
-    upstream_billing_probe_enabled: (form.platform === 'deepseek' || form.platform === 'tokenrhythm') ? undefined : upstreamBillingAutoProbeEnabled.value,
+    upstream_billing_probe_enabled: (form.platform === 'deepseek' || form.platform === 'kimi' || form.platform === 'tokenrhythm') ? undefined : upstreamBillingAutoProbeEnabled.value,
     auto_pause_on_expired: autoPauseOnExpired.value
   })
 }
@@ -5574,7 +5628,7 @@ const createAccountAndFinish = async (
     // 上游倍率探测对支持的 API-key 平台开放（antigravity upstream 走本 helper）；
     // DeepSeek 使用独立余额探测，非 apikey 类型（bedrock/oauth）不传。
     upstream_billing_probe_enabled:
-    type === 'apikey' && form.platform !== 'deepseek' && form.platform !== 'tokenrhythm' ? upstreamBillingAutoProbeEnabled.value : undefined,
+    type === 'apikey' && form.platform !== 'deepseek' && form.platform !== 'kimi' && form.platform !== 'tokenrhythm' ? upstreamBillingAutoProbeEnabled.value : undefined,
     auto_pause_on_expired: autoPauseOnExpired.value
   })
 }

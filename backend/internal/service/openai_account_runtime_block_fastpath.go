@@ -35,7 +35,7 @@ func isGrokOAuthAccount(account *Account) bool {
 }
 
 func isOpenAIAccount(account *Account) bool {
-	return account != nil && (account.Platform == PlatformOpenAI || account.Platform == PlatformGrok || account.Platform == PlatformAgnes || account.Platform == PlatformDeepSeek || account.Platform == PlatformNvidia || account.Platform == PlatformTokenRhythm)
+	return account != nil && (account.Platform == PlatformOpenAI || account.Platform == PlatformGrok || account.Platform == PlatformAgnes || account.Platform == PlatformDeepSeek || account.Platform == PlatformNvidia || account.Platform == PlatformTokenRhythm || account.Platform == PlatformKimi)
 }
 
 // handleOpenAIAccountUpstreamError expects canonicalModel to be the model used

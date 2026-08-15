@@ -590,6 +590,24 @@ export async function getTokenRhythmBalance(id: number, signal?: AbortSignal): P
   return data
 }
 
+export interface KimiBalanceResult {
+  is_available: boolean
+  available_balance?: number
+  voucher_balance?: number
+  cash_balance?: number
+  currency?: string
+  fetched_at?: number
+  status_code?: number
+}
+
+export async function getKimiBalance(id: number, signal?: AbortSignal): Promise<KimiBalanceResult> {
+  const { data } = await apiClient.get<KimiBalanceResult>(
+    `/admin/kimi/accounts/${id}/balance`,
+    { signal }
+  )
+  return data
+}
+
 /**
  * Sync live supported models from the account's upstream model-list endpoint
  * @param id - Account ID
@@ -1060,6 +1078,7 @@ export const accountsAPI = {
   getAvailableModels,
   getDeepSeekBalance,
   getTokenRhythmBalance,
+  getKimiBalance,
   syncUpstreamModels,
   syncUpstreamModelsPreview,
   generateAuthUrl,

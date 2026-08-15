@@ -47,6 +47,7 @@ const (
 	PlatformDeepSeek          = domain.PlatformDeepSeek
 	PlatformNvidia            = domain.PlatformNvidia
 	PlatformTokenRhythm       = domain.PlatformTokenRhythm
+	PlatformKimi              = domain.PlatformKimi
 	PlatformComposite         = domain.PlatformComposite
 	AgnesDefaultBaseURL       = domain.AgnesDefaultBaseURL
 	AgnesDefaultModel         = domain.AgnesDefaultModel
@@ -54,6 +55,8 @@ const (
 	NvidiaDefaultBaseURL      = domain.NvidiaDefaultBaseURL
 	NvidiaDefaultModel        = domain.NvidiaDefaultModel
 	TokenRhythmDefaultBaseURL = domain.TokenRhythmDefaultBaseURL
+	KimiDefaultBaseURL        = domain.KimiDefaultBaseURL
+	KimiInternationalBaseURL  = domain.KimiInternationalBaseURL
 	// PlatformKiro is retained for unsupported-platform threshold tests and legacy
 	// account rows. Scheduling-threshold evaluation never pauses kiro accounts.
 	PlatformKiro = "kiro"
@@ -72,11 +75,18 @@ var AllowedQuotaPlatforms = []string{
 	PlatformDeepSeek,
 	PlatformNvidia,
 	PlatformTokenRhythm,
+	PlatformKimi,
 }
 
 // DeepSeekDefaultModelIDs are the public DeepSeek V4 model IDs shown in default selections.
 func DeepSeekDefaultModelIDs() []string {
 	return []string{"deepseek-v4-pro", "deepseek-v4-flash"}
+}
+
+// KimiDefaultModelIDs are the general-purpose Kimi API model IDs shown when
+// an account or group has no explicit model list.
+func KimiDefaultModelIDs() []string {
+	return []string{"kimi-k2.6", "kimi-k2.5"}
 }
 
 // AllowedSchedulingThresholdPlatforms 是允许设置账号自动停调阈值的平台列表。

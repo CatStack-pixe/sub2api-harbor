@@ -15,7 +15,7 @@ import (
 func ValidateAccountPlatform(platform string) error {
 	switch strings.TrimSpace(platform) {
 	case PlatformAnthropic, PlatformOpenAI, PlatformGemini, PlatformAntigravity,
-		PlatformGrok, PlatformAgnes, PlatformDeepSeek, PlatformNvidia, PlatformTokenRhythm:
+		PlatformGrok, PlatformAgnes, PlatformDeepSeek, PlatformNvidia, PlatformTokenRhythm, PlatformKimi:
 		return nil
 	default:
 		return infraerrors.BadRequest("UNSUPPORTED_ACCOUNT_PLATFORM", "unsupported account platform")
@@ -25,7 +25,7 @@ func ValidateAccountPlatform(platform string) error {
 func ValidateGroupPlatform(platform string) error {
 	switch strings.TrimSpace(platform) {
 	case PlatformAnthropic, PlatformOpenAI, PlatformGemini, PlatformAntigravity,
-		PlatformGrok, PlatformAgnes, PlatformDeepSeek, PlatformNvidia, PlatformTokenRhythm, PlatformComposite:
+		PlatformGrok, PlatformAgnes, PlatformDeepSeek, PlatformNvidia, PlatformTokenRhythm, PlatformKimi, PlatformComposite:
 		return nil
 	default:
 		return infraerrors.BadRequest("UNSUPPORTED_GROUP_PLATFORM", "unsupported group platform")
@@ -35,8 +35,8 @@ func ValidateGroupPlatform(platform string) error {
 func accountCanBindToGroupPlatform(accountPlatform, groupPlatform string) bool {
 	accountPlatform = strings.TrimSpace(accountPlatform)
 	groupPlatform = strings.TrimSpace(groupPlatform)
-	if accountPlatform != PlatformDeepSeek && accountPlatform != PlatformNvidia && accountPlatform != PlatformTokenRhythm &&
-		groupPlatform != PlatformDeepSeek && groupPlatform != PlatformNvidia && groupPlatform != PlatformTokenRhythm {
+	if accountPlatform != PlatformDeepSeek && accountPlatform != PlatformNvidia && accountPlatform != PlatformTokenRhythm && accountPlatform != PlatformKimi &&
+		groupPlatform != PlatformDeepSeek && groupPlatform != PlatformNvidia && groupPlatform != PlatformTokenRhythm && groupPlatform != PlatformKimi {
 		return true
 	}
 	return groupPlatform == PlatformComposite || accountPlatform == groupPlatform
@@ -85,7 +85,7 @@ func validateAccountCredentials(platform, accountType string, credentials map[st
 	if err := ValidateAccountPlatform(platform); err != nil {
 		return err
 	}
-	if platform != PlatformDeepSeek && platform != PlatformNvidia && platform != PlatformTokenRhythm {
+	if platform != PlatformDeepSeek && platform != PlatformNvidia && platform != PlatformTokenRhythm && platform != PlatformKimi {
 		return nil
 	}
 	platformName := "DeepSeek"
@@ -97,6 +97,10 @@ func validateAccountCredentials(platform, accountType string, credentials map[st
 	if platform == PlatformTokenRhythm {
 		platformName = "TokenRhythm"
 		errorPrefix = "TOKENRHYTHM"
+	}
+	if platform == PlatformKimi {
+		platformName = "Kimi"
+		errorPrefix = "KIMI"
 	}
 	if accountType != AccountTypeAPIKey {
 		return infraerrors.BadRequest(errorPrefix+"_ACCOUNT_TYPE_UNSUPPORTED", platformName+" accounts must use the apikey account type")
@@ -121,6 +125,15 @@ func validateAccountCredentials(platform, accountType string, credentials map[st
 		}
 		return nil
 	}
+	if platform == PlatformKimi {
+		if rawBaseURL, exists := credentials["base_url"]; exists && rawBaseURL != nil {
+			baseURL, ok := rawBaseURL.(string)
+			if !ok || (strings.TrimSpace(baseURL) != "" && !isKimiBaseURL(baseURL)) {
+				return infraerrors.BadRequest(errorPrefix+"_BASE_URL_INVALID", platformName+" base_url must be an official Kimi API URL")
+			}
+		}
+		return nil
+	}
 	if rawBaseURL, exists := credentials["base_url"]; exists && rawBaseURL != nil {
 		baseURL, ok := rawBaseURL.(string)
 		if !ok {
@@ -138,4 +151,9 @@ func validateAccountCredentials(platform, accountType string, credentials map[st
 		}
 	}
 	return nil
+}
+
+func isKimiBaseURL(raw string) bool {
+	baseURL := strings.TrimRight(strings.TrimSpace(raw), "/")
+	return baseURL == KimiDefaultBaseURL || baseURL == KimiInternationalBaseURL
 }

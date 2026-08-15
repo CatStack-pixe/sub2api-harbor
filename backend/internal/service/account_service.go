@@ -529,6 +529,8 @@ func (s *AccountService) TestCredentials(ctx context.Context, id int64) error {
 		return validateAccountCredentials(account.Platform, account.Type, account.Credentials)
 	case PlatformTokenRhythm:
 		return validateAccountCredentials(account.Platform, account.Type, account.Credentials)
+	case PlatformKimi:
+		return validateAccountCredentials(account.Platform, account.Type, account.Credentials)
 	default:
 		return fmt.Errorf("unsupported platform: %s", account.Platform)
 	}

@@ -450,6 +450,7 @@ export default {
       grok: 'Grok',
       agnes: 'Agnes',
       deepseek: 'DeepSeek',
+      kimi: 'Kimi',
       nvidia: 'NVIDIA'
     },
     extraModelsHeader: 'Extra Models',

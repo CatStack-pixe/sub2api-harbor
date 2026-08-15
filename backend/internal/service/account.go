@@ -283,19 +283,23 @@ func (a *Account) IsTokenRhythm() bool {
 	return a != nil && a.Platform == PlatformTokenRhythm
 }
 
+func (a *Account) IsKimi() bool {
+	return a != nil && a.Platform == PlatformKimi
+}
+
 func (a *Account) IsGrokOAuth() bool {
 	return a.IsGrok() && a.Type == AccountTypeOAuth
 }
 
 func (a *Account) IsOpenAICompatible() bool {
-	return a != nil && (a.Platform == PlatformOpenAI || a.Platform == PlatformGrok || a.Platform == PlatformAgnes || a.Platform == PlatformDeepSeek || a.Platform == PlatformNvidia || a.Platform == PlatformTokenRhythm)
+	return a != nil && (a.Platform == PlatformOpenAI || a.Platform == PlatformGrok || a.Platform == PlatformAgnes || a.Platform == PlatformDeepSeek || a.Platform == PlatformNvidia || a.Platform == PlatformTokenRhythm || a.Platform == PlatformKimi)
 }
 
 // ShouldUseOpenAIResponsesAPI reports whether this OpenAI-compatible account
 // accepts native Responses requests. Agnes currently documents Chat
 // Completions only, so Responses and Messages requests must use the bridge.
 func (a *Account) ShouldUseOpenAIResponsesAPI() bool {
-	return a != nil && !a.IsAgnes() && !a.IsDeepSeek() && !a.IsNvidia() && !a.IsTokenRhythm() && openai_compat.ShouldUseResponsesAPI(a.Extra)
+	return a != nil && !a.IsAgnes() && !a.IsDeepSeek() && !a.IsNvidia() && !a.IsTokenRhythm() && !a.IsKimi() && openai_compat.ShouldUseResponsesAPI(a.Extra)
 }
 
 func (a *Account) GeminiOAuthType() string {
@@ -1305,8 +1309,14 @@ func (a *Account) IsOpenAIApiKey() bool {
 }
 
 func (a *Account) GetOpenAIBaseURL() string {
-	if !a.IsOpenAI() && !a.IsAgnes() && !a.IsDeepSeek() && !a.IsNvidia() && !a.IsTokenRhythm() {
+	if !a.IsOpenAI() && !a.IsAgnes() && !a.IsDeepSeek() && !a.IsNvidia() && !a.IsTokenRhythm() && !a.IsKimi() {
 		return ""
+	}
+	if a.IsKimi() {
+		if baseURL := strings.TrimRight(strings.TrimSpace(a.GetCredential("base_url")), "/"); isKimiBaseURL(baseURL) {
+			return baseURL
+		}
+		return KimiDefaultBaseURL
 	}
 	if a.Type == AccountTypeAPIKey {
 		baseURL := a.GetCredential("base_url")
@@ -1433,7 +1443,7 @@ func (a *Account) GetOpenAIIDToken() string {
 }
 
 func (a *Account) GetOpenAIApiKey() string {
-	if a == nil || a.Type != AccountTypeAPIKey || (!a.IsOpenAI() && !a.IsAgnes() && !a.IsDeepSeek() && !a.IsNvidia() && !a.IsTokenRhythm()) {
+	if a == nil || a.Type != AccountTypeAPIKey || (!a.IsOpenAI() && !a.IsAgnes() && !a.IsDeepSeek() && !a.IsNvidia() && !a.IsTokenRhythm() && !a.IsKimi()) {
 		return ""
 	}
 	return a.GetCredential("api_key")
@@ -1527,6 +1537,9 @@ func (a *Account) SupportsOpenAIEndpointCapability(capability OpenAIEndpointCapa
 		return capability == OpenAIEndpointCapabilityChatCompletions
 	}
 	if a.IsNvidia() {
+		return capability == OpenAIEndpointCapabilityChatCompletions
+	}
+	if a.IsKimi() {
 		return capability == OpenAIEndpointCapabilityChatCompletions
 	}
 	switch capability {
