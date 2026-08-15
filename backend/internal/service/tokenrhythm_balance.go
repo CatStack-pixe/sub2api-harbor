@@ -65,19 +65,19 @@ type tokenRhythmBalanceWire struct {
 	Code    json.RawMessage `json:"code"`
 	Message string          `json:"message"`
 	Data    struct {
-		Calls               int64   `json:"calls"`
-		SuccessCalls        int64   `json:"successCalls"`
-		ErrorCalls          int64   `json:"errorCalls"`
-		AbortedCalls        int64   `json:"abortedCalls"`
-		InputTokens         int64   `json:"inputTokens"`
-		OutputTokens        int64   `json:"outputTokens"`
+		Calls               int64             `json:"calls"`
+		SuccessCalls        int64             `json:"successCalls"`
+		ErrorCalls          int64             `json:"errorCalls"`
+		AbortedCalls        int64             `json:"abortedCalls"`
+		InputTokens         int64             `json:"inputTokens"`
+		OutputTokens        int64             `json:"outputTokens"`
 		CostCNY             tokenRhythmAmount `json:"costCny"`
 		BalanceCNY          tokenRhythmAmount `json:"balanceCny"`
 		FrozenBalanceCNY    tokenRhythmAmount `json:"frozenBalanceCny"`
 		AvailableBalanceCNY tokenRhythmAmount `json:"availableBalanceCny"`
 		ExpiringBalanceCNY  tokenRhythmAmount `json:"expiringBalanceCny"`
-		NextExpiryAt        string  `json:"nextExpiryAt"`
-		Currency            string  `json:"currency"`
+		NextExpiryAt        string            `json:"nextExpiryAt"`
+		Currency            string            `json:"currency"`
 	} `json:"data"`
 }
 
