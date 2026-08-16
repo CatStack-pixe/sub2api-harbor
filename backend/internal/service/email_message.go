@@ -130,14 +130,14 @@ func htmlToPlainText(body string) string {
 			case "head", "script", "style", "svg":
 				skip = true
 			case "br":
-				raw.WriteByte('\n')
+				_ = raw.WriteByte('\n')
 			}
 			if !skip && isPlainTextBlock(node.Data) {
-				raw.WriteByte('\n')
+				_ = raw.WriteByte('\n')
 			}
 		}
 		if node.Type == xhtml.TextNode && !skip {
-			raw.WriteString(node.Data)
+			_, _ = raw.WriteString(node.Data)
 		}
 
 		for child := node.FirstChild; child != nil; child = child.NextSibling {
@@ -149,13 +149,13 @@ func htmlToPlainText(body string) string {
 		}
 		if node.Data == "a" {
 			if target := safePlainTextLink(node); target != "" {
-				raw.WriteString(" (")
-				raw.WriteString(target)
-				raw.WriteByte(')')
+				_, _ = raw.WriteString(" (")
+				_, _ = raw.WriteString(target)
+				_ = raw.WriteByte(')')
 			}
 		}
 		if isPlainTextBlock(node.Data) {
-			raw.WriteByte('\n')
+			_ = raw.WriteByte('\n')
 		}
 	}
 	walk(doc, false)

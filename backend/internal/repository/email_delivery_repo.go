@@ -80,7 +80,7 @@ func (r *emailDeliveryRepository) ListRecent(ctx context.Context, limit int) ([]
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	items := make([]service.EmailDelivery, 0, limit)
 	for rows.Next() {
 		var item service.EmailDelivery
