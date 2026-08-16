@@ -611,6 +611,9 @@ func (s *SchedulerSnapshotService) handleBulkAccountEvent(ctx context.Context, p
 		switch account.Platform {
 		case PlatformAnthropic, PlatformGemini, PlatformOpenAI, PlatformGrok, PlatformAgnes, PlatformDeepSeek, PlatformNvidia, PlatformTokenRhythm, PlatformKimi:
 			addPlatformGroups(account.Platform, accountGroupIDs)
+			if account.Platform == PlatformTokenRhythm {
+				addPlatformGroups(PlatformDeepSeek, accountGroupIDs)
+			}
 		case PlatformAntigravity:
 			// 批量更新可能刚关闭 mixed_scheduling，仍需清理两个兼容平台的旧快照。
 			addPlatformGroups(PlatformAntigravity, accountGroupIDs)
@@ -817,6 +820,9 @@ func (s *SchedulerSnapshotService) rebuildByAccount(ctx context.Context, account
 	}
 
 	buckets := s.bucketsForPlatform(account.Platform, groupIDs, seen)
+	if account.Platform == PlatformTokenRhythm {
+		buckets = append(buckets, s.bucketsForPlatform(PlatformDeepSeek, groupIDs, seen)...)
+	}
 	if account.Platform == PlatformAntigravity && account.IsMixedSchedulingEnabled() {
 		buckets = append(buckets, s.bucketsForPlatform(PlatformAnthropic, groupIDs, seen)...)
 		buckets = append(buckets, s.bucketsForPlatform(PlatformGemini, groupIDs, seen)...)
@@ -1488,6 +1494,10 @@ func (s *SchedulerSnapshotService) loadAccountsFromDB(ctx context.Context, bucke
 	}
 
 	if groupID > 0 {
+		platforms := accountPlatformsForGroupPlatform(bucket.Platform)
+		if len(platforms) > 1 {
+			return s.accountRepo.ListSchedulableByGroupIDAndPlatforms(ctx, groupID, platforms)
+		}
 		return s.accountRepo.ListSchedulableByGroupIDAndPlatform(ctx, groupID, bucket.Platform)
 	}
 	if s.isRunModeSimple() {

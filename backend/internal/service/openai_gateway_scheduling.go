@@ -326,7 +326,7 @@ func isOpenAICompatibleAccountEligibleForRequest(ctx context.Context, account *A
 // profit veto so earlier failures retain their actual reason.
 func isOpenAICompatibleAccountEligibleForRequestBeforeProfit(ctx context.Context, account *Account, platform string, requestedModel string, requireCompact bool, requiredCapability OpenAIEndpointCapability) bool {
 	platform = normalizeOpenAICompatiblePlatform(platform)
-	if account == nil || account.Platform != platform || !account.IsOpenAICompatible() || !account.IsSchedulableForModelWithContext(ctx, requestedModel) {
+	if account == nil || !accountPlatformMatchesGroup(platform, account.Platform) || !account.IsOpenAICompatible() || !account.IsSchedulableForModelWithContext(ctx, requestedModel) {
 		return false
 	}
 	if account.IsOpenAI() {
@@ -1291,7 +1291,12 @@ func (s *OpenAIGatewayService) listSchedulableAccounts(ctx context.Context, grou
 	if s.cfg != nil && s.cfg.RunMode == config.RunModeSimple {
 		accounts, err = s.accountRepo.ListSchedulableByPlatform(ctx, platform)
 	} else if groupID != nil {
-		accounts, err = s.accountRepo.ListSchedulableByGroupIDAndPlatform(ctx, *groupID, platform)
+		platforms := accountPlatformsForGroupPlatform(platform)
+		if len(platforms) > 1 {
+			accounts, err = s.accountRepo.ListSchedulableByGroupIDAndPlatforms(ctx, *groupID, platforms)
+		} else {
+			accounts, err = s.accountRepo.ListSchedulableByGroupIDAndPlatform(ctx, *groupID, platform)
+		}
 	} else {
 		accounts, err = s.accountRepo.ListSchedulableUngroupedByPlatform(ctx, platform)
 	}

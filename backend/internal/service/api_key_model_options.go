@@ -61,7 +61,7 @@ func mappedGroupModelOptions(accounts []Account, platform string) []string {
 	seen := make(map[string]struct{})
 	models := make([]string, 0)
 	for _, account := range accounts {
-		if account.Platform != platform {
+		if !accountPlatformMatchesGroup(platform, account.Platform) {
 			continue
 		}
 		for model := range account.GetModelMapping() {
@@ -98,7 +98,7 @@ func compositeGroupModelOptions(accounts []Account) []string {
 
 func hasSchedulableAccountPlatform(accounts []Account, platform string) bool {
 	for _, account := range accounts {
-		if account.Platform == platform && isConcreteRequestPlatform(account.Platform) {
+		if accountPlatformMatchesGroup(platform, account.Platform) && isConcreteRequestPlatform(account.Platform) {
 			return true
 		}
 	}
