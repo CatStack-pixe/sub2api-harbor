@@ -896,7 +896,7 @@ export default {
         fromName: '发件人名称',
         fromNamePlaceholder: 'Sub2API',
         replyTo: '回复地址',
-        replyToPlaceholder: 'support@example.com（可选）',
+        replyToPlaceholder: "support{'@'}example.com（可选）",
         useTls: '使用 TLS',
         useTlsHint: '为 SMTP 连接启用 TLS 加密'
       },
