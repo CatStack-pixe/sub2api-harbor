@@ -1367,7 +1367,8 @@ func (s *GatewayService) GetAvailableModels(ctx context.Context, groupID *int64,
 	if platform != "" {
 		filtered := make([]Account, 0)
 		for _, acc := range accounts {
-			if acc.Platform == platform {
+			if (groupID != nil && accountPlatformMatchesGroup(platform, acc.Platform)) ||
+				(groupID == nil && acc.Platform == platform) {
 				filtered = append(filtered, acc)
 			}
 		}
