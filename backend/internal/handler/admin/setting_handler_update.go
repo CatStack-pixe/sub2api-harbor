@@ -48,6 +48,7 @@ type UpdateSettingsRequest struct {
 	SMTPPassword string `json:"smtp_password"`
 	SMTPFrom     string `json:"smtp_from_email"`
 	SMTPFromName string `json:"smtp_from_name"`
+	SMTPReplyTo  string `json:"smtp_reply_to"`
 	SMTPUseTLS   bool   `json:"smtp_use_tls"`
 
 	// Cloudflare Turnstile 设置
@@ -606,6 +607,7 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 	req.SMTPPassword = strings.TrimSpace(req.SMTPPassword)
 	req.SMTPFrom = strings.TrimSpace(req.SMTPFrom)
 	req.SMTPFromName = strings.TrimSpace(req.SMTPFromName)
+	req.SMTPReplyTo = strings.TrimSpace(req.SMTPReplyTo)
 	req.TencentCaptchaAppID = strings.TrimSpace(req.TencentCaptchaAppID)
 	req.TencentCaptchaAppSecretKey = strings.TrimSpace(req.TencentCaptchaAppSecretKey)
 	req.TencentCaptchaCloudSecretID = strings.TrimSpace(req.TencentCaptchaCloudSecretID)
@@ -628,6 +630,7 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		req.SMTPUsername = previousSettings.SMTPUsername
 		req.SMTPFrom = previousSettings.SMTPFrom
 		req.SMTPFromName = previousSettings.SMTPFromName
+		req.SMTPReplyTo = previousSettings.SMTPReplyTo
 		req.SMTPUseTLS = previousSettings.SMTPUseTLS
 	}
 
@@ -1517,6 +1520,7 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		SMTPPassword:                        req.SMTPPassword,
 		SMTPFrom:                            req.SMTPFrom,
 		SMTPFromName:                        req.SMTPFromName,
+		SMTPReplyTo:                         req.SMTPReplyTo,
 		SMTPUseTLS:                          req.SMTPUseTLS,
 		TurnstileEnabled:                    req.TurnstileEnabled,
 		TurnstileSiteKey:                    req.TurnstileSiteKey,
@@ -2132,6 +2136,7 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		SMTPPasswordConfigured:                                 updatedSettings.SMTPPasswordConfigured,
 		SMTPFrom:                                               updatedSettings.SMTPFrom,
 		SMTPFromName:                                           updatedSettings.SMTPFromName,
+		SMTPReplyTo:                                            updatedSettings.SMTPReplyTo,
 		SMTPUseTLS:                                             updatedSettings.SMTPUseTLS,
 		TurnstileEnabled:                                       updatedSettings.TurnstileEnabled,
 		TurnstileSiteKey:                                       updatedSettings.TurnstileSiteKey,

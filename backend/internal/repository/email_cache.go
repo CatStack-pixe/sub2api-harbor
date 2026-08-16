@@ -13,6 +13,7 @@ import (
 
 const (
 	verifyCodeKeyPrefix          = "verify_code:"
+	verifyCodeSendKeyPrefix      = "verify_code_send:"
 	notifyVerifyKeyPrefix        = "notify_verify:"
 	passwordResetKeyPrefix       = "password_reset:"
 	passwordResetSentAtKeyPrefix = "password_reset_sent:"
@@ -23,6 +24,10 @@ const (
 // Email is lowercased for case-insensitive consistency.
 func verifyCodeKey(email string) string {
 	return verifyCodeKeyPrefix + strings.ToLower(email)
+}
+
+func verifyCodeSendKey(email string) string {
+	return verifyCodeSendKeyPrefix + strings.ToLower(email)
 }
 
 // notifyVerifyKey generates the Redis key for notify email verification code.
@@ -75,6 +80,21 @@ func (c *emailCache) SetVerificationCode(ctx context.Context, email string, data
 func (c *emailCache) DeleteVerificationCode(ctx context.Context, email string) error {
 	key := verifyCodeKey(email)
 	return c.rdb.Del(ctx, key).Err()
+}
+
+func (c *emailCache) ReserveVerificationSend(ctx context.Context, email, reservationID string, ttl time.Duration) (bool, error) {
+	return c.rdb.SetNX(ctx, verifyCodeSendKey(email), reservationID, ttl).Result()
+}
+
+var releaseVerificationSendScript = redis.NewScript(`
+if redis.call("GET", KEYS[1]) == ARGV[1] then
+  return redis.call("DEL", KEYS[1])
+end
+return 0
+`)
+
+func (c *emailCache) ReleaseVerificationSend(ctx context.Context, email, reservationID string) error {
+	return releaseVerificationSendScript.Run(ctx, c.rdb, []string{verifyCodeSendKey(email)}, reservationID).Err()
 }
 
 // Password reset token methods

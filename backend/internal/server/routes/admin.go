@@ -74,6 +74,9 @@ func RegisterAdminRoutes(
 
 		// 系统设置
 		registerSettingsRoutes(admin, h)
+		if h.ResendWebhook != nil {
+			admin.GET("/email-deliveries", h.ResendWebhook.ListDeliveries)
+		}
 
 		// 数据管理
 		registerDataManagementRoutes(admin, h, stepUpAuth)

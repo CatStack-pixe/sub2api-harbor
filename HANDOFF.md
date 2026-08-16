@@ -23,3 +23,22 @@
 - Branch: create a feature branch from the current merged base before submitting the Kimi change.
 - Required release path: English Conventional Commit, push and create a labeled PR with `gh`, review the PR diff, squash-merge, then dispatch the repository release workflow. Deploy the resulting application container only.
 - No manual production account-state mutation is required; the next matching upstream insufficient-balance response activates the existing 30-minute pool quarantine.
+
+## 2026-08-16 邮件发送慢与失败诊断
+
+- `fix/email-delivery-reliability` 已实现待提交版本：邮件改为 `multipart/alternative`（纯文本 + HTML），新增可选 `smtp_reply_to`，587 只建立一次强制 STARTTLS 连接，465 保留隐式 TLS，并将 context 取消贯穿拨号、握手与 SMTP socket。
+- 验证码发送现在在 HTTP 请求线程通过 Redis `SET NX` 原子预留 60 秒冷却，任务携带固定验证码；队列满/最终失败按 reservation ID 条件释放，临时且明确未被接受的错误最多重试 3 次，API 文案改为“accepted for delivery”。队列停止时会拒绝新任务并排空已入队任务。
+- 新增迁移 `224_email_delivery_webhooks.sql`、Resend Svix 签名校验、事件幂等入库和按事件时间更新投递状态；公共端点为 `POST /api/v1/webhooks/resend`，管理员查询为 `GET /api/v1/admin/email-deliveries`。上线后仍需在 Resend 创建 webhook，并把返回的 signing secret 写入设置键 `resend_webhook_secret`。
+- 本地验证：Go 文件已由缓存 Go 1.26.6 `gofmt`；`git diff --check`、前端 `pnpm typecheck`、目标 ESLint、SettingsView 35 项测试通过。当前本机 Go 安装缺标准库，后端编译/单测必须由 PR GitHub Actions 完成。
+
+- 改善方案已分层记录：先补 `text/plain`/可回复发件身份和 Resend delivery webhook，再修复 587 STARTTLS、Redis 原子冷却、失败回滚/有限重试；若 QQ 仍慢，使用 Resend 与腾讯云 SES 对 `qq.com/foxmail.com` 做小比例 A/B，不直接全量切换或购买独立 IP。
+- Resend 只读 API 复核：QQ 邮件累计 `31 delivered / 2 delivery_delayed`，Gmail `1 delivered`。两封延迟邮件的脱敏收件人此前均有成功投递记录；发信域、DKIM、SPF 均为 verified，Resend 当前没有平台级事故。结合应用约 `3.3-3.9s` 完成 SMTP 接受，半小时以上延迟发生在 Resend 到 QQ 的下游投递重试阶段，而非 Sub2API 本地队列。
+- 当前邮件为 HTML-only 且使用 `noreply` 发件地址。后续投递优化应增加 `text/plain` alternative、改用可回复地址、接入 Resend delivery webhook，并评估 QQ 收件使用更适配国内邮箱的通道。
+- 生产 SSH 复核已恢复：`sub2api` 为 `running/healthy`、restart count `0`。最近 24 小时统计为验证码入队 14、worker 成功 13、失败 1、SMTP 错误 0、队列满 0；成功任务从入队到 SMTP 接受约 `3.3-3.9s`。
+- 唯一失败是接口先返回 HTTP 200，worker 同时因 `VERIFY_CODE_TOO_FREQUENT` 拒绝发送；其前一次成功发送约在 59 秒前。这是冷却检查在 worker 内导致的误报成功，生产日志已复现源码诊断。
+- 注册验证码和忘记密码接口走 `EmailQueueService`：固定缓冲 100、默认仅 3 个 worker；接口返回成功只代表入队，实际 SMTP 失败只记录日志，没有重试、死信或用户可见状态。队列满时验证码请求直接报错，密码重置为防止枚举会静默成功。
+- 每封邮件都会从数据库重新读取 7 个 SMTP 设置，并新建/认证/关闭一个 SMTP 连接。网络路径有 10 秒拨号和 20 秒 I/O 超时，认证、MAIL、RCPT、DATA 串行执行；慢 SMTP 会占满 3 个 worker，任务因此排队变慢。`UseTLS=true` 在 STARTTLS 端口还会先尝试一次隐式 TLS，再建立第二条连接，可能额外增加延迟。
+- SMTP 发送没有使用调用方 context；队列的 30 秒 context 无法中断底层网络操作。同步 OAuth/邮箱绑定流程会直接等待 SMTP，可能把请求拖到超时。
+- `SendVerifyCode` 先把验证码写入 Redis，再发邮件。发送失败时验证码和 60 秒冷却仍保留，用户立即重试会收到 `VERIFY_CODE_TOO_FREQUENT`；队列也不会重试该任务。冷却检查位于 worker 内而非入队处，并发请求可能被多个 worker 同时放行、生成不同验证码，最终只有 Redis 最后一次写入的验证码有效，先到达的邮件可能无法验证。密码重置 token 同样先保存，但其冷却标记只在成功后写入。
+- 生产交接记录显示 Resend 本地发送链路曾在约 4 秒内完成（入队到 worker 成功）；QQ 的 `Delivery Delayed` 是 Resend 已接受后收件服务器临时 4xx/限流/信誉等外部投递问题，Gmail 为 `Delivered`。需要在 Resend Events/Logs 查看 QQ 的具体 SMTP 4xx 原因，应用当前无法看到收件箱内部投递结果。
+- 本次为只读诊断，未修改业务代码、生产配置或部署。后续修复优先级：失败重试/死信与可观测指标、发送失败回滚验证码或清除冷却、SMTP 配置缓存与连接复用、将 context/超时贯穿网络调用，并区分“入队成功”和“发送成功”的 API 状态。

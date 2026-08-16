@@ -55,6 +55,7 @@ type SystemSettings struct {
 	SMTPPasswordConfigured bool   `json:"smtp_password_configured"`
 	SMTPFrom               string `json:"smtp_from_email"`
 	SMTPFromName           string `json:"smtp_from_name"`
+	SMTPReplyTo            string `json:"smtp_reply_to"`
 	SMTPUseTLS             bool   `json:"smtp_use_tls"`
 
 	TurnstileEnabled                       bool     `json:"turnstile_enabled"`
