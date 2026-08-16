@@ -37,6 +37,8 @@ type EmailCache interface {
 	GetVerificationCode(ctx context.Context, email string) (*VerificationCodeData, error)
 	SetVerificationCode(ctx context.Context, email string, data *VerificationCodeData, ttl time.Duration) error
 	DeleteVerificationCode(ctx context.Context, email string) error
+	ReserveVerificationSend(ctx context.Context, email, reservationID string, ttl time.Duration) (bool, error)
+	ReleaseVerificationSend(ctx context.Context, email, reservationID string) error
 
 	// Notify email verification code methods
 	GetNotifyVerifyCode(ctx context.Context, email string) (*VerificationCodeData, error)
@@ -66,6 +68,11 @@ type VerificationCodeData struct {
 	ExpiresAt time.Time // absolute expiry; used to preserve remaining TTL when updating attempts
 }
 
+type PreparedVerifyCode struct {
+	Code          string
+	ReservationID string
+}
+
 // PasswordResetTokenData represents password reset token data
 type PasswordResetTokenData struct {
 	Token     string
@@ -92,6 +99,7 @@ type SMTPConfig struct {
 	Password string
 	From     string
 	FromName string
+	ReplyTo  string
 	UseTLS   bool
 }
 
@@ -141,6 +149,7 @@ func (s *EmailService) GetSMTPConfig(ctx context.Context) (*SMTPConfig, error) {
 		SettingKeySMTPPassword,
 		SettingKeySMTPFrom,
 		SettingKeySMTPFromName,
+		SettingKeySMTPReplyTo,
 		SettingKeySMTPUseTLS,
 	}
 
@@ -170,6 +179,7 @@ func (s *EmailService) GetSMTPConfig(ctx context.Context) (*SMTPConfig, error) {
 		Password: strings.TrimSpace(settings[SettingKeySMTPPassword]),
 		From:     strings.TrimSpace(settings[SettingKeySMTPFrom]),
 		FromName: strings.TrimSpace(settings[SettingKeySMTPFromName]),
+		ReplyTo:  strings.TrimSpace(settings[SettingKeySMTPReplyTo]),
 		UseTLS:   useTLS,
 	}, nil
 }
@@ -180,7 +190,7 @@ func (s *EmailService) SendEmail(ctx context.Context, to, subject, body string) 
 	if err != nil {
 		return err
 	}
-	return s.SendEmailWithConfig(config, to, subject, body)
+	return s.SendEmailWithConfigContext(ctx, config, to, subject, body)
 }
 
 const smtpDialTimeout = 10 * time.Second
@@ -188,36 +198,47 @@ const smtpIOTimeout = 20 * time.Second
 
 // SendEmailWithConfig 使用指定配置发送邮件
 func (s *EmailService) SendEmailWithConfig(config *SMTPConfig, to, subject, body string) error {
+	return s.SendEmailWithConfigContext(context.Background(), config, to, subject, body)
+}
+
+func (s *EmailService) SendEmailWithConfigContext(ctx context.Context, config *SMTPConfig, to, subject, body string) error {
+	return s.sendEmailWithConfigAt(ctx, config, to, subject, body, smtpAddress(config))
+}
+
+func (s *EmailService) sendEmailWithConfigAt(ctx context.Context, config *SMTPConfig, to, subject, body, addr string) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	message, err := buildSMTPMessage(config, to, subject, body)
 	if err != nil {
 		return err
 	}
 
-	client, err := s.connectSMTP(config)
+	client, err := s.connectSMTPAt(ctx, config, addr)
 	if err != nil {
 		return err
 	}
-	defer func() { _ = client.Close() }()
+	defer client.close()
 
 	auth := smtp.PlainAuth("", config.Username, config.Password, config.Host)
 	if err = client.Auth(auth); err != nil {
-		return fmt.Errorf("smtp auth: %w", err)
+		return smtpContextError(ctx, "smtp auth", err)
 	}
 	if err = client.Mail(message.envelopeFrom); err != nil {
-		return fmt.Errorf("smtp mail: %w", err)
+		return smtpContextError(ctx, "smtp mail", err)
 	}
 	if err = client.Rcpt(message.envelopeTo); err != nil {
-		return fmt.Errorf("smtp rcpt: %w", err)
+		return smtpContextError(ctx, "smtp rcpt", err)
 	}
 	w, err := client.Data()
 	if err != nil {
-		return fmt.Errorf("smtp data: %w", err)
+		return smtpContextError(ctx, "smtp data", err)
 	}
 	if _, err = w.Write(message.data); err != nil {
-		return fmt.Errorf("write msg: %w", err)
+		return smtpContextError(ctx, "write msg", err)
 	}
 	if err = w.Close(); err != nil {
-		return fmt.Errorf("close writer: %w", err)
+		return smtpContextError(ctx, "close writer", err)
 	}
 	// Email is sent successfully after w.Close(), ignore Quit errors
 	// Some SMTP servers return non-standard responses on QUIT
@@ -228,6 +249,21 @@ func (s *EmailService) SendEmailWithConfig(config *SMTPConfig, to, subject, body
 // smtpTestRootCAs 仅供单元测试注入自签 CA，生产环境始终为 nil（走系统信任链）。
 var smtpTestRootCAs *x509.CertPool
 
+type smtpClient struct {
+	*smtp.Client
+	stopContextWatch func() bool
+}
+
+func (c *smtpClient) close() {
+	if c == nil {
+		return
+	}
+	if c.stopContextWatch != nil {
+		c.stopContextWatch()
+	}
+	_ = c.Close()
+}
+
 func smtpTLSConfig(host string) *tls.Config {
 	return &tls.Config{
 		ServerName: host,
@@ -237,68 +273,126 @@ func smtpTLSConfig(host string) *tls.Config {
 	}
 }
 
-// connectSMTP 按配置建立 SMTP 会话，发送与测试连接共用此路径，
-// 保证"测试连接成功 ⇔ 实际发信可用"：
-//   - UseTLS=true：先尝试隐式 TLS（465 语义）；若服务器以明文应答
-//     （587/25 等提交端口的 STARTTLS 语义），自动改走"明文连接 + 强制 STARTTLS"。
-//     两种方式都无法建立加密连接时报错，绝不明文继续。
-//   - UseTLS=false：明文连接后若服务器支持 STARTTLS 则机会式升级，
-//     与 smtp.SendMail 的默认行为一致。
-func (s *EmailService) connectSMTP(config *SMTPConfig) (*smtp.Client, error) {
-	addr := fmt.Sprintf("%s:%d", config.Host, config.Port)
+// Port 465 uses implicit TLS. Other TLS-enabled ports use one connection and
+// require STARTTLS. TLS-disabled configurations retain opportunistic STARTTLS.
+func (s *EmailService) connectSMTP(ctx context.Context, config *SMTPConfig) (*smtpClient, error) {
+	return s.connectSMTPAt(ctx, config, smtpAddress(config))
+}
+
+func smtpAddress(config *SMTPConfig) string {
+	if config == nil {
+		return ""
+	}
+	return net.JoinHostPort(config.Host, strconv.Itoa(config.Port))
+}
+
+func (s *EmailService) connectSMTPAt(ctx context.Context, config *SMTPConfig, addr string) (*smtpClient, error) {
+	if config == nil {
+		return nil, errors.New("missing SMTP configuration")
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	dialer := &net.Dialer{Timeout: smtpDialTimeout}
 	tlsConfig := smtpTLSConfig(config.Host)
 
+	if config.UseTLS && config.Port == 465 {
+		return s.connectSMTPImplicitTLS(ctx, dialer, addr, config.Host, tlsConfig)
+	}
 	if config.UseTLS {
-		conn, err := tls.DialWithDialer(dialer, "tcp", addr, tlsConfig)
-		if err == nil {
-			return newSMTPClient(conn, config.Host)
-		}
-		var recordErr tls.RecordHeaderError
-		if !errors.As(err, &recordErr) {
-			return nil, fmt.Errorf("tls dial: %w", err)
-		}
-		// SMTP 服务器先发问候语：明文问候会让 TLS 握手立刻返回
-		// RecordHeaderError，据此可靠判定对端期望 STARTTLS。
-		return s.connectSMTPStartTLS(dialer, addr, config.Host, tlsConfig, true)
+		return s.connectSMTPStartTLS(ctx, dialer, addr, config.Host, tlsConfig, true)
 	}
 
-	return s.connectSMTPStartTLS(dialer, addr, config.Host, tlsConfig, false)
+	return s.connectSMTPStartTLS(ctx, dialer, addr, config.Host, tlsConfig, false)
+}
+
+func (s *EmailService) connectSMTPImplicitTLS(ctx context.Context, dialer *net.Dialer, addr, host string, tlsConfig *tls.Config) (*smtpClient, error) {
+	conn, err := dialer.DialContext(ctx, "tcp", addr)
+	if err != nil {
+		return nil, smtpContextError(ctx, "tls dial", err)
+	}
+	if err := setSMTPDeadline(ctx, conn); err != nil {
+		_ = conn.Close()
+		return nil, err
+	}
+	stopContextWatch := context.AfterFunc(ctx, func() { _ = conn.Close() })
+	tlsConn := tls.Client(conn, tlsConfig)
+	if err := tlsConn.HandshakeContext(ctx); err != nil {
+		stopContextWatch()
+		_ = conn.Close()
+		return nil, smtpContextError(ctx, "tls handshake", err)
+	}
+	return newSMTPClient(ctx, tlsConn, host, stopContextWatch)
 }
 
 // connectSMTPStartTLS 建立明文连接并按需升级 STARTTLS。
 // mandatory 为 true 时服务器必须支持 STARTTLS，否则报错。
-func (s *EmailService) connectSMTPStartTLS(dialer *net.Dialer, addr, host string, tlsConfig *tls.Config, mandatory bool) (*smtp.Client, error) {
-	conn, err := dialer.Dial("tcp", addr)
+func (s *EmailService) connectSMTPStartTLS(ctx context.Context, dialer *net.Dialer, addr, host string, tlsConfig *tls.Config, mandatory bool) (*smtpClient, error) {
+	conn, err := dialer.DialContext(ctx, "tcp", addr)
 	if err != nil {
-		return nil, fmt.Errorf("smtp dial: %w", err)
+		return nil, smtpContextError(ctx, "smtp dial", err)
 	}
-	client, err := newSMTPClient(conn, host)
+	client, err := newSMTPClient(ctx, conn, host, nil)
 	if err != nil {
 		return nil, err
 	}
 	if ok, _ := client.Extension("STARTTLS"); !ok {
+		if err := ctx.Err(); err != nil {
+			client.close()
+			return nil, fmt.Errorf("smtp STARTTLS capability: %w", err)
+		}
 		if mandatory {
-			_ = client.Close()
+			client.close()
 			return nil, errors.New("smtp server does not support STARTTLS")
 		}
 		return client, nil
 	}
 	if err := client.StartTLS(tlsConfig); err != nil {
-		_ = client.Close()
-		return nil, fmt.Errorf("starttls: %w", err)
+		client.close()
+		return nil, smtpContextError(ctx, "starttls", err)
 	}
 	return client, nil
 }
 
-func newSMTPClient(conn net.Conn, host string) (*smtp.Client, error) {
-	_ = conn.SetDeadline(time.Now().Add(smtpIOTimeout))
+func newSMTPClient(ctx context.Context, conn net.Conn, host string, stopContextWatch func() bool) (*smtpClient, error) {
+	if err := setSMTPDeadline(ctx, conn); err != nil {
+		if stopContextWatch != nil {
+			stopContextWatch()
+		}
+		_ = conn.Close()
+		return nil, err
+	}
+	if stopContextWatch == nil {
+		stopContextWatch = context.AfterFunc(ctx, func() { _ = conn.Close() })
+	}
 	client, err := smtp.NewClient(conn, host)
 	if err != nil {
+		stopContextWatch()
 		_ = conn.Close()
-		return nil, fmt.Errorf("new smtp client: %w", err)
+		return nil, smtpContextError(ctx, "new smtp client", err)
 	}
-	return client, nil
+	return &smtpClient{Client: client, stopContextWatch: stopContextWatch}, nil
+}
+
+func setSMTPDeadline(ctx context.Context, conn net.Conn) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	deadline := time.Now().Add(smtpIOTimeout)
+	if contextDeadline, ok := ctx.Deadline(); ok && contextDeadline.Before(deadline) {
+		deadline = contextDeadline
+	}
+	if err := conn.SetDeadline(deadline); err != nil {
+		return fmt.Errorf("set smtp deadline: %w", err)
+	}
+	return nil
+}
+
+func smtpContextError(ctx context.Context, stage string, err error) error {
+	if contextErr := ctx.Err(); contextErr != nil {
+		return fmt.Errorf("%s: %w", stage, contextErr)
+	}
+	return fmt.Errorf("%s: %w", stage, err)
 }
 
 // GenerateVerifyCode 生成6位数字验证码
@@ -317,30 +411,67 @@ func (s *EmailService) GenerateVerifyCode() (string, error) {
 
 // SendVerifyCode 发送验证码邮件
 func (s *EmailService) SendVerifyCode(ctx context.Context, email, siteName string, locale ...string) error {
-	// 检查是否在冷却期内
-	existing, err := s.cache.GetVerificationCode(ctx, email)
-	if err == nil && existing != nil {
-		if time.Since(existing.CreatedAt) < verifyCodeCooldown {
-			return ErrVerifyCodeTooFrequent
-		}
+	prepared, err := s.PrepareVerifyCode(ctx, email)
+	if err != nil {
+		return err
+	}
+	if err := s.SendPreparedVerifyCode(ctx, email, siteName, prepared, locale...); err != nil {
+		s.ReleaseVerifyCodeReservation(ctx, email, prepared.ReservationID)
+		return err
+	}
+	return nil
+}
+
+func (s *EmailService) PrepareVerifyCode(ctx context.Context, email string) (*PreparedVerifyCode, error) {
+	reservationBytes := make([]byte, 16)
+	if _, err := rand.Read(reservationBytes); err != nil {
+		return nil, fmt.Errorf("generate verification reservation: %w", err)
+	}
+	reservationID := hex.EncodeToString(reservationBytes)
+	reserved, err := s.cache.ReserveVerificationSend(ctx, email, reservationID, verifyCodeCooldown)
+	if err != nil {
+		return nil, fmt.Errorf("reserve verification send: %w", err)
+	}
+	if !reserved {
+		return nil, ErrVerifyCodeTooFrequent
 	}
 
-	// 生成验证码
+	prepared := &PreparedVerifyCode{ReservationID: reservationID}
+	existing, getErr := s.cache.GetVerificationCode(ctx, email)
+	if getErr == nil && existing != nil && existing.Code != "" && existing.Attempts < maxVerifyCodeAttempts && time.Until(existing.ExpiresAt) > 0 {
+		prepared.Code = existing.Code
+		return prepared, nil
+	}
+
 	code, err := s.GenerateVerifyCode()
 	if err != nil {
-		return fmt.Errorf("generate code: %w", err)
+		s.ReleaseVerifyCodeReservation(ctx, email, reservationID)
+		return nil, fmt.Errorf("generate code: %w", err)
 	}
-
-	// 保存验证码到 Redis
-	data := &VerificationCodeData{
-		Code:      code,
-		Attempts:  0,
-		CreatedAt: time.Now(),
-		ExpiresAt: time.Now().Add(verifyCodeTTL),
-	}
+	now := time.Now()
+	data := &VerificationCodeData{Code: code, Attempts: 0, CreatedAt: now, ExpiresAt: now.Add(verifyCodeTTL)}
 	if err := s.cache.SetVerificationCode(ctx, email, data, verifyCodeTTL); err != nil {
-		return fmt.Errorf("save verify code: %w", err)
+		s.ReleaseVerifyCodeReservation(ctx, email, reservationID)
+		return nil, fmt.Errorf("save verify code: %w", err)
 	}
+	prepared.Code = code
+	return prepared, nil
+}
+
+func (s *EmailService) ReleaseVerifyCodeReservation(ctx context.Context, email, reservationID string) {
+	if reservationID == "" {
+		return
+	}
+	if err := s.cache.ReleaseVerificationSend(ctx, email, reservationID); err != nil {
+		slog.Warn("failed to release verification send reservation", "recipient_hash", notificationEmailHash(email), "error", err)
+	}
+}
+
+func (s *EmailService) SendPreparedVerifyCode(ctx context.Context, email, siteName string, prepared *PreparedVerifyCode, locale ...string) error {
+	if prepared == nil || prepared.Code == "" {
+		return errors.New("verification code was not prepared")
+	}
+	code := prepared.Code
 
 	if s.notificationEmailService != nil {
 		err := s.notificationEmailService.Send(ctx, NotificationEmailSendInput{
@@ -453,15 +584,22 @@ func (s *EmailService) buildVerifyCodeEmailBody(code, siteName string) string {
 // 与 SendEmailWithConfig 共用 connectSMTP 建连（含 STARTTLS 升级逻辑），
 // 避免出现"测试连接失败但实际发信成功"的不一致。
 func (s *EmailService) TestSMTPConnectionWithConfig(config *SMTPConfig) error {
-	client, err := s.connectSMTP(config)
+	return s.TestSMTPConnectionWithConfigContext(context.Background(), config)
+}
+
+func (s *EmailService) TestSMTPConnectionWithConfigContext(ctx context.Context, config *SMTPConfig) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	client, err := s.connectSMTP(ctx, config)
 	if err != nil {
 		return fmt.Errorf("smtp connection failed: %w", err)
 	}
-	defer func() { _ = client.Close() }()
+	defer client.close()
 
 	auth := smtp.PlainAuth("", config.Username, config.Password, config.Host)
 	if err := client.Auth(auth); err != nil {
-		return fmt.Errorf("smtp authentication failed: %w", err)
+		return smtpContextError(ctx, "smtp authentication failed", err)
 	}
 
 	// 认证成功即视为连接可用；与发送路径一致，忽略 QUIT 的非标准响应。

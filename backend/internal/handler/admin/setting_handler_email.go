@@ -85,6 +85,7 @@ type SendTestEmailRequest struct {
 	SMTPPassword string `json:"smtp_password"`
 	SMTPFrom     string `json:"smtp_from_email"`
 	SMTPFromName string `json:"smtp_from_name"`
+	SMTPReplyTo  string `json:"smtp_reply_to"`
 	SMTPUseTLS   bool   `json:"smtp_use_tls"`
 }
 
@@ -101,6 +102,7 @@ func (h *SettingHandler) SendTestEmail(c *gin.Context) {
 	req.SMTPUsername = strings.TrimSpace(req.SMTPUsername)
 	req.SMTPFrom = strings.TrimSpace(req.SMTPFrom)
 	req.SMTPFromName = strings.TrimSpace(req.SMTPFromName)
+	req.SMTPReplyTo = strings.TrimSpace(req.SMTPReplyTo)
 
 	var savedConfig *service.SMTPConfig
 	if cfg, err := h.emailService.GetSMTPConfig(c.Request.Context()); err == nil && cfg != nil {
@@ -130,6 +132,9 @@ func (h *SettingHandler) SendTestEmail(c *gin.Context) {
 	if req.SMTPFromName == "" && savedConfig != nil {
 		req.SMTPFromName = savedConfig.FromName
 	}
+	if req.SMTPReplyTo == "" && savedConfig != nil {
+		req.SMTPReplyTo = savedConfig.ReplyTo
+	}
 	if req.SMTPHost == "" {
 		response.BadRequest(c, "SMTP host is required")
 		return
@@ -142,6 +147,7 @@ func (h *SettingHandler) SendTestEmail(c *gin.Context) {
 		Password: password,
 		From:     req.SMTPFrom,
 		FromName: req.SMTPFromName,
+		ReplyTo:  req.SMTPReplyTo,
 		UseTLS:   req.SMTPUseTLS,
 	}
 

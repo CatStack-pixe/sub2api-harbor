@@ -98,6 +98,9 @@ func diffSettings(before *service.SystemSettings, after *service.SystemSettings,
 	if before.SMTPFromName != after.SMTPFromName {
 		changed = append(changed, "smtp_from_name")
 	}
+	if before.SMTPReplyTo != after.SMTPReplyTo {
+		changed = append(changed, "smtp_reply_to")
+	}
 	if before.SMTPUseTLS != after.SMTPUseTLS {
 		changed = append(changed, "smtp_use_tls")
 	}

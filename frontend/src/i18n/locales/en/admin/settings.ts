@@ -900,6 +900,8 @@ export default {
         fromEmailPlaceholder: "noreply{'@'}example.com",
         fromName: 'From Name',
         fromNamePlaceholder: 'Sub2API',
+        replyTo: 'Reply-To Address',
+        replyToPlaceholder: 'support@example.com (optional)',
         useTls: 'Use TLS',
         useTlsHint: 'Enable TLS encryption for SMTP connection'
       },

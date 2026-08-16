@@ -5,6 +5,8 @@ import (
 	"context"
 	"errors"
 	"io"
+	"mime"
+	"mime/multipart"
 	"mime/quotedprintable"
 	"net"
 	"net/mail"
@@ -606,6 +608,27 @@ func (s *notificationEmailTestSMTPServer) lastMessageBody(t *testing.T) string {
 
 	message, err := mail.ReadMessage(strings.NewReader(s.lastMessage()))
 	require.NoError(t, err)
+
+	mediaType, params, err := mime.ParseMediaType(message.Header.Get("Content-Type"))
+	if err == nil && mediaType == "multipart/alternative" {
+		parts := multipart.NewReader(message.Body, params["boundary"])
+		for {
+			part, partErr := parts.NextPart()
+			if partErr == io.EOF {
+				break
+			}
+			require.NoError(t, partErr)
+			partType, _, parseErr := mime.ParseMediaType(part.Header.Get("Content-Type"))
+			require.NoError(t, parseErr)
+			if partType != "text/html" {
+				continue
+			}
+			body, readErr := io.ReadAll(quotedprintable.NewReader(part))
+			require.NoError(t, readErr)
+			return string(body)
+		}
+		require.FailNow(t, "multipart email did not contain an HTML part")
+	}
 
 	bodyReader := io.Reader(message.Body)
 	if strings.EqualFold(message.Header.Get("Content-Transfer-Encoding"), "quoted-printable") {

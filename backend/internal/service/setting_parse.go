@@ -329,6 +329,7 @@ func (s *SettingService) parseSettings(settings map[string]string) *SystemSettin
 		SMTPUsername:                           settings[SettingKeySMTPUsername],
 		SMTPFrom:                               settings[SettingKeySMTPFrom],
 		SMTPFromName:                           settings[SettingKeySMTPFromName],
+		SMTPReplyTo:                            settings[SettingKeySMTPReplyTo],
 		SMTPUseTLS:                             settings[SettingKeySMTPUseTLS] == "true",
 		SMTPPasswordConfigured:                 settings[SettingKeySMTPPassword] != "",
 		TurnstileEnabled:                       settings[SettingKeyTurnstileEnabled] == "true",

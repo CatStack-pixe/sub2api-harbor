@@ -8319,6 +8319,19 @@
                     :placeholder="t('admin.settings.smtp.fromNamePlaceholder')"
                   />
                 </div>
+                <div>
+                  <label
+                    class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
+                  >
+                    {{ t("admin.settings.smtp.replyTo") }}
+                  </label>
+                  <input
+                    v-model="form.smtp_reply_to"
+                    type="email"
+                    class="input"
+                    :placeholder="t('admin.settings.smtp.replyToPlaceholder')"
+                  />
+                </div>
               </div>
 
               <!-- Use TLS Toggle -->
@@ -9506,6 +9519,7 @@ const form = reactive<SettingsForm>({
   smtp_password_configured: false,
   smtp_from_email: "",
   smtp_from_name: "",
+  smtp_reply_to: "",
   smtp_use_tls: true,
   // Cloudflare Turnstile
   turnstile_enabled: false,
@@ -11093,6 +11107,7 @@ async function saveSettings() {
       smtp_password: form.smtp_password || undefined,
       smtp_from_email: form.smtp_from_email,
       smtp_from_name: form.smtp_from_name,
+      smtp_reply_to: form.smtp_reply_to,
       smtp_use_tls: form.smtp_use_tls,
       turnstile_enabled: form.turnstile_enabled,
       turnstile_site_key: form.turnstile_site_key,
@@ -11541,6 +11556,7 @@ async function sendTestEmail() {
       smtp_password: smtpPasswordForSend,
       smtp_from_email: form.smtp_from_email,
       smtp_from_name: form.smtp_from_name,
+      smtp_reply_to: form.smtp_reply_to,
       smtp_use_tls: form.smtp_use_tls,
     });
     // API returns { message: "..." } on success, errors are thrown as exceptions

@@ -396,6 +396,7 @@ const baseSettingsResponse = {
   smtp_password_configured: false,
   smtp_from_email: "",
   smtp_from_name: "",
+  smtp_reply_to: "",
   smtp_use_tls: true,
   turnstile_enabled: false,
   turnstile_site_key: "",

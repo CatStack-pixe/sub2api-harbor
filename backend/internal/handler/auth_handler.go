@@ -229,7 +229,7 @@ func (h *AuthHandler) SendVerifyCode(c *gin.Context) {
 	}
 
 	response.Success(c, SendVerifyCodeResponse{
-		Message:   "Verification code sent successfully",
+		Message:   "Verification email accepted for delivery",
 		Countdown: result.Countdown,
 	})
 }

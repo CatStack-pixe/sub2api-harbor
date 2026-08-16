@@ -346,7 +346,7 @@ func (s *AuthService) SendVerifyCode(ctx context.Context, email string, locale .
 
 // SendVerifyCodeAsync 异步发送邮箱验证码并返回倒计时
 func (s *AuthService) SendVerifyCodeAsync(ctx context.Context, email string, locale ...string) (*SendVerifyCodeResult, error) {
-	logger.LegacyPrintf("service.auth", "[Auth] SendVerifyCodeAsync called for email: %s", email)
+	logger.LegacyPrintf("service.auth", "[Auth] SendVerifyCodeAsync called recipient_hash=%s", notificationEmailHash(email))
 
 	// 检查是否开放注册（默认关闭）
 	if s.settingService == nil || !s.settingService.IsRegistrationEnabled(ctx) {
@@ -364,7 +364,7 @@ func (s *AuthService) SendVerifyCodeAsync(ctx context.Context, email string, loc
 		return nil, ErrServiceUnavailable
 	}
 	if existsEmail {
-		logger.LegacyPrintf("service.auth", "[Auth] Email already exists: %s", email)
+		logger.LegacyPrintf("service.auth", "[Auth] Email already exists recipient_hash=%s", notificationEmailHash(email))
 		return nil, ErrEmailExists
 	}
 	if err := s.validateRegistrationEmailQuota(ctx, email); err != nil {
@@ -384,13 +384,13 @@ func (s *AuthService) SendVerifyCodeAsync(ctx context.Context, email string, loc
 	}
 
 	// 异步发送
-	logger.LegacyPrintf("service.auth", "[Auth] Enqueueing verify code for: %s", email)
-	if err := s.emailQueueService.EnqueueVerifyCode(email, siteName, firstEmailLocale(locale)); err != nil {
+	logger.LegacyPrintf("service.auth", "[Auth] Enqueueing verify code recipient_hash=%s", notificationEmailHash(email))
+	if err := s.emailQueueService.EnqueueVerifyCodeContext(ctx, email, siteName, firstEmailLocale(locale)); err != nil {
 		logger.LegacyPrintf("service.auth", "[Auth] Failed to enqueue: %v", err)
 		return nil, fmt.Errorf("enqueue verify code: %w", err)
 	}
 
-	logger.LegacyPrintf("service.auth", "[Auth] Verify code enqueued successfully for: %s", email)
+	logger.LegacyPrintf("service.auth", "[Auth] Verify code enqueued recipient_hash=%s", notificationEmailHash(email))
 	return &SendVerifyCodeResult{
 		Countdown: 60, // 60秒倒计时
 	}, nil

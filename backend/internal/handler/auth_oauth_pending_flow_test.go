@@ -2821,6 +2821,14 @@ func (s *oauthPendingFlowEmailCacheStub) DeleteVerificationCode(_ context.Contex
 	return nil
 }
 
+func (s *oauthPendingFlowEmailCacheStub) ReserveVerificationSend(context.Context, string, string, time.Duration) (bool, error) {
+	return true, nil
+}
+
+func (s *oauthPendingFlowEmailCacheStub) ReleaseVerificationSend(context.Context, string, string) error {
+	return nil
+}
+
 func (s *oauthPendingFlowEmailCacheStub) GetNotifyVerifyCode(context.Context, string) (*service.VerificationCodeData, error) {
 	return nil, nil
 }
