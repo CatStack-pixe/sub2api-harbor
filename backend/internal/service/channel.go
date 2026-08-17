@@ -102,6 +102,24 @@ type ChannelModelPricing struct {
 	Intervals        []PricingInterval `json:"intervals"`
 	CreatedAt        time.Time         `json:"created_at,omitempty"`
 	UpdatedAt        time.Time         `json:"updated_at,omitempty"`
+
+	TimeWindows []PricingTimeWindow `json:"time_windows"`
+}
+
+// PricingTimeWindow overrides selected model prices during a daily Beijing-time window.
+// The interval is [StartMinute, EndMinute); gaps fall back to the parent pricing.
+type PricingTimeWindow struct {
+	ID              int64     `json:"id,omitempty"`
+	PricingID       int64     `json:"pricing_id,omitempty"`
+	StartMinute     int       `json:"start_minute"`
+	EndMinute       int       `json:"end_minute"`
+	InputPrice      *float64  `json:"input_price"`
+	OutputPrice     *float64  `json:"output_price"`
+	CacheWritePrice *float64  `json:"cache_write_price"`
+	CacheReadPrice  *float64  `json:"cache_read_price"`
+	SortOrder       int       `json:"sort_order"`
+	CreatedAt       time.Time `json:"created_at,omitempty"`
+	UpdatedAt       time.Time `json:"updated_at,omitempty"`
 }
 
 // PricingInterval 定价区间（token 区间 / 按次分层 / 图片分辨率分层）
@@ -195,7 +213,86 @@ func (p ChannelModelPricing) Clone() ChannelModelPricing {
 		cp.Intervals = make([]PricingInterval, len(p.Intervals))
 		copy(cp.Intervals, p.Intervals)
 	}
+	if p.TimeWindows != nil {
+		cp.TimeWindows = make([]PricingTimeWindow, len(p.TimeWindows))
+		copy(cp.TimeWindows, p.TimeWindows)
+	}
 	return cp
+}
+
+// ApplyTimeWindow returns a copy with the matching daily Beijing-time override applied.
+func (p ChannelModelPricing) ApplyTimeWindow(at time.Time) ChannelModelPricing {
+	if len(p.TimeWindows) == 0 {
+		return p
+	}
+	if at.IsZero() {
+		at = time.Now()
+	}
+	beijing, err := time.LoadLocation("Asia/Shanghai")
+	if err != nil {
+		return p
+	}
+	local := at.In(beijing)
+	minute := local.Hour()*60 + local.Minute()
+	for _, window := range p.TimeWindows {
+		if minute < window.StartMinute || minute >= window.EndMinute {
+			continue
+		}
+		cp := p.Clone()
+		if window.InputPrice != nil {
+			cp.InputPrice = window.InputPrice
+		}
+		if window.OutputPrice != nil {
+			cp.OutputPrice = window.OutputPrice
+		}
+		if window.CacheWritePrice != nil {
+			cp.CacheWritePrice = window.CacheWritePrice
+		}
+		if window.CacheReadPrice != nil {
+			cp.CacheReadPrice = window.CacheReadPrice
+		}
+		for i := range cp.Intervals {
+			if window.InputPrice != nil {
+				cp.Intervals[i].InputPrice = window.InputPrice
+			}
+			if window.OutputPrice != nil {
+				cp.Intervals[i].OutputPrice = window.OutputPrice
+			}
+			if window.CacheWritePrice != nil {
+				cp.Intervals[i].CacheWritePrice = window.CacheWritePrice
+			}
+			if window.CacheReadPrice != nil {
+				cp.Intervals[i].CacheReadPrice = window.CacheReadPrice
+			}
+		}
+		return cp
+	}
+	return p
+}
+
+func ValidatePricingTimeWindows(windows []PricingTimeWindow) error {
+	if len(windows) == 0 {
+		return nil
+	}
+	sorted := append([]PricingTimeWindow(nil), windows...)
+	sort.Slice(sorted, func(i, j int) bool { return sorted[i].StartMinute < sorted[j].StartMinute })
+	for i, window := range sorted {
+		if window.StartMinute < 0 || window.StartMinute >= 24*60 || window.EndMinute <= 0 || window.EndMinute > 24*60 || window.StartMinute >= window.EndMinute {
+			return fmt.Errorf("time window #%d: must be a valid non-crossing daily interval", i+1)
+		}
+		if window.InputPrice == nil && window.OutputPrice == nil && window.CacheWritePrice == nil && window.CacheReadPrice == nil {
+			return fmt.Errorf("time window #%d: at least one price is required", i+1)
+		}
+		for _, price := range []*float64{window.InputPrice, window.OutputPrice, window.CacheWritePrice, window.CacheReadPrice} {
+			if price != nil && *price < 0 {
+				return fmt.Errorf("time window #%d: prices must be >= 0", i+1)
+			}
+		}
+		if i > 0 && sorted[i-1].EndMinute > window.StartMinute {
+			return fmt.Errorf("time window #%d overlaps time window #%d", i, i+1)
+		}
+	}
+	return nil
 }
 
 // Clone 返回 Channel 的深拷贝

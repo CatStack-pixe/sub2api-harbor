@@ -134,6 +134,31 @@
             </div>
           </div>
 
+          <div v-if="!hideTimeWindows" class="mt-3">
+            <div class="flex items-center justify-between">
+              <div>
+                <label class="text-xs font-medium text-gray-500 dark:text-gray-400">
+                  {{ t('admin.channels.form.timeWindows') }}
+                </label>
+                <p class="mt-0.5 text-xs text-gray-400">{{ t('admin.channels.form.timeWindowsHint') }}</p>
+              </div>
+              <button type="button" @click="addTimeWindow" class="text-xs text-primary-600 hover:text-primary-700">
+                + {{ t('admin.channels.form.addTimeWindow') }}
+              </button>
+            </div>
+            <div v-if="entry.time_windows.length" class="mt-2 space-y-2">
+              <div v-for="(window, idx) in entry.time_windows" :key="idx" class="grid grid-cols-2 items-end gap-2 rounded border border-gray-200 p-2 dark:border-dark-600 sm:grid-cols-7">
+                <div><label class="text-xs text-gray-400">{{ t('admin.channels.form.startTime') }}</label><input :value="window.start_time" type="text" inputmode="numeric" placeholder="HH:mm" class="input mt-0.5 text-sm" @input="updateTimeWindowField(idx, 'start_time', ($event.target as HTMLInputElement).value)" /></div>
+                <div><label class="text-xs text-gray-400">{{ t('admin.channels.form.endTime') }}</label><input :value="window.end_time" type="text" inputmode="numeric" placeholder="HH:mm" class="input mt-0.5 text-sm" @input="updateTimeWindowField(idx, 'end_time', ($event.target as HTMLInputElement).value)" /></div>
+                <div><label class="text-xs text-gray-400">{{ t('admin.channels.form.inputPrice') }}</label><input :value="window.input_price" type="number" step="any" min="0" class="input mt-0.5 text-sm" @input="updateTimeWindowField(idx, 'input_price', ($event.target as HTMLInputElement).value)" /></div>
+                <div><label class="text-xs text-gray-400">{{ t('admin.channels.form.outputPrice') }}</label><input :value="window.output_price" type="number" step="any" min="0" class="input mt-0.5 text-sm" @input="updateTimeWindowField(idx, 'output_price', ($event.target as HTMLInputElement).value)" /></div>
+                <div><label class="text-xs text-gray-400">{{ t('admin.channels.form.cacheWritePrice') }}</label><input :value="window.cache_write_price" type="number" step="any" min="0" class="input mt-0.5 text-sm" @input="updateTimeWindowField(idx, 'cache_write_price', ($event.target as HTMLInputElement).value)" /></div>
+                <div><label class="text-xs text-gray-400">{{ t('admin.channels.form.cacheReadPrice') }}</label><input :value="window.cache_read_price" type="number" step="any" min="0" class="input mt-0.5 text-sm" @input="updateTimeWindowField(idx, 'cache_read_price', ($event.target as HTMLInputElement).value)" /></div>
+                <button type="button" class="mb-0.5 h-9 w-9 justify-self-end rounded p-1 text-gray-400 hover:text-red-500" @click="removeTimeWindow(idx)"><Icon name="trash" size="sm" /></button>
+              </div>
+            </div>
+          </div>
+
           <!-- Token intervals (channel-only; group long-context uses official presets) -->
           <div v-if="!hideTokenIntervals" class="mt-3">
             <div class="flex items-center justify-between">
@@ -249,8 +274,10 @@ const props = withDefaults(defineProps<{
   entry: PricingFormEntry
   platform?: string
   hideTokenIntervals?: boolean
+	 hideTimeWindows?: boolean
 }>(), {
   hideTokenIntervals: false,
+	 hideTimeWindows: false,
 })
 
 const emit = defineEmits<{
@@ -312,6 +339,24 @@ function removeInterval(idx: number) {
   const intervals = [...(props.entry.intervals || [])]
   intervals.splice(idx, 1)
   emit('update', { ...props.entry, intervals })
+}
+
+function addTimeWindow() {
+  const time_windows = [...(props.entry.time_windows || [])]
+  time_windows.push({ start_time: '00:00', end_time: '00:00', input_price: null, output_price: null, cache_write_price: null, cache_read_price: null, sort_order: time_windows.length })
+  emit('update', { ...props.entry, time_windows })
+}
+
+function updateTimeWindowField(idx: number, field: string, value: string) {
+  const time_windows = [...(props.entry.time_windows || [])]
+  time_windows[idx] = { ...time_windows[idx], [field]: value === '' ? null : value }
+  emit('update', { ...props.entry, time_windows })
+}
+
+function removeTimeWindow(idx: number) {
+  const time_windows = [...(props.entry.time_windows || [])]
+  time_windows.splice(idx, 1)
+  emit('update', { ...props.entry, time_windows })
 }
 
 async function onModelsUpdate(newModels: string[]) {

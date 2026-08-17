@@ -598,6 +598,7 @@ func writeUsageLogBestEffort(ctx context.Context, repo UsageLogRepository, usage
 
 // recordUsageOpts 内部选项，参数化普通计费与长上下文计费的差异点。
 type recordUsageOpts struct {
+	PricingAt time.Time
 	// 长上下文计费（仅 Gemini 路径需要）
 	LongContextThreshold  int
 	LongContextMultiplier float64
@@ -809,6 +810,7 @@ func (s *GatewayService) recordUsageCore(ctx context.Context, input *recordUsage
 	if pricingAt.IsZero() {
 		pricingAt = timezone.Now()
 	}
+	opts.PricingAt = pricingAt
 	multiplier, imageMultiplier := computePeakAwareMultipliers(apiKey, multiplier, pricingAt)
 
 	// 确定计费模型
@@ -849,9 +851,9 @@ func (s *GatewayService) recordUsageCore(ctx context.Context, input *recordUsage
 		result.UpstreamResponseModelConflict,
 		result.ImageCount > 0 || result.AudioUsage != nil || result.SearchCount > 0,
 	); responseModel != "" && !strings.EqualFold(responseModel, strings.TrimSpace(billingModel)) {
-		if identified, responseChannelPriced := s.hasIdentifiedResponseModelPricing(ctx, responseModel, apiKey); identified {
+		if identified, responseChannelPriced := s.hasIdentifiedResponseModelPricing(ctx, responseModel, apiKey, pricingAt); identified {
 			responseCost := s.calculateRecordUsageCost(ctx, result, apiKey, responseModel, multiplier, imageMultiplier, opts)
-			baselineChannelPriced := s.resolveChannelPricing(ctx, billingModel, apiKey) != nil
+			baselineChannelPriced := s.resolveChannelPricingAt(ctx, billingModel, apiKey, pricingAt) != nil
 			if responseModelBillingAdoptable(cost, responseCost, baselineChannelPriced, responseChannelPriced) {
 				// billingModel 到此为止只是定价查表的入参，后续流程只消费 cost，
 				// 因此这里不改写它，改由日志记录实际生效的计费基准。
@@ -941,23 +943,31 @@ func (s *GatewayService) calculateRecordUsageCost(
 	imageMultiplier float64,
 	opts *recordUsageOpts,
 ) *CostBreakdown {
+	if opts == nil {
+		opts = &recordUsageOpts{}
+	}
+	if opts.PricingAt.IsZero() {
+		opts.PricingAt = timezone.Now()
+	}
+
 	// 图片生成：渠道定价为 token 计费时走 token 路径，否则走图片计费
 	if result.ImageCount > 0 {
-		if resolved := s.resolveChannelPricing(ctx, billingModel, apiKey); resolved != nil && resolved.Mode == BillingModeToken {
+		if resolved := s.resolveChannelPricingAt(ctx, billingModel, apiKey, opts.PricingAt); resolved != nil && resolved.Mode == BillingModeToken {
 			return s.calculateTokenCost(ctx, result, apiKey, billingModel, multiplier, opts)
 		}
-		return s.calculateImageCost(ctx, result, apiKey, billingModel, imageMultiplier)
+		return s.calculateImageCost(ctx, result, apiKey, billingModel, imageMultiplier, opts.PricingAt)
 	}
 
 	// Voice audio (TTS / STT / realtime) when present on the forward result.
 	if result.AudioUsage != nil {
-		if resolved := s.resolveChannelPricing(ctx, billingModel, apiKey); resolved != nil &&
+		if resolved := s.resolveChannelPricingAt(ctx, billingModel, apiKey, opts.PricingAt); resolved != nil &&
 			resolved.Mode == BillingModePerRequest {
 			gid := apiKey.Group.ID
 			cost, err := s.billingService.CalculateCostUnified(CostInput{
 				Ctx: ctx, Model: billingModel, GroupID: &gid, Group: apiKey.Group,
 				UsageUnits: result.AudioUsage.DurationOrUnits, SizeTier: result.AudioUsage.Mode,
 				RateMultiplier: multiplier, Resolver: s.resolver, Resolved: resolved,
+				PricingAt: opts.PricingAt,
 			})
 			if err == nil {
 				return cost
@@ -1042,11 +1052,11 @@ func (s *GatewayService) hasResolvableTokenPricing(ctx context.Context, model st
 // 与 hasResolvableTokenPricing 的区别是刻意更严：只接受管理员为该模型显式配置的
 // 渠道定价，或价格表中能被确定性识别的条目；不接受按子串猜出来的系列兜底价。
 // 详见 responseModelBillingDeclaration 的说明。
-func (s *GatewayService) hasIdentifiedResponseModelPricing(ctx context.Context, model string, apiKey *APIKey) (identified bool, channelPriced bool) {
+func (s *GatewayService) hasIdentifiedResponseModelPricing(ctx context.Context, model string, apiKey *APIKey, pricingAt time.Time) (identified bool, channelPriced bool) {
 	if strings.TrimSpace(model) == "" {
 		return false, false
 	}
-	if s.resolveChannelPricing(ctx, model, apiKey) != nil {
+	if s.resolveChannelPricingAt(ctx, model, apiKey, pricingAt) != nil {
 		return true, true
 	}
 	return s.billingService.HasIdentifiedTokenPricing(model), false
@@ -1055,11 +1065,15 @@ func (s *GatewayService) hasIdentifiedResponseModelPricing(ctx context.Context, 
 // resolveChannelPricing 检查指定模型是否存在渠道级别定价。
 // 返回非 nil 的 ResolvedPricing 表示有渠道定价，nil 表示走默认定价路径。
 func (s *GatewayService) resolveChannelPricing(ctx context.Context, billingModel string, apiKey *APIKey) *ResolvedPricing {
+	return s.resolveChannelPricingAt(ctx, billingModel, apiKey, time.Time{})
+}
+
+func (s *GatewayService) resolveChannelPricingAt(ctx context.Context, billingModel string, apiKey *APIKey, pricingAt time.Time) *ResolvedPricing {
 	if s.resolver == nil || apiKey.Group == nil {
 		return nil
 	}
 	gid := apiKey.Group.ID
-	resolved := s.resolver.Resolve(ctx, PricingInput{Model: billingModel, GroupID: &gid, Group: apiKey.Group})
+	resolved := s.resolver.Resolve(ctx, PricingInput{Model: billingModel, GroupID: &gid, Group: apiKey.Group, PricingAt: pricingAt})
 	if resolved.Source == PricingSourceGroup || resolved.Source == PricingSourceChannel {
 		return resolved
 	}
@@ -1073,15 +1087,16 @@ func (s *GatewayService) calculateImageCost(
 	apiKey *APIKey,
 	billingModel string,
 	multiplier float64,
+	pricingAt time.Time,
 ) *CostBreakdown {
 	sizeTier := NormalizeImageBillingTierOrDefault(result.ImageSize)
-	resolved := s.resolveChannelPricing(ctx, billingModel, apiKey)
+	resolved := s.resolveChannelPricingAt(ctx, billingModel, apiKey, pricingAt)
 	if resolved != nil && resolved.Source == PricingSourceGroup {
 		gid := apiKey.Group.ID
 		cost, err := s.billingService.CalculateCostUnified(CostInput{
 			Ctx: ctx, Model: billingModel, GroupID: &gid, Group: apiKey.Group,
 			RequestCount: result.ImageCount, SizeTier: sizeTier,
-			RateMultiplier: multiplier, Resolver: s.resolver, Resolved: resolved,
+			RateMultiplier: multiplier, Resolver: s.resolver, Resolved: resolved, PricingAt: pricingAt,
 		})
 		if err == nil {
 			return cost
@@ -1144,7 +1159,7 @@ func (s *GatewayService) calculateTokenCost(
 
 	// Explicit group/channel pricing wins. Built-in pricing also uses the unified
 	// resolver so the group long-context toggle can veto model-native tiers.
-	if resolved := s.resolveChannelPricing(ctx, billingModel, apiKey); resolved != nil {
+	if resolved := s.resolveChannelPricingAt(ctx, billingModel, apiKey, opts.PricingAt); resolved != nil {
 		gid := apiKey.Group.ID
 		cost, err = s.billingService.CalculateCostUnified(CostInput{
 			Ctx:            ctx,
@@ -1156,6 +1171,7 @@ func (s *GatewayService) calculateTokenCost(
 			RateMultiplier: multiplier,
 			Resolver:       s.resolver,
 			Resolved:       resolved,
+			PricingAt:      opts.PricingAt,
 		})
 	} else if opts.LongContextThreshold > 0 && (apiKey.Group == nil || apiKey.Group.LongContextPricingEnabled) {
 		// 长上下文双倍计费（如 Gemini 200K 阈值）
@@ -1164,7 +1180,7 @@ func (s *GatewayService) calculateTokenCost(
 		gid := apiKey.Group.ID
 		cost, err = s.billingService.CalculateCostUnified(CostInput{
 			Ctx: ctx, Model: billingModel, GroupID: &gid, Group: apiKey.Group,
-			Tokens: tokens, RequestCount: 1, RateMultiplier: multiplier, Resolver: s.resolver,
+			Tokens: tokens, RequestCount: 1, RateMultiplier: multiplier, Resolver: s.resolver, PricingAt: opts.PricingAt,
 		})
 	} else {
 		cost, err = s.billingService.CalculateCost(billingModel, tokens, multiplier)

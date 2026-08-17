@@ -1,4 +1,4 @@
-import type { BillingMode, PricingInterval } from '@/api/admin/channels'
+import type { BillingMode, PricingInterval, PricingTimeWindow } from '@/api/admin/channels'
 
 type TranslateFn = (key: string, params?: Record<string, unknown>) => string
 
@@ -24,7 +24,18 @@ export interface PricingFormEntry {
   image_input_price: number | string | null
   image_output_price: number | string | null
   per_request_price: number | string | null
-  intervals: IntervalFormEntry[]
+	intervals: IntervalFormEntry[]
+	time_windows: TimeWindowFormEntry[]
+}
+
+export interface TimeWindowFormEntry {
+  start_time: string
+  end_time: string
+  input_price: number | string | null
+  output_price: number | string | null
+  cache_write_price: number | string | null
+  cache_read_price: number | string | null
+  sort_order: number
 }
 
 // 价格转换：后端存 per-token，前端显示 per-MTok ($/1M tokens)
@@ -74,6 +85,30 @@ export function formIntervalsToAPI(intervals: IntervalFormEntry[]): PricingInter
     cache_read_price: mTokToPerToken(iv.cache_read_price),
     per_request_price: toNullableNumber(iv.per_request_price),
     sort_order: iv.sort_order
+  }))
+}
+
+export function apiTimeWindowsToForm(windows: PricingTimeWindow[]): TimeWindowFormEntry[] {
+  return (windows || []).map(window => ({
+    start_time: window.start_time,
+    end_time: window.end_time,
+    input_price: perTokenToMTok(window.input_price),
+    output_price: perTokenToMTok(window.output_price),
+    cache_write_price: perTokenToMTok(window.cache_write_price),
+    cache_read_price: perTokenToMTok(window.cache_read_price),
+    sort_order: window.sort_order
+  }))
+}
+
+export function formTimeWindowsToAPI(windows: TimeWindowFormEntry[]): PricingTimeWindow[] {
+  return (windows || []).map(window => ({
+    start_time: window.start_time,
+    end_time: window.end_time,
+    input_price: mTokToPerToken(window.input_price),
+    output_price: mTokToPerToken(window.output_price),
+    cache_write_price: mTokToPerToken(window.cache_write_price),
+    cache_read_price: mTokToPerToken(window.cache_read_price),
+    sort_order: window.sort_order
   }))
 }
 

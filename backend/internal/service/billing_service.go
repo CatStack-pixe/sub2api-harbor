@@ -1023,6 +1023,7 @@ type CostInput struct {
 	Resolver                  *ModelPricingResolver // 定价解析器
 	Resolved                  *ResolvedPricing      // 可选：预解析的定价结果（避免重复 Resolve 调用）
 	LongContextBillingEnabled *bool
+	PricingAt                 time.Time
 }
 
 // CalculateCostUnified 统一计费入口，支持三种计费模式。
@@ -1048,9 +1049,10 @@ func (s *BillingService) CalculateCostUnified(input CostInput) (*CostBreakdown, 
 	resolved := input.Resolved
 	if resolved == nil {
 		resolved = input.Resolver.Resolve(input.Ctx, PricingInput{
-			Model:   input.Model,
-			GroupID: input.GroupID,
-			Group:   input.Group,
+			Model:     input.Model,
+			GroupID:   input.GroupID,
+			Group:     input.Group,
+			PricingAt: input.PricingAt,
 		})
 	}
 
