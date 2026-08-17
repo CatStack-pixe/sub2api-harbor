@@ -68,6 +68,18 @@ type channelModelPricingRequest struct {
 	ImageOutputPrice *float64                 `json:"image_output_price" binding:"omitempty,min=0"`
 	PerRequestPrice  *float64                 `json:"per_request_price" binding:"omitempty,min=0"`
 	Intervals        []pricingIntervalRequest `json:"intervals"`
+
+	TimeWindows []pricingTimeWindowRequest `json:"time_windows"`
+}
+
+type pricingTimeWindowRequest struct {
+	StartTime       string   `json:"start_time"`
+	EndTime         string   `json:"end_time"`
+	InputPrice      *float64 `json:"input_price" binding:"omitempty,min=0"`
+	OutputPrice     *float64 `json:"output_price" binding:"omitempty,min=0"`
+	CacheWritePrice *float64 `json:"cache_write_price" binding:"omitempty,min=0"`
+	CacheReadPrice  *float64 `json:"cache_read_price" binding:"omitempty,min=0"`
+	SortOrder       int      `json:"sort_order"`
 }
 
 type pricingIntervalRequest struct {
@@ -120,6 +132,19 @@ type channelModelPricingResponse struct {
 	ImageOutputPrice *float64                  `json:"image_output_price"`
 	PerRequestPrice  *float64                  `json:"per_request_price"`
 	Intervals        []pricingIntervalResponse `json:"intervals"`
+
+	TimeWindows []pricingTimeWindowResponse `json:"time_windows"`
+}
+
+type pricingTimeWindowResponse struct {
+	ID              int64    `json:"id"`
+	StartTime       string   `json:"start_time"`
+	EndTime         string   `json:"end_time"`
+	InputPrice      *float64 `json:"input_price"`
+	OutputPrice     *float64 `json:"output_price"`
+	CacheWritePrice *float64 `json:"cache_write_price"`
+	CacheReadPrice  *float64 `json:"cache_read_price"`
+	SortOrder       int      `json:"sort_order"`
 }
 
 type pricingIntervalResponse struct {
@@ -215,6 +240,14 @@ func pricingToResponse(p *service.ChannelModelPricing) channelModelPricingRespon
 	for _, iv := range p.Intervals {
 		intervals = append(intervals, intervalToResponse(iv))
 	}
+	timeWindows := make([]pricingTimeWindowResponse, 0, len(p.TimeWindows))
+	for _, window := range p.TimeWindows {
+		timeWindows = append(timeWindows, pricingTimeWindowResponse{
+			ID: window.ID, StartTime: minuteToClock(window.StartMinute), EndTime: minuteToClock(window.EndMinute),
+			InputPrice: window.InputPrice, OutputPrice: window.OutputPrice,
+			CacheWritePrice: window.CacheWritePrice, CacheReadPrice: window.CacheReadPrice, SortOrder: window.SortOrder,
+		})
+	}
 	return channelModelPricingResponse{
 		ID:               p.ID,
 		Platform:         platform,
@@ -228,6 +261,7 @@ func pricingToResponse(p *service.ChannelModelPricing) channelModelPricingRespon
 		ImageOutputPrice: p.ImageOutputPrice,
 		PerRequestPrice:  p.PerRequestPrice,
 		Intervals:        intervals,
+		TimeWindows:      timeWindows,
 	}
 }
 
@@ -268,6 +302,21 @@ func pricingRequestToService(reqs []channelModelPricingRequest) []service.Channe
 				SortOrder:       iv.SortOrder,
 			})
 		}
+		timeWindows := make([]service.PricingTimeWindow, 0, len(r.TimeWindows))
+		for _, window := range r.TimeWindows {
+			start, startOK := clockToMinute(window.StartTime)
+			end, endOK := clockToMinute(window.EndTime)
+			if !startOK {
+				start = -1
+			}
+			if !endOK {
+				end = -1
+			}
+			timeWindows = append(timeWindows, service.PricingTimeWindow{
+				StartMinute: start, EndMinute: end, InputPrice: window.InputPrice, OutputPrice: window.OutputPrice,
+				CacheWritePrice: window.CacheWritePrice, CacheReadPrice: window.CacheReadPrice, SortOrder: window.SortOrder,
+			})
+		}
 		result = append(result, service.ChannelModelPricing{
 			Platform:         platform,
 			Models:           r.Models,
@@ -280,9 +329,27 @@ func pricingRequestToService(reqs []channelModelPricingRequest) []service.Channe
 			ImageOutputPrice: r.ImageOutputPrice,
 			PerRequestPrice:  r.PerRequestPrice,
 			Intervals:        intervals,
+			TimeWindows:      timeWindows,
 		})
 	}
 	return result
+}
+
+func clockToMinute(value string) (int, bool) {
+	parts := strings.Split(value, ":")
+	if len(parts) != 2 {
+		return 0, false
+	}
+	hour, hourErr := strconv.Atoi(parts[0])
+	minute, minuteErr := strconv.Atoi(parts[1])
+	if hourErr != nil || minuteErr != nil || hour < 0 || hour > 24 || minute < 0 || minute > 59 || (hour == 24 && minute != 0) {
+		return 0, false
+	}
+	return hour*60 + minute, true
+}
+
+func minuteToClock(minute int) string {
+	return fmt.Sprintf("%02d:%02d", minute/60, minute%60)
 }
 
 func accountStatsPricingRuleRequestToService(r accountStatsPricingRuleRequest) service.AccountStatsPricingRule {
