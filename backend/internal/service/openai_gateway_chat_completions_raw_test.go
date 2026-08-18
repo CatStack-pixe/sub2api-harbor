@@ -649,6 +649,151 @@ func TestForwardAsRawChatCompletions_ClientDisconnectDrainsUsage(t *testing.T) {
 	require.True(t, gjson.GetBytes(upstream.lastBody, "stream_options.include_usage").Bool())
 }
 
+func TestStreamRawChatCompletions_ClientDisconnectDoesNotQuarantineCompatibleProxy(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Writer = &openAIChatFailingWriter{ResponseWriter: c.Writer, failAfter: 0}
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
+
+	proxyID := int64(31)
+	account := rawChatCompletionsTestAccount()
+	account.Platform = PlatformDeepSeek
+	account.ProxyID = &proxyID
+	svc := &OpenAIGatewayService{cfg: rawChatCompletionsTestConfig()}
+	svc.openaiProxyStreamCircuit = newOpenAIProxyStreamCircuit(openAIProxyStreamCircuitSettings{
+		failureThreshold: 1,
+		failureWindow:    time.Minute,
+		quarantineTTL:    10 * time.Minute,
+		maxEntries:       16,
+	})
+	resp := &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     http.Header{"Content-Type": []string{"text/event-stream"}},
+		Body: io.NopCloser(strings.NewReader(
+			"data: {\"id\":\"chatcmpl_disconnect\",\"object\":\"chat.completion.chunk\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"ok\"}}]}\n\n"+
+			"data: [DONE]\n\n",
+		)),
+	}
+
+	result, err := svc.streamRawChatCompletions(c, resp, account, "deepseek-v4-flash", "deepseek-v4-flash", "deepseek-v4-flash", nil, nil, time.Now(), 0)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	require.Equal(t, 0, svc.getOpenAIProxyStreamCircuit().activeBlockCount(time.Now()))
+}
+
+func TestStreamRawChatCompletions_MissingDoneBeforeOutputReturnsFailover(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
+
+	svc := &OpenAIGatewayService{cfg: rawChatCompletionsTestConfig()}
+	resp := &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     http.Header{"Content-Type": []string{"text/event-stream"}, "x-request-id": []string{"rid_raw_eof_before_output"}},
+		Body:       io.NopCloser(strings.NewReader("")),
+	}
+
+	result, err := svc.streamRawChatCompletions(c, resp, rawChatCompletionsTestAccount(), "gpt-5.4", "gpt-5.4", "gpt-5.4", nil, nil, time.Now(), 0)
+	require.Error(t, err)
+	require.Nil(t, result)
+	var failoverErr *UpstreamFailoverError
+	require.ErrorAs(t, err, &failoverErr)
+	require.False(t, c.Writer.Written())
+}
+
+func TestStreamRawChatCompletions_MissingDoneAfterOutputEmitsError(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
+
+	upstream := `data: {"id":"chatcmpl_partial","object":"chat.completion.chunk","choices":[{"index":0,"delta":{"content":"partial"}}]}` + "\n\n"
+	svc := &OpenAIGatewayService{cfg: rawChatCompletionsTestConfig()}
+	resp := &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     http.Header{"Content-Type": []string{"text/event-stream"}, "x-request-id": []string{"rid_raw_eof_after_output"}},
+		Body:       io.NopCloser(strings.NewReader(upstream)),
+	}
+
+	result, err := svc.streamRawChatCompletions(c, resp, rawChatCompletionsTestAccount(), "gpt-5.4", "gpt-5.4", "gpt-5.4", nil, nil, time.Now(), 0)
+	require.Error(t, err)
+	require.NotNil(t, result)
+	var failoverErr *UpstreamFailoverError
+	require.False(t, errors.As(err, &failoverErr))
+	body := rec.Body.String()
+	require.Contains(t, body, `"content":"partial"`)
+	require.Contains(t, body, `"upstream_stream_read_error"`)
+	require.Contains(t, body, "data: [DONE]")
+}
+
+func TestStreamRawChatCompletions_ReadErrorAfterOutputClassifiesError(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
+
+	resp := &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     http.Header{"Content-Type": []string{"text/event-stream"}, "x-request-id": []string{"rid_raw_read_error"}},
+		Body: &openAIChatStreamReadErrorCloser{
+			payload: []byte(`data: {"id":"chatcmpl_partial","object":"chat.completion.chunk","choices":[{"index":0,"delta":{"content":"partial"}}]}` + "\n\n"),
+			err:     errors.New("http2: client connection lost"),
+		},
+	}
+	svc := &OpenAIGatewayService{cfg: rawChatCompletionsTestConfig()}
+
+	result, err := svc.streamRawChatCompletions(c, resp, rawChatCompletionsTestAccount(), "gpt-5.4", "gpt-5.4", "gpt-5.4", nil, nil, time.Now(), 0)
+	require.Error(t, err)
+	require.NotNil(t, result)
+	code, message, ok := OpenAIUpstreamStreamReadErrorDetails(err)
+	require.True(t, ok)
+	require.Equal(t, OpenAIUpstreamHTTP2StreamErrorCode, code)
+	require.Equal(t, "Upstream HTTP/2 stream failed", message)
+	require.Contains(t, rec.Body.String(), `"upstream_http2_stream_error"`)
+}
+
+func TestStreamRawChatCompletions_KeepaliveDuringUpstreamSilence(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
+	pr, pw := io.Pipe()
+
+	svc := &OpenAIGatewayService{cfg: &config.Config{Gateway: config.GatewayConfig{StreamKeepaliveInterval: 1}}}
+	resp := &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     http.Header{"Content-Type": []string{"text/event-stream"}, "x-request-id": []string{"rid_raw_keepalive"}},
+		Body:       pr,
+	}
+	resultCh := make(chan struct {
+		result *OpenAIForwardResult
+		err    error
+	}, 1)
+	go func() {
+		result, err := svc.streamRawChatCompletions(c, resp, rawChatCompletionsTestAccount(), "gpt-5.4", "gpt-5.4", "gpt-5.4", nil, nil, time.Now(), 0)
+		resultCh <- struct {
+			result *OpenAIForwardResult
+			err    error
+		}{result: result, err: err}
+	}()
+
+	require.Eventually(t, func() bool { return strings.Contains(rec.Body.String(), ": keepalive\n\n") }, 2500*time.Millisecond, 20*time.Millisecond)
+	_, _ = pw.Write([]byte("data: {\"id\":\"chatcmpl_keepalive\",\"object\":\"chat.completion.chunk\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"ok\"}}]}\n\n"))
+	require.Eventually(t, func() bool { return strings.Count(rec.Body.String(), ": keepalive\n\n") >= 2 }, 2500*time.Millisecond, 20*time.Millisecond)
+	_, _ = pw.Write([]byte("data: [DONE]\n\n"))
+	_ = pw.Close()
+
+	select {
+	case result := <-resultCh:
+		require.NoError(t, result.err)
+		require.NotNil(t, result.result)
+	case <-time.After(2 * time.Second):
+		t.Fatal("raw Chat stream did not finish after upstream terminal event")
+	}
+}
+
 func TestForwardAsRawChatCompletions_UpstreamRequestIgnoresClientCancel(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
