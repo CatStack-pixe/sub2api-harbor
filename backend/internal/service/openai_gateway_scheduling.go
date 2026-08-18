@@ -329,6 +329,9 @@ func isOpenAICompatibleAccountEligibleForRequestBeforeProfit(ctx context.Context
 	if account == nil || !accountPlatformMatchesGroup(platform, account.Platform) || !account.IsOpenAICompatible() || !account.IsSchedulableForModelWithContext(ctx, requestedModel) {
 		return false
 	}
+	if !tokenRhythmBalanceProbeAllowsScheduling(account, time.Now()) {
+		return false
+	}
 	if account.IsOpenAI() {
 		if paused, reason := shouldAutoPauseOpenAIAccountByQuota(ctx, account); paused {
 			// Debug level: this fires per-candidate on the scheduling hot path, so Info

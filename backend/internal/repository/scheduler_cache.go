@@ -1064,6 +1064,12 @@ func filterSchedulerUpstreamBillingProbe(value any) map[string]any {
 		"peak_end",
 		"peak_rate_multiplier",
 		"timezone",
+		"provider",
+		"balance_cny",
+		"available_balance_cny",
+		"frozen_balance_cny",
+		"expiring_balance_cny",
+		"currency",
 	} {
 		if field, exists := data[key]; exists && field != nil {
 			filteredData[key] = field
