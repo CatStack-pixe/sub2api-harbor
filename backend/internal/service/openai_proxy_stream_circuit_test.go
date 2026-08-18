@@ -141,11 +141,11 @@ func TestOpenAIProxyStreamDisconnectQuarantinesDeepSeekAndTokenRhythmProxies(t *
 			account := &Account{ID: 42, Platform: platform, ProxyID: &proxyID}
 			svc := &OpenAIGatewayService{}
 			svc.openaiProxyStreamCircuit = newOpenAIProxyStreamCircuit(openAIProxyStreamCircuitSettings{
-				failureThreshold:  2,
-				failureWindow:     time.Minute,
-				quarantineTTL:     10 * time.Minute,
-				collapseInterval:  0,
-				maxEntries:        16,
+				failureThreshold: 2,
+				failureWindow:    time.Minute,
+				quarantineTTL:    10 * time.Minute,
+				collapseInterval: 0,
+				maxEntries:       16,
 			})
 			svc.recordOpenAIProxyStreamDisconnect(account, errors.New("connection reset by peer"), "rid-1")
 			svc.recordOpenAIProxyStreamDisconnect(account, errors.New("connection reset by peer"), "rid-2")

@@ -9,29 +9,28 @@ import (
 
 func TestTokenRhythmBalanceProbeAllowsSchedulingOnlyWithFreshPositiveBalance(t *testing.T) {
 	now := time.Date(2026, time.August, 18, 12, 0, 0, 0, time.UTC)
-	fresh := now.Add(10 * time.Minute).Format(time.RFC3339)
-	account := &Account{
-		Platform: PlatformTokenRhythm,
-		Type:     AccountTypeAPIKey,
-		Extra: map[string]any{
-			UpstreamBillingProbeEnabledExtraKey: true,
-			UpstreamBillingProbeExtraKey: map[string]any{
-				"status":      UpstreamBillingProbeStatusOK,
-				"fresh_until": fresh,
-				"data": map[string]any{
-					"available_balance_cny": 1.25,
+	newAccount := func(balance float64, freshUntil time.Time) *Account {
+		return &Account{
+			Platform: PlatformTokenRhythm,
+			Type:     AccountTypeAPIKey,
+			Extra: map[string]any{
+				UpstreamBillingProbeEnabledExtraKey: true,
+				UpstreamBillingProbeExtraKey: map[string]any{
+					"status":      UpstreamBillingProbeStatusOK,
+					"fresh_until": freshUntil.Format(time.RFC3339),
+					"data": map[string]any{
+						"available_balance_cny": balance,
+					},
 				},
 			},
-		},
+		}
 	}
+	account := newAccount(1.25, now.Add(10*time.Minute))
 	require.True(t, tokenRhythmBalanceProbeAllowsScheduling(account, now))
 
-	account.Extra[UpstreamBillingProbeExtraKey].(map[string]any)["data"].(map[string]any)["available_balance_cny"] = 0.0
-	require.False(t, tokenRhythmBalanceProbeAllowsScheduling(account, now))
+	require.False(t, tokenRhythmBalanceProbeAllowsScheduling(newAccount(0, now.Add(10*time.Minute)), now))
 
-	account.Extra[UpstreamBillingProbeExtraKey].(map[string]any)["data"].(map[string]any)["available_balance_cny"] = 1.25
-	account.Extra[UpstreamBillingProbeExtraKey].(map[string]any)["fresh_until"] = now.Add(-time.Second).Format(time.RFC3339)
-	require.False(t, tokenRhythmBalanceProbeAllowsScheduling(account, now))
+	require.False(t, tokenRhythmBalanceProbeAllowsScheduling(newAccount(1.25, now.Add(-time.Second)), now))
 }
 
 func TestTokenRhythmBalanceProbeDisabledPreservesScheduling(t *testing.T) {

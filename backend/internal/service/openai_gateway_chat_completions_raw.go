@@ -420,7 +420,7 @@ func (s *OpenAIGatewayService) streamRawChatCompletions(
 					clientDisconnected = true
 					logger.L().Debug("openai chat_completions raw: client disconnected during keepalive, continuing to drain upstream for billing",
 						zap.String("request_id", requestID),
-				)
+					)
 				}
 			}
 		}
