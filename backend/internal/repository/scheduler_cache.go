@@ -1012,6 +1012,7 @@ func filterSchedulerExtra(extra map[string]any) map[string]any {
 		"auto_pause_5h_disabled",
 		"auto_pause_7d_disabled",
 		"model_rate_limits",
+		service.UpstreamBillingProbeEnabledExtraKey,
 		service.UpstreamBillingProbeExtraKey,
 		service.GrokMediaEligibleExtraKey,
 		"grok_billing_snapshot",
@@ -1064,6 +1065,12 @@ func filterSchedulerUpstreamBillingProbe(value any) map[string]any {
 		"peak_end",
 		"peak_rate_multiplier",
 		"timezone",
+		"provider",
+		"balance_cny",
+		"available_balance_cny",
+		"frozen_balance_cny",
+		"expiring_balance_cny",
+		"currency",
 	} {
 		if field, exists := data[key]; exists && field != nil {
 			filteredData[key] = field

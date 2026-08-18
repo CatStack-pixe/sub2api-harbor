@@ -5499,7 +5499,9 @@ const handleSubmit = async () => {
     ...form,
     group_ids: form.group_ids,
     extra,
-    upstream_billing_probe_enabled: (form.platform === 'deepseek' || form.platform === 'kimi' || form.platform === 'tokenrhythm') ? undefined : upstreamBillingAutoProbeEnabled.value,
+    upstream_billing_probe_enabled: form.platform === 'deepseek' || form.platform === 'kimi' || form.platform === 'tokenrhythm'
+      ? form.platform === 'tokenrhythm'
+      : upstreamBillingAutoProbeEnabled.value,
     auto_pause_on_expired: autoPauseOnExpired.value
   })
 }
@@ -5631,7 +5633,13 @@ const createAccountAndFinish = async (
     // 上游倍率探测对支持的 API-key 平台开放（antigravity upstream 走本 helper）；
     // DeepSeek 使用独立余额探测，非 apikey 类型（bedrock/oauth）不传。
     upstream_billing_probe_enabled:
-    type === 'apikey' && form.platform !== 'deepseek' && form.platform !== 'kimi' && form.platform !== 'tokenrhythm' ? upstreamBillingAutoProbeEnabled.value : undefined,
+    type === 'apikey'
+      ? form.platform === 'tokenrhythm'
+        ? true
+        : form.platform !== 'deepseek' && form.platform !== 'kimi'
+          ? upstreamBillingAutoProbeEnabled.value
+          : undefined
+      : undefined,
     auto_pause_on_expired: autoPauseOnExpired.value
   })
 }

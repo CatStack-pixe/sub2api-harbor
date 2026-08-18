@@ -461,7 +461,12 @@ func buildAccountForCreate(input *CreateAccountInput, accountExtra map[string]an
 	if input.InitialSchedulable != nil {
 		account.Schedulable = *input.InitialSchedulable
 	}
-	if input.ProbeEnabled != nil && *input.ProbeEnabled {
+	probeEnabled := input.ProbeEnabled
+	if probeEnabled == nil && account.IsTokenRhythm() {
+		enabled := true
+		probeEnabled = &enabled
+	}
+	if probeEnabled != nil && *probeEnabled {
 		if !isUpstreamBillingProbeAccount(account) {
 			return nil, ErrUpstreamBillingProbeAccountInvalid
 		}

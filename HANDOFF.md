@@ -1,5 +1,22 @@
 # Handoff
 
+## 2026-08-18 TokenRhythm DS Balance-Gated Scheduling
+
+- Scope: DS group `18` (`deepseek-025`) contains 19 TokenRhythm API-key accounts. User `3933240147@qq.com` is `user_id=17`; the previous 72-hour sample had 386 operations, 68 final errors, and 28 transport-related errors. Account `6202` is already in `error` with `Payment required (402): 余额不足`.
+- Code: TokenRhythm is now a supported upstream billing-probe identity. Its official `usage-summary` balance is stored as a sanitized snapshot; fresh positive `available_balance_cny` is required for scheduling when probing is enabled. New TokenRhythm accounts default to probing enabled, the advanced scheduler cache preserves both the enable flag and sanitized balance snapshot, and the initial TopK compatibility filter applies the same gate.
+- GitHub: PR `#69` (`feat(scheduling): gate TokenRhythm accounts by balance probes`) is labeled `bug` and uses the `fix/deepseek-stream-resilience-main` branch. An initial lint run exposed formatting/test issues; fixes are pushed in commit `68c8c0f14`, and the replacement CI run is the authoritative build/test gate. Deployment must use the GitHub release workflow and GHCR image, never a local build.
+- Production backup: completed before any deployment at `/opt/sub2api/backups/pre-release-20260818T152946Z` on the `/dev/sdb` backup disk. It contains compose/env/config copies, Docker inspection, PostgreSQL custom-format dump, optional Redis RDB, and `SHA256SUMS` (134M).
+- Production deployment status: still running `ghcr.io/catstack-pixe/sub2api:0.1.176-nvidia.13`; no container has been restarted. PostgreSQL, Redis, and Mihomo must remain untouched; only `sub2api` may be recreated after PR squash-merge and successful GitHub release.
+- Remaining gap: proxy selection still does not rank by measured CN latency, verify TokenRhythm balance before assignment, or enforce distributed proxy-IP diversity. Existing proxy latency probing is admin/display-only; implement that separately and do not claim it is fixed by this change.
+
+## 2026-08-18 DeepSeek Long-Stream Disconnect Hardening
+
+- Root cause: raw Chat Completions SSE forwarding discarded scanner errors and accepted EOF without `[DONE]`; Responses-to-Chat fallback keepalive was limited to NVIDIA; proxy stream quarantine only recognized `PlatformOpenAI` accounts.
+- Code changes: raw Chat forwarding now reads asynchronously while emitting configured `gateway.stream_keepalive_interval` SSE comments, distinguishes clean `[DONE]`, upstream read failure/missing terminal event, and client disconnect drain, records/clears proxy stream failures, and emits OpenAI-compatible stream error termination after business output. Responses fallback keepalive now covers NVIDIA, DeepSeek, and TokenRhythm; committed fallback streams terminate with one `response.failed` event on upstream read failure or missing `[DONE]`. Stream quarantine now applies to all OpenAI-compatible HTTP accounts, including DeepSeek and TokenRhythm, without changing thresholds, windows, TTLs, or no-proxy behavior.
+- Local checks: `git diff --check` passed. Go/gofmt are unavailable in this Windows environment; authoritative Go generation, formatting, unit/integration tests, lint, and security checks must run in GitHub Actions.
+- Controlled production verification against `https://api.catpithos.top` used a short DeepSeek Flash prompt sequentially through both endpoints. Chat request ID `f35f116c-4608-4fca-b57d-5833ed785fb2`: HTTP `200`, headers `4.29s`, first token `4.37s`, completed `11.52s`, `[DONE]` present, no `response.failed`. Responses request ID `7109c52a-06c5-4b55-a23d-96b324674f5a`: HTTP `200`, headers `18.17s`, first token `18.17s`, completed `24.11s`, `[DONE]` present, no `response.failed`. No production container or data service was restarted or modified.
+- The temporary production Bearer credential supplied for this verification is not recorded here and should be rotated after use.
+
 ## Current State
 
 - Added the TokenRhythm account platform with API-key inference through the fixed `https://tokenrhythm.studio/v1` endpoint.

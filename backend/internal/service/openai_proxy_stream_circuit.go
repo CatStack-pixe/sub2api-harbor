@@ -229,7 +229,7 @@ func (c *openAIProxyStreamCircuit) ensureCapacityLocked(now time.Time) {
 }
 
 func openAIProxyStreamCircuitProxyID(account *Account) (int64, bool) {
-	if account == nil || account.Platform != PlatformOpenAI || account.ProxyID == nil || *account.ProxyID <= 0 {
+	if account == nil || !account.IsOpenAICompatible() || account.ProxyID == nil || *account.ProxyID <= 0 {
 		return 0, false
 	}
 	return *account.ProxyID, true
