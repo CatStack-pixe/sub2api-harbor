@@ -369,6 +369,30 @@ func TestBuildSchedulerMetadataAccount_KeepsGrokMediaEligibility(t *testing.T) {
 	})
 }
 
+func TestBuildSchedulerMetadataAccount_KeepsUpstreamBillingProbeEnabled(t *testing.T) {
+	account := service.Account{
+		ID:       45,
+		Platform: service.PlatformTokenRhythm,
+		Type:     service.AccountTypeAPIKey,
+		Extra: map[string]any{
+			service.UpstreamBillingProbeEnabledExtraKey: true,
+			service.UpstreamBillingProbeExtraKey: map[string]any{
+				"status": service.UpstreamBillingProbeStatusOK,
+				"data": map[string]any{
+					"available_balance_cny": 1.5,
+				},
+			},
+		},
+	}
+
+	got := buildSchedulerMetadataAccount(account)
+
+	require.Equal(t, true, got.Extra[service.UpstreamBillingProbeEnabledExtraKey])
+	probe, ok := got.Extra[service.UpstreamBillingProbeExtraKey].(map[string]any)
+	require.True(t, ok)
+	require.Equal(t, service.UpstreamBillingProbeStatusOK, probe["status"])
+}
+
 func TestBuildSchedulerMetadataAccount_KeepsSlimGroupMembership(t *testing.T) {
 	account := service.Account{
 		ID:       42,

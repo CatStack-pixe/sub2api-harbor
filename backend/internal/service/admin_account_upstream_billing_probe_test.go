@@ -161,6 +161,23 @@ func TestCreateAccountAcceptsDedicatedUpstreamBillingProbeSetting(t *testing.T) 
 	require.ErrorIs(t, err, ErrUpstreamBillingProbeAccountInvalid)
 }
 
+func TestCreateTokenRhythmAccountEnablesBalanceProbeByDefault(t *testing.T) {
+	repo := &upstreamBillingProbeAccountRepo{}
+	created, err := (&adminServiceImpl{accountRepo: repo}).CreateAccount(context.Background(), &CreateAccountInput{
+		Name:     "tokenrhythm-default-probe",
+		Platform: PlatformTokenRhythm,
+		Type:     AccountTypeAPIKey,
+		Credentials: map[string]any{
+			"api_key":    "sk-tokenrhythm",
+			"tr_session": "session",
+			"tr_csrf":    "csrf",
+		},
+		SkipDefaultGroupBind: true,
+	})
+	require.NoError(t, err)
+	require.Equal(t, true, created.Extra[UpstreamBillingProbeEnabledExtraKey])
+}
+
 func TestUpdateAccountPreservesManagedUpstreamBillingProbeStateForUnrelatedEdit(t *testing.T) {
 	accountID := int64(110)
 	repo := &upstreamBillingProbeAccountRepo{accounts: map[int64]*Account{

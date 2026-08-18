@@ -25,6 +25,24 @@ type schedulerTestOpenAIAccountRepo struct {
 	accounts []Account
 }
 
+func TestAccountRequestCompatibilityBlocksTokenRhythmWithoutFreshBalance(t *testing.T) {
+	scheduler := &defaultOpenAIAccountScheduler{service: &OpenAIGatewayService{}}
+	account := &Account{
+		ID:          1,
+		Platform:    PlatformTokenRhythm,
+		Type:        AccountTypeAPIKey,
+		Schedulable: true,
+		Extra: map[string]any{
+			UpstreamBillingProbeEnabledExtraKey: true,
+		},
+	}
+
+	compatible, reason := scheduler.isAccountRequestCompatibleReason(context.Background(), account, OpenAIAccountScheduleRequest{})
+
+	require.False(t, compatible)
+	require.Equal(t, "tokenrhythm_balance_unavailable", reason)
+}
+
 func (r schedulerTestOpenAIAccountRepo) GetByID(ctx context.Context, id int64) (*Account, error) {
 	for i := range r.accounts {
 		if r.accounts[i].ID == id {
