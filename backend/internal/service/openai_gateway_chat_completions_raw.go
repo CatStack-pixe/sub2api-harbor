@@ -270,11 +270,23 @@ func (s *OpenAIGatewayService) streamRawChatCompletions(
 	requestID := resp.Header.Get("x-request-id")
 	writeStreamHeaders := s.newStreamHeaderWriter(c, resp.Header)
 	scanner := s.newUpstreamSSEScanner(resp.Body)
+	keepaliveStop := func() {}
+	var keepaliveOwner *openAIResponsesSSEKeepaliveOwner
+	var keepaliveInterval time.Duration
+	if s.cfg != nil && s.cfg.Gateway.StreamKeepaliveInterval > 0 {
+		keepaliveInterval = time.Duration(s.cfg.Gateway.StreamKeepaliveInterval) * time.Second
+		if _, alreadyStarted := c.Get(openAIResponsesSSEKeepaliveKey); !alreadyStarted {
+			keepaliveStop = StartOpenAIResponsesSSEKeepalive(c, keepaliveInterval)
+			keepaliveOwner, _, _, _ = takeOverOpenAIResponsesSSEKeepalive(c)
+		}
+	}
+	defer keepaliveStop()
 
 	var usage OpenAIUsage
 	var firstTokenMs *int
 	clientDisconnected := false
 	clientOutputStarted := false
+	sawDone := false
 	pendingLines := make([]string, 0, 8)
 	refusalDetector := newOpenAIChatSilentRefusalDetector(requestBodyLen)
 
@@ -310,12 +322,13 @@ func (s *OpenAIGatewayService) streamRawChatCompletions(
 		}
 	}
 
-	for scanner.Scan() {
-		line := scanner.Text()
+	processLine := func(line string) {
 		refusalDetector.ObserveSSELine(line)
 		if payload, ok := extractOpenAISSEDataLine(line); ok {
 			trimmedPayload := strings.TrimSpace(payload)
-			if trimmedPayload != "[DONE]" {
+			if trimmedPayload == "[DONE]" {
+				sawDone = true
+			} else {
 				observer.ObserveOpenAI([]byte(payload), strings.TrimSpace(gjson.Get(payload, "type").String()))
 				usageOnlyChunk := isOpenAIChatUsageOnlyStreamChunk(payload)
 				if u := extractCCStreamUsage(payload); u != nil {
@@ -333,21 +346,163 @@ func (s *OpenAIGatewayService) streamRawChatCompletions(
 			if !clientDisconnected && clientOutputStarted {
 				c.Writer.Flush()
 			}
-			continue
+			return
 		}
 		if !clientDisconnected && clientOutputStarted {
 			c.Writer.Flush()
 		}
 	}
 
-	if err := scanner.Err(); err != nil {
-		if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
-			logger.L().Warn("openai chat_completions raw: stream read error",
-				zap.Error(err),
-				zap.String("request_id", requestID),
-			)
+	var streamErr error
+	if keepaliveOwner == nil {
+		for scanner.Scan() {
+			processLine(scanner.Text())
+			if sawDone {
+				break
+			}
 		}
-	} else if !clientDisconnected && !clientOutputStarted {
+		streamErr = scanner.Err()
+	} else {
+		// Scanner reads block on the upstream body. Move it to a worker so the
+		// same goroutine can serialize keepalive and downstream SSE writes.
+		type scanEvent struct {
+			line string
+			err  error
+		}
+		events := make(chan scanEvent, 16)
+		drainDone := make(chan struct{})
+		sendEvent := func(event scanEvent) bool {
+			select {
+			case events <- event:
+				return true
+			case <-drainDone:
+				return false
+			}
+		}
+		go func() {
+			defer close(events)
+			for scanner.Scan() {
+				if !sendEvent(scanEvent{line: scanner.Text()}) {
+					return
+				}
+			}
+			if err := scanner.Err(); err != nil {
+				_ = sendEvent(scanEvent{err: err})
+			}
+		}()
+		defer close(drainDone)
+
+		ticker := time.NewTicker(keepaliveInterval)
+		defer ticker.Stop()
+	streamLoop:
+		for {
+			select {
+			case event, ok := <-events:
+				if !ok {
+					returnStreamErr := scanner.Err()
+					streamErr = returnStreamErr
+					break streamLoop
+				}
+				if event.err != nil {
+					streamErr = event.err
+					break streamLoop
+				}
+				processLine(event.line)
+				if sawDone {
+					break streamLoop
+				}
+			case <-ticker.C:
+				if clientDisconnected || (c.Request != nil && c.Request.Context().Err() != nil) {
+					clientDisconnected = true
+					continue
+				}
+				if !keepaliveOwner.beat() {
+					clientDisconnected = true
+					logger.L().Debug("openai chat_completions raw: client disconnected during keepalive, continuing to drain upstream for billing",
+						zap.String("request_id", requestID),
+				)
+				}
+			}
+		}
+	}
+
+	if streamErr != nil && !errors.Is(streamErr, context.Canceled) && !errors.Is(streamErr, context.DeadlineExceeded) {
+		logger.L().Warn("openai chat_completions raw: stream read error",
+			zap.Error(streamErr),
+			zap.String("request_id", requestID),
+		)
+	}
+
+	resultWithUsage := func() *OpenAIForwardResult {
+		return &OpenAIForwardResult{
+			RequestID:                     requestID,
+			Usage:                         usage,
+			Model:                         originalModel,
+			BillingModel:                  billingModel,
+			UpstreamModel:                 upstreamModel,
+			UpstreamResponseModel:         observedUpstreamResponseModel(c),
+			UpstreamResponseModelConflict: observedUpstreamResponseModelConflict(c),
+			ReasoningEffort:               reasoningEffort,
+			ServiceTier:                   serviceTier,
+			Stream:                        true,
+			Duration:                      time.Since(startTime),
+			FirstTokenMs:                  firstTokenMs,
+		}
+	}
+	requestCanceled := c != nil && c.Request != nil && c.Request.Context().Err() != nil
+
+	// A client write failure must never be attributed to the selected proxy.
+	// Keep draining the upstream above so usage accounting remains complete.
+	if clientDisconnected || requestCanceled {
+		if sawDone {
+			s.clearOpenAIProxyStreamDisconnect(account)
+			return resultWithUsage(), nil
+		}
+		if streamErr != nil {
+			return resultWithUsage(), fmt.Errorf("stream usage incomplete after disconnect: %w", streamErr)
+		}
+		return resultWithUsage(), fmt.Errorf("stream usage incomplete after disconnect: missing terminal event")
+	}
+
+	if streamErr != nil {
+		if errors.Is(streamErr, context.Canceled) || errors.Is(streamErr, context.DeadlineExceeded) {
+			return resultWithUsage(), fmt.Errorf("stream usage incomplete: %w", streamErr)
+		}
+		if !clientOutputStarted {
+			s.recordOpenAIProxyStreamDisconnect(account, streamErr, requestID)
+			return nil, s.newOpenAIStreamFailoverError(c, account, false, requestID, nil, "OpenAI stream disconnected before completion", resp.Header)
+		}
+		s.recordOpenAIProxyStreamDisconnect(account, streamErr, requestID)
+		streamReadErr := newOpenAIUpstreamStreamReadError(streamErr)
+		if code, message, ok := OpenAIUpstreamStreamReadErrorDetails(streamReadErr); ok {
+			writeStreamHeaders()
+			if _, werr := c.Writer.WriteString(buildChatStreamErrorSSE(code, message)); werr == nil {
+				_, _ = c.Writer.WriteString("data: [DONE]\n\n")
+				c.Writer.Flush()
+			}
+		}
+		return resultWithUsage(), streamReadErr
+	}
+
+	if !sawDone {
+		if !clientOutputStarted {
+			s.recordOpenAIProxyStreamDisconnect(account, errors.New("stream ended before terminal event"), requestID)
+			if refusalDetector.IsSilentRefusal() {
+				return nil, newOpenAISilentRefusalFailoverError(c, account, requestID)
+			}
+			return nil, s.newOpenAIStreamFailoverError(c, account, false, requestID, nil, "OpenAI stream ended before a terminal event", resp.Header)
+		}
+		s.recordOpenAIProxyStreamDisconnect(account, errors.New("stream ended before terminal event"), requestID)
+		writeStreamHeaders()
+		if _, werr := c.Writer.WriteString(buildChatStreamErrorSSE(OpenAIUpstreamStreamReadErrorCode, "OpenAI stream ended before a terminal event")); werr == nil {
+			_, _ = c.Writer.WriteString("data: [DONE]\n\n")
+			c.Writer.Flush()
+		}
+		return resultWithUsage(), fmt.Errorf("stream usage incomplete: missing terminal event")
+	}
+
+	s.clearOpenAIProxyStreamDisconnect(account)
+	if !clientOutputStarted {
 		if refusalDetector.IsSilentRefusal() {
 			return nil, newOpenAISilentRefusalFailoverError(c, account, requestID)
 		}
@@ -370,20 +525,7 @@ func (s *OpenAIGatewayService) streamRawChatCompletions(
 		}
 	}
 
-	return &OpenAIForwardResult{
-		RequestID:                     requestID,
-		Usage:                         usage,
-		Model:                         originalModel,
-		BillingModel:                  billingModel,
-		UpstreamModel:                 upstreamModel,
-		UpstreamResponseModel:         observedUpstreamResponseModel(c),
-		UpstreamResponseModelConflict: observedUpstreamResponseModelConflict(c),
-		ReasoningEffort:               reasoningEffort,
-		ServiceTier:                   serviceTier,
-		Stream:                        true,
-		Duration:                      time.Since(startTime),
-		FirstTokenMs:                  firstTokenMs,
-	}, nil
+	return resultWithUsage(), nil
 }
 
 // ensureOpenAIChatStreamUsage 确保 raw Chat Completions 流式请求会让上游返回 usage。

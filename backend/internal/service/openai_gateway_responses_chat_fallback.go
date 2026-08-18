@@ -182,7 +182,7 @@ func (s *OpenAIGatewayService) streamChatCompletionsAsResponses(
 	startTime time.Time,
 ) (*OpenAIForwardResult, error) {
 	requestID := resp.Header.Get("x-request-id")
-	keepaliveOwner, _, lastDownstreamWriteAt, keepaliveInterval := takeOverOpenAIResponsesSSEKeepalive(c)
+	keepaliveOwner, keepaliveCommitted, lastDownstreamWriteAt, keepaliveInterval := takeOverOpenAIResponsesSSEKeepalive(c)
 	writeInitialStreamHeaders := s.newStreamHeaderWriter(c, resp.Header)
 	writeStreamHeaders := func() {
 		if keepaliveOwner != nil && keepaliveOwner.committed() {
@@ -196,6 +196,7 @@ func (s *OpenAIGatewayService) streamChatCompletionsAsResponses(
 	state.ToolSearchDeclared = toolSearch
 	state.NamespaceTools = namespaceTools
 	clientDisconnected := false
+	businessOutputCommitted := false
 	downstreamWritten := func() {}
 
 	writeEvents := func(events []apicompat.ResponsesStreamEvent) {
@@ -224,6 +225,7 @@ func (s *OpenAIGatewayService) streamChatCompletionsAsResponses(
 			wroteEvent = true
 		}
 		if wroteEvent {
+			businessOutputCommitted = true
 			MarkOpenAINvidiaResponsesBusinessOutput(c)
 			c.Writer.Flush()
 			downstreamWritten()
@@ -246,8 +248,28 @@ func (s *OpenAIGatewayService) streamChatCompletionsAsResponses(
 	}
 
 	finishStream := func(scan ccStreamScanState) (*OpenAIForwardResult, error) {
-		if scan.Err != nil {
-			return resultWithScan(scan), fmt.Errorf("stream usage incomplete: %w", scan.Err)
+		if c != nil && c.Request != nil && c.Request.Context().Err() != nil {
+			clientDisconnected = true
+		}
+		if scan.Err != nil || !scan.SawDone {
+			streamErr := scan.Err
+			if streamErr == nil {
+				streamErr = errors.New("stream ended before terminal event")
+				logCCStreamMissingDoneSentinel("openai responses chat fallback", requestID)
+			}
+			// Once a keepalive or business event has committed the SSE response,
+			// JSON/status-code errors would corrupt the stream. Emit the Responses
+			// terminal failure event instead. Before any output, retain the error
+			// so the handler can still fail over to another account.
+			if !clientDisconnected && (keepaliveCommitted || businessOutputCommitted) {
+				MarkResponseCommitted(c)
+				message := sanitizeUpstreamErrorMessage(streamErr.Error())
+				if message == "" {
+					message = "Upstream response stream ended unexpectedly"
+				}
+				writeOpenAIResponsesSSEFailureMessage(c, http.StatusBadGateway, "upstream_error", message)
+			}
+			return resultWithScan(scan), fmt.Errorf("stream usage incomplete: %w", streamErr)
 		}
 
 		writeEvents(apicompat.FinalizeChatCompletionsResponsesStream(state))
@@ -260,9 +282,6 @@ func (s *OpenAIGatewayService) streamChatCompletionsAsResponses(
 				c.Writer.Flush()
 				downstreamWritten()
 			}
-		}
-		if !scan.SawDone {
-			logCCStreamMissingDoneSentinel("openai responses chat fallback", requestID)
 		}
 		return resultWithScan(scan), nil
 	}
