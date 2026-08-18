@@ -356,6 +356,15 @@ func TestOpenAIEnsureForwardErrorResponse_CompactKeepaliveOnlyWritesResponseFail
 	require.NotContains(t, w.Body.String(), "event: error\n")
 }
 
+func TestIsResponsesChatFallbackPlatform(t *testing.T) {
+	for _, platform := range []string{service.PlatformNvidia, service.PlatformDeepSeek, service.PlatformTokenRhythm} {
+		require.True(t, isResponsesChatFallbackPlatform(platform))
+	}
+	for _, platform := range []string{service.PlatformOpenAI, service.PlatformGrok, service.PlatformAgnes, service.PlatformKimi, service.PlatformAnthropic} {
+		require.False(t, isResponsesChatFallbackPlatform(platform))
+	}
+}
+
 func TestOpenAIEnsureForwardErrorResponse_ImageJSONKeepaliveWritesSingleJSONFallback(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	w := httptest.NewRecorder()

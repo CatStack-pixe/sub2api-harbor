@@ -152,6 +152,39 @@ func TestForwardResponses_DeepSeekReasoningOnlyStreamProducesVisibleText(t *test
 	require.Contains(t, rec.Body.String(), "data: [DONE]")
 }
 
+func TestForwardResponses_ChatFallbackKeepaliveAndFailedEventForDeepSeekAndTokenRhythm(t *testing.T) {
+	for _, platform := range []string{PlatformDeepSeek, PlatformTokenRhythm} {
+		t.Run(platform, func(t *testing.T) {
+			gin.SetMode(gin.TestMode)
+			recorder := newOpenAIResponseFlushRecorder()
+			c, _ := gin.CreateTestContext(recorder)
+			c.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", nil)
+			streamChunk := []byte(`data: {"id":"chatcmpl_broken","object":"chat.completion.chunk","choices":[{"index":0,"delta":{"content":"partial"},"finish_reason":null}]}` + "\n\n")
+			upstream := &httpUpstreamRecorder{resp: &http.Response{
+				StatusCode: http.StatusOK,
+				Header:     http.Header{"Content-Type": []string{"text/event-stream"}, "x-request-id": []string{"rid_" + platform}},
+				Body:       &openAIResponseFlushReadError{payload: streamChunk, err: errors.New("connection reset by peer")},
+			}}
+			svc := &OpenAIGatewayService{cfg: rawChatCompletionsTestConfig(), httpUpstream: upstream}
+			account := forceChatResponsesFallbackAccount()
+			account.Platform = platform
+			stop := StartOpenAIResponsesSSEKeepalive(c, 10*time.Millisecond)
+			defer stop()
+			waitForFallbackRecorderBody(t, recorder, ": keepalive\n\n")
+
+			result, err := svc.Forward(context.Background(), c, account, []byte(`{"model":"fallback/test","input":"hello","stream":true}`))
+			require.Error(t, err)
+			require.NotNil(t, result)
+			body, _ := recorder.snapshot()
+			require.Contains(t, body, ": keepalive\n\n")
+			require.Contains(t, body, "response.output_text.delta")
+			require.Equal(t, 1, strings.Count(body, `"type":"response.failed"`))
+			require.NotContains(t, body, "response.completed")
+			require.NotContains(t, body, "data: [DONE]")
+		})
+	}
+}
+
 func TestForwardResponses_AutoSupportedAccountStillUsesResponsesEndpoint(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 

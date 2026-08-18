@@ -399,11 +399,11 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 	// Get subscription info (may be nil)
 	subscription, _ := middleware2.GetSubscriptionFromContext(c)
 	requestPlatform := openAICompatibleRequestPlatform(c.Request.Context(), apiKey)
-	stopNvidiaResponsesKeepalive := func() {}
-	if reqStream && requestPlatform == service.PlatformNvidia && isBareOpenAIResponsesPath(c) {
-		stopNvidiaResponsesKeepalive = service.StartOpenAIResponsesSSEKeepalive(c, h.openAIResponsesKeepaliveInterval())
+	stopResponsesFallbackKeepalive := func() {}
+	if reqStream && isResponsesChatFallbackPlatform(requestPlatform) && isBareOpenAIResponsesPath(c) {
+		stopResponsesFallbackKeepalive = service.StartOpenAIResponsesSSEKeepalive(c, h.openAIResponsesKeepaliveInterval())
 	}
-	defer stopNvidiaResponsesKeepalive()
+	defer stopResponsesFallbackKeepalive()
 
 	service.SetOpsLatencyMs(c, service.OpsAuthLatencyMsKey, time.Since(requestStart).Milliseconds())
 	routingStart := time.Now()
@@ -2862,6 +2862,18 @@ func (h *OpenAIGatewayHandler) openAIResponsesKeepaliveInterval() time.Duration 
 		return 0
 	}
 	return time.Duration(h.cfg.Gateway.StreamKeepaliveInterval) * time.Second
+}
+
+// isResponsesChatFallbackPlatform identifies OpenAI-compatible platforms whose
+// Responses requests are bridged to Chat Completions and therefore need a
+// pre-output SSE keepalive while the upstream is silent.
+func isResponsesChatFallbackPlatform(platform string) bool {
+	switch platform {
+	case service.PlatformNvidia, service.PlatformDeepSeek, service.PlatformTokenRhythm:
+		return true
+	default:
+		return false
+	}
 }
 
 func setOpenAIClientTransportHTTP(c *gin.Context) {

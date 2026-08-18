@@ -1,5 +1,13 @@
 # Handoff
 
+## 2026-08-18 DeepSeek Long-Stream Disconnect Hardening
+
+- Root cause: raw Chat Completions SSE forwarding discarded scanner errors and accepted EOF without `[DONE]`; Responses-to-Chat fallback keepalive was limited to NVIDIA; proxy stream quarantine only recognized `PlatformOpenAI` accounts.
+- Code changes: raw Chat forwarding now reads asynchronously while emitting configured `gateway.stream_keepalive_interval` SSE comments, distinguishes clean `[DONE]`, upstream read failure/missing terminal event, and client disconnect drain, records/clears proxy stream failures, and emits OpenAI-compatible stream error termination after business output. Responses fallback keepalive now covers NVIDIA, DeepSeek, and TokenRhythm; committed fallback streams terminate with one `response.failed` event on upstream read failure or missing `[DONE]`. Stream quarantine now applies to all OpenAI-compatible HTTP accounts, including DeepSeek and TokenRhythm, without changing thresholds, windows, TTLs, or no-proxy behavior.
+- Local checks: `git diff --check` passed. Go/gofmt are unavailable in this Windows environment; authoritative Go generation, formatting, unit/integration tests, lint, and security checks must run in GitHub Actions.
+- Controlled production verification against `https://api.catpithos.top` used a short DeepSeek Flash prompt sequentially through both endpoints. Chat request ID `f35f116c-4608-4fca-b57d-5833ed785fb2`: HTTP `200`, headers `4.29s`, first token `4.37s`, completed `11.52s`, `[DONE]` present, no `response.failed`. Responses request ID `7109c52a-06c5-4b55-a23d-96b324674f5a`: HTTP `200`, headers `18.17s`, first token `18.17s`, completed `24.11s`, `[DONE]` present, no `response.failed`. No production container or data service was restarted or modified.
+- The temporary production Bearer credential supplied for this verification is not recorded here and should be rotated after use.
+
 ## Current State
 
 - Added the TokenRhythm account platform with API-key inference through the fixed `https://tokenrhythm.studio/v1` endpoint.
