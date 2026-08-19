@@ -81,7 +81,7 @@ func mappedGroupModelOptions(accounts []Account, platform string) []string {
 }
 
 func compositeGroupModelOptions(accounts []Account) []string {
-	platforms := []string{PlatformAnthropic, PlatformGemini, PlatformOpenAI, PlatformAntigravity, PlatformGrok, PlatformAgnes, PlatformDeepSeek, PlatformNvidia, PlatformTokenRhythm, PlatformKimi}
+	platforms := []string{PlatformAnthropic, PlatformGemini, PlatformOpenAI, PlatformAntigravity, PlatformGrok, PlatformAgnes, PlatformDeepSeek, PlatformNvidia, PlatformTokenRhythm, PlatformKimi, PlatformChatAnywhere}
 	models := make([]string, 0)
 	for _, platform := range platforms {
 		platformModels := mappedGroupModelOptions(accounts, platform)

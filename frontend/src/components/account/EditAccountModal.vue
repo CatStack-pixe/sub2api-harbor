@@ -37,6 +37,10 @@
               <option value="https://api.moonshot.ai/v1">{{ t('admin.accounts.kimi.internationalRegion') }}</option>
             </datalist>
           </template>
+          <select v-else-if="account.platform === 'chatanywhere'" v-model="editBaseUrl" class="input" data-testid="chatanywhere-region">
+            <option value="https://api.chatanywhere.tech/v1">{{ t('admin.accounts.chatanywhere.chinaRegion') }}</option>
+            <option value="https://api.chatanywhere.org/v1">{{ t('admin.accounts.chatanywhere.globalRegion') }}</option>
+          </select>
           <input
             v-else
             v-model="editBaseUrl"
@@ -96,6 +100,8 @@
                           : account.platform === 'deepseek'
                           ? 'sk-...'
                           : account.platform === 'kimi'
+                            ? 'sk-...'
+                          : account.platform === 'chatanywhere'
                             ? 'sk-...'
                           : 'sk-ant-...'
             "
@@ -2848,6 +2854,7 @@ const baseUrlHint = computed(() => {
   if (props.account.platform === 'deepseek') return t('admin.accounts.deepseek.baseUrlHint')
   if (props.account.platform === 'kimi') return t('admin.accounts.kimi.baseUrlHint')
   if (props.account.platform === 'tokenrhythm') return t('admin.accounts.tokenrhythm.baseUrlHint')
+  if (props.account.platform === 'chatanywhere') return t('admin.accounts.chatanywhere.baseUrlHint')
   if (props.account.platform === 'nvidia') return t('admin.accounts.nvidia.baseUrlHint')
   return t('admin.accounts.baseUrlHint')
 })
@@ -3321,6 +3328,7 @@ const defaultBaseUrl = computed(() => {
   if (props.account?.platform === 'deepseek') return 'https://api.deepseek.com'
   if (props.account?.platform === 'kimi') return 'https://api.moonshot.cn/v1'
   if (props.account?.platform === 'tokenrhythm') return 'https://tokenrhythm.studio/v1'
+  if (props.account?.platform === 'chatanywhere') return 'https://api.chatanywhere.tech/v1'
   return 'https://api.anthropic.com'
 })
 
@@ -3472,7 +3480,7 @@ const syncFormFromAccount = (newAccount: Account | null) => {
 	autoPause7dThreshold.value = typeof extra?.auto_pause_7d_threshold === 'number' ? extra.auto_pause_7d_threshold * 100 : null
 	autoPause5hDisabled.value = extra?.auto_pause_5h_disabled === true
 	autoPause7dDisabled.value = extra?.auto_pause_7d_disabled === true
-	upstreamBillingAutoProbeEnabled.value = newAccount.platform !== 'deepseek' && newAccount.platform !== 'kimi' && newAccount.platform !== 'tokenrhythm' && extra?.upstream_billing_probe_enabled === true
+	upstreamBillingAutoProbeEnabled.value = newAccount.platform !== 'deepseek' && newAccount.platform !== 'kimi' && newAccount.platform !== 'tokenrhythm' && newAccount.platform !== 'chatanywhere' && extra?.upstream_billing_probe_enabled === true
   upstreamBillingRateSyncEnabled.value =
     upstreamBillingAutoProbeEnabled.value && extra?.upstream_billing_rate_sync_enabled === true
 
@@ -3681,6 +3689,8 @@ const syncFormFromAccount = (newAccount: Account | null) => {
               ? 'https://apihub.agnes-ai.com/v1'
               : newAccount.platform === 'tokenrhythm'
                 ? 'https://tokenrhythm.studio/v1'
+              : newAccount.platform === 'chatanywhere'
+                ? 'https://api.chatanywhere.tech/v1'
               : newAccount.platform === 'kimi'
                 ? 'https://api.moonshot.cn/v1'
               : newAccount.platform === 'nvidia'
@@ -3763,6 +3773,8 @@ const syncFormFromAccount = (newAccount: Account | null) => {
               ? 'https://apihub.agnes-ai.com/v1'
               : newAccount.platform === 'tokenrhythm'
                 ? 'https://tokenrhythm.studio/v1'
+              : newAccount.platform === 'chatanywhere'
+                ? 'https://api.chatanywhere.tech/v1'
               : newAccount.platform === 'kimi'
                 ? 'https://api.moonshot.cn/v1'
               : newAccount.platform === 'nvidia'
@@ -4348,7 +4360,7 @@ const handleSubmit = async () => {
       updatePayload.load_factor = 0
     }
     updatePayload.auto_pause_on_expired = autoPauseOnExpired.value
-    if (props.account.type === 'apikey' && props.account.platform !== 'deepseek' && props.account.platform !== 'kimi' && props.account.platform !== 'tokenrhythm') {
+    if (props.account.type === 'apikey' && props.account.platform !== 'deepseek' && props.account.platform !== 'kimi' && props.account.platform !== 'tokenrhythm' && props.account.platform !== 'chatanywhere') {
       updatePayload.upstream_billing_probe_enabled = upstreamBillingAutoProbeEnabled.value
       updatePayload.upstream_billing_rate_sync_enabled = upstreamBillingRateSyncEnabled.value
       if (upstreamBillingRateSyncEnabled.value) {

@@ -148,6 +148,8 @@ func openAICompatibleSelectionErrorForLog(err error, platform string) error {
 		provider = "TokenRhythm"
 	case service.PlatformKimi:
 		provider = "Kimi"
+	case service.PlatformChatAnywhere:
+		provider = "ChatAnywhere"
 	default:
 		return err
 	}

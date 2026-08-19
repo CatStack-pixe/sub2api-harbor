@@ -197,6 +197,12 @@ const tokenRhythmModels = [
   'gpt-4o', 'gpt-4o-mini', 'gpt-4.1', 'gpt-5', 'gpt-5-mini'
 ]
 
+// ChatAnywhere exposes a mixed OpenAI/Anthropic catalog; these IDs provide a
+// useful initial whitelist while account model sync can add newer IDs.
+const chatAnywhereModels = [
+  'gpt-5.5', 'gpt-5.1', 'gpt-4.1', 'claude-sonnet-4-5', 'deepseek-v3-2'
+]
+
 // 字节跳动 豆包
 const doubaoModels = [
   'doubao-pro-256k', 'doubao-pro-128k', 'doubao-pro-32k', 'doubao-pro-4k',
@@ -447,6 +453,7 @@ export function getModelsByPlatform(platform: string): string[] {
     case 'moonshot': return moonshotModels
     case 'kimi': return moonshotModels
     case 'tokenrhythm': return tokenRhythmModels
+    case 'chatanywhere': return chatAnywhereModels
     case 'doubao': return doubaoModels
     case 'minimax': return minimaxModels
     case 'baidu': return baiduModels
@@ -459,7 +466,7 @@ export function getModelsByPlatform(platform: string): string[] {
 
 // 按平台获取预设映射
 export function getPresetMappingsByPlatform(platform: string) {
-  if (platform === 'agnes' || platform === 'deepseek' || platform === 'kimi' || platform === 'nvidia' || platform === 'tokenrhythm') return []
+  if (platform === 'agnes' || platform === 'deepseek' || platform === 'kimi' || platform === 'nvidia' || platform === 'tokenrhythm' || platform === 'chatanywhere') return []
   if (platform === 'openai') return openaiPresetMappings
   if (platform === 'gemini') return geminiPresetMappings
   if (platform === 'grok' || platform === 'xai') return grokPresetMappings

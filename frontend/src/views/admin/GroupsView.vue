@@ -4867,6 +4867,7 @@ const platformOptions = computed(() => [
   { value: "kimi", label: "Kimi" },
   { value: "nvidia", label: "NVIDIA" },
   { value: "tokenrhythm", label: "TokenRhythm" },
+	{ value: "chatanywhere", label: "ChatAnywhere" },
   { value: "composite", label: "Composite" },
 ]);
 
@@ -4882,6 +4883,7 @@ const platformFilterOptions = computed(() => [
   { value: "kimi", label: "Kimi" },
   { value: "nvidia", label: "NVIDIA" },
   { value: "tokenrhythm", label: "TokenRhythm" },
+	{ value: "chatanywhere", label: "ChatAnywhere" },
   { value: "composite", label: "Composite" },
 ]);
 
@@ -4896,6 +4898,7 @@ const compositeRoutePlatformOptions = computed(() => [
   { value: "kimi", label: "Kimi" },
   { value: "nvidia", label: "NVIDIA" },
   { value: "tokenrhythm", label: "TokenRhythm" },
+	{ value: "chatanywhere", label: "ChatAnywhere" },
 ]);
 
 const compositeRouteEndpointOptions = computed(() => [

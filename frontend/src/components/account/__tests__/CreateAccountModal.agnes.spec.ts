@@ -24,7 +24,7 @@ describe('CreateAccountModal DeepSeek account type', () => {
     expect(source).toContain("newPlatform === 'deepseek'")
     expect(source).toContain("? 'https://api.deepseek.com'")
     expect(source).toContain('allowedModels.value = [...getModelsByPlatform(newPlatform)]')
-    expect(source).toContain("form.platform === 'deepseek' || form.platform === 'kimi' || form.platform === 'tokenrhythm'")
+    expect(source).toContain("form.platform === 'deepseek' || form.platform === 'kimi' || form.platform === 'chatanywhere'")
   })
 })
 
@@ -46,5 +46,16 @@ describe('CreateAccountModal Kimi account type', () => {
     expect(source).toContain('data-testid="kimi-base-url"')
     expect(source).toContain('https://api.moonshot.cn/v1')
     expect(source).toContain('https://api.moonshot.ai/v1')
+  })
+})
+
+describe('CreateAccountModal ChatAnywhere account type', () => {
+  it('offers API-key setup with official regional endpoints and no billing probe', () => {
+    expect(source).toContain('data-testid="chatanywhere-platform"')
+    expect(source).toContain('data-testid="chatanywhere-account-type-api-key"')
+    expect(source).toContain("newPlatform === 'chatanywhere'")
+    expect(source).toContain('https://api.chatanywhere.tech/v1')
+    expect(source).toContain('https://api.chatanywhere.org/v1')
+    expect(source).toContain("form.platform !== 'tokenrhythm' && form.platform !== 'chatanywhere'")
   })
 })

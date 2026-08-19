@@ -33,7 +33,11 @@ func (s *GatewayService) buildUpstreamRequest(ctx context.Context, c *gin.Contex
 			if err != nil {
 				return nil, nil, err
 			}
-			targetURL = validatedURL + "/v1/messages?beta=true"
+			if account.IsChatAnywhere() {
+				targetURL = strings.TrimRight(validatedURL, "/") + "/messages"
+			} else {
+				targetURL = validatedURL + "/v1/messages?beta=true"
+			}
 		}
 	} else if account.IsCustomBaseURLEnabled() {
 		customURL := account.GetCustomBaseURL()
@@ -126,6 +130,10 @@ func (s *GatewayService) buildUpstreamRequest(ctx context.Context, c *gin.Contex
 		setHeaderRaw(req.Header, "authorization", "Bearer "+token)
 	} else {
 		setAnthropicAPIKeyAuthHeader(req.Header, account, token)
+		if account.IsChatAnywhere() {
+			deleteHeaderAllForms(req.Header, "x-api-key")
+			setHeaderRaw(req.Header, "authorization", "Bearer "+token)
+		}
 	}
 
 	// 白名单透传 headers

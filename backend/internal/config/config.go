@@ -1978,6 +1978,8 @@ func setDefaults() {
 		"api.kimi.com",
 		"api.moonshot.ai",
 		"api.moonshot.cn",
+		"api.chatanywhere.tech",
+		"api.chatanywhere.org",
 		"open.bigmodel.cn",
 		"api.minimaxi.com",
 		"generativelanguage.googleapis.com",

@@ -46,6 +46,13 @@
   <svg v-else-if="platform === 'tokenrhythm'" :class="sizeClass" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
     <path d="M3 12h3l2.2-6 3.6 12 2.4-8 1.5 2H21" />
   </svg>
+  <!-- ChatAnywhere connected nodes mark -->
+  <svg v-else-if="platform === 'chatanywhere'" :class="sizeClass" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="6" cy="12" r="2.5" />
+    <circle cx="18" cy="7" r="2.5" />
+    <circle cx="18" cy="17" r="2.5" />
+    <path d="m8.3 10.9 7.4-3M8.3 13.1l7.4 3" />
+  </svg>
   <!-- Composite group icon -->
   <svg v-else-if="platform === 'composite'" :class="sizeClass" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
     <circle cx="6" cy="12" r="3" />

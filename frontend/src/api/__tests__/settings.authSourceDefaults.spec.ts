@@ -21,6 +21,7 @@ const allNullQuotas: DefaultPlatformQuotasMap = {
   kimi: { daily: null, weekly: null, monthly: null },
   nvidia: { daily: null, weekly: null, monthly: null },
   tokenrhythm: { daily: null, weekly: null, monthly: null },
+  chatanywhere: { daily: null, weekly: null, monthly: null },
 }
 
 describe("admin settings auth source defaults helpers", () => {
@@ -232,6 +233,7 @@ describe("admin settings auth source defaults helpers", () => {
     // 缺失平台归一化为全 null
     expect(emailQuotas.gemini).toEqual({ daily: null, weekly: null, monthly: null });
     expect(emailQuotas.antigravity).toEqual({ daily: null, weekly: null, monthly: null });
+    expect(emailQuotas.chatanywhere).toEqual({ daily: null, weekly: null, monthly: null });
   });
 });
 
@@ -248,11 +250,12 @@ describe("normalizePlatformQuotasMap", () => {
     expect(result.kimi).toEqual({ daily: null, weekly: null, monthly: null });
     expect(result.nvidia).toEqual({ daily: null, weekly: null, monthly: null });
     expect(result.tokenrhythm).toEqual({ daily: null, weekly: null, monthly: null });
+    expect(result.chatanywhere).toEqual({ daily: null, weekly: null, monthly: null });
   });
 
   it("无参数时返回全平台全 null", () => {
     const result = normalizePlatformQuotasMap();
-    expect(Object.keys(result)).toHaveLength(10);
+    expect(Object.keys(result)).toHaveLength(11);
     for (const v of Object.values(result)) {
       expect(v).toEqual({ daily: null, weekly: null, monthly: null });
     }
@@ -300,7 +303,7 @@ describe("sanitizePlatformQuotasMap", () => {
 
   it("缺失平台填充为全 null", () => {
     const result = sanitizePlatformQuotasMap({});
-    expect(Object.keys(result)).toHaveLength(10);
+    expect(Object.keys(result)).toHaveLength(11);
     for (const v of Object.values(result)) {
       expect(v).toEqual({ daily: null, weekly: null, monthly: null });
     }

@@ -451,7 +451,8 @@ export default {
       agnes: 'Agnes',
       deepseek: 'DeepSeek',
       kimi: 'Kimi',
-      nvidia: 'NVIDIA'
+      nvidia: 'NVIDIA',
+      chatanywhere: 'ChatAnywhere'
     },
     extraModelsHeader: 'Extra Models',
     extraModelsEmpty: 'No extra models',

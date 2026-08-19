@@ -478,3 +478,23 @@ func TestGatewayRoutesOpenAICountTokensPathIsRegistered(t *testing.T) {
 	router.ServeHTTP(w, req)
 	require.NotEqual(t, http.StatusNotFound, w.Code)
 }
+
+func TestGatewayRoutesChatAnywhereCountTokensUsesLocalEstimate(t *testing.T) {
+	router := newGatewayRoutesTestRouterWithConfig(&config.Config{
+		Gateway: config.GatewayConfig{MaxBodySize: 1024 * 1024},
+	}, service.PlatformChatAnywhere)
+
+	for _, path := range []string{"/v1/messages/count_tokens", "/messages/count_tokens"} {
+		req := httptest.NewRequest(http.MethodPost, path, strings.NewReader(`{"model":"claude-sonnet-4-5","messages":[{"role":"user","content":"hi"}]}`))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+
+		router.ServeHTTP(w, req)
+		require.Equal(t, http.StatusOK, w.Code, "path=%s", path)
+		var response struct {
+			InputTokens int `json:"input_tokens"`
+		}
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &response), "path=%s", path)
+		require.Positive(t, response.InputTokens, "path=%s", path)
+	}
+}

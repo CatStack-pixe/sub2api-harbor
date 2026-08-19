@@ -95,6 +95,7 @@ const platformLabel = computed(() => {
   if (props.platform === 'kimi') return 'Kimi'
   if (props.platform === 'nvidia') return 'NVIDIA'
   if (props.platform === 'tokenrhythm') return 'TokenRhythm'
+  if (props.platform === 'chatanywhere') return 'ChatAnywhere'
   return 'Gemini'
 })
 
@@ -208,6 +209,9 @@ const platformClass = computed(() => {
   if (props.platform === 'tokenrhythm') {
     return 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300'
   }
+  if (props.platform === 'chatanywhere') {
+    return 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300'
+  }
   return 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
 })
 
@@ -238,6 +242,9 @@ const typeClass = computed(() => {
   }
   if (props.platform === 'tokenrhythm') {
     return 'bg-teal-100 text-teal-600 dark:bg-teal-900/30 dark:text-teal-300'
+  }
+  if (props.platform === 'chatanywhere') {
+    return 'bg-violet-100 text-violet-600 dark:bg-violet-900/30 dark:text-violet-300'
   }
   return 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400'
 })

@@ -19,6 +19,12 @@
 
 ## Current State
 
+- Added the ChatAnywhere account and group platform with API-key-only authentication, official China/Global endpoint selection (`https://api.chatanywhere.tech/v1` and `https://api.chatanywhere.org/v1`), native OpenAI Chat Completions/Responses routing, and native Anthropic Messages routing.
+- ChatAnywhere `/v1/messages/count_tokens` uses the local Anthropic-compatible estimator because the official documentation does not define a token-counting endpoint; this avoids forwarding to an unsupported URL or with the wrong authentication scheme.
+- Added ChatAnywhere model defaults, upstream model synchronization, composite routing, quota/platform validation, URL allowlist hosts, admin account create/edit controls, model whitelist defaults, platform badges/icons, group/channel filters, and dashboard quota labels.
+- ChatAnywhere account creation and editing use the existing localized region labels, base URL guidance, and API-key guidance in both supported UI languages.
+- Migration `226_add_chatanywhere_platform_constraints.sql` aligns user quota and composite-route database constraints with all currently supported concrete platforms, including ChatAnywhere; the Ent quota validator is aligned as well.
+- ChatAnywhere does not enable upstream billing balance probing because the official documentation does not define a stable balance endpoint.
 - Added the TokenRhythm account platform with API-key inference through the fixed `https://tokenrhythm.studio/v1` endpoint.
 - Admin account create/edit accepts a complete Cookie header, stores only `tr_session` and `tr_csrf`, and exposes presence flags without returning secret values.
 - Added the admin-only TokenRhythm balance probe at `/admin/tokenrhythm/accounts/:id/balance`; it sends the stored Cookie only to the official usage endpoint and does not change scheduling state.
@@ -30,7 +36,8 @@
 
 ## Verification
 
-- Frontend `pnpm typecheck`, `pnpm lint:check`, targeted TokenRhythm tests, and updated quota contract tests pass locally.
+- Frontend `pnpm typecheck`, `pnpm lint:check`, and focused ChatAnywhere-adjacent account/quota/credential tests pass locally (74 assertions); ChatAnywhere account URL helpers cover both OpenAI and Anthropic defaults.
+- Backend Go formatting and unit tests could not run because `go`/`gofmt` are unavailable in the local Windows environment; run the repository GitHub Actions CI before release.
 - Kimi frontend typecheck, lint, and focused account/platform/quota tests pass locally (54 assertions).
 - Full frontend Vitest has two pre-existing transform failures caused by duplicate `getLiveCapability` declarations in the baseline GroupsView tests; unrelated assertions now pass.
 - Go is unavailable in the local Windows environment. Run the repository GitHub Actions CI before release to execute Go generation, unit tests, integration tests, and frontend build.

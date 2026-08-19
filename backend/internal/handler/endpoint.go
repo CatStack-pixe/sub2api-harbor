@@ -186,6 +186,11 @@ func DeriveUpstreamEndpoint(inbound, rawRequestPath, platform string) string {
 	switch platform {
 	case service.PlatformAgnes, service.PlatformDeepSeek, service.PlatformNvidia, service.PlatformTokenRhythm, service.PlatformKimi:
 		return EndpointChatCompletions
+	case service.PlatformChatAnywhere:
+		if inbound == EndpointMessages || inbound == EndpointResponses || inbound == EndpointResponsesCompact {
+			return inbound
+		}
+		return EndpointChatCompletions
 	case service.PlatformOpenAI, service.PlatformGrok:
 		if inbound == EndpointEmbeddings || inbound == EndpointAlphaSearch || inbound == EndpointImagesGenerations || inbound == EndpointImagesEdits || inbound == EndpointVideosGenerations || inbound == EndpointVideosEdits || inbound == EndpointVideosExtensions || inbound == EndpointVideos {
 			return inbound

@@ -230,6 +230,20 @@
             <PlatformIcon platform="tokenrhythm" size="sm" />
             TokenRhythm
           </button>
+          <button
+            type="button"
+            data-testid="chatanywhere-platform"
+            @click="form.platform = 'chatanywhere'"
+            :class="[
+              'flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium transition-all',
+              form.platform === 'chatanywhere'
+                ? 'bg-white text-violet-700 shadow-sm dark:bg-dark-600 dark:text-violet-300'
+                : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200'
+            ]"
+          >
+            <PlatformIcon platform="chatanywhere" size="sm" />
+            ChatAnywhere
+          </button>
         </div>
       </div>
 
@@ -517,6 +531,26 @@
             <div>
               <span class="block text-sm font-medium text-gray-900 dark:text-white">API Key</span>
               <span class="text-xs text-gray-500 dark:text-gray-400">TokenRhythm API</span>
+            </div>
+          </button>
+        </div>
+      </div>
+
+      <div v-if="form.platform === 'chatanywhere'">
+        <label class="input-label">{{ t('admin.accounts.accountType') }}</label>
+        <div class="mt-2 grid grid-cols-1 gap-3" data-tour="account-form-type">
+          <button
+            type="button"
+            data-testid="chatanywhere-account-type-api-key"
+            @click="accountCategory = 'apikey'"
+            class="flex items-center gap-3 rounded-lg border-2 border-violet-500 bg-violet-50 p-3 text-left dark:bg-violet-900/20"
+          >
+            <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-violet-600 text-white">
+              <Icon name="key" size="sm" />
+            </div>
+            <div>
+              <span class="block text-sm font-medium text-gray-900 dark:text-white">API Key</span>
+              <span class="text-xs text-gray-500 dark:text-gray-400">ChatAnywhere API</span>
             </div>
           </button>
         </div>
@@ -1293,6 +1327,10 @@
               <option value="https://api.moonshot.ai/v1">{{ t('admin.accounts.kimi.internationalRegion') }}</option>
             </datalist>
           </template>
+          <select v-else-if="form.platform === 'chatanywhere'" v-model="apiKeyBaseUrl" class="input" data-testid="chatanywhere-region">
+            <option value="https://api.chatanywhere.tech/v1">{{ t('admin.accounts.chatanywhere.chinaRegion') }}</option>
+            <option value="https://api.chatanywhere.org/v1">{{ t('admin.accounts.chatanywhere.globalRegion') }}</option>
+          </select>
           <input
             v-else
             v-model="apiKeyBaseUrl"
@@ -1346,6 +1384,8 @@
                         ? 'sk-...'
                         : form.platform === 'kimi'
                           ? 'sk-...'
+                        : form.platform === 'chatanywhere'
+                          ? 'sk-...'
                         : 'sk-ant-...'
             "
           />
@@ -1368,7 +1408,7 @@
 
         <!-- 上游倍率自动探测：支持的 API-key 平台可用，DeepSeek 使用独立余额探测。 -->
         <div
-          v-if="form.platform !== 'deepseek' && form.platform !== 'kimi' && form.platform !== 'tokenrhythm'"
+          v-if="form.platform !== 'deepseek' && form.platform !== 'kimi' && form.platform !== 'tokenrhythm' && form.platform !== 'chatanywhere'"
           class="flex items-center justify-between gap-4 border-t border-gray-200 pt-4 dark:border-dark-600"
         >
           <div>
@@ -3878,6 +3918,7 @@ const baseUrlHint = computed(() => {
   if (form.platform === 'deepseek') return t('admin.accounts.deepseek.baseUrlHint')
   if (form.platform === 'kimi') return t('admin.accounts.kimi.baseUrlHint')
   if (form.platform === 'tokenrhythm') return t('admin.accounts.tokenrhythm.baseUrlHint')
+  if (form.platform === 'chatanywhere') return t('admin.accounts.chatanywhere.baseUrlHint')
   if (form.platform === 'nvidia') return t('admin.accounts.nvidia.baseUrlHint')
   return t('admin.accounts.baseUrlHint')
 })
@@ -3890,6 +3931,7 @@ const apiKeyHint = computed(() => {
   if (form.platform === 'deepseek') return t('admin.accounts.deepseek.apiKeyHint')
   if (form.platform === 'kimi') return t('admin.accounts.kimi.apiKeyHint')
   if (form.platform === 'tokenrhythm') return t('admin.accounts.tokenrhythm.apiKeyHint')
+  if (form.platform === 'chatanywhere') return t('admin.accounts.chatanywhere.apiKeyHint')
   if (form.platform === 'nvidia') return t('admin.accounts.nvidia.apiKeyHint')
   return t('admin.accounts.apiKeyHint')
 })
@@ -4480,6 +4522,8 @@ watch(
                 ? 'https://apihub.agnes-ai.com/v1'
                 : newPlatform === 'tokenrhythm'
                   ? 'https://tokenrhythm.studio/v1'
+                : newPlatform === 'chatanywhere'
+                  ? 'https://api.chatanywhere.tech/v1'
                 : newPlatform === 'kimi'
                   ? 'https://api.moonshot.cn/v1'
                 : newPlatform === 'nvidia'
@@ -4545,6 +4589,13 @@ watch(
       accountCategory.value = 'apikey'
       modelRestrictionMode.value = 'whitelist'
       allowedModels.value = []
+      form.concurrency = 10
+      form.load_factor = null
+    }
+    if (newPlatform === 'chatanywhere') {
+      accountCategory.value = 'apikey'
+      modelRestrictionMode.value = 'whitelist'
+      allowedModels.value = [...getModelsByPlatform(newPlatform)]
       form.concurrency = 10
       form.load_factor = null
     }
@@ -5420,6 +5471,8 @@ const handleSubmit = async () => {
                 ? 'https://apihub.agnes-ai.com/v1'
                 : form.platform === 'tokenrhythm'
                   ? 'https://tokenrhythm.studio/v1'
+                : form.platform === 'chatanywhere'
+                  ? 'https://api.chatanywhere.tech/v1'
                 : form.platform === 'kimi'
                   ? 'https://api.moonshot.cn/v1'
                 : form.platform === 'nvidia'
@@ -5499,9 +5552,12 @@ const handleSubmit = async () => {
     ...form,
     group_ids: form.group_ids,
     extra,
-    upstream_billing_probe_enabled: form.platform === 'deepseek' || form.platform === 'kimi' || form.platform === 'tokenrhythm'
-      ? form.platform === 'tokenrhythm'
-      : upstreamBillingAutoProbeEnabled.value,
+    upstream_billing_probe_enabled:
+      form.platform === 'deepseek' || form.platform === 'kimi' || form.platform === 'chatanywhere'
+        ? undefined
+        : form.platform === 'tokenrhythm'
+          ? true
+          : upstreamBillingAutoProbeEnabled.value,
     auto_pause_on_expired: autoPauseOnExpired.value
   })
 }
@@ -5633,13 +5689,13 @@ const createAccountAndFinish = async (
     // 上游倍率探测对支持的 API-key 平台开放（antigravity upstream 走本 helper）；
     // DeepSeek 使用独立余额探测，非 apikey 类型（bedrock/oauth）不传。
     upstream_billing_probe_enabled:
-    type === 'apikey'
-      ? form.platform === 'tokenrhythm'
-        ? true
-        : form.platform !== 'deepseek' && form.platform !== 'kimi'
-          ? upstreamBillingAutoProbeEnabled.value
-          : undefined
-      : undefined,
+      type === 'apikey'
+        ? form.platform === 'tokenrhythm'
+          ? true
+          : form.platform !== 'deepseek' && form.platform !== 'kimi' && form.platform !== 'chatanywhere'
+            ? upstreamBillingAutoProbeEnabled.value
+            : undefined
+        : undefined,
     auto_pause_on_expired: autoPauseOnExpired.value
   })
 }

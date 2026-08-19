@@ -264,6 +264,8 @@ func defaultModelsListCandidateIDs(platform string) []string {
 		return NvidiaDefaultModelIDs()
 	case PlatformKimi:
 		return KimiDefaultModelIDs()
+	case PlatformChatAnywhere:
+		return ChatAnywhereDefaultModelIDs()
 	case PlatformTokenRhythm:
 		return TokenRhythmDefaultModelIDs()
 	case PlatformComposite:
@@ -286,7 +288,7 @@ func defaultAllowImageGenerationForPlatform(platform string) bool {
 func compositeDefaultModelsListCandidateIDs() []string {
 	seen := make(map[string]struct{})
 	ids := make([]string, 0)
-	for _, platform := range []string{PlatformAnthropic, PlatformGemini, PlatformOpenAI, PlatformAntigravity, PlatformGrok, PlatformAgnes, PlatformDeepSeek, PlatformNvidia, PlatformTokenRhythm, PlatformKimi} {
+	for _, platform := range []string{PlatformAnthropic, PlatformGemini, PlatformOpenAI, PlatformAntigravity, PlatformGrok, PlatformAgnes, PlatformDeepSeek, PlatformNvidia, PlatformTokenRhythm, PlatformKimi, PlatformChatAnywhere} {
 		for _, id := range defaultModelsListCandidateIDs(platform) {
 			if _, ok := seen[id]; ok {
 				continue

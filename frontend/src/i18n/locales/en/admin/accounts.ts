@@ -109,6 +109,7 @@ export default {
         kimi: 'Kimi',
         nvidia: 'NVIDIA',
         tokenrhythm: 'TokenRhythm',
+        chatanywhere: 'ChatAnywhere',
       },
       types: {
         oauth: 'OAuth',
@@ -640,6 +641,12 @@ export default {
       nvidia: {
         baseUrlHint: 'OpenAI-compatible NVIDIA NIM endpoint. The default includes /v1.',
         apiKeyHint: 'Your NVIDIA API Key'
+      },
+      chatanywhere: {
+        baseUrlHint: 'Select the official China or Global ChatAnywhere endpoint.',
+        apiKeyHint: 'Your ChatAnywhere API key',
+        chinaRegion: 'China: api.chatanywhere.tech',
+        globalRegion: 'Global: api.chatanywhere.org'
       },
       grok: {
         baseUrlHint: 'Grok OAuth accounts forward to the official xAI API base URL.',
