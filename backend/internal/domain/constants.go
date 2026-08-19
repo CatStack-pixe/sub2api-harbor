@@ -18,18 +18,18 @@ const (
 
 // Platform constants
 const (
-	PlatformAnthropic   = "anthropic"
-	PlatformOpenAI      = "openai"
-	PlatformGemini      = "gemini"
-	PlatformAntigravity = "antigravity"
-	PlatformGrok        = "grok"
-	PlatformAgnes       = "agnes"
-	PlatformDeepSeek    = "deepseek"
-	PlatformNvidia      = "nvidia"
-	PlatformTokenRhythm = "tokenrhythm"
-	PlatformKimi        = "kimi"
+	PlatformAnthropic    = "anthropic"
+	PlatformOpenAI       = "openai"
+	PlatformGemini       = "gemini"
+	PlatformAntigravity  = "antigravity"
+	PlatformGrok         = "grok"
+	PlatformAgnes        = "agnes"
+	PlatformDeepSeek     = "deepseek"
+	PlatformNvidia       = "nvidia"
+	PlatformTokenRhythm  = "tokenrhythm"
+	PlatformKimi         = "kimi"
 	PlatformChatAnywhere = "chatanywhere"
-	PlatformComposite   = "composite"
+	PlatformComposite    = "composite"
 )
 
 const (

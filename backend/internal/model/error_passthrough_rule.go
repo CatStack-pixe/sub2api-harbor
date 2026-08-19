@@ -32,16 +32,16 @@ const MatchModeAll = "all"
 
 // 支持的平台常量
 const (
-	PlatformAnthropic   = "anthropic"
-	PlatformOpenAI      = "openai"
-	PlatformGemini      = "gemini"
-	PlatformAntigravity = "antigravity"
-	PlatformGrok        = "grok"
-	PlatformAgnes       = "agnes"
-	PlatformDeepSeek    = "deepseek"
-	PlatformNvidia      = "nvidia"
-	PlatformTokenRhythm = "tokenrhythm"
-	PlatformKimi        = "kimi"
+	PlatformAnthropic    = "anthropic"
+	PlatformOpenAI       = "openai"
+	PlatformGemini       = "gemini"
+	PlatformAntigravity  = "antigravity"
+	PlatformGrok         = "grok"
+	PlatformAgnes        = "agnes"
+	PlatformDeepSeek     = "deepseek"
+	PlatformNvidia       = "nvidia"
+	PlatformTokenRhythm  = "tokenrhythm"
+	PlatformKimi         = "kimi"
 	PlatformChatAnywhere = "chatanywhere"
 )
 

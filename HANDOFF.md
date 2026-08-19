@@ -33,7 +33,7 @@
 
 ## Verification
 
-- Frontend `pnpm typecheck`, `pnpm lint:check`, and focused ChatAnywhere-adjacent account/quota/credential tests pass locally (73 assertions); ChatAnywhere account URL helpers cover both OpenAI and Anthropic defaults.
+- Frontend `pnpm typecheck`, `pnpm lint:check`, and focused ChatAnywhere-adjacent account/quota/credential tests pass locally (74 assertions); ChatAnywhere account URL helpers cover both OpenAI and Anthropic defaults.
 - Backend Go formatting and unit tests could not run because `go`/`gofmt` are unavailable in the local Windows environment; run the repository GitHub Actions CI before release.
 - Kimi frontend typecheck, lint, and focused account/platform/quota tests pass locally (54 assertions).
 - Full frontend Vitest has two pre-existing transform failures caused by duplicate `getLiveCapability` declarations in the baseline GroupsView tests; unrelated assertions now pass.

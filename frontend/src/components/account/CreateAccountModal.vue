@@ -5689,7 +5689,6 @@ const createAccountAndFinish = async (
     // 上游倍率探测对支持的 API-key 平台开放（antigravity upstream 走本 helper）；
     // DeepSeek 使用独立余额探测，非 apikey 类型（bedrock/oauth）不传。
     upstream_billing_probe_enabled:
-    upstream_billing_probe_enabled:
       type === 'apikey'
         ? form.platform === 'tokenrhythm'
           ? true
