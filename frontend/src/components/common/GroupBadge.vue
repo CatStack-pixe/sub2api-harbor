@@ -180,6 +180,9 @@ const labelClass = computed(() => {
   if (props.platform === 'chatanywhere') {
     return `${base} bg-violet-200/70 text-violet-900 dark:bg-violet-900/50 dark:text-violet-300`
   }
+  if (props.platform === 'glm') {
+    return `${base} bg-rose-200/70 text-rose-900 dark:bg-rose-900/50 dark:text-rose-300`
+  }
   if (props.platform === 'composite') {
     return `${base} bg-cyan-200/70 text-cyan-900 dark:bg-cyan-900/50 dark:text-cyan-300`
   }
@@ -247,6 +250,11 @@ const badgeClass = computed(() => {
     return isSubscription.value
       ? 'bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-300'
       : 'bg-violet-50 text-violet-800 dark:bg-violet-900/20 dark:text-violet-300'
+  }
+  if (props.platform === 'glm') {
+    return isSubscription.value
+      ? 'bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-300'
+      : 'bg-rose-50 text-rose-800 dark:bg-rose-900/20 dark:text-rose-300'
   }
   if (props.platform === 'composite') {
     return isSubscription.value

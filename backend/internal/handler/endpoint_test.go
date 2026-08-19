@@ -140,6 +140,8 @@ func TestDeriveUpstreamEndpoint(t *testing.T) {
 		{"chatanywhere chat", EndpointChatCompletions, "/v1/chat/completions", service.PlatformChatAnywhere, EndpointChatCompletions},
 		{"chatanywhere responses", EndpointResponses, "/v1/responses", service.PlatformChatAnywhere, EndpointResponses},
 		{"chatanywhere messages", EndpointMessages, "/v1/messages", service.PlatformChatAnywhere, EndpointMessages},
+		{"glm chat", EndpointChatCompletions, "/v1/chat/completions", service.PlatformGLM, EndpointChatCompletions},
+		{"glm responses bridges to chat", EndpointResponses, "/v1/responses", service.PlatformGLM, EndpointChatCompletions},
 
 		// Antigravity — uses inbound to pick Claude vs Gemini upstream.
 		{"antigravity claude", EndpointMessages, "/antigravity/v1/messages", service.PlatformAntigravity, EndpointMessages},

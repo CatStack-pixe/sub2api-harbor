@@ -53,6 +53,11 @@
     <circle cx="18" cy="17" r="2.5" />
     <path d="m8.3 10.9 7.4-3M8.3 13.1l7.4 3" />
   </svg>
+  <!-- Zhipu GLM official mark -->
+  <svg v-else-if="platform === 'glm'" :class="sizeClass" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M5 5h14L5 19h14" />
+    <path d="M12 5v14" />
+  </svg>
   <!-- Composite group icon -->
   <svg v-else-if="platform === 'composite'" :class="sizeClass" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
     <circle cx="6" cy="12" r="3" />

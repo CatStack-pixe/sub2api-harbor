@@ -244,6 +244,20 @@
             <PlatformIcon platform="chatanywhere" size="sm" />
             ChatAnywhere
           </button>
+          <button
+            type="button"
+            data-testid="glm-platform"
+            @click="form.platform = 'glm'"
+            :class="[
+              'flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium transition-all',
+              form.platform === 'glm'
+                ? 'bg-white text-rose-700 shadow-sm dark:bg-dark-600 dark:text-rose-300'
+                : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200'
+            ]"
+          >
+            <PlatformIcon platform="glm" size="sm" />
+            GLM
+          </button>
         </div>
       </div>
 
@@ -551,6 +565,26 @@
             <div>
               <span class="block text-sm font-medium text-gray-900 dark:text-white">API Key</span>
               <span class="text-xs text-gray-500 dark:text-gray-400">ChatAnywhere API</span>
+            </div>
+          </button>
+        </div>
+      </div>
+
+      <div v-if="form.platform === 'glm'">
+        <label class="input-label">{{ t('admin.accounts.accountType') }}</label>
+        <div class="mt-2 grid grid-cols-1 gap-3" data-tour="account-form-type">
+          <button
+            type="button"
+            data-testid="glm-account-type-api-key"
+            @click="accountCategory = 'apikey'"
+            class="flex items-center gap-3 rounded-lg border-2 border-rose-500 bg-rose-50 p-3 text-left dark:bg-rose-900/20"
+          >
+            <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-rose-600 text-white">
+              <Icon name="key" size="sm" />
+            </div>
+            <div>
+              <span class="block text-sm font-medium text-gray-900 dark:text-white">API Key</span>
+              <span class="text-xs text-gray-500 dark:text-gray-400">{{ t('admin.accounts.glm.apiKeyHint') }}</span>
             </div>
           </button>
         </div>
@@ -1332,6 +1366,15 @@
             <option value="https://api.chatanywhere.org/v1">{{ t('admin.accounts.chatanywhere.globalRegion') }}</option>
           </select>
           <input
+            v-else-if="form.platform === 'glm'"
+            v-model="apiKeyBaseUrl"
+            type="text"
+            class="input"
+            readonly
+            data-testid="glm-base-url"
+            placeholder="https://open.bigmodel.cn/api/paas/v4"
+          />
+          <input
             v-else
             v-model="apiKeyBaseUrl"
             type="text"
@@ -1350,7 +1393,7 @@
                         ? 'https://tokenrhythm.studio/v1'
                       : form.platform === 'nvidia'
                         ? 'https://integrate.api.nvidia.com/v1'
-                        : form.platform === 'deepseek'
+                      : form.platform === 'deepseek'
                         ? 'https://api.deepseek.com'
                         : 'https://api.anthropic.com'
             "
@@ -1386,6 +1429,8 @@
                           ? 'sk-...'
                         : form.platform === 'chatanywhere'
                           ? 'sk-...'
+                        : form.platform === 'glm'
+                          ? '...'
                         : 'sk-ant-...'
             "
           />
@@ -1408,7 +1453,7 @@
 
         <!-- 上游倍率自动探测：支持的 API-key 平台可用，DeepSeek 使用独立余额探测。 -->
         <div
-          v-if="form.platform !== 'deepseek' && form.platform !== 'kimi' && form.platform !== 'tokenrhythm' && form.platform !== 'chatanywhere'"
+          v-if="form.platform !== 'deepseek' && form.platform !== 'kimi' && form.platform !== 'tokenrhythm' && form.platform !== 'chatanywhere' && form.platform !== 'glm'"
           class="flex items-center justify-between gap-4 border-t border-gray-200 pt-4 dark:border-dark-600"
         >
           <div>
@@ -3919,6 +3964,7 @@ const baseUrlHint = computed(() => {
   if (form.platform === 'kimi') return t('admin.accounts.kimi.baseUrlHint')
   if (form.platform === 'tokenrhythm') return t('admin.accounts.tokenrhythm.baseUrlHint')
   if (form.platform === 'chatanywhere') return t('admin.accounts.chatanywhere.baseUrlHint')
+  if (form.platform === 'glm') return t('admin.accounts.glm.baseUrlHint')
   if (form.platform === 'nvidia') return t('admin.accounts.nvidia.baseUrlHint')
   return t('admin.accounts.baseUrlHint')
 })
@@ -3932,6 +3978,7 @@ const apiKeyHint = computed(() => {
   if (form.platform === 'kimi') return t('admin.accounts.kimi.apiKeyHint')
   if (form.platform === 'tokenrhythm') return t('admin.accounts.tokenrhythm.apiKeyHint')
   if (form.platform === 'chatanywhere') return t('admin.accounts.chatanywhere.apiKeyHint')
+  if (form.platform === 'glm') return t('admin.accounts.glm.apiKeyHint')
   if (form.platform === 'nvidia') return t('admin.accounts.nvidia.apiKeyHint')
   return t('admin.accounts.apiKeyHint')
 })
@@ -4524,6 +4571,8 @@ watch(
                   ? 'https://tokenrhythm.studio/v1'
                 : newPlatform === 'chatanywhere'
                   ? 'https://api.chatanywhere.tech/v1'
+                : newPlatform === 'glm'
+                  ? 'https://open.bigmodel.cn/api/paas/v4'
                 : newPlatform === 'kimi'
                   ? 'https://api.moonshot.cn/v1'
                 : newPlatform === 'nvidia'
@@ -4593,6 +4642,13 @@ watch(
       form.load_factor = null
     }
     if (newPlatform === 'chatanywhere') {
+      accountCategory.value = 'apikey'
+      modelRestrictionMode.value = 'whitelist'
+      allowedModels.value = [...getModelsByPlatform(newPlatform)]
+      form.concurrency = 10
+      form.load_factor = null
+    }
+    if (newPlatform === 'glm') {
       accountCategory.value = 'apikey'
       modelRestrictionMode.value = 'whitelist'
       allowedModels.value = [...getModelsByPlatform(newPlatform)]
@@ -5473,6 +5529,8 @@ const handleSubmit = async () => {
                   ? 'https://tokenrhythm.studio/v1'
                 : form.platform === 'chatanywhere'
                   ? 'https://api.chatanywhere.tech/v1'
+                : form.platform === 'glm'
+                  ? 'https://open.bigmodel.cn/api/paas/v4'
                 : form.platform === 'kimi'
                   ? 'https://api.moonshot.cn/v1'
                 : form.platform === 'nvidia'
@@ -5553,7 +5611,7 @@ const handleSubmit = async () => {
     group_ids: form.group_ids,
     extra,
     upstream_billing_probe_enabled:
-      form.platform === 'deepseek' || form.platform === 'kimi' || form.platform === 'chatanywhere'
+      form.platform === 'deepseek' || form.platform === 'kimi' || form.platform === 'chatanywhere' || form.platform === 'glm'
         ? undefined
         : form.platform === 'tokenrhythm'
           ? true
@@ -5692,7 +5750,7 @@ const createAccountAndFinish = async (
       type === 'apikey'
         ? form.platform === 'tokenrhythm'
           ? true
-          : form.platform !== 'deepseek' && form.platform !== 'kimi' && form.platform !== 'chatanywhere'
+          : form.platform !== 'deepseek' && form.platform !== 'kimi' && form.platform !== 'chatanywhere' && form.platform !== 'glm'
             ? upstreamBillingAutoProbeEnabled.value
             : undefined
         : undefined,

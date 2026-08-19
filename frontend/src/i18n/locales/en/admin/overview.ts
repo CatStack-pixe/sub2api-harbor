@@ -953,7 +953,9 @@ export default {
         deepseek: 'DeepSeek',
         kimi: 'Kimi',
         nvidia: 'NVIDIA',
+        tokenrhythm: 'TokenRhythm',
         chatanywhere: 'ChatAnywhere',
+        glm: 'GLM',
         composite: 'Composite',
       },
       deleteConfirm:

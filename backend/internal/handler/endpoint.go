@@ -184,7 +184,7 @@ func DeriveUpstreamEndpoint(inbound, rawRequestPath, platform string) string {
 	inbound = strings.TrimSpace(inbound)
 
 	switch platform {
-	case service.PlatformAgnes, service.PlatformDeepSeek, service.PlatformNvidia, service.PlatformTokenRhythm, service.PlatformKimi:
+	case service.PlatformAgnes, service.PlatformDeepSeek, service.PlatformNvidia, service.PlatformTokenRhythm, service.PlatformKimi, service.PlatformGLM:
 		return EndpointChatCompletions
 	case service.PlatformChatAnywhere:
 		if inbound == EndpointMessages || inbound == EndpointResponses || inbound == EndpointResponsesCompact {

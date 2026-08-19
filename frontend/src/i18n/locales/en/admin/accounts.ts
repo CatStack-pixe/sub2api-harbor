@@ -110,6 +110,7 @@ export default {
         nvidia: 'NVIDIA',
         tokenrhythm: 'TokenRhythm',
         chatanywhere: 'ChatAnywhere',
+        glm: 'GLM',
       },
       types: {
         oauth: 'OAuth',
@@ -647,6 +648,10 @@ export default {
         apiKeyHint: 'Your ChatAnywhere API key',
         chinaRegion: 'China: api.chatanywhere.tech',
         globalRegion: 'Global: api.chatanywhere.org'
+      },
+      glm: {
+        baseUrlHint: 'GLM uses the fixed official Z.AI OpenAI-compatible endpoint.',
+        apiKeyHint: 'Your Zhipu AI / Z.AI API key'
       },
       grok: {
         baseUrlHint: 'Grok OAuth accounts forward to the official xAI API base URL.',

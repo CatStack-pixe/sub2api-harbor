@@ -300,7 +300,7 @@ func (s *AccountTestService) TestAccountConnection(c *gin.Context, accountID int
 		return s.testChatAnywhereAccountConnection(c, account, modelID, prompt)
 	}
 
-	if account.IsOpenAI() || account.IsAgnes() {
+	if account.IsOpenAI() || account.IsAgnes() || account.IsGLM() {
 		return s.testOpenAIAccountConnection(c, account, modelID, prompt, normalizeAccountTestMode(mode))
 	}
 
@@ -703,10 +703,10 @@ func (s *AccountTestService) testOpenAIAccountConnection(c *gin.Context, account
 	ctx := c.Request.Context()
 	mode = normalizeAccountTestMode(mode)
 
-	// Default to openai.DefaultTestModel for OpenAI testing
+	// Default to the provider's own model for OpenAI-compatible testing.
 	testModelID := modelID
 	if testModelID == "" {
-		testModelID = openai.DefaultTestModel
+		testModelID = defaultOpenAIAccountTestModel(account)
 	}
 
 	// Align test routing with gateway behavior: OpenAI accounts apply normal
@@ -888,6 +888,13 @@ func (s *AccountTestService) testOpenAIAccountConnection(c *gin.Context, account
 
 	// Process SSE stream
 	return s.processOpenAIStream(c, resp.Body)
+}
+
+func defaultOpenAIAccountTestModel(account *Account) string {
+	if account != nil && account.IsGLM() {
+		return GLMDefaultModelIDs()[0]
+	}
+	return openai.DefaultTestModel
 }
 
 // testGrokAccountConnection routes Grok admin connectivity tests by explicit mode first,

@@ -291,19 +291,23 @@ func (a *Account) IsChatAnywhere() bool {
 	return a != nil && a.Platform == PlatformChatAnywhere
 }
 
+func (a *Account) IsGLM() bool {
+	return a != nil && a.Platform == PlatformGLM
+}
+
 func (a *Account) IsGrokOAuth() bool {
 	return a.IsGrok() && a.Type == AccountTypeOAuth
 }
 
 func (a *Account) IsOpenAICompatible() bool {
-	return a != nil && (a.Platform == PlatformOpenAI || a.Platform == PlatformGrok || a.Platform == PlatformAgnes || a.Platform == PlatformDeepSeek || a.Platform == PlatformNvidia || a.Platform == PlatformTokenRhythm || a.Platform == PlatformKimi || a.Platform == PlatformChatAnywhere)
+	return a != nil && (a.Platform == PlatformOpenAI || a.Platform == PlatformGrok || a.Platform == PlatformAgnes || a.Platform == PlatformDeepSeek || a.Platform == PlatformNvidia || a.Platform == PlatformTokenRhythm || a.Platform == PlatformKimi || a.Platform == PlatformChatAnywhere || a.Platform == PlatformGLM)
 }
 
 // ShouldUseOpenAIResponsesAPI reports whether this OpenAI-compatible account
 // accepts native Responses requests. Agnes currently documents Chat
 // Completions only, so Responses and Messages requests must use the bridge.
 func (a *Account) ShouldUseOpenAIResponsesAPI() bool {
-	return a != nil && !a.IsAgnes() && !a.IsDeepSeek() && !a.IsNvidia() && !a.IsTokenRhythm() && !a.IsKimi() && openai_compat.ShouldUseResponsesAPI(a.Extra)
+	return a != nil && !a.IsAgnes() && !a.IsDeepSeek() && !a.IsNvidia() && !a.IsTokenRhythm() && !a.IsKimi() && !a.IsGLM() && openai_compat.ShouldUseResponsesAPI(a.Extra)
 }
 
 func (a *Account) GeminiOAuthType() string {
@@ -961,6 +965,13 @@ func (a *Account) GetBaseURL() string {
 		}
 		return ChatAnywhereChinaBaseURL
 	}
+	if a.IsGLM() {
+		baseURL := strings.TrimRight(strings.TrimSpace(a.GetCredential("base_url")), "/")
+		if baseURL == GLMDefaultBaseURL {
+			return baseURL
+		}
+		return GLMDefaultBaseURL
+	}
 	baseURL := a.GetCredential("base_url")
 	if baseURL == "" {
 		return "https://api.anthropic.com"
@@ -1320,7 +1331,7 @@ func (a *Account) IsOpenAIApiKey() bool {
 }
 
 func (a *Account) GetOpenAIBaseURL() string {
-	if !a.IsOpenAI() && !a.IsAgnes() && !a.IsDeepSeek() && !a.IsNvidia() && !a.IsTokenRhythm() && !a.IsKimi() && !a.IsChatAnywhere() {
+	if !a.IsOpenAI() && !a.IsAgnes() && !a.IsDeepSeek() && !a.IsNvidia() && !a.IsTokenRhythm() && !a.IsKimi() && !a.IsChatAnywhere() && !a.IsGLM() {
 		return ""
 	}
 	if a.IsChatAnywhere() {
@@ -1329,6 +1340,13 @@ func (a *Account) GetOpenAIBaseURL() string {
 			return baseURL
 		}
 		return ChatAnywhereChinaBaseURL
+	}
+	if a.IsGLM() {
+		baseURL := strings.TrimRight(strings.TrimSpace(a.GetCredential("base_url")), "/")
+		if baseURL == GLMDefaultBaseURL {
+			return baseURL
+		}
+		return GLMDefaultBaseURL
 	}
 	if a.IsKimi() {
 		if baseURL := strings.TrimRight(strings.TrimSpace(a.GetCredential("base_url")), "/"); isKimiBaseURL(baseURL) {
@@ -1567,6 +1585,9 @@ func (a *Account) SupportsOpenAIEndpointCapability(capability OpenAIEndpointCapa
 		default:
 			return false
 		}
+	}
+	if a.IsGLM() {
+		return capability == OpenAIEndpointCapabilityChatCompletions
 	}
 	switch capability {
 	case OpenAIEndpointCapabilityChatCompletions:
