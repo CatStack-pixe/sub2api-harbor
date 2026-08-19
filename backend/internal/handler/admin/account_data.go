@@ -79,12 +79,15 @@ type DataImportRequest struct {
 }
 
 type DataImportResult struct {
-	ProxyCreated   int               `json:"proxy_created"`
-	ProxyReused    int               `json:"proxy_reused"`
-	ProxyFailed    int               `json:"proxy_failed"`
-	AccountCreated int               `json:"account_created"`
-	AccountFailed  int               `json:"account_failed"`
-	Errors         []DataImportError `json:"errors,omitempty"`
+	ProxyCreated       int               `json:"proxy_created"`
+	ProxyReused        int               `json:"proxy_reused"`
+	ProxyFailed        int               `json:"proxy_failed"`
+	AccountCreated     int               `json:"account_created"`
+	AccountFailed      int               `json:"account_failed"`
+	ModelSyncSucceeded int               `json:"model_sync_succeeded"`
+	ModelSyncSkipped   int               `json:"model_sync_skipped"`
+	ModelSyncFailed    int               `json:"model_sync_failed"`
+	Errors             []DataImportError `json:"errors,omitempty"`
 }
 
 type DataImportError struct {
@@ -454,6 +457,7 @@ func (h *AccountHandler) importData(ctx context.Context, req DataImportRequest) 
 
 	// 收集需要异步设置隐私的 Antigravity OAuth 账号
 	var privacyAccounts []*service.Account
+	var createdAccounts []*service.Account
 
 	for i := range dataPayload.Accounts {
 		item := dataPayload.Accounts[i]
@@ -517,10 +521,29 @@ func (h *AccountHandler) importData(ctx context.Context, req DataImportRequest) 
 			privacyAccounts = append(privacyAccounts, created)
 		}
 		h.scheduleGrokImportProbe(created)
+		createdAccounts = append(createdAccounts, created)
 		result.AccountCreated++
 	}
 
-	// 异步设置 Antigravity 隐私，避免大量导入时阻塞请求
+	// Persist live upstream models before the import result is returned.
+	for _, outcome := range h.syncImportedAccounts(ctx, createdAccounts) {
+		switch outcome.Status {
+		case importedModelSyncSucceeded:
+			result.ModelSyncSucceeded++
+		case importedModelSyncSkipped:
+			result.ModelSyncSkipped++
+		default:
+			result.ModelSyncFailed++
+			logImportedModelSyncFailure(outcome)
+			result.Errors = append(result.Errors, DataImportError{
+				Kind:    "account_model_sync",
+				Name:    outcome.Name,
+				Message: importedModelSyncClientMessage(outcome.Err),
+			})
+		}
+	}
+
+	// Configure Antigravity privacy asynchronously so large imports remain bounded.
 	if len(privacyAccounts) > 0 {
 		adminSvc := h.adminService
 		go func() {

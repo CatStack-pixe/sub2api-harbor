@@ -830,6 +830,53 @@ func (r *accountRepository) UpdateCredentials(ctx context.Context, id int64, cre
 	return nil
 }
 
+// MergeAccountModelMapping adds identity mappings discovered from upstream.
+// Existing entries win so operator-defined targets are never overwritten.
+func (r *accountRepository) MergeAccountModelMapping(ctx context.Context, id int64, models map[string]string) error {
+	if len(models) == 0 {
+		return nil
+	}
+	if r == nil || r.sql == nil {
+		return errors.New("account repository SQL executor is not configured")
+	}
+	payload, err := json.Marshal(models)
+	if err != nil {
+		return err
+	}
+	result, err := r.sql.ExecContext(ctx, `
+		WITH updated AS (
+			UPDATE accounts
+			SET credentials = jsonb_set(
+				COALESCE(credentials, '{}'::jsonb),
+				'{model_mapping}',
+				$1::jsonb || CASE
+					WHEN jsonb_typeof(credentials->'model_mapping') = 'object'
+						THEN credentials->'model_mapping'
+					ELSE '{}'::jsonb
+				END,
+				TRUE
+			),
+			updated_at = NOW()
+			WHERE id = $2 AND deleted_at IS NULL
+			RETURNING id
+		)
+		INSERT INTO scheduler_outbox (event_type, account_id, group_id, payload)
+		SELECT $3, updated.id, NULL, NULL FROM updated
+	`, string(payload), id, service.SchedulerOutboxEventAccountChanged)
+	if err != nil {
+		return err
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		return service.ErrAccountNotFound
+	}
+	r.syncSchedulerAccountSnapshotDetached(ctx, id)
+	return nil
+}
+
 func (r *accountRepository) Delete(ctx context.Context, id int64) error {
 	groupIDs, err := r.loadAccountGroupIDs(ctx, id)
 	if err != nil {
