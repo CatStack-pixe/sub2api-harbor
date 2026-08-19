@@ -1879,6 +1879,8 @@ func (h *AccountHandler) BatchCreate(c *gin.Context) {
 		success := 0
 		failed := 0
 		results := make([]gin.H, 0, len(req.Accounts))
+		createdAccounts := make([]*service.Account, 0, len(req.Accounts))
+		resultIndexes := make(map[int64]int, len(req.Accounts))
 		// 收集需要异步设置隐私的 OAuth 账号
 		var antigravityPrivacyAccounts []*service.Account
 		var openaiPrivacyAccounts []*service.Account
@@ -1937,6 +1939,8 @@ func (h *AccountHandler) BatchCreate(c *gin.Context) {
 			h.scheduleOpenAIResponsesProbe(account)
 			h.scheduleGrokImportProbe(account)
 			success++
+			createdAccounts = append(createdAccounts, account)
+			resultIndexes[account.ID] = len(results)
 			results = append(results, gin.H{
 				"name":    item.Name,
 				"id":      account.ID,
@@ -1944,7 +1948,30 @@ func (h *AccountHandler) BatchCreate(c *gin.Context) {
 			})
 		}
 
-		// 异步设置隐私，避免批量创建时阻塞请求
+		// Persist live upstream models before the batch result is returned.
+		modelSyncSucceeded := 0
+		modelSyncSkipped := 0
+		modelSyncFailed := 0
+		for _, outcome := range h.syncImportedAccounts(ctx, createdAccounts) {
+			resultIndex, ok := resultIndexes[outcome.AccountID]
+			if !ok {
+				continue
+			}
+			results[resultIndex]["model_sync"] = outcome.Status
+			switch outcome.Status {
+			case importedModelSyncSucceeded:
+				modelSyncSucceeded++
+				results[resultIndex]["model_count"] = outcome.Count
+			case importedModelSyncSkipped:
+				modelSyncSkipped++
+			default:
+				modelSyncFailed++
+				logImportedModelSyncFailure(outcome)
+				results[resultIndex]["model_sync_error"] = importedModelSyncClientMessage(outcome.Err)
+			}
+		}
+
+		// Configure provider privacy asynchronously after the import work finishes.
 		adminSvc := h.adminService
 		if len(antigravityPrivacyAccounts) > 0 {
 			accounts := antigravityPrivacyAccounts
@@ -1976,9 +2003,12 @@ func (h *AccountHandler) BatchCreate(c *gin.Context) {
 		}
 
 		return gin.H{
-			"success": success,
-			"failed":  failed,
-			"results": results,
+			"success":              success,
+			"failed":               failed,
+			"model_sync_succeeded": modelSyncSucceeded,
+			"model_sync_skipped":   modelSyncSkipped,
+			"model_sync_failed":    modelSyncFailed,
+			"results":              results,
 		}, nil
 	})
 }
