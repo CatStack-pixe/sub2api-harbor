@@ -14,7 +14,7 @@ import (
 func ValidateAccountPlatform(platform string) error {
 	switch strings.TrimSpace(platform) {
 	case PlatformAnthropic, PlatformOpenAI, PlatformGemini, PlatformAntigravity,
-		PlatformGrok, PlatformAgnes, PlatformDeepSeek, PlatformNvidia, PlatformTokenRhythm, PlatformKimi:
+		PlatformGrok, PlatformAgnes, PlatformDeepSeek, PlatformNvidia, PlatformTokenRhythm, PlatformKimi, PlatformChatAnywhere:
 		return nil
 	default:
 		return infraerrors.BadRequest("UNSUPPORTED_ACCOUNT_PLATFORM", "unsupported account platform")
@@ -24,7 +24,7 @@ func ValidateAccountPlatform(platform string) error {
 func ValidateGroupPlatform(platform string) error {
 	switch strings.TrimSpace(platform) {
 	case PlatformAnthropic, PlatformOpenAI, PlatformGemini, PlatformAntigravity,
-		PlatformGrok, PlatformAgnes, PlatformDeepSeek, PlatformNvidia, PlatformTokenRhythm, PlatformKimi, PlatformComposite:
+		PlatformGrok, PlatformAgnes, PlatformDeepSeek, PlatformNvidia, PlatformTokenRhythm, PlatformKimi, PlatformChatAnywhere, PlatformComposite:
 		return nil
 	default:
 		return infraerrors.BadRequest("UNSUPPORTED_GROUP_PLATFORM", "unsupported group platform")
@@ -52,7 +52,7 @@ func validateAccountCredentials(platform, accountType string, credentials map[st
 	if err := ValidateAccountPlatform(platform); err != nil {
 		return err
 	}
-	if platform != PlatformDeepSeek && platform != PlatformNvidia && platform != PlatformTokenRhythm && platform != PlatformKimi {
+	if platform != PlatformDeepSeek && platform != PlatformNvidia && platform != PlatformTokenRhythm && platform != PlatformKimi && platform != PlatformChatAnywhere {
 		return nil
 	}
 	platformName := "DeepSeek"
@@ -68,6 +68,10 @@ func validateAccountCredentials(platform, accountType string, credentials map[st
 	if platform == PlatformKimi {
 		platformName = "Kimi"
 		errorPrefix = "KIMI"
+	}
+	if platform == PlatformChatAnywhere {
+		platformName = "ChatAnywhere"
+		errorPrefix = "CHATANYWHERE"
 	}
 	if accountType != AccountTypeAPIKey {
 		return infraerrors.BadRequest(errorPrefix+"_ACCOUNT_TYPE_UNSUPPORTED", platformName+" accounts must use the apikey account type")
@@ -89,6 +93,19 @@ func validateAccountCredentials(platform, accountType string, credentials map[st
 		}
 		if _, _, err := TokenRhythmCookieCredentials(credentials); err != nil {
 			return infraerrors.BadRequest(errorPrefix+"_COOKIE_INVALID", err.Error())
+		}
+		return nil
+	}
+	if platform == PlatformChatAnywhere {
+		if rawBaseURL, exists := credentials["base_url"]; exists && rawBaseURL != nil {
+			baseURL, ok := rawBaseURL.(string)
+			if !ok {
+				return infraerrors.BadRequest(errorPrefix+"_BASE_URL_INVALID", platformName+" base_url must be a supported ChatAnywhere endpoint")
+			}
+			trimmed := strings.TrimRight(strings.TrimSpace(baseURL), "/")
+			if trimmed != "" && trimmed != ChatAnywhereChinaBaseURL && trimmed != ChatAnywhereGlobalBaseURL {
+				return infraerrors.BadRequest("CHATANYWHERE_BASE_URL_INVALID", "ChatAnywhere base_url must use a supported regional endpoint")
+			}
 		}
 		return nil
 	}

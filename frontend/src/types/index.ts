@@ -525,7 +525,7 @@ export interface PaginationConfig {
 
 // ==================== API Key & Group Types ====================
 
-export type GroupPlatform = 'anthropic' | 'openai' | 'gemini' | 'antigravity' | 'grok' | 'agnes' | 'deepseek' | 'kimi' | 'nvidia' | 'tokenrhythm' | 'composite'
+export type GroupPlatform = 'anthropic' | 'openai' | 'gemini' | 'antigravity' | 'grok' | 'agnes' | 'deepseek' | 'kimi' | 'nvidia' | 'tokenrhythm' | 'chatanywhere' | 'composite'
 
 export type VideoModelPrices = Record<string, Record<string, number>>
 
@@ -893,7 +893,7 @@ export interface UpdateGroupRequest {
 
 // ==================== Account & Proxy Types ====================
 
-export type AccountPlatform = 'anthropic' | 'openai' | 'gemini' | 'antigravity' | 'grok' | 'agnes' | 'deepseek' | 'kimi' | 'nvidia' | 'tokenrhythm'
+export type AccountPlatform = 'anthropic' | 'openai' | 'gemini' | 'antigravity' | 'grok' | 'agnes' | 'deepseek' | 'kimi' | 'nvidia' | 'tokenrhythm' | 'chatanywhere'
 export type AccountType = 'oauth' | 'setup-token' | 'apikey' | 'upstream' | 'bedrock' | 'service_account'
 export type OAuthAddMethod = 'oauth' | 'setup-token'
 export type ProxyProtocol = 'http' | 'https' | 'socks5' | 'socks5h'

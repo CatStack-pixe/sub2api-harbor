@@ -296,6 +296,9 @@ func (s *AccountTestService) TestAccountConnection(c *gin.Context, accountID int
 	if account.IsKimi() {
 		return s.testKimiAccountConnection(c, account, modelID, prompt)
 	}
+	if account.IsChatAnywhere() {
+		return s.testChatAnywhereAccountConnection(c, account, modelID, prompt)
+	}
 
 	if account.IsOpenAI() || account.IsAgnes() {
 		return s.testOpenAIAccountConnection(c, account, modelID, prompt, normalizeAccountTestMode(mode))
@@ -380,6 +383,23 @@ func (s *AccountTestService) testKimiAccountConnection(c *gin.Context, account *
 	baseURL, err := s.validateUpstreamBaseURL(account.GetOpenAIBaseURL())
 	if err != nil {
 		return s.sendErrorAndEnd(c, fmt.Sprintf("Invalid Kimi base URL: %s", err.Error()))
+	}
+	return s.testOpenAIChatCompletionsConnection(c, account, testModelID, prompt, baseURL, authToken)
+}
+
+func (s *AccountTestService) testChatAnywhereAccountConnection(c *gin.Context, account *Account, modelID string, prompt string) error {
+	testModelID := strings.TrimSpace(modelID)
+	if testModelID == "" {
+		testModelID = ChatAnywhereDefaultModelIDs()[0]
+	}
+	testModelID = account.GetMappedModel(testModelID)
+	authToken := strings.TrimSpace(account.GetOpenAIApiKey())
+	if authToken == "" {
+		return s.sendErrorAndEnd(c, "No ChatAnywhere API key available")
+	}
+	baseURL, err := s.validateUpstreamBaseURL(account.GetOpenAIBaseURL())
+	if err != nil {
+		return s.sendErrorAndEnd(c, fmt.Sprintf("Invalid ChatAnywhere base URL: %s", err.Error()))
 	}
 	return s.testOpenAIChatCompletionsConnection(c, account, testModelID, prompt, baseURL, authToken)
 }

@@ -287,12 +287,16 @@ func (a *Account) IsKimi() bool {
 	return a != nil && a.Platform == PlatformKimi
 }
 
+func (a *Account) IsChatAnywhere() bool {
+	return a != nil && a.Platform == PlatformChatAnywhere
+}
+
 func (a *Account) IsGrokOAuth() bool {
 	return a.IsGrok() && a.Type == AccountTypeOAuth
 }
 
 func (a *Account) IsOpenAICompatible() bool {
-	return a != nil && (a.Platform == PlatformOpenAI || a.Platform == PlatformGrok || a.Platform == PlatformAgnes || a.Platform == PlatformDeepSeek || a.Platform == PlatformNvidia || a.Platform == PlatformTokenRhythm || a.Platform == PlatformKimi)
+	return a != nil && (a.Platform == PlatformOpenAI || a.Platform == PlatformGrok || a.Platform == PlatformAgnes || a.Platform == PlatformDeepSeek || a.Platform == PlatformNvidia || a.Platform == PlatformTokenRhythm || a.Platform == PlatformKimi || a.Platform == PlatformChatAnywhere)
 }
 
 // ShouldUseOpenAIResponsesAPI reports whether this OpenAI-compatible account
@@ -950,6 +954,13 @@ func (a *Account) GetBaseURL() string {
 	if a.Type != AccountTypeAPIKey {
 		return ""
 	}
+	if a.IsChatAnywhere() {
+		baseURL := strings.TrimRight(strings.TrimSpace(a.GetCredential("base_url")), "/")
+		if baseURL == ChatAnywhereGlobalBaseURL || baseURL == ChatAnywhereChinaBaseURL {
+			return baseURL
+		}
+		return ChatAnywhereChinaBaseURL
+	}
 	baseURL := a.GetCredential("base_url")
 	if baseURL == "" {
 		return "https://api.anthropic.com"
@@ -1309,8 +1320,15 @@ func (a *Account) IsOpenAIApiKey() bool {
 }
 
 func (a *Account) GetOpenAIBaseURL() string {
-	if !a.IsOpenAI() && !a.IsAgnes() && !a.IsDeepSeek() && !a.IsNvidia() && !a.IsTokenRhythm() && !a.IsKimi() {
+	if !a.IsOpenAI() && !a.IsAgnes() && !a.IsDeepSeek() && !a.IsNvidia() && !a.IsTokenRhythm() && !a.IsKimi() && !a.IsChatAnywhere() {
 		return ""
+	}
+	if a.IsChatAnywhere() {
+		baseURL := strings.TrimRight(strings.TrimSpace(a.GetCredential("base_url")), "/")
+		if baseURL == ChatAnywhereGlobalBaseURL || baseURL == ChatAnywhereChinaBaseURL {
+			return baseURL
+		}
+		return ChatAnywhereChinaBaseURL
 	}
 	if a.IsKimi() {
 		if baseURL := strings.TrimRight(strings.TrimSpace(a.GetCredential("base_url")), "/"); isKimiBaseURL(baseURL) {
@@ -1443,7 +1461,7 @@ func (a *Account) GetOpenAIIDToken() string {
 }
 
 func (a *Account) GetOpenAIApiKey() string {
-	if a == nil || a.Type != AccountTypeAPIKey || (!a.IsOpenAI() && !a.IsAgnes() && !a.IsDeepSeek() && !a.IsNvidia() && !a.IsTokenRhythm() && !a.IsKimi()) {
+	if a == nil || a.Type != AccountTypeAPIKey || (!a.IsOpenAI() && !a.IsAgnes() && !a.IsDeepSeek() && !a.IsNvidia() && !a.IsTokenRhythm() && !a.IsKimi() && !a.IsChatAnywhere()) {
 		return ""
 	}
 	return a.GetCredential("api_key")
@@ -1541,6 +1559,14 @@ func (a *Account) SupportsOpenAIEndpointCapability(capability OpenAIEndpointCapa
 	}
 	if a.IsKimi() {
 		return capability == OpenAIEndpointCapabilityChatCompletions
+	}
+	if a.IsChatAnywhere() {
+		switch capability {
+		case OpenAIEndpointCapabilityChatCompletions, OpenAIEndpointCapabilityResponses:
+			return true
+		default:
+			return false
+		}
 	}
 	switch capability {
 	case OpenAIEndpointCapabilityChatCompletions:

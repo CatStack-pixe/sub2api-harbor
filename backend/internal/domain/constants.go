@@ -28,6 +28,7 @@ const (
 	PlatformNvidia      = "nvidia"
 	PlatformTokenRhythm = "tokenrhythm"
 	PlatformKimi        = "kimi"
+	PlatformChatAnywhere = "chatanywhere"
 	PlatformComposite   = "composite"
 )
 
@@ -40,6 +41,8 @@ const (
 	TokenRhythmDefaultBaseURL = "https://tokenrhythm.studio/v1"
 	KimiDefaultBaseURL        = "https://api.moonshot.cn/v1"
 	KimiInternationalBaseURL  = "https://api.moonshot.ai/v1"
+	ChatAnywhereChinaBaseURL  = "https://api.chatanywhere.tech/v1"
+	ChatAnywhereGlobalBaseURL = "https://api.chatanywhere.org/v1"
 )
 
 // Account type constants

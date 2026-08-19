@@ -37,6 +37,19 @@ func TestNvidiaDefaultModelIDs(t *testing.T) {
 	}
 }
 
+func TestChatAnywhereDefaultModelIDs(t *testing.T) {
+	want := []string{"gpt-5.5", "gpt-5.1", "gpt-4.1", "claude-sonnet-4-5", "deepseek-v3-2"}
+	got := ChatAnywhereDefaultModelIDs()
+	if len(got) != len(want) {
+		t.Fatalf("ChatAnywhereDefaultModelIDs() = %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("ChatAnywhereDefaultModelIDs() = %v, want %v", got, want)
+		}
+	}
+}
+
 // TestSettingKeyDefaultPlatformQuotas 验证新的系统层 JSON key 常量值正确。
 func TestSettingKeyDefaultPlatformQuotas(t *testing.T) {
 	if SettingKeyDefaultPlatformQuotas != "default_platform_quotas" {

@@ -42,11 +42,12 @@ const (
 	PlatformNvidia      = "nvidia"
 	PlatformTokenRhythm = "tokenrhythm"
 	PlatformKimi        = "kimi"
+	PlatformChatAnywhere = "chatanywhere"
 )
 
 // AllPlatforms 返回所有支持的平台列表
 func AllPlatforms() []string {
-	return []string{PlatformAnthropic, PlatformOpenAI, PlatformGemini, PlatformAntigravity, PlatformGrok, PlatformAgnes, PlatformDeepSeek, PlatformNvidia, PlatformTokenRhythm, PlatformKimi}
+	return []string{PlatformAnthropic, PlatformOpenAI, PlatformGemini, PlatformAntigravity, PlatformGrok, PlatformAgnes, PlatformDeepSeek, PlatformNvidia, PlatformTokenRhythm, PlatformKimi, PlatformChatAnywhere}
 }
 
 // Validate 验证规则配置的有效性

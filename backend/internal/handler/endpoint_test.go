@@ -137,6 +137,9 @@ func TestDeriveUpstreamEndpoint(t *testing.T) {
 		{"deepseek responses path stays chat", EndpointResponses, "/v1/responses", service.PlatformDeepSeek, EndpointChatCompletions},
 		{"nvidia chat", EndpointChatCompletions, "/v1/chat/completions", service.PlatformNvidia, EndpointChatCompletions},
 		{"nvidia responses path stays chat", EndpointResponses, "/v1/responses", service.PlatformNvidia, EndpointChatCompletions},
+		{"chatanywhere chat", EndpointChatCompletions, "/v1/chat/completions", service.PlatformChatAnywhere, EndpointChatCompletions},
+		{"chatanywhere responses", EndpointResponses, "/v1/responses", service.PlatformChatAnywhere, EndpointResponses},
+		{"chatanywhere messages", EndpointMessages, "/v1/messages", service.PlatformChatAnywhere, EndpointMessages},
 
 		// Antigravity — uses inbound to pick Claude vs Gemini upstream.
 		{"antigravity claude", EndpointMessages, "/antigravity/v1/messages", service.PlatformAntigravity, EndpointMessages},

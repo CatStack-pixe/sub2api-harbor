@@ -886,6 +886,7 @@ export default {
         deepseek: 'DeepSeek',
         kimi: 'Kimi',
         nvidia: 'NVIDIA',
+        chatanywhere: 'ChatAnywhere',
         composite: 'Composite',
       },
       saving: '保存中...',
