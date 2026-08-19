@@ -2,6 +2,7 @@ package admin
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -110,7 +111,7 @@ func TestSyncImportedAccountModelsUsesHydratedProxyAndPersistsModels(t *testing.
 func TestNormalizeImportedUpstreamModelsRejectsUnsafeLists(t *testing.T) {
 	models := make([]string, maxImportedUpstreamModels+1)
 	for index := range models {
-		models[index] = strings.Repeat("m", index/maxImportedUpstreamModels+1) + string(rune(index+1))
+		models[index] = fmt.Sprintf("model-%03d", index)
 	}
 	_, err := normalizeImportedUpstreamModels(models)
 	require.ErrorContains(t, err, "more than")
