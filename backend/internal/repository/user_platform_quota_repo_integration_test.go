@@ -98,6 +98,47 @@ func TestUserPlatformQuotaRepository_BulkInsertInitial_GrokAllowed(t *testing.T)
 	require.InDelta(t, 9.0, *rec.DailyLimitUSD, 1e-9)
 }
 
+func TestUserPlatformQuotaRepository_BulkInsertInitial_ChatAnywhereAllowed(t *testing.T) {
+	ctx := context.Background()
+	tx := testEntTx(t)
+	txCtx := dbent.NewTxContext(ctx, tx)
+	client := tx.Client()
+
+	userID := mustCreateUserForQuota(t, client)
+	repo := NewUserPlatformQuotaRepository(client)
+
+	daily := 9.0
+	records := []UserPlatformQuotaRecord{
+		{UserID: userID, Platform: service.PlatformChatAnywhere, DailyLimitUSD: &daily},
+	}
+	require.NoError(t, repo.BulkInsertInitial(txCtx, records),
+		"ChatAnywhere quota rows must satisfy the database platform constraint")
+
+	rec, err := repo.GetByUserPlatform(txCtx, userID, service.PlatformChatAnywhere)
+	require.NoError(t, err)
+	require.NotNil(t, rec, "ChatAnywhere quota row should be persisted")
+	require.NotNil(t, rec.DailyLimitUSD)
+	require.InDelta(t, 9.0, *rec.DailyLimitUSD, 1e-9)
+}
+
+func TestCompositeModelRoute_ChatAnywhereTargetAllowed(t *testing.T) {
+	ctx := context.Background()
+	tx := testEntTx(t)
+	txCtx := dbent.NewTxContext(ctx, tx)
+	client := tx.Client()
+
+	group := mustCreateGroup(t, client, &service.Group{
+		Name:     fmt.Sprintf("chatanywhere-composite-%d", time.Now().UnixNano()),
+		Platform: service.PlatformComposite,
+	})
+	_, err := client.CompositeModelRoute.Create().
+		SetGroupID(group.ID).
+		SetPublicModel("chatanywhere-audit-model").
+		SetTargetPlatform(service.PlatformChatAnywhere).
+		Save(txCtx)
+	require.NoError(t, err, "ChatAnywhere must satisfy the composite route target constraint")
+}
+
 func TestUserPlatformQuotaRepository_GetByUserPlatform(t *testing.T) {
 	ctx := context.Background()
 	tx := testEntTx(t)

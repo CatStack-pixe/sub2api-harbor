@@ -422,7 +422,7 @@ func ValidateProfitControlConfig(platform string, enabled bool, minMargin, safet
 		return nil
 	}
 	if !profitControlPlatformSupported(platform) {
-		return errors.New("profit control only supports openai, anthropic, gemini, grok, antigravity, deepseek, nvidia, tokenrhythm, and kimi groups")
+		return errors.New("profit control only supports openai, anthropic, gemini, grok, antigravity, deepseek, nvidia, tokenrhythm, kimi, and chatanywhere groups")
 	}
 	if !validProfitControlRatio(minMargin) {
 		return fmt.Errorf("profit_min_margin 应为 [0,1) 的小数，got %v", minMargin)
