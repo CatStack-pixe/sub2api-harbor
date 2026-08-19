@@ -1328,8 +1328,8 @@
             </datalist>
           </template>
           <select v-else-if="form.platform === 'chatanywhere'" v-model="apiKeyBaseUrl" class="input" data-testid="chatanywhere-region">
-            <option value="https://api.chatanywhere.tech/v1">China (api.chatanywhere.tech)</option>
-            <option value="https://api.chatanywhere.org/v1">Global (api.chatanywhere.org)</option>
+            <option value="https://api.chatanywhere.tech/v1">{{ t('admin.accounts.chatanywhere.chinaRegion') }}</option>
+            <option value="https://api.chatanywhere.org/v1">{{ t('admin.accounts.chatanywhere.globalRegion') }}</option>
           </select>
           <input
             v-else
@@ -3918,7 +3918,7 @@ const baseUrlHint = computed(() => {
   if (form.platform === 'deepseek') return t('admin.accounts.deepseek.baseUrlHint')
   if (form.platform === 'kimi') return t('admin.accounts.kimi.baseUrlHint')
   if (form.platform === 'tokenrhythm') return t('admin.accounts.tokenrhythm.baseUrlHint')
-  if (form.platform === 'chatanywhere') return 'ChatAnywhere uses the selected official regional endpoint.'
+  if (form.platform === 'chatanywhere') return t('admin.accounts.chatanywhere.baseUrlHint')
   if (form.platform === 'nvidia') return t('admin.accounts.nvidia.baseUrlHint')
   return t('admin.accounts.baseUrlHint')
 })
@@ -3931,7 +3931,7 @@ const apiKeyHint = computed(() => {
   if (form.platform === 'deepseek') return t('admin.accounts.deepseek.apiKeyHint')
   if (form.platform === 'kimi') return t('admin.accounts.kimi.apiKeyHint')
   if (form.platform === 'tokenrhythm') return t('admin.accounts.tokenrhythm.apiKeyHint')
-  if (form.platform === 'chatanywhere') return 'Use a ChatAnywhere API key.'
+  if (form.platform === 'chatanywhere') return t('admin.accounts.chatanywhere.apiKeyHint')
   if (form.platform === 'nvidia') return t('admin.accounts.nvidia.apiKeyHint')
   return t('admin.accounts.apiKeyHint')
 })

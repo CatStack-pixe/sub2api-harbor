@@ -20,7 +20,9 @@
 ## Current State
 
 - Added the ChatAnywhere account and group platform with API-key-only authentication, official China/Global endpoint selection (`https://api.chatanywhere.tech/v1` and `https://api.chatanywhere.org/v1`), native OpenAI Chat Completions/Responses routing, and native Anthropic Messages routing.
+- ChatAnywhere `/v1/messages/count_tokens` uses the local Anthropic-compatible estimator because the official documentation does not define a token-counting endpoint; this avoids forwarding to an unsupported URL or with the wrong authentication scheme.
 - Added ChatAnywhere model defaults, upstream model synchronization, composite routing, quota/platform validation, URL allowlist hosts, admin account create/edit controls, model whitelist defaults, platform badges/icons, group/channel filters, and dashboard quota labels.
+- ChatAnywhere account creation and editing use the existing localized region labels, base URL guidance, and API-key guidance in both supported UI languages.
 - ChatAnywhere does not enable upstream billing balance probing because the official documentation does not define a stable balance endpoint.
 - Added the TokenRhythm account platform with API-key inference through the fixed `https://tokenrhythm.studio/v1` endpoint.
 - Admin account create/edit accepts a complete Cookie header, stores only `tr_session` and `tr_csrf`, and exposes presence flags without returning secret values.

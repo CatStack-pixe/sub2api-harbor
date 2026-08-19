@@ -74,7 +74,7 @@ func RegisterGatewayRoutes(
 		switch getGroupPlatform(c) {
 		case service.PlatformOpenAI:
 			h.OpenAIGateway.CountTokens(c)
-		case service.PlatformGrok, service.PlatformAgnes, service.PlatformNvidia:
+		case service.PlatformGrok, service.PlatformAgnes, service.PlatformNvidia, service.PlatformChatAnywhere:
 			h.OpenAIGateway.GrokCountTokens(c)
 		default:
 			h.Gateway.CountTokens(c)

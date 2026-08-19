@@ -38,8 +38,8 @@
             </datalist>
           </template>
           <select v-else-if="account.platform === 'chatanywhere'" v-model="editBaseUrl" class="input" data-testid="chatanywhere-region">
-            <option value="https://api.chatanywhere.tech/v1">China (api.chatanywhere.tech)</option>
-            <option value="https://api.chatanywhere.org/v1">Global (api.chatanywhere.org)</option>
+            <option value="https://api.chatanywhere.tech/v1">{{ t('admin.accounts.chatanywhere.chinaRegion') }}</option>
+            <option value="https://api.chatanywhere.org/v1">{{ t('admin.accounts.chatanywhere.globalRegion') }}</option>
           </select>
           <input
             v-else
@@ -2854,7 +2854,7 @@ const baseUrlHint = computed(() => {
   if (props.account.platform === 'deepseek') return t('admin.accounts.deepseek.baseUrlHint')
   if (props.account.platform === 'kimi') return t('admin.accounts.kimi.baseUrlHint')
   if (props.account.platform === 'tokenrhythm') return t('admin.accounts.tokenrhythm.baseUrlHint')
-  if (props.account.platform === 'chatanywhere') return 'ChatAnywhere uses the selected official regional endpoint.'
+  if (props.account.platform === 'chatanywhere') return t('admin.accounts.chatanywhere.baseUrlHint')
   if (props.account.platform === 'nvidia') return t('admin.accounts.nvidia.baseUrlHint')
   return t('admin.accounts.baseUrlHint')
 })
