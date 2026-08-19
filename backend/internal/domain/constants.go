@@ -29,7 +29,7 @@ const (
 	PlatformTokenRhythm  = "tokenrhythm"
 	PlatformKimi         = "kimi"
 	PlatformChatAnywhere = "chatanywhere"
-	PlatformGLM           = "glm"
+	PlatformGLM          = "glm"
 	PlatformComposite    = "composite"
 )
 

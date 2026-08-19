@@ -588,7 +588,7 @@ var platformToLiteLLMProvider = map[string]string{
 	service.PlatformTokenRhythm:  "tokenrhythm",
 	service.PlatformKimi:         "moonshot",
 	service.PlatformChatAnywhere: "chatanywhere",
-	service.PlatformGLM:           "glm",
+	service.PlatformGLM:          "glm",
 }
 
 // SyncPricingModels 返回 LiteLLM 定价目录中指定平台的最新模型列表

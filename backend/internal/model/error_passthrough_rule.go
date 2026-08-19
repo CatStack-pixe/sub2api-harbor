@@ -43,7 +43,7 @@ const (
 	PlatformTokenRhythm  = "tokenrhythm"
 	PlatformKimi         = "kimi"
 	PlatformChatAnywhere = "chatanywhere"
-	PlatformGLM           = "glm"
+	PlatformGLM          = "glm"
 )
 
 // AllPlatforms 返回所有支持的平台列表
