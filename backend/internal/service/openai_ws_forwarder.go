@@ -220,6 +220,9 @@ type OpenAIWSIngressHooks struct {
 	// ReasoningEffortMappings rewrites explicit effort values for this WS session.
 	ReasoningEffortMappings []ReasoningEffortMapping
 	BeforeTurn              func(turn int) error
+	// BeforeTurnAdmission runs for response.create frames in passthrough mode,
+	// whose relay intentionally does not use the regular BeforeTurn callback.
+	BeforeTurnAdmission    func(turn int) error
 	BeforeRequest           func(turn int, payload []byte, originalModel string) error
 	// MutateRequestPayload rewrites each response.create payload before it is
 	// audited, policy-checked, and forwarded upstream.
