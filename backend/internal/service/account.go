@@ -2266,12 +2266,12 @@ func (a *Account) GetQuotaWeeklyUsed() float64 {
 	return a.getExtraFloat64("quota_weekly_used")
 }
 
-// GetRequestQuotaLimit returns the number of successful requests allowed before cooldown.
+// GetRequestQuotaLimit returns the number of admitted requests allowed before cooldown.
 func (a *Account) GetRequestQuotaLimit() int {
 	return a.getExtraInt("request_quota_limit")
 }
 
-// GetRequestQuotaUsed returns the successful request count in the current quota cycle.
+// GetRequestQuotaUsed returns the admitted request count in the current quota cycle.
 func (a *Account) GetRequestQuotaUsed() int {
 	return a.getExtraInt("request_quota_used")
 }

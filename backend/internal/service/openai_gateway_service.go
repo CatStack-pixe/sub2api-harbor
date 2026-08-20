@@ -474,7 +474,7 @@ func (s *OpenAIGatewayService) ReserveAccountRequestQuota(ctx context.Context, a
 	}
 	reservoir, ok := s.accountRepo.(AccountRequestQuotaReservoir)
 	if !ok {
-		return true, nil
+		return false, errors.New("request quota storage is unavailable")
 	}
 	return reservoir.ReserveRequestQuota(ctx, account.ID)
 }
