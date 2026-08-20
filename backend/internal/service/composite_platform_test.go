@@ -36,6 +36,10 @@ func TestDetectModelPlatform(t *testing.T) {
 		{name: "glm", model: "glm-5.2", platform: PlatformGLM, ok: true},
 		{name: "glm prefix", model: "glm/glm-5.2", platform: PlatformGLM, ok: true},
 		{name: "zhipu prefix", model: "zhipu/glm-5.2", platform: PlatformGLM, ok: true},
+		// NVIDIA NIM publishes models under the z-ai namespace too. Keep that
+		// ambiguous prefix unresolved unless an explicit composite route exists.
+		{name: "ambiguous z-ai prefix", model: "z-ai/glm-5.2", ok: false},
+		{name: "ambiguous zai prefix", model: "zai/glm-5.2", ok: false},
 		{name: "unknown", model: "llama-4-maverick", ok: false},
 	}
 

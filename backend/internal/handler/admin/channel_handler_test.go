@@ -455,6 +455,10 @@ func TestSyncPricingModels_UnsupportedPlatform(t *testing.T) {
 	require.Equal(t, http.StatusBadRequest, w.Code)
 }
 
+func TestPlatformToLiteLLMProvider_GLMMatchesZAI(t *testing.T) {
+	require.Equal(t, "zai", platformToLiteLLMProvider[service.PlatformGLM])
+}
+
 func TestSyncPricingModels_ValidPlatform_EmptyService(t *testing.T) {
 	svc := service.NewPricingService(nil, nil)
 	router := setupSyncPricingModelsRouter(svc)

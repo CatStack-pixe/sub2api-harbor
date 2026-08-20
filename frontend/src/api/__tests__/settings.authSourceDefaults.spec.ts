@@ -22,6 +22,7 @@ const allNullQuotas: DefaultPlatformQuotasMap = {
   nvidia: { daily: null, weekly: null, monthly: null },
   tokenrhythm: { daily: null, weekly: null, monthly: null },
   chatanywhere: { daily: null, weekly: null, monthly: null },
+  glm: { daily: null, weekly: null, monthly: null },
 }
 
 describe("admin settings auth source defaults helpers", () => {
@@ -251,11 +252,12 @@ describe("normalizePlatformQuotasMap", () => {
     expect(result.nvidia).toEqual({ daily: null, weekly: null, monthly: null });
     expect(result.tokenrhythm).toEqual({ daily: null, weekly: null, monthly: null });
     expect(result.chatanywhere).toEqual({ daily: null, weekly: null, monthly: null });
+    expect(result.glm).toEqual({ daily: null, weekly: null, monthly: null });
   });
 
   it("无参数时返回全平台全 null", () => {
     const result = normalizePlatformQuotasMap();
-    expect(Object.keys(result)).toHaveLength(11);
+    expect(Object.keys(result)).toHaveLength(12);
     for (const v of Object.values(result)) {
       expect(v).toEqual({ daily: null, weekly: null, monthly: null });
     }
@@ -303,7 +305,7 @@ describe("sanitizePlatformQuotasMap", () => {
 
   it("缺失平台填充为全 null", () => {
     const result = sanitizePlatformQuotasMap({});
-    expect(Object.keys(result)).toHaveLength(11);
+    expect(Object.keys(result)).toHaveLength(12);
     for (const v of Object.values(result)) {
       expect(v).toEqual({ daily: null, weekly: null, monthly: null });
     }

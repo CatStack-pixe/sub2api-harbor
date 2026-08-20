@@ -118,7 +118,7 @@ func DetectModelPlatform(model string) (string, bool) {
 			return PlatformKimi, true
 		case "chatanywhere":
 			return PlatformChatAnywhere, true
-		case "glm", "zhipu", "z-ai", "zai":
+		case "glm", "zhipu":
 			return PlatformGLM, true
 		}
 		if rest != "" {
