@@ -2106,7 +2106,7 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 			selection.Account = latest
 			accountReleaseFunc = fastReleaseFunc
 		}
-		reserveWSRequestQuota := func(quotaCtx context.Context) *service.OpenAIWSClientCloseError {
+		reserveWSRequestQuota := func(quotaCtx context.Context) error {
 			allowed, err := h.gatewayService.ReserveAccountRequestQuota(quotaCtx, account)
 			if err != nil {
 				return service.NewOpenAIWSClientCloseError(coderws.StatusInternalError, "failed to reserve account request quota", err)
@@ -2116,11 +2116,16 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 			}
 			return nil
 		}
-		if closeErr := reserveWSRequestQuota(admissionCtx); closeErr != nil {
+		if quotaErr := reserveWSRequestQuota(admissionCtx); quotaErr != nil {
 			if accountReleaseFunc != nil {
 				accountReleaseFunc()
 			}
-			closeOpenAIClientWS(wsConn, closeErr.StatusCode(), closeErr.Reason())
+			var closeErr *service.OpenAIWSClientCloseError
+			if errors.As(quotaErr, &closeErr) {
+				closeOpenAIClientWS(wsConn, closeErr.StatusCode(), closeErr.Reason())
+			} else {
+				closeOpenAIClientWS(wsConn, coderws.StatusInternalError, "failed to reserve account request quota")
+			}
 			return
 		}
 		// 准入完成：门并入连接 ctx，turn 级复核与 failover 重选共用。
