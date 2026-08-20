@@ -125,6 +125,14 @@ type AccountRepository interface {
 	ListShadowsByParent(ctx context.Context, parentID int64) ([]*Account, error)
 }
 
+// AccountRequestQuotaReservoir is an optional repository capability used by
+// schedulers that need to reserve a request before forwarding it upstream.
+// Keeping it separate from AccountRepository avoids forcing every lightweight
+// test or plugin repository to implement quota storage.
+type AccountRequestQuotaReservoir interface {
+	ReserveRequestQuota(ctx context.Context, id int64) (bool, error)
+}
+
 type AccountDuplicateRepository interface {
 	// CreateWithAccountGroups atomically persists an account, its exact group priorities,
 	// and the scheduler outbox event for the new routing snapshot.

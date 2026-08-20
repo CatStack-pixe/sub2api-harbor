@@ -1314,10 +1314,31 @@ func (s *OpenAIGatewayService) listSchedulableAccounts(ctx context.Context, grou
 }
 
 func (s *OpenAIGatewayService) tryAcquireAccountSlot(ctx context.Context, accountID int64, maxConcurrency int) (*AcquireResult, error) {
+	var result *AcquireResult
+	var err error
 	if s.concurrencyService == nil {
-		return &AcquireResult{Acquired: true, ReleaseFunc: func() {}}, nil
+		result = &AcquireResult{Acquired: true, ReleaseFunc: func() {}}
+	} else {
+		result, err = s.concurrencyService.AcquireAccountSlot(ctx, accountID, maxConcurrency)
+		if err != nil || result == nil || !result.Acquired {
+			return result, err
+		}
 	}
-	return s.concurrencyService.AcquireAccountSlot(ctx, accountID, maxConcurrency)
+
+	reservoir, ok := s.accountRepo.(AccountRequestQuotaReservoir)
+	if !ok {
+		return result, nil
+	}
+	allowed, err := reservoir.ReserveRequestQuota(ctx, accountID)
+	if err != nil {
+		result.ReleaseFunc()
+		return nil, err
+	}
+	if !allowed {
+		result.ReleaseFunc()
+		return &AcquireResult{Acquired: false}, nil
+	}
+	return result, nil
 }
 
 func (s *OpenAIGatewayService) resolveFreshSchedulableOpenAIAccount(ctx context.Context, account *Account, platform string, requestedModel string, requireCompact bool, requiredCapability OpenAIEndpointCapability) *Account {

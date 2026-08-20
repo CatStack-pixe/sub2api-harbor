@@ -4,9 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"strconv"
 	"strings"
-	"time"
 
 	dbent "github.com/Wei-Shaw/sub2api/ent"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
@@ -209,14 +207,6 @@ func (r *usageBillingRepository) applyUsageBillingEffects(ctx context.Context, t
 			return err
 		}
 		result.QuotaState = quotaState
-	}
-
-	if cmd.AccountRequestQuota && (strings.EqualFold(cmd.AccountType, service.AccountTypeAPIKey) || strings.EqualFold(cmd.AccountType, service.AccountTypeBedrock)) {
-		exhausted, err := incrementUsageBillingAccountRequestQuota(ctx, tx, cmd.AccountID)
-		if err != nil {
-			return err
-		}
-		result.AccountRequestQuotaExhausted = exhausted
 	}
 
 	return nil
@@ -566,82 +556,4 @@ func incrementUsageBillingAccountQuota(ctx context.Context, tx *sql.Tx, accountI
 		}
 	}
 	return &state, nil
-}
-
-func incrementUsageBillingAccountRequestQuota(ctx context.Context, tx *sql.Tx, accountID int64) (bool, error) {
-	var usedRaw, limitRaw string
-	var resetAtRaw sql.NullString
-	err := tx.QueryRowContext(ctx, `
-		SELECT
-			COALESCE(extra->>'request_quota_used', ''),
-			COALESCE(extra->>'request_quota_limit', ''),
-			NULLIF(extra->>'request_quota_reset_at', '')
-		FROM accounts
-		WHERE id = $1 AND deleted_at IS NULL
-		FOR UPDATE`, accountID).Scan(&usedRaw, &limitRaw, &resetAtRaw)
-	if errors.Is(err, sql.ErrNoRows) {
-		return false, service.ErrAccountNotFound
-	}
-	if err != nil {
-		return false, err
-	}
-	used, _ := strconv.ParseInt(strings.TrimSpace(usedRaw), 10, 64)
-	limit, _ := strconv.ParseInt(strings.TrimSpace(limitRaw), 10, 64)
-	if limit <= 0 {
-		return false, nil
-	}
-	if used < 0 {
-		used = 0
-	}
-	var resetAt sql.NullTime
-	if resetAtRaw.Valid {
-		if parsed, parseErr := time.Parse(time.RFC3339Nano, strings.TrimSpace(resetAtRaw.String)); parseErr == nil {
-			resetAt = sql.NullTime{Time: parsed, Valid: true}
-		}
-	}
-
-	now := time.Now().UTC()
-	if used >= limit && resetAt.Valid && now.Before(resetAt.Time) {
-		return true, nil
-	}
-
-	if used >= limit {
-		used = 0
-		resetAt = sql.NullTime{}
-	}
-	used++
-	crossed := used >= limit
-	if crossed {
-		resetAt = sql.NullTime{Time: now.Add(24 * time.Hour), Valid: true}
-	}
-
-	var resetAtValue any
-	if resetAt.Valid {
-		resetAtValue = resetAt.Time.Format(time.RFC3339Nano)
-	}
-	result, err := tx.ExecContext(ctx, `
-		UPDATE accounts
-		SET extra = COALESCE(extra, '{}'::jsonb) || jsonb_build_object(
-			'request_quota_used', $1::bigint,
-			'request_quota_reset_at', $2::text
-		), updated_at = NOW()
-		WHERE id = $3 AND deleted_at IS NULL`, used, resetAtValue, accountID)
-	if err != nil {
-		return false, err
-	}
-	affected, err := result.RowsAffected()
-	if err != nil {
-		return false, err
-	}
-	if affected == 0 {
-		return false, service.ErrAccountNotFound
-	}
-
-	if crossed {
-		if err := enqueueSchedulerOutbox(ctx, tx, service.SchedulerOutboxEventAccountChanged, &accountID, nil, nil); err != nil {
-			logger.LegacyPrintf("repository.usage_billing", "[SchedulerOutbox] enqueue request quota exceeded failed: account=%d err=%v", accountID, err)
-			return false, err
-		}
-	}
-	return crossed, nil
 }

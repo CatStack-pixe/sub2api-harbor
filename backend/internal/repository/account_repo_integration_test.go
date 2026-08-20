@@ -1681,3 +1681,47 @@ func idsOfAccounts(accounts []service.Account) []int64 {
 	}
 	return out
 }
+
+func TestAccountRepositoryReserveRequestQuota(t *testing.T) {
+	ctx := context.Background()
+	client := testEntClient(t)
+	repo := newAccountRepositoryWithSQL(client, integrationDB, nil)
+	account := mustCreateAccount(t, client, &service.Account{
+		Name: "request-quota-reservation-" + time.Now().Format("150405.000000000"),
+		Extra: map[string]any{"request_quota_limit": 2},
+	})
+	t.Cleanup(func() {
+		_, _ = integrationDB.ExecContext(ctx, "DELETE FROM accounts WHERE id = $1", account.ID)
+	})
+
+	allowed, err := repo.ReserveRequestQuota(ctx, account.ID)
+	require.NoError(t, err)
+	require.True(t, allowed)
+	allowed, err = repo.ReserveRequestQuota(ctx, account.ID)
+	require.NoError(t, err)
+	require.True(t, allowed)
+	allowed, err = repo.ReserveRequestQuota(ctx, account.ID)
+	require.NoError(t, err)
+	require.False(t, allowed)
+
+	var used int
+	var resetAt time.Time
+	require.NoError(t, integrationDB.QueryRowContext(ctx, `
+		SELECT (extra->>'request_quota_used')::int,
+		       (extra->>'request_quota_reset_at')::timestamptz
+		FROM accounts WHERE id = $1`, account.ID).Scan(&used, &resetAt))
+	require.Equal(t, 2, used)
+	require.WithinDuration(t, time.Now().UTC().Add(24*time.Hour), resetAt.UTC(), 5*time.Second)
+
+	_, err = integrationDB.ExecContext(ctx, `
+		UPDATE accounts
+		SET extra = jsonb_set(extra, '{request_quota_reset_at}', to_jsonb($1::text), true)
+		WHERE id = $2`, time.Now().UTC().Add(-time.Minute).Format(time.RFC3339), account.ID)
+	require.NoError(t, err)
+	allowed, err = repo.ReserveRequestQuota(ctx, account.ID)
+	require.NoError(t, err)
+	require.True(t, allowed)
+	require.NoError(t, integrationDB.QueryRowContext(ctx,
+		"SELECT (extra->>'request_quota_used')::int FROM accounts WHERE id = $1", account.ID).Scan(&used))
+	require.Equal(t, 1, used)
+}
