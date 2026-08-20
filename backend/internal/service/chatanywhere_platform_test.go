@@ -46,8 +46,11 @@ func TestChatAnywhereAccountCredentialsAndBaseURLs(t *testing.T) {
 	if got := customAccount.GetOpenAIBaseURL(); got != ChatAnywhereChinaBaseURL {
 		t.Fatalf("custom base URL = %q", got)
 	}
-	if !defaultAccount.SupportsOpenAIEndpointCapability(OpenAIEndpointCapabilityChatCompletions) ||
-		!defaultAccount.SupportsOpenAIEndpointCapability(OpenAIEndpointCapabilityResponses) {
-		t.Fatal("ChatAnywhere should support Chat Completions and Responses")
+	if !defaultAccount.SupportsOpenAIEndpointCapability(OpenAIEndpointCapabilityChatCompletions) {
+		t.Fatal("ChatAnywhere should support Chat Completions")
+	}
+	if defaultAccount.SupportsOpenAIEndpointCapability(OpenAIEndpointCapabilityResponses) ||
+		defaultAccount.ShouldUseOpenAIResponsesAPI() {
+		t.Fatal("ChatAnywhere must bridge Responses through Chat Completions")
 	}
 }
