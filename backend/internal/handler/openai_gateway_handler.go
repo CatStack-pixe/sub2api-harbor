@@ -1510,6 +1510,17 @@ func (h *OpenAIGatewayHandler) acquireResponsesAccountSlot(
 		}
 		account = latest
 		selection.Account = latest
+		allowed, err := h.gatewayService.ReserveAccountRequestQuota(ctx, account)
+		if err != nil {
+			if selection.ReleaseFunc != nil { selection.ReleaseFunc() }
+			h.handleConcurrencyError(c, err, "account", *streamStarted)
+			return nil, openAISlotAcquireFailed
+		}
+		if !allowed {
+			if selection.ReleaseFunc != nil { selection.ReleaseFunc() }
+			h.handleStreamingAwareError(c, http.StatusTooManyRequests, "rate_limit_error", "Account request quota exhausted; retry after 24 hours", *streamStarted)
+			return nil, openAISlotAcquireFailed
+		}
 		// 调度器已抢槽路径无门时由选号内部完成 eager 绑定；门下选号内部
 		// 推迟绑定，这里在终检通过后补准入后绑定。
 		if selection.ProfitGateActive() {
@@ -1548,6 +1559,21 @@ func (h *OpenAIGatewayHandler) acquireResponsesAccountSlot(
 		}
 		account = latest
 		selection.Account = latest
+		allowed, err := h.gatewayService.ReserveAccountRequestQuota(ctx, account)
+		if err != nil {
+			if fastReleaseFunc != nil {
+				fastReleaseFunc()
+			}
+			h.handleConcurrencyError(c, err, "account", *streamStarted)
+			return nil, openAISlotAcquireFailed
+		}
+		if !allowed {
+			if fastReleaseFunc != nil {
+				fastReleaseFunc()
+			}
+			h.handleStreamingAwareError(c, http.StatusTooManyRequests, "rate_limit_error", "Account request quota exhausted; retry after 24 hours", *streamStarted)
+			return nil, openAISlotAcquireFailed
+		}
 		if err := h.gatewayService.BindStickySessionAfterProfitAdmission(ctx, groupID, sessionHash, account.ID); err != nil {
 			reqLog.Warn("openai.bind_sticky_session_after_profit_admission_failed", zap.Int64("account_id", account.ID), zap.Error(err))
 		}
@@ -1603,6 +1629,21 @@ func (h *OpenAIGatewayHandler) acquireResponsesAccountSlot(
 	}
 	account = latest
 	selection.Account = latest
+	allowed, err := h.gatewayService.ReserveAccountRequestQuota(ctx, account)
+	if err != nil {
+		if accountReleaseFunc != nil {
+			accountReleaseFunc()
+		}
+		h.handleConcurrencyError(c, err, "account", *streamStarted)
+		return nil, openAISlotAcquireFailed
+	}
+	if !allowed {
+		if accountReleaseFunc != nil {
+			accountReleaseFunc()
+		}
+		h.handleStreamingAwareError(c, http.StatusTooManyRequests, "rate_limit_error", "Account request quota exhausted; retry after 24 hours", *streamStarted)
+		return nil, openAISlotAcquireFailed
+	}
 	if err := h.gatewayService.BindStickySessionAfterProfitAdmission(ctx, groupID, sessionHash, account.ID); err != nil {
 		reqLog.Warn("openai.bind_sticky_session_after_profit_admission_failed", zap.Int64("account_id", account.ID), zap.Error(err))
 	}

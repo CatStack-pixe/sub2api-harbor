@@ -2291,7 +2291,7 @@ func (a *Account) IsRequestQuotaExceeded() bool {
 		return false
 	}
 	resetAt := a.GetRequestQuotaResetAt()
-	return !resetAt.IsZero() && time.Now().Before(resetAt)
+	return resetAt.IsZero() || time.Now().Before(resetAt)
 }
 
 // getExtraFloat64 从 Extra 中读取指定 key 的 float64 值

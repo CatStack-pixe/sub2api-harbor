@@ -465,6 +465,20 @@ type OpenAIGatewayService struct {
 	agnesQuotaFallbackUntil             sync.Map // key: agnesQuotaFallbackKey, value: time.Time
 }
 
+// ReserveAccountRequestQuota performs the final, serialized request admission
+// check. It is intentionally separate from account selection so wait plans,
+// candidate rechecks, and profit vetoes cannot consume quota prematurely.
+func (s *OpenAIGatewayService) ReserveAccountRequestQuota(ctx context.Context, account *Account) (bool, error) {
+	if account == nil || !account.HasRequestQuotaLimit() || s.accountRepo == nil {
+		return true, nil
+	}
+	reservoir, ok := s.accountRepo.(AccountRequestQuotaReservoir)
+	if !ok {
+		return true, nil
+	}
+	return reservoir.ReserveRequestQuota(ctx, account.ID)
+}
+
 // NewOpenAIGatewayService creates a new OpenAIGatewayService
 func NewOpenAIGatewayService(
 	accountRepo AccountRepository,

@@ -3825,7 +3825,7 @@ func (r *accountRepository) ReserveRequestQuota(ctx context.Context, id int64) (
 	}
 	resetAt := parseRequestQuotaTime(extra["request_quota_reset_at"])
 	now := time.Now().UTC()
-	if used >= limit && !resetAt.IsZero() && now.Before(resetAt) {
+	if used >= limit && (resetAt.IsZero() || now.Before(resetAt)) {
 		if err := tx.Commit(); err != nil {
 			return false, err
 		}
