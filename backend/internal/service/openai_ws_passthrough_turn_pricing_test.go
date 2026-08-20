@@ -81,11 +81,18 @@ func TestPassthroughIngressNeverCallsBeforeTurn(t *testing.T) {
 
 	var hooksMu sync.Mutex
 	beforeTurnCalls := 0
+	beforeTurnAdmissionCalls := 0
 	afterTurnCalls := 0
 	hooks := &OpenAIWSIngressHooks{
 		BeforeTurn: func(int) error {
 			hooksMu.Lock()
 			beforeTurnCalls++
+			hooksMu.Unlock()
+			return nil
+		},
+		BeforeTurnAdmission: func(int) error {
+			hooksMu.Lock()
+			beforeTurnAdmissionCalls++
 			hooksMu.Unlock()
 			return nil
 		},
@@ -120,9 +127,10 @@ func TestPassthroughIngressNeverCallsBeforeTurn(t *testing.T) {
 	}
 
 	hooksMu.Lock()
-	gotBefore, gotAfter := beforeTurnCalls, afterTurnCalls
+	gotBefore, gotAdmission, gotAfter := beforeTurnCalls, beforeTurnAdmissionCalls, afterTurnCalls
 	hooksMu.Unlock()
 
 	require.Zero(t, gotBefore, "透传 ingress 没有 turn 起始回调，BeforeTurn 不应被调用")
+	require.Zero(t, gotAdmission, "首轮透传请求已在 handler 准入，不应重复触发 turn 配额回调")
 	require.Positive(t, gotAfter, "透传 ingress 仍应回调 AfterTurn 提交用量")
 }

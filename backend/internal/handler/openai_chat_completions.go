@@ -151,6 +151,7 @@ func (h *OpenAIGatewayHandler) ChatCompletions(c *gin.Context) {
 	switchCount := 0
 	profitVetoCount := 0
 	failedAccountIDs := make(map[int64]struct{})
+	quotaAccountExhausted := false
 	sameAccountRetryCount := make(map[int64]int)
 	var lastFailoverErr *service.UpstreamFailoverError
 
@@ -182,6 +183,10 @@ func (h *OpenAIGatewayHandler) ChatCompletions(c *gin.Context) {
 				reqLog.Info("openai_chat_completions.account_select_aborted_client_disconnected", zap.Error(err))
 				return
 			}
+			if quotaAccountExhausted {
+				h.handleStreamingAwareError(c, http.StatusTooManyRequests, "rate_limit_error", "Account request quota exhausted; retry after 24 hours", streamStarted)
+				return
+			}
 			reqLog.Warn("openai_chat_completions.account_select_failed",
 				zap.Error(openAICompatibleSelectionErrorForLog(err, requestPlatform)),
 				zap.Int("excluded_account_count", len(failedAccountIDs)),
@@ -203,6 +208,10 @@ func (h *OpenAIGatewayHandler) ChatCompletions(c *gin.Context) {
 			}
 		}
 		if selection == nil || selection.Account == nil {
+			if quotaAccountExhausted {
+				h.handleStreamingAwareError(c, http.StatusTooManyRequests, "rate_limit_error", "Account request quota exhausted; retry after 24 hours", streamStarted)
+				return
+			}
 			cls := classifyOpenAICompatibleNoAccountErrorFromGin(c, h.gatewayService, apiKey, routingModel, reqModel)
 			if !cls.ModelNotFound {
 				markOpsRoutingCapacityLimited(c)
@@ -223,6 +232,11 @@ func (h *OpenAIGatewayHandler) ChatCompletions(c *gin.Context) {
 				h.handleOpenAIProfitVetoExhausted(c, streamStarted, reqLog, profitVetoCount)
 				return
 			}
+			continue
+		}
+		if slotResult == openAISlotAcquireQuotaExhausted {
+			quotaAccountExhausted = true
+			failedAccountIDs[account.ID] = struct{}{}
 			continue
 		}
 		if slotResult != openAISlotAcquireOK {

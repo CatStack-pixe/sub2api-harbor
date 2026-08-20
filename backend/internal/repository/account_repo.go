@@ -3882,8 +3882,13 @@ func parseRequestQuotaInt(raw json.RawMessage) int {
 	}
 	var text string
 	if json.Unmarshal(raw, &text) == nil {
-		value, _ := strconv.Atoi(strings.TrimSpace(text))
-		return value
+		trimmed := strings.TrimSpace(text)
+		if value, err := strconv.Atoi(trimmed); err == nil {
+			return value
+		}
+		if value, err := strconv.ParseFloat(trimmed, 64); err == nil {
+			return int(value)
+		}
 	}
 	return 0
 }
