@@ -120,6 +120,10 @@ func DetectModelPlatform(model string) (string, bool) {
 			return PlatformChatAnywhere, true
 		case "glm", "zhipu":
 			return PlatformGLM, true
+		case "z-ai", "zai":
+			// NVIDIA NIM also publishes models under these namespaces. Leave
+			// ambiguous names unresolved unless a composite route is explicit.
+			return "", false
 		}
 		if rest != "" {
 			normalized = strings.TrimPrefix(rest, "models/")
