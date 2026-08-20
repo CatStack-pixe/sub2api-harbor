@@ -219,7 +219,7 @@ type OpenAIWSIngressHooks struct {
 	MaxReasoningEffort string
 	// ReasoningEffortMappings rewrites explicit effort values for this WS session.
 	ReasoningEffortMappings []ReasoningEffortMapping
-	BeforeTurn          func(turn int) error
+	BeforeTurn              func(turn int) error
 	// BeforeTurnAdmission runs for response.create frames in passthrough mode,
 	// whose relay intentionally does not use the regular BeforeTurn callback.
 	BeforeTurnAdmission func(turn int) error
