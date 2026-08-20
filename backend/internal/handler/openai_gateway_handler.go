@@ -45,6 +45,8 @@ type OpenAIGatewayHandler struct {
 	cfg                        *config.Config
 }
 
+const openAIRequestQuotaReservedContextKey = "openai_request_quota_reserved_accounts"
+
 type openAIWSTurnChannelMappingSnapshot struct {
 	turn    int
 	mapping service.ChannelMappingResult
@@ -1510,7 +1512,7 @@ func (h *OpenAIGatewayHandler) acquireResponsesAccountSlot(
 		}
 		account = latest
 		selection.Account = latest
-		allowed, err := h.gatewayService.ReserveAccountRequestQuota(ctx, account)
+		allowed, err := h.reserveAccountRequestQuota(c, ctx, account)
 		if err != nil {
 			if selection.ReleaseFunc != nil { selection.ReleaseFunc() }
 			h.handleConcurrencyError(c, err, "account", *streamStarted)
@@ -1559,7 +1561,7 @@ func (h *OpenAIGatewayHandler) acquireResponsesAccountSlot(
 		}
 		account = latest
 		selection.Account = latest
-		allowed, err := h.gatewayService.ReserveAccountRequestQuota(ctx, account)
+		allowed, err := h.reserveAccountRequestQuota(c, ctx, account)
 		if err != nil {
 			if fastReleaseFunc != nil {
 				fastReleaseFunc()
@@ -1629,7 +1631,7 @@ func (h *OpenAIGatewayHandler) acquireResponsesAccountSlot(
 	}
 	account = latest
 	selection.Account = latest
-	allowed, err := h.gatewayService.ReserveAccountRequestQuota(ctx, account)
+	allowed, err := h.reserveAccountRequestQuota(c, ctx, account)
 	if err != nil {
 		if accountReleaseFunc != nil {
 			accountReleaseFunc()
@@ -1648,6 +1650,28 @@ func (h *OpenAIGatewayHandler) acquireResponsesAccountSlot(
 		reqLog.Warn("openai.bind_sticky_session_after_profit_admission_failed", zap.Int64("account_id", account.ID), zap.Error(err))
 	}
 	return wrapReleaseOnDone(ctx, accountReleaseFunc), openAISlotAcquireOK
+}
+
+func (h *OpenAIGatewayHandler) reserveAccountRequestQuota(c *gin.Context, ctx context.Context, account *service.Account) (bool, error) {
+	if account == nil || !account.HasRequestQuotaLimit() {
+		return true, nil
+	}
+	reserved := map[int64]struct{}{}
+	if value, exists := c.Get(openAIRequestQuotaReservedContextKey); exists {
+		if existing, ok := value.(map[int64]struct{}); ok {
+			reserved = existing
+		}
+	}
+	if _, exists := reserved[account.ID]; exists {
+		return true, nil
+	}
+	allowed, err := h.gatewayService.ReserveAccountRequestQuota(ctx, account)
+	if err != nil || !allowed {
+		return allowed, err
+	}
+	reserved[account.ID] = struct{}{}
+	c.Set(openAIRequestQuotaReservedContextKey, reserved)
+	return true, nil
 }
 
 // ResponsesWebSocket handles OpenAI Responses API WebSocket ingress endpoint
