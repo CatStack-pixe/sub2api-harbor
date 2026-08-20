@@ -24,7 +24,7 @@ func TestGLMPlatformCredentialsAndDefaults(t *testing.T) {
 	require.Equal(t, GLMDefaultBaseURL, account.GetOpenAIBaseURL())
 	require.Equal(t, "glm-key", account.GetOpenAIApiKey())
 	require.False(t, account.ShouldUseOpenAIResponsesAPI())
-	require.ElementsMatch(t, []string{"glm-5.2", "glm-5.1", "glm-5", "glm-4.7", "glm-4.6", "glm-4.5-air"}, GLMDefaultModelIDs())
+	require.ElementsMatch(t, []string{"glm-5.2", "glm-5.1", "glm-5", "glm-5-turbo", "glm-4.7", "glm-4.5-air", "glm-4.7-flashx", "glm-4.7-flash"}, GLMDefaultModelIDs())
 
 	require.Equal(t, "glm-5.2", defaultOpenAIAccountTestModel(account))
 }

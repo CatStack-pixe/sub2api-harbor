@@ -108,7 +108,7 @@ func validateAccountCredentials(platform, accountType string, credentials map[st
 			}
 			trimmed := strings.TrimRight(strings.TrimSpace(baseURL), "/")
 			if trimmed != "" && trimmed != GLMDefaultBaseURL {
-				return infraerrors.BadRequest("GLM_BASE_URL_INVALID", "GLM base_url must use the official Z.AI endpoint")
+				return infraerrors.BadRequest("GLM_BASE_URL_INVALID", "GLM base_url must use the mainland Zhipu AI Open Platform endpoint")
 			}
 		}
 		return nil

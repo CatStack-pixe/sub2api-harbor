@@ -494,16 +494,16 @@ func TestGetFallbackPricing_FamilyMatching(t *testing.T) {
 		{
 			name:              "glm 5.2 flagship",
 			model:             "glm-5.2",
-			expectedInput:     1.4e-6,
-			expectedOutput:    floatPtr(4.4e-6),
-			expectedCacheRead: floatPtr(0.26e-6),
+			expectedInput:     1.120448e-6,
+			expectedOutput:    floatPtr(3.921569e-6),
+			expectedCacheRead: floatPtr(0.280112e-6),
 		},
 		{
 			name:              "glm 5.1 flagship",
 			model:             "glm-5.1",
-			expectedInput:     1.4e-6,
-			expectedOutput:    floatPtr(4.4e-6),
-			expectedCacheRead: floatPtr(0.26e-6),
+			expectedInput:     1.120448e-6,
+			expectedOutput:    floatPtr(3.921569e-6),
+			expectedCacheRead: floatPtr(0.280112e-6),
 		},
 		{
 			name:              "glm 5 base",
@@ -550,9 +550,9 @@ func TestGetFallbackPricing_FamilyMatching(t *testing.T) {
 		{
 			name:              "glm 4.5-air lightweight",
 			model:             "glm-4.5-air",
-			expectedInput:     0.2e-6,
-			expectedOutput:    floatPtr(1.1e-6),
-			expectedCacheRead: floatPtr(0.03e-6),
+			expectedInput:     0.168067e-6,
+			expectedOutput:    floatPtr(1.120448e-6),
+			expectedCacheRead: floatPtr(0.033613e-6),
 		},
 		{
 			name:              "glm 4.7-flashx",
@@ -585,23 +585,23 @@ func TestGetFallbackPricing_FamilyMatching(t *testing.T) {
 		{
 			name:              "glm 5.1 vs glm 5 ordering (verbatim 5.1)",
 			model:             "glm-5.1",
-			expectedInput:     1.4e-6, // = glm-5.1 价格
-			expectedOutput:    floatPtr(4.4e-6),
-			expectedCacheRead: floatPtr(0.26e-6),
+			expectedInput:     1.120448e-6, // = glm-5.1 价格
+			expectedOutput:    floatPtr(3.921569e-6),
+			expectedCacheRead: floatPtr(0.280112e-6),
 		},
 		{
 			name:              "glm 5.2 vs glm 5 ordering (verbatim 5.2)",
 			model:             "glm-5.2",
-			expectedInput:     1.4e-6, // = glm-5.2 价格（不是 glm-5 的 1e-6）
-			expectedOutput:    floatPtr(4.4e-6),
-			expectedCacheRead: floatPtr(0.26e-6),
+			expectedInput:     1.120448e-6, // = glm-5.2 价格（不是 glm-5 的 1e-6）
+			expectedOutput:    floatPtr(3.921569e-6),
+			expectedCacheRead: floatPtr(0.280112e-6),
 		},
 		{
 			name:              "glm 4.5-air vs glm 4.5 ordering",
 			model:             "glm-4.5-air",
-			expectedInput:     0.2e-6, // = glm-4.5-air 价格（不是 glm-4.5 的 0.6e-6）
-			expectedOutput:    floatPtr(1.1e-6),
-			expectedCacheRead: floatPtr(0.03e-6),
+			expectedInput:     0.168067e-6, // = glm-4.5-air 价格（不是 glm-4.5 的 0.6e-6）
+			expectedOutput:    floatPtr(1.120448e-6),
+			expectedCacheRead: floatPtr(0.033613e-6),
 		},
 
 		// ---- 月之暗面 Kimi ----

@@ -103,7 +103,7 @@ func ChatAnywhereDefaultModelIDs() []string {
 
 // GLMDefaultModelIDs are conservative fallbacks used before a live model sync.
 func GLMDefaultModelIDs() []string {
-	return []string{"glm-5.2", "glm-5.1", "glm-5", "glm-4.7", "glm-4.6", "glm-4.5-air"}
+	return []string{"glm-5.2", "glm-5.1", "glm-5", "glm-5-turbo", "glm-4.7", "glm-4.5-air", "glm-4.7-flashx", "glm-4.7-flash"}
 }
 
 // TokenRhythmDefaultModelIDs are OpenAI-compatible fallbacks used until the

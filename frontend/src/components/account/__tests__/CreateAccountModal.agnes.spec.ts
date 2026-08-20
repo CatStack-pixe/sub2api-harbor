@@ -61,7 +61,7 @@ describe('CreateAccountModal ChatAnywhere account type', () => {
 })
 
 describe('CreateAccountModal GLM account type', () => {
-  it('offers API-key setup with the fixed official Z.AI endpoint', () => {
+  it('offers API-key setup with the fixed mainland Zhipu endpoint', () => {
     expect(source).toContain('data-testid="glm-platform"')
     expect(source).toContain('data-testid="glm-account-type-api-key"')
     expect(source).toContain("newPlatform === 'glm'")

@@ -650,8 +650,8 @@ export default {
         globalRegion: 'Global: api.chatanywhere.org'
       },
       glm: {
-        baseUrlHint: 'GLM uses the fixed official Z.AI OpenAI-compatible endpoint.',
-        apiKeyHint: 'Your Zhipu AI / Z.AI API key'
+        baseUrlHint: 'GLM uses the fixed mainland Zhipu AI Open Platform endpoint.',
+        apiKeyHint: 'Your mainland Zhipu AI Open Platform API key'
       },
       grok: {
         baseUrlHint: 'Grok OAuth accounts forward to the official xAI API base URL.',

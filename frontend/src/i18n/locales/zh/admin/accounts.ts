@@ -732,7 +732,7 @@ export default {
       },
       glm: {
         baseUrlHint: 'GLM 使用智谱官方 OpenAI 兼容端点，地址不可修改。',
-        apiKeyHint: '智谱 AI / Z.AI 官方 API Key'
+        apiKeyHint: '智谱 AI 开放平台（中国大陆）API Key'
       },
       grok: {
         baseUrlHint: 'Grok OAuth 账号会转发到官方 xAI API Base URL。',
