@@ -3770,6 +3770,141 @@ func (r *accountRepository) IncrementQuotaUsed(ctx context.Context, id int64, am
 	return nil
 }
 
+// ReserveRequestQuota atomically reserves one request for an account before
+// forwarding it upstream. Accounts without a positive request_quota_limit are
+// allowed without changing their extra JSON.
+func (r *accountRepository) ReserveRequestQuota(ctx context.Context, id int64) (bool, error) {
+	beginner, ok := r.sql.(interface {
+		BeginTx(context.Context, *sql.TxOptions) (*sql.Tx, error)
+	})
+	if !ok {
+		return false, errors.New("account repository SQL executor does not support transactions")
+	}
+	tx, err := beginner.BeginTx(ctx, nil)
+	if err != nil {
+		return false, err
+	}
+	committed := false
+	defer func() {
+		if !committed {
+			_ = tx.Rollback()
+		}
+	}()
+
+	var raw []byte
+	err = tx.QueryRowContext(ctx, `
+		SELECT COALESCE(extra, '{}'::jsonb)
+		FROM accounts
+		WHERE id = $1 AND deleted_at IS NULL
+		FOR UPDATE`, id).Scan(&raw)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, service.ErrAccountNotFound
+	}
+	if err != nil {
+		return false, err
+	}
+
+	var extra map[string]json.RawMessage
+	if len(raw) != 0 {
+		if err := json.Unmarshal(raw, &extra); err != nil {
+			return false, err
+		}
+	}
+	limit := parseRequestQuotaInt(extra["request_quota_limit"])
+	if limit <= 0 {
+		if err := tx.Commit(); err != nil {
+			return false, err
+		}
+		committed = true
+		return true, nil
+	}
+
+	used := parseRequestQuotaInt(extra["request_quota_used"])
+	if used < 0 {
+		used = 0
+	}
+	resetAt := parseRequestQuotaTime(extra["request_quota_reset_at"])
+	now := time.Now().UTC()
+	if used >= limit && (resetAt.IsZero() || now.Before(resetAt)) {
+		if err := tx.Commit(); err != nil {
+			return false, err
+		}
+		committed = true
+		return false, nil
+	}
+	if used >= limit {
+		used = 0
+	}
+	used++
+	updates := map[string]any{"request_quota_used": used}
+	crossed := used >= limit
+	if crossed {
+		updates["request_quota_reset_at"] = now.Add(24 * time.Hour).Format(time.RFC3339Nano)
+	} else {
+		updates["request_quota_reset_at"] = nil
+	}
+	payload, err := json.Marshal(updates)
+	if err != nil {
+		return false, err
+	}
+	result, err := tx.ExecContext(ctx, `
+		UPDATE accounts
+		SET extra = COALESCE(extra, '{}'::jsonb) || $1::jsonb, updated_at = NOW()
+		WHERE id = $2 AND deleted_at IS NULL`, payload, id)
+	if err != nil {
+		return false, err
+	}
+	if affected, err := result.RowsAffected(); err != nil {
+		return false, err
+	} else if affected == 0 {
+		return false, service.ErrAccountNotFound
+	}
+	if crossed {
+		if err := enqueueSchedulerOutbox(ctx, tx, service.SchedulerOutboxEventAccountChanged, &id, nil, nil); err != nil {
+			logger.LegacyPrintf("repository.account", "[SchedulerOutbox] enqueue request quota exceeded failed: account=%d err=%v", id, err)
+			return false, err
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return false, err
+	}
+	committed = true
+	return true, nil
+}
+
+func parseRequestQuotaInt(raw json.RawMessage) int {
+	if len(raw) == 0 || string(raw) == "null" {
+		return 0
+	}
+	var number float64
+	if json.Unmarshal(raw, &number) == nil {
+		return int(number)
+	}
+	var text string
+	if json.Unmarshal(raw, &text) == nil {
+		value, _ := strconv.Atoi(strings.TrimSpace(text))
+		return value
+	}
+	return 0
+}
+
+func parseRequestQuotaTime(raw json.RawMessage) time.Time {
+	if len(raw) == 0 || string(raw) == "null" {
+		return time.Time{}
+	}
+	var text string
+	if json.Unmarshal(raw, &text) != nil {
+		return time.Time{}
+	}
+	if parsed, err := time.Parse(time.RFC3339Nano, strings.TrimSpace(text)); err == nil {
+		return parsed
+	}
+	if parsed, err := time.Parse(time.RFC3339, strings.TrimSpace(text)); err == nil {
+		return parsed
+	}
+	return time.Time{}
+}
+
 // ResetQuotaUsed 重置账号所有维度的配额用量为 0
 // 保留固定重置模式的配置字段（quota_daily_reset_mode 等），仅清零用量和窗口起始时间
 func (r *accountRepository) ResetQuotaUsed(ctx context.Context, id int64) error {

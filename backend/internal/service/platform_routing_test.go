@@ -12,6 +12,12 @@ func TestDeepSeekGroupAllowsTokenRhythmAccounts(t *testing.T) {
 	require.False(t, accountPlatformMatchesGroup(PlatformTokenRhythm, PlatformDeepSeek))
 }
 
+func TestOpenAIGroupAllowsChatAnywhereAccounts(t *testing.T) {
+	require.True(t, accountPlatformMatchesGroup(PlatformOpenAI, PlatformOpenAI))
+	require.True(t, accountPlatformMatchesGroup(PlatformOpenAI, PlatformChatAnywhere))
+	require.False(t, accountPlatformMatchesGroup(PlatformChatAnywhere, PlatformOpenAI))
+}
+
 func TestDeepSeekGroupModelOptionsIncludeTokenRhythmMappings(t *testing.T) {
 	group := &Group{Platform: PlatformDeepSeek}
 	accounts := []Account{{

@@ -148,6 +148,9 @@ func (m *mockAccountRepoForPlatform) ListSchedulableByPlatforms(ctx context.Cont
 	return result, nil
 }
 func (m *mockAccountRepoForPlatform) ListSchedulableByGroupIDAndPlatforms(ctx context.Context, groupID int64, platforms []string) ([]Account, error) {
+	if m.listPlatformFunc != nil && len(platforms) > 0 {
+		return m.listPlatformFunc(ctx, platforms[0])
+	}
 	return m.ListSchedulableByPlatforms(ctx, platforms)
 }
 func (m *mockAccountRepoForPlatform) ListSchedulableUngroupedByPlatform(ctx context.Context, platform string) ([]Account, error) {
