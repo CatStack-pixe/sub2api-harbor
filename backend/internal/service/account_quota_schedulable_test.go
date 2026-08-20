@@ -101,6 +101,20 @@ func TestAccountIsSchedulable_QuotaExceeded(t *testing.T) {
 			want: true,
 		},
 		{
+			name: "apikey malformed request quota cooldown fails closed",
+			account: &Account{
+				Status:      StatusActive,
+				Schedulable: true,
+				Type:        AccountTypeAPIKey,
+				Extra: map[string]any{
+					"request_quota_limit":    100,
+					"request_quota_used":     100,
+					"request_quota_reset_at": "not-a-timestamp",
+				},
+			},
+			want: false,
+		},
+		{
 			name: "apikey expired daily period restores schedulable",
 			account: &Account{
 				Status:      StatusActive,

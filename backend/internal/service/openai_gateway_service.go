@@ -469,8 +469,11 @@ type OpenAIGatewayService struct {
 // check. It is intentionally separate from account selection so wait plans,
 // candidate rechecks, and profit vetoes cannot consume quota prematurely.
 func (s *OpenAIGatewayService) ReserveAccountRequestQuota(ctx context.Context, account *Account) (bool, error) {
-	if account == nil || !account.HasRequestQuotaLimit() || s.accountRepo == nil {
+	if account == nil || !account.HasRequestQuotaLimit() {
 		return true, nil
+	}
+	if s.accountRepo == nil {
+		return false, errors.New("request quota storage is unavailable")
 	}
 	reservoir, ok := s.accountRepo.(AccountRequestQuotaReservoir)
 	if !ok {
