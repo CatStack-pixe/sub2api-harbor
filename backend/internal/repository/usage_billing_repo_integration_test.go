@@ -199,6 +199,93 @@ func TestUsageBillingRepositoryApply_UpdatesAccountQuota(t *testing.T) {
 	require.InDelta(t, 3.5, quotaUsed, 0.000001)
 }
 
+func TestUsageBillingRepositoryApply_EnforcesAccountRequestQuotaCooldown(t *testing.T) {
+	ctx := context.Background()
+	client := testEntClient(t)
+	repo := NewUsageBillingRepository(client, integrationDB)
+
+	user := mustCreateUser(t, client, &service.User{
+		Email:        fmt.Sprintf("usage-billing-request-quota-%d@example.com", time.Now().UnixNano()),
+		PasswordHash: "hash",
+	})
+	apiKey := mustCreateApiKey(t, client, &service.APIKey{
+		UserID: user.ID,
+		Key:    "sk-usage-billing-request-quota-" + uuid.NewString(),
+		Name:   "billing-request-quota",
+	})
+	account := mustCreateAccount(t, client, &service.Account{
+		Name: "usage-billing-request-quota-" + uuid.NewString(),
+		Type: service.AccountTypeAPIKey,
+		Extra: map[string]any{
+			"request_quota_limit": 2,
+		},
+	})
+
+	for range 2 {
+		_, err := repo.Apply(ctx, &service.UsageBillingCommand{
+			RequestID:           uuid.NewString(),
+			APIKeyID:            apiKey.ID,
+			UserID:              user.ID,
+			AccountID:           account.ID,
+			AccountType:         service.AccountTypeAPIKey,
+			AccountRequestQuota: true,
+		})
+		require.NoError(t, err)
+	}
+
+	var used int
+	var resetAt time.Time
+	require.NoError(t, integrationDB.QueryRowContext(ctx, `
+		SELECT (extra->>'request_quota_used')::int, (extra->>'request_quota_reset_at')::timestamptz
+		FROM accounts WHERE id = $1`, account.ID).Scan(&used, &resetAt))
+	require.Equal(t, 2, used)
+	require.WithinDuration(t, time.Now().UTC().Add(24*time.Hour), resetAt.UTC(), 5*time.Second)
+
+	var outboxCount int
+	require.NoError(t, integrationDB.QueryRowContext(ctx,
+		"SELECT COUNT(*) FROM scheduler_outbox WHERE event_type = $1 AND account_id = $2",
+		service.SchedulerOutboxEventAccountChanged, account.ID,
+	).Scan(&outboxCount))
+	require.Equal(t, 1, outboxCount)
+
+	_, err := repo.Apply(ctx, &service.UsageBillingCommand{
+		RequestID:           uuid.NewString(),
+		APIKeyID:            apiKey.ID,
+		UserID:              user.ID,
+		AccountID:           account.ID,
+		AccountType:         service.AccountTypeAPIKey,
+		AccountRequestQuota: true,
+	})
+	require.NoError(t, err)
+	require.NoError(t, integrationDB.QueryRowContext(ctx, `
+		SELECT (extra->>'request_quota_used')::int
+		FROM accounts WHERE id = $1`, account.ID).Scan(&used))
+	require.Equal(t, 2, used, "requests completing during cooldown must not extend the quota")
+
+	_, err = integrationDB.ExecContext(ctx, `
+		UPDATE accounts
+		SET extra = jsonb_set(extra, '{request_quota_reset_at}', to_jsonb($1::text), true)
+		WHERE id = $2`, time.Now().UTC().Add(-time.Minute).Format(time.RFC3339), account.ID)
+	require.NoError(t, err)
+
+	_, err = repo.Apply(ctx, &service.UsageBillingCommand{
+		RequestID:           uuid.NewString(),
+		APIKeyID:            apiKey.ID,
+		UserID:              user.ID,
+		AccountID:           account.ID,
+		AccountType:         service.AccountTypeAPIKey,
+		AccountRequestQuota: true,
+	})
+	require.NoError(t, err)
+
+	var resetAtRaw *string
+	require.NoError(t, integrationDB.QueryRowContext(ctx, `
+		SELECT (extra->>'request_quota_used')::int, extra->>'request_quota_reset_at'
+		FROM accounts WHERE id = $1`, account.ID).Scan(&used, &resetAtRaw))
+	require.Equal(t, 1, used)
+	require.Nil(t, resetAtRaw)
+}
+
 func TestUsageBillingRepositoryApply_EnqueuesSchedulerOutboxOnQuotaCrossing(t *testing.T) {
 	ctx := context.Background()
 	client := testEntClient(t)

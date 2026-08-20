@@ -129,6 +129,10 @@ func (p *postUsageBillingParams) shouldUpdateAccountQuota() bool {
 	return p.Cost.TotalCost > 0 && p.Account.IsAPIKeyOrBedrock() && p.Account.HasAnyQuotaLimit()
 }
 
+func (p *postUsageBillingParams) shouldCountAccountRequest() bool {
+	return p.Account.IsAPIKeyOrBedrock() && p.Account.HasRequestQuotaLimit()
+}
+
 // postUsageBilling is the legacy fallback billing path used when the unified
 // billing repo is unavailable (nil). Production uses applyUsageBilling → repo.Apply
 // for atomic billing. This path only runs in tests or degraded mode.
@@ -326,6 +330,7 @@ func buildUsageBillingCommand(requestID string, usageLog *UsageLog, p *postUsage
 	if p.shouldUpdateAccountQuota() {
 		cmd.AccountQuotaCost = p.Cost.TotalCost * p.AccountRateMultiplier
 	}
+	cmd.AccountRequestQuota = p.shouldCountAccountRequest()
 
 	cmd.Normalize()
 	return cmd
@@ -383,6 +388,14 @@ func finalizePostUsageBilling(ctx context.Context, p *postUsageBillingParams, de
 	}
 
 	deps.deferredService.ScheduleLastUsedUpdate(p.Account.ID)
+	if result != nil && result.AccountRequestQuotaExhausted && deps.schedulerSnapshot != nil && deps.accountRepo != nil {
+		fresh, err := deps.accountRepo.GetByID(ctx, p.Account.ID)
+		if err != nil {
+			slog.Warn("reload account after request quota exhaustion failed", "account_id", p.Account.ID, "error", err)
+		} else if err := deps.schedulerSnapshot.UpdateAccountInCache(ctx, fresh); err != nil {
+			slog.Warn("refresh scheduler cache after request quota exhaustion failed", "account_id", p.Account.ID, "error", err)
+		}
+	}
 
 	// Platform quota 累加：仅在 standard（余额）模式生效；订阅模式豁免；仅对有 limit 的用户写
 	// Redis 同步写 + DB 异步持久化（flag=false 降级）或 flusher 异步刷（flag=true）:
@@ -548,6 +561,7 @@ type billingDeps struct {
 	deferredService       *DeferredService
 	balanceNotifyService  *BalanceNotifyService
 	userPlatformQuotaRepo UserPlatformQuotaRepository
+	schedulerSnapshot     *SchedulerSnapshotService
 	cfg                   *config.Config
 }
 
@@ -560,6 +574,7 @@ func (s *GatewayService) billingDeps() *billingDeps {
 		deferredService:       s.deferredService,
 		balanceNotifyService:  s.balanceNotifyService,
 		userPlatformQuotaRepo: s.userPlatformQuotaRepo,
+		schedulerSnapshot:     s.schedulerSnapshot,
 		cfg:                   s.cfg,
 	}
 }

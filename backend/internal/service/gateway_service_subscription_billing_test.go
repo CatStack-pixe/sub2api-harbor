@@ -83,3 +83,20 @@ func TestBuildUsageBillingCommand_SubscriptionAppliesRateMultiplier(t *testing.T
 		})
 	}
 }
+
+func TestBuildUsageBillingCommand_EnablesAccountRequestQuotaForZeroCostUsage(t *testing.T) {
+	p := &postUsageBillingParams{
+		Cost:    &CostBreakdown{},
+		User:    &User{ID: 1},
+		APIKey:  &APIKey{ID: 2},
+		Account: &Account{ID: 3, Type: AccountTypeAPIKey, Extra: map[string]any{"request_quota_limit": 100}},
+	}
+
+	cmd := buildUsageBillingCommand("req-request-quota", nil, p)
+	if cmd == nil {
+		t.Fatal("buildUsageBillingCommand returned nil")
+	}
+	if !cmd.AccountRequestQuota {
+		t.Fatal("AccountRequestQuota = false, want true")
+	}
+}

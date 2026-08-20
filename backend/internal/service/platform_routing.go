@@ -3,6 +3,9 @@ package service
 // accountPlatformsForGroupPlatform keeps the group's public routing identity
 // separate from compatible provider account identities.
 func accountPlatformsForGroupPlatform(groupPlatform string) []string {
+	if groupPlatform == PlatformOpenAI {
+		return []string{PlatformOpenAI, PlatformChatAnywhere}
+	}
 	if groupPlatform == PlatformDeepSeek {
 		return []string{PlatformDeepSeek, PlatformTokenRhythm}
 	}

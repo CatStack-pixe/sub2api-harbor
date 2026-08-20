@@ -2266,6 +2266,34 @@ func (a *Account) GetQuotaWeeklyUsed() float64 {
 	return a.getExtraFloat64("quota_weekly_used")
 }
 
+// GetRequestQuotaLimit returns the number of successful requests allowed before cooldown.
+func (a *Account) GetRequestQuotaLimit() int {
+	return a.getExtraInt("request_quota_limit")
+}
+
+// GetRequestQuotaUsed returns the successful request count in the current quota cycle.
+func (a *Account) GetRequestQuotaUsed() int {
+	return a.getExtraInt("request_quota_used")
+}
+
+// GetRequestQuotaResetAt returns the cooldown deadline after the request quota is exhausted.
+func (a *Account) GetRequestQuotaResetAt() time.Time {
+	return a.getExtraTime("request_quota_reset_at")
+}
+
+func (a *Account) HasRequestQuotaLimit() bool {
+	return a.GetRequestQuotaLimit() > 0
+}
+
+func (a *Account) IsRequestQuotaExceeded() bool {
+	limit := a.GetRequestQuotaLimit()
+	if limit <= 0 || a.GetRequestQuotaUsed() < limit {
+		return false
+	}
+	resetAt := a.GetRequestQuotaResetAt()
+	return !resetAt.IsZero() && time.Now().Before(resetAt)
+}
+
 // getExtraFloat64 从 Extra 中读取指定 key 的 float64 值
 func (a *Account) getExtraFloat64(key string) float64 {
 	if a.Extra == nil {
@@ -2693,6 +2721,9 @@ func (a *Account) IsWeeklyQuotaPeriodExpired() bool {
 
 // IsQuotaExceeded 检查 API Key 账号配额是否已超限（任一维度超限即返回 true）
 func (a *Account) IsQuotaExceeded() bool {
+	if a.IsRequestQuotaExceeded() {
+		return true
+	}
 	// 总额度
 	if limit := a.GetQuotaLimit(); limit > 0 && a.GetQuotaUsed() >= limit {
 		return true
