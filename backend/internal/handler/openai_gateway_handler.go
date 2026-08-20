@@ -1514,12 +1514,16 @@ func (h *OpenAIGatewayHandler) acquireResponsesAccountSlot(
 		selection.Account = latest
 		allowed, err := h.reserveAccountRequestQuota(c, ctx, account)
 		if err != nil {
-			if selection.ReleaseFunc != nil { selection.ReleaseFunc() }
+			if selection.ReleaseFunc != nil {
+				selection.ReleaseFunc()
+			}
 			h.handleConcurrencyError(c, err, "account", *streamStarted)
 			return nil, openAISlotAcquireFailed
 		}
 		if !allowed {
-			if selection.ReleaseFunc != nil { selection.ReleaseFunc() }
+			if selection.ReleaseFunc != nil {
+				selection.ReleaseFunc()
+			}
 			h.handleStreamingAwareError(c, http.StatusTooManyRequests, "rate_limit_error", "Account request quota exhausted; retry after 24 hours", *streamStarted)
 			return nil, openAISlotAcquireFailed
 		}
