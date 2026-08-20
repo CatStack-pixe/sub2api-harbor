@@ -84,6 +84,7 @@ func TestGatewayRoutesChatOnlyPlatformsResponsesUseOpenAICompatibleHandler(t *te
 	}{
 		{name: "deepseek", platform: service.PlatformDeepSeek, model: "deepseek-v4-flash"},
 		{name: "nvidia", platform: service.PlatformNvidia, model: "z-ai/glm-5.2"},
+		{name: "chatanywhere", platform: service.PlatformChatAnywhere, model: "gpt-4o-mini"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

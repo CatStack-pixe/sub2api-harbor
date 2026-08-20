@@ -138,8 +138,9 @@ func TestDeriveUpstreamEndpoint(t *testing.T) {
 		{"nvidia chat", EndpointChatCompletions, "/v1/chat/completions", service.PlatformNvidia, EndpointChatCompletions},
 		{"nvidia responses path stays chat", EndpointResponses, "/v1/responses", service.PlatformNvidia, EndpointChatCompletions},
 		{"chatanywhere chat", EndpointChatCompletions, "/v1/chat/completions", service.PlatformChatAnywhere, EndpointChatCompletions},
-		{"chatanywhere responses", EndpointResponses, "/v1/responses", service.PlatformChatAnywhere, EndpointResponses},
-		{"chatanywhere messages", EndpointMessages, "/v1/messages", service.PlatformChatAnywhere, EndpointMessages},
+		{"chatanywhere responses bridge", EndpointResponses, "/v1/responses", service.PlatformChatAnywhere, EndpointChatCompletions},
+		{"chatanywhere responses compact bridge", EndpointResponsesCompact, "/v1/responses/compact", service.PlatformChatAnywhere, EndpointChatCompletions},
+		{"chatanywhere messages bridge", EndpointMessages, "/v1/messages", service.PlatformChatAnywhere, EndpointChatCompletions},
 		{"glm chat", EndpointChatCompletions, "/v1/chat/completions", service.PlatformGLM, EndpointChatCompletions},
 		{"glm responses bridges to chat", EndpointResponses, "/v1/responses", service.PlatformGLM, EndpointChatCompletions},
 

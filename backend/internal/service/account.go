@@ -304,10 +304,10 @@ func (a *Account) IsOpenAICompatible() bool {
 }
 
 // ShouldUseOpenAIResponsesAPI reports whether this OpenAI-compatible account
-// accepts native Responses requests. Agnes currently documents Chat
-// Completions only, so Responses and Messages requests must use the bridge.
+// accepts native Responses requests. Chat-only providers use the compatibility
+// bridge so every upstream request is sent to /v1/chat/completions.
 func (a *Account) ShouldUseOpenAIResponsesAPI() bool {
-	return a != nil && !a.IsAgnes() && !a.IsDeepSeek() && !a.IsNvidia() && !a.IsTokenRhythm() && !a.IsKimi() && !a.IsGLM() && openai_compat.ShouldUseResponsesAPI(a.Extra)
+	return a != nil && !a.IsAgnes() && !a.IsDeepSeek() && !a.IsNvidia() && !a.IsTokenRhythm() && !a.IsKimi() && !a.IsChatAnywhere() && !a.IsGLM() && openai_compat.ShouldUseResponsesAPI(a.Extra)
 }
 
 func (a *Account) GeminiOAuthType() string {
@@ -1579,12 +1579,7 @@ func (a *Account) SupportsOpenAIEndpointCapability(capability OpenAIEndpointCapa
 		return capability == OpenAIEndpointCapabilityChatCompletions
 	}
 	if a.IsChatAnywhere() {
-		switch capability {
-		case OpenAIEndpointCapabilityChatCompletions, OpenAIEndpointCapabilityResponses:
-			return true
-		default:
-			return false
-		}
+		return capability == OpenAIEndpointCapabilityChatCompletions
 	}
 	if a.IsGLM() {
 		return capability == OpenAIEndpointCapabilityChatCompletions

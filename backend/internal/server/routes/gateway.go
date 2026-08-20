@@ -55,7 +55,7 @@ func RegisterGatewayRoutes(
 	}
 	isOpenAIMessagesCompatibleGatewayPlatform := func(c *gin.Context) bool {
 		switch getGroupPlatform(c) {
-		case service.PlatformOpenAI, service.PlatformGrok, service.PlatformAgnes, service.PlatformTokenRhythm, service.PlatformGLM:
+		case service.PlatformOpenAI, service.PlatformGrok, service.PlatformAgnes, service.PlatformTokenRhythm, service.PlatformChatAnywhere, service.PlatformGLM:
 			return true
 		default:
 			return false
@@ -199,10 +199,6 @@ func RegisterGatewayRoutes(
 	{
 		// /v1/messages: auto-route based on group platform
 		gateway.POST("/messages", func(c *gin.Context) {
-			if getGroupPlatform(c) == service.PlatformChatAnywhere {
-				h.Gateway.Messages(c)
-				return
-			}
 			if isOpenAIMessagesCompatibleGatewayPlatform(c) {
 				h.OpenAIGateway.Messages(c)
 				return
