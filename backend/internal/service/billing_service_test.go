@@ -490,7 +490,7 @@ func TestGetFallbackPricing_FamilyMatching(t *testing.T) {
 			expectedCacheRead: floatPtr(2.8e-9),
 		},
 
-		// ---- 智谱 GLM（z.ai USD 口径）----
+		// ---- 智谱 GLM（中国大陆开放平台 CNY 口径换算为 USD）----
 		{
 			name:              "glm 5.2 flagship",
 			model:             "glm-5.2",
@@ -508,37 +508,37 @@ func TestGetFallbackPricing_FamilyMatching(t *testing.T) {
 		{
 			name:              "glm 5 base",
 			model:             "glm-5",
-			expectedInput:     1e-6,
-			expectedOutput:    floatPtr(3.2e-6),
-			expectedCacheRead: floatPtr(0.2e-6),
+			expectedInput:     0.840336e-6,
+			expectedOutput:    floatPtr(3.081232e-6),
+			expectedCacheRead: floatPtr(0.210084e-6),
 		},
 		{
 			name:              "glm 5 turbo",
 			model:             "glm-5-turbo",
-			expectedInput:     1.2e-6,
-			expectedOutput:    floatPtr(4e-6),
-			expectedCacheRead: floatPtr(0.24e-6),
+			expectedInput:     0.980392e-6,
+			expectedOutput:    floatPtr(3.641457e-6),
+			expectedCacheRead: floatPtr(0.252101e-6),
 		},
 		{
 			name:              "glm 4.7",
 			model:             "glm-4.7",
-			expectedInput:     0.6e-6,
-			expectedOutput:    floatPtr(2.2e-6),
-			expectedCacheRead: floatPtr(0.11e-6),
+			expectedInput:     0.560224e-6,
+			expectedOutput:    floatPtr(2.240896e-6),
+			expectedCacheRead: floatPtr(0.112045e-6),
 		},
 		{
 			name:              "glm 4.6",
 			model:             "glm-4.6",
-			expectedInput:     0.6e-6,
-			expectedOutput:    floatPtr(2.2e-6),
-			expectedCacheRead: floatPtr(0.11e-6),
+			expectedInput:     0.560224e-6,
+			expectedOutput:    floatPtr(2.240896e-6),
+			expectedCacheRead: floatPtr(0.112045e-6),
 		},
 		{
 			name:              "glm 4.5",
 			model:             "glm-4.5",
-			expectedInput:     0.6e-6,
-			expectedOutput:    floatPtr(2.2e-6),
-			expectedCacheRead: floatPtr(0.11e-6),
+			expectedInput:     0.560224e-6,
+			expectedOutput:    floatPtr(2.240896e-6),
+			expectedCacheRead: floatPtr(0.112045e-6),
 		},
 		{
 			name:              "glm 4.5-x premium",
@@ -557,14 +557,14 @@ func TestGetFallbackPricing_FamilyMatching(t *testing.T) {
 		{
 			name:              "glm 4.7-flashx",
 			model:             "glm-4.7-flashx",
-			expectedInput:     0.07e-6,
-			expectedOutput:    floatPtr(0.4e-6),
-			expectedCacheRead: floatPtr(0.01e-6),
+			expectedInput:     0.070028e-6,
+			expectedOutput:    floatPtr(0.420168e-6),
+			expectedCacheRead: floatPtr(0.014006e-6),
 		},
 		{
 			name:              "glm 4.5-flash free tier",
 			model:             "glm-4.5-flash",
-			expectedInput:     0, // Free tier on z.ai
+			expectedInput:     0, // Free tier on the mainland platform
 			expectedOutput:    floatPtr(0),
 			expectedCacheRead: floatPtr(0),
 		},
