@@ -588,6 +588,7 @@ var platformToLiteLLMProvider = map[string]string{
 	service.PlatformTokenRhythm:  "tokenrhythm",
 	service.PlatformKimi:         "moonshot",
 	service.PlatformChatAnywhere: "chatanywhere",
+	service.PlatformGLM:          "zai",
 }
 
 // SyncPricingModels 返回 LiteLLM 定价目录中指定平台的最新模型列表
@@ -609,5 +610,8 @@ func (h *ChannelHandler) SyncPricingModels(c *gin.Context) {
 	}
 
 	models := h.pricingService.ListModelNamesByProvider(provider)
+	if platform == service.PlatformGLM && len(models) == 0 {
+		models = service.GLMDefaultModelIDs()
+	}
 	response.Success(c, gin.H{"models": models})
 }

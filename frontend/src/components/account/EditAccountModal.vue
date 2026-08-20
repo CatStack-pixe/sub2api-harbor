@@ -46,7 +46,7 @@
             v-model="editBaseUrl"
             type="text"
             class="input"
-            :readonly="account.platform === 'tokenrhythm'"
+            :readonly="account.platform === 'tokenrhythm' || account.platform === 'glm'"
             :placeholder="
               account.platform === 'openai'
                 ? 'https://api.openai.com'
@@ -64,6 +64,8 @@
                           ? 'https://integrate.api.nvidia.com/v1'
                           : account.platform === 'deepseek'
                           ? 'https://api.deepseek.com'
+                          : account.platform === 'glm'
+                          ? 'https://open.bigmodel.cn/api/paas/v4'
                           : 'https://api.anthropic.com'
             "
           />
@@ -103,6 +105,8 @@
                             ? 'sk-...'
                           : account.platform === 'chatanywhere'
                             ? 'sk-...'
+                          : account.platform === 'glm'
+                            ? '...'
                           : 'sk-ant-...'
             "
           />
@@ -2855,6 +2859,7 @@ const baseUrlHint = computed(() => {
   if (props.account.platform === 'kimi') return t('admin.accounts.kimi.baseUrlHint')
   if (props.account.platform === 'tokenrhythm') return t('admin.accounts.tokenrhythm.baseUrlHint')
   if (props.account.platform === 'chatanywhere') return t('admin.accounts.chatanywhere.baseUrlHint')
+  if (props.account.platform === 'glm') return t('admin.accounts.glm.baseUrlHint')
   if (props.account.platform === 'nvidia') return t('admin.accounts.nvidia.baseUrlHint')
   return t('admin.accounts.baseUrlHint')
 })
@@ -3329,6 +3334,7 @@ const defaultBaseUrl = computed(() => {
   if (props.account?.platform === 'kimi') return 'https://api.moonshot.cn/v1'
   if (props.account?.platform === 'tokenrhythm') return 'https://tokenrhythm.studio/v1'
   if (props.account?.platform === 'chatanywhere') return 'https://api.chatanywhere.tech/v1'
+  if (props.account?.platform === 'glm') return 'https://open.bigmodel.cn/api/paas/v4'
   return 'https://api.anthropic.com'
 })
 
@@ -3480,7 +3486,7 @@ const syncFormFromAccount = (newAccount: Account | null) => {
 	autoPause7dThreshold.value = typeof extra?.auto_pause_7d_threshold === 'number' ? extra.auto_pause_7d_threshold * 100 : null
 	autoPause5hDisabled.value = extra?.auto_pause_5h_disabled === true
 	autoPause7dDisabled.value = extra?.auto_pause_7d_disabled === true
-	upstreamBillingAutoProbeEnabled.value = newAccount.platform !== 'deepseek' && newAccount.platform !== 'kimi' && newAccount.platform !== 'tokenrhythm' && newAccount.platform !== 'chatanywhere' && extra?.upstream_billing_probe_enabled === true
+	upstreamBillingAutoProbeEnabled.value = newAccount.platform !== 'deepseek' && newAccount.platform !== 'kimi' && newAccount.platform !== 'tokenrhythm' && newAccount.platform !== 'chatanywhere' && newAccount.platform !== 'glm' && extra?.upstream_billing_probe_enabled === true
   upstreamBillingRateSyncEnabled.value =
     upstreamBillingAutoProbeEnabled.value && extra?.upstream_billing_rate_sync_enabled === true
 
@@ -3691,6 +3697,8 @@ const syncFormFromAccount = (newAccount: Account | null) => {
                 ? 'https://tokenrhythm.studio/v1'
               : newAccount.platform === 'chatanywhere'
                 ? 'https://api.chatanywhere.tech/v1'
+              : newAccount.platform === 'glm'
+                ? 'https://open.bigmodel.cn/api/paas/v4'
               : newAccount.platform === 'kimi'
                 ? 'https://api.moonshot.cn/v1'
               : newAccount.platform === 'nvidia'
@@ -3775,6 +3783,8 @@ const syncFormFromAccount = (newAccount: Account | null) => {
                 ? 'https://tokenrhythm.studio/v1'
               : newAccount.platform === 'chatanywhere'
                 ? 'https://api.chatanywhere.tech/v1'
+              : newAccount.platform === 'glm'
+                ? 'https://open.bigmodel.cn/api/paas/v4'
               : newAccount.platform === 'kimi'
                 ? 'https://api.moonshot.cn/v1'
               : newAccount.platform === 'nvidia'
@@ -4360,7 +4370,7 @@ const handleSubmit = async () => {
       updatePayload.load_factor = 0
     }
     updatePayload.auto_pause_on_expired = autoPauseOnExpired.value
-    if (props.account.type === 'apikey' && props.account.platform !== 'deepseek' && props.account.platform !== 'kimi' && props.account.platform !== 'tokenrhythm' && props.account.platform !== 'chatanywhere') {
+    if (props.account.type === 'apikey' && props.account.platform !== 'deepseek' && props.account.platform !== 'kimi' && props.account.platform !== 'tokenrhythm' && props.account.platform !== 'chatanywhere' && props.account.platform !== 'glm') {
       updatePayload.upstream_billing_probe_enabled = upstreamBillingAutoProbeEnabled.value
       updatePayload.upstream_billing_rate_sync_enabled = upstreamBillingRateSyncEnabled.value
       if (upstreamBillingRateSyncEnabled.value) {

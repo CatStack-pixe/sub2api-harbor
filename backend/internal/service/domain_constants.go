@@ -49,6 +49,7 @@ const (
 	PlatformTokenRhythm       = domain.PlatformTokenRhythm
 	PlatformKimi              = domain.PlatformKimi
 	PlatformChatAnywhere      = domain.PlatformChatAnywhere
+	PlatformGLM               = domain.PlatformGLM
 	PlatformComposite         = domain.PlatformComposite
 	AgnesDefaultBaseURL       = domain.AgnesDefaultBaseURL
 	AgnesDefaultModel         = domain.AgnesDefaultModel
@@ -60,6 +61,7 @@ const (
 	KimiInternationalBaseURL  = domain.KimiInternationalBaseURL
 	ChatAnywhereChinaBaseURL  = domain.ChatAnywhereChinaBaseURL
 	ChatAnywhereGlobalBaseURL = domain.ChatAnywhereGlobalBaseURL
+	GLMDefaultBaseURL         = domain.GLMDefaultBaseURL
 	// PlatformKiro is retained for unsupported-platform threshold tests and legacy
 	// account rows. Scheduling-threshold evaluation never pauses kiro accounts.
 	PlatformKiro = "kiro"
@@ -80,6 +82,7 @@ var AllowedQuotaPlatforms = []string{
 	PlatformTokenRhythm,
 	PlatformKimi,
 	PlatformChatAnywhere,
+	PlatformGLM,
 }
 
 // DeepSeekDefaultModelIDs are the public DeepSeek V4 model IDs shown in default selections.
@@ -96,6 +99,11 @@ func KimiDefaultModelIDs() []string {
 // ChatAnywhereDefaultModelIDs are conservative fallbacks used before live model sync.
 func ChatAnywhereDefaultModelIDs() []string {
 	return []string{"gpt-5.5", "gpt-5.1", "gpt-4.1", "claude-sonnet-4-5", "deepseek-v3-2"}
+}
+
+// GLMDefaultModelIDs are conservative fallbacks used before a live model sync.
+func GLMDefaultModelIDs() []string {
+	return []string{"glm-5.2", "glm-5.1", "glm-5", "glm-5-turbo", "glm-4.7", "glm-4.5-air", "glm-4.7-flashx", "glm-4.7-flash"}
 }
 
 // TokenRhythmDefaultModelIDs are OpenAI-compatible fallbacks used until the

@@ -457,7 +457,8 @@ export default {
       deepseek: 'DeepSeek',
       kimi: 'Kimi',
       nvidia: 'NVIDIA',
-      chatanywhere: 'ChatAnywhere'
+      chatanywhere: 'ChatAnywhere',
+      glm: 'GLM'
     },
     extraModelsHeader: '附加模型',
     extraModelsEmpty: '无附加模型',

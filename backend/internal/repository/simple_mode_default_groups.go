@@ -32,6 +32,7 @@ func ensureSimpleModeDefaultGroups(ctx context.Context, client *dbent.Client) er
 		service.PlatformTokenRhythm:  1,
 		service.PlatformKimi:         1,
 		service.PlatformChatAnywhere: 1,
+		service.PlatformGLM:          1,
 	}
 
 	for platform, minCount := range requiredByPlatform {

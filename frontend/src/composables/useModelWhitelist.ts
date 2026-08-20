@@ -203,6 +203,13 @@ const chatAnywhereModels = [
   'gpt-5.5', 'gpt-5.1', 'gpt-4.1', 'claude-sonnet-4-5', 'deepseek-v3-2'
 ]
 
+// GLM official Z.AI models. Account sync can extend this list from /models.
+const glmModels = [
+  'glm-5.2', 'glm-5.1', 'glm-5', 'glm-5-turbo',
+  'glm-4.7', 'glm-4.7-flash', 'glm-4.6', 'glm-4.5', 'glm-4.5-air',
+  'glm-4.5-flash', 'glm-4.1v-thinking-flashx', 'glm-4.1v-thinking-flash'
+]
+
 // 字节跳动 豆包
 const doubaoModels = [
   'doubao-pro-256k', 'doubao-pro-128k', 'doubao-pro-32k', 'doubao-pro-4k',
@@ -454,6 +461,7 @@ export function getModelsByPlatform(platform: string): string[] {
     case 'kimi': return moonshotModels
     case 'tokenrhythm': return tokenRhythmModels
     case 'chatanywhere': return chatAnywhereModels
+    case 'glm': return glmModels
     case 'doubao': return doubaoModels
     case 'minimax': return minimaxModels
     case 'baidu': return baiduModels
@@ -466,7 +474,7 @@ export function getModelsByPlatform(platform: string): string[] {
 
 // 按平台获取预设映射
 export function getPresetMappingsByPlatform(platform: string) {
-  if (platform === 'agnes' || platform === 'deepseek' || platform === 'kimi' || platform === 'nvidia' || platform === 'tokenrhythm' || platform === 'chatanywhere') return []
+  if (platform === 'agnes' || platform === 'deepseek' || platform === 'kimi' || platform === 'nvidia' || platform === 'tokenrhythm' || platform === 'chatanywhere' || platform === 'glm') return []
   if (platform === 'openai') return openaiPresetMappings
   if (platform === 'gemini') return geminiPresetMappings
   if (platform === 'grok' || platform === 'xai') return grokPresetMappings

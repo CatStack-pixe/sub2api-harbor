@@ -29,6 +29,7 @@ const (
 	PlatformTokenRhythm  = "tokenrhythm"
 	PlatformKimi         = "kimi"
 	PlatformChatAnywhere = "chatanywhere"
+	PlatformGLM          = "glm"
 	PlatformComposite    = "composite"
 )
 
@@ -43,6 +44,7 @@ const (
 	KimiInternationalBaseURL  = "https://api.moonshot.ai/v1"
 	ChatAnywhereChinaBaseURL  = "https://api.chatanywhere.tech/v1"
 	ChatAnywhereGlobalBaseURL = "https://api.chatanywhere.org/v1"
+	GLMDefaultBaseURL         = "https://open.bigmodel.cn/api/paas/v4"
 )
 
 // Account type constants

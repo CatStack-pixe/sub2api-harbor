@@ -150,6 +150,8 @@ func openAICompatibleSelectionErrorForLog(err error, platform string) error {
 		provider = "Kimi"
 	case service.PlatformChatAnywhere:
 		provider = "ChatAnywhere"
+	case service.PlatformGLM:
+		provider = "GLM"
 	default:
 		return err
 	}

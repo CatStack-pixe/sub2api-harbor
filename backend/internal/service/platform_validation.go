@@ -14,7 +14,7 @@ import (
 func ValidateAccountPlatform(platform string) error {
 	switch strings.TrimSpace(platform) {
 	case PlatformAnthropic, PlatformOpenAI, PlatformGemini, PlatformAntigravity,
-		PlatformGrok, PlatformAgnes, PlatformDeepSeek, PlatformNvidia, PlatformTokenRhythm, PlatformKimi, PlatformChatAnywhere:
+		PlatformGrok, PlatformAgnes, PlatformDeepSeek, PlatformNvidia, PlatformTokenRhythm, PlatformKimi, PlatformChatAnywhere, PlatformGLM:
 		return nil
 	default:
 		return infraerrors.BadRequest("UNSUPPORTED_ACCOUNT_PLATFORM", "unsupported account platform")
@@ -24,7 +24,7 @@ func ValidateAccountPlatform(platform string) error {
 func ValidateGroupPlatform(platform string) error {
 	switch strings.TrimSpace(platform) {
 	case PlatformAnthropic, PlatformOpenAI, PlatformGemini, PlatformAntigravity,
-		PlatformGrok, PlatformAgnes, PlatformDeepSeek, PlatformNvidia, PlatformTokenRhythm, PlatformKimi, PlatformChatAnywhere, PlatformComposite:
+		PlatformGrok, PlatformAgnes, PlatformDeepSeek, PlatformNvidia, PlatformTokenRhythm, PlatformKimi, PlatformChatAnywhere, PlatformGLM, PlatformComposite:
 		return nil
 	default:
 		return infraerrors.BadRequest("UNSUPPORTED_GROUP_PLATFORM", "unsupported group platform")
@@ -52,7 +52,7 @@ func validateAccountCredentials(platform, accountType string, credentials map[st
 	if err := ValidateAccountPlatform(platform); err != nil {
 		return err
 	}
-	if platform != PlatformDeepSeek && platform != PlatformNvidia && platform != PlatformTokenRhythm && platform != PlatformKimi && platform != PlatformChatAnywhere {
+	if platform != PlatformDeepSeek && platform != PlatformNvidia && platform != PlatformTokenRhythm && platform != PlatformKimi && platform != PlatformChatAnywhere && platform != PlatformGLM {
 		return nil
 	}
 	platformName := "DeepSeek"
@@ -72,6 +72,10 @@ func validateAccountCredentials(platform, accountType string, credentials map[st
 	if platform == PlatformChatAnywhere {
 		platformName = "ChatAnywhere"
 		errorPrefix = "CHATANYWHERE"
+	}
+	if platform == PlatformGLM {
+		platformName = "GLM"
+		errorPrefix = "GLM"
 	}
 	if accountType != AccountTypeAPIKey {
 		return infraerrors.BadRequest(errorPrefix+"_ACCOUNT_TYPE_UNSUPPORTED", platformName+" accounts must use the apikey account type")
@@ -93,6 +97,19 @@ func validateAccountCredentials(platform, accountType string, credentials map[st
 		}
 		if _, _, err := TokenRhythmCookieCredentials(credentials); err != nil {
 			return infraerrors.BadRequest(errorPrefix+"_COOKIE_INVALID", err.Error())
+		}
+		return nil
+	}
+	if platform == PlatformGLM {
+		if rawBaseURL, exists := credentials["base_url"]; exists && rawBaseURL != nil {
+			baseURL, ok := rawBaseURL.(string)
+			if !ok {
+				return infraerrors.BadRequest(errorPrefix+"_BASE_URL_INVALID", platformName+" base_url must be a supported GLM endpoint")
+			}
+			trimmed := strings.TrimRight(strings.TrimSpace(baseURL), "/")
+			if trimmed != "" && trimmed != GLMDefaultBaseURL {
+				return infraerrors.BadRequest("GLM_BASE_URL_INVALID", "GLM base_url must use the mainland Zhipu AI Open Platform endpoint")
+			}
 		}
 		return nil
 	}

@@ -1186,7 +1186,7 @@ func (h *GatewayHandler) compositeAvailableModels(ctx context.Context, groupID *
 	seen := make(map[string]struct{})
 	models := make([]string, 0)
 	schedulablePlatforms := h.gatewayService.GetSchedulablePlatforms(ctx, groupID)
-	for _, platform := range []string{service.PlatformAnthropic, service.PlatformGemini, service.PlatformOpenAI, service.PlatformAntigravity, service.PlatformGrok, service.PlatformAgnes, service.PlatformDeepSeek, service.PlatformNvidia, service.PlatformTokenRhythm, service.PlatformKimi, service.PlatformChatAnywhere} {
+	for _, platform := range []string{service.PlatformAnthropic, service.PlatformGemini, service.PlatformOpenAI, service.PlatformAntigravity, service.PlatformGrok, service.PlatformAgnes, service.PlatformDeepSeek, service.PlatformNvidia, service.PlatformTokenRhythm, service.PlatformKimi, service.PlatformChatAnywhere, service.PlatformGLM} {
 		platformModels := h.gatewayService.GetAvailableModels(ctx, groupID, platform)
 		if len(platformModels) == 0 {
 			if _, ok := schedulablePlatforms[platform]; ok {
@@ -1420,10 +1420,12 @@ func defaultModelIDsForPlatform(platform string) []string {
 		return service.KimiDefaultModelIDs()
 	case service.PlatformChatAnywhere:
 		return service.ChatAnywhereDefaultModelIDs()
+	case service.PlatformGLM:
+		return service.GLMDefaultModelIDs()
 	case service.PlatformComposite:
 		ids := make([]string, 0)
 		seen := make(map[string]struct{})
-		for _, concretePlatform := range []string{service.PlatformAnthropic, service.PlatformGemini, service.PlatformOpenAI, service.PlatformAntigravity, service.PlatformGrok, service.PlatformAgnes, service.PlatformDeepSeek, service.PlatformNvidia, service.PlatformTokenRhythm, service.PlatformKimi, service.PlatformChatAnywhere} {
+		for _, concretePlatform := range []string{service.PlatformAnthropic, service.PlatformGemini, service.PlatformOpenAI, service.PlatformAntigravity, service.PlatformGrok, service.PlatformAgnes, service.PlatformDeepSeek, service.PlatformNvidia, service.PlatformTokenRhythm, service.PlatformKimi, service.PlatformChatAnywhere, service.PlatformGLM} {
 			for _, id := range defaultModelIDsForPlatform(concretePlatform) {
 				if _, ok := seen[id]; ok {
 					continue

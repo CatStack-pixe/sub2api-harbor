@@ -313,6 +313,7 @@ export default {
         nvidia: 'NVIDIA',
         tokenrhythm: 'TokenRhythm',
         chatanywhere: 'ChatAnywhere',
+        glm: 'GLM',
       },
       types: {
         oauth: 'OAuth',
@@ -728,6 +729,10 @@ export default {
         apiKeyHint: '您的 ChatAnywhere API Key',
         chinaRegion: '国内：api.chatanywhere.tech',
         globalRegion: '海外：api.chatanywhere.org'
+      },
+      glm: {
+        baseUrlHint: 'GLM 使用智谱官方 OpenAI 兼容端点，地址不可修改。',
+        apiKeyHint: '智谱 AI 开放平台（中国大陆）API Key'
       },
       grok: {
         baseUrlHint: 'Grok OAuth 账号会转发到官方 xAI API Base URL。',

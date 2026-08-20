@@ -403,57 +403,57 @@ func (s *BillingService) initFallbackPricing() {
 		SupportsCacheBreakdown: false,
 	}
 
-	// ---- 智谱 GLM（Z.AI）----
-	// Source: https://docs.z.ai/guides/overview/pricing (USD per 1M tokens)
+	// ---- 智谱 GLM（中国大陆开放平台）----
+	// Source: https://bigmodel.cn/pricing (CNY per 1M tokens)
 	// 注意：CacheReadPricePerToken 即"缓存命中"价格，CacheCreationPricePerToken 留空（智谱未公开写入价，按 0 处理）。
-	// GLM-4.6 与 GLM-4.5 在 z.ai 国际版上定价一致；GLM-4.5 国内按 ¥0.8/¥2，汇率换算后约 $0.112/$0.28，与国际版 $0.6/$2.2 不同，本分支采用国际版 USD 口径与现有 Claude/GPT 一致。
-	// GLM-5.2 与 GLM-5.1 在 z.ai 上同价。
+	// Mainland Open Platform prices are CNY per million tokens; convert to the
+	// existing USD ledger at 7.14 CNY/USD and use the highest context tier.
 	s.fallbackPrices["glm-5.2"] = &ModelPricing{
-		InputPricePerToken:     1.4e-6, // $1.40 per MTok
-		OutputPricePerToken:    4.4e-6, // $4.40 per MTok
-		CacheReadPricePerToken: 0.26e-6,
+		InputPricePerToken:     1.120448e-6, // CNY 8 / 7.14
+		OutputPricePerToken:    3.921569e-6, // CNY 28 / 7.14
+		CacheReadPricePerToken: 0.280112e-6, // CNY 2 / 7.14
 		SupportsCacheBreakdown: false,
 	}
 	s.fallbackPrices["glm-5.1"] = &ModelPricing{
-		InputPricePerToken:     1.4e-6, // $1.40 per MTok
-		OutputPricePerToken:    4.4e-6, // $4.40 per MTok
-		CacheReadPricePerToken: 0.26e-6,
+		InputPricePerToken:     1.120448e-6,
+		OutputPricePerToken:    3.921569e-6,
+		CacheReadPricePerToken: 0.280112e-6,
 		SupportsCacheBreakdown: false,
 	}
 	s.fallbackPrices["glm-5"] = &ModelPricing{
-		InputPricePerToken:     1e-6, // $1.00 per MTok
-		OutputPricePerToken:    3.2e-6,
-		CacheReadPricePerToken: 0.2e-6,
+		InputPricePerToken:     0.840336e-6, // CNY 6 / 7.14
+		OutputPricePerToken:    3.081232e-6, // CNY 22 / 7.14
+		CacheReadPricePerToken: 0.210084e-6, // CNY 1.5 / 7.14
 		SupportsCacheBreakdown: false,
 	}
 	s.fallbackPrices["glm-5-turbo"] = &ModelPricing{
-		InputPricePerToken:     1.2e-6,
-		OutputPricePerToken:    4e-6,
-		CacheReadPricePerToken: 0.24e-6,
+		InputPricePerToken:     0.980392e-6, // CNY 7 / 7.14
+		OutputPricePerToken:    3.641457e-6, // CNY 26 / 7.14
+		CacheReadPricePerToken: 0.252101e-6, // CNY 1.8 / 7.14
 		SupportsCacheBreakdown: false,
 	}
 	s.fallbackPrices["glm-4.7"] = &ModelPricing{
-		InputPricePerToken:     0.6e-6, // $0.60 per MTok
-		OutputPricePerToken:    2.2e-6,
-		CacheReadPricePerToken: 0.11e-6,
+		InputPricePerToken:     0.560224e-6, // CNY 4 / 7.14
+		OutputPricePerToken:    2.240896e-6, // CNY 16 / 7.14
+		CacheReadPricePerToken: 0.112045e-6, // CNY 0.8 / 7.14
 		SupportsCacheBreakdown: false,
 	}
 	s.fallbackPrices["glm-4.7-flashx"] = &ModelPricing{
-		InputPricePerToken:     0.07e-6, // $0.07 per MTok
-		OutputPricePerToken:    0.4e-6,
-		CacheReadPricePerToken: 0.01e-6,
+		InputPricePerToken:     0.070028e-6, // CNY 0.5 / 7.14
+		OutputPricePerToken:    0.420168e-6, // CNY 3 / 7.14
+		CacheReadPricePerToken: 0.014006e-6, // CNY 0.1 / 7.14
 		SupportsCacheBreakdown: false,
 	}
 	s.fallbackPrices["glm-4.6"] = &ModelPricing{
-		InputPricePerToken:     0.6e-6, // $0.60 per MTok
-		OutputPricePerToken:    2.2e-6,
-		CacheReadPricePerToken: 0.11e-6,
+		InputPricePerToken:     0.560224e-6,
+		OutputPricePerToken:    2.240896e-6,
+		CacheReadPricePerToken: 0.112045e-6,
 		SupportsCacheBreakdown: false,
 	}
 	s.fallbackPrices["glm-4.5"] = &ModelPricing{
-		InputPricePerToken:     0.6e-6, // $0.60 per MTok
-		OutputPricePerToken:    2.2e-6,
-		CacheReadPricePerToken: 0.11e-6,
+		InputPricePerToken:     0.560224e-6,
+		OutputPricePerToken:    2.240896e-6,
+		CacheReadPricePerToken: 0.112045e-6,
 		SupportsCacheBreakdown: false,
 	}
 	s.fallbackPrices["glm-4.5-x"] = &ModelPricing{
@@ -463,9 +463,9 @@ func (s *BillingService) initFallbackPricing() {
 		SupportsCacheBreakdown: false,
 	}
 	s.fallbackPrices["glm-4.5-air"] = &ModelPricing{
-		InputPricePerToken:     0.2e-6, // $0.20 per MTok
-		OutputPricePerToken:    1.1e-6,
-		CacheReadPricePerToken: 0.03e-6,
+		InputPricePerToken:     0.168067e-6, // CNY 1.2 / 7.14
+		OutputPricePerToken:    1.120448e-6, // CNY 8 / 7.14
+		CacheReadPricePerToken: 0.033613e-6, // CNY 0.24 / 7.14
 		SupportsCacheBreakdown: false,
 	}
 	s.fallbackPrices["glm-4.5-airx"] = &ModelPricing{
@@ -479,7 +479,8 @@ func (s *BillingService) initFallbackPricing() {
 		OutputPricePerToken:    0.1e-6,
 		SupportsCacheBreakdown: false,
 	}
-	// GLM-4.5-Flash / GLM-4.7-Flash 在 z.ai 上为 Free，保留 zero-cost entry 防止未知 alias 误计费。
+	// GLM-4.5-Flash / GLM-4.7-Flash 在大陆开放平台为免费，保留 zero-cost
+	// entries 防止未知 alias 误计费。
 	s.fallbackPrices["glm-4.5-flash"] = &ModelPricing{
 		InputPricePerToken:     0,
 		OutputPricePerToken:    0,

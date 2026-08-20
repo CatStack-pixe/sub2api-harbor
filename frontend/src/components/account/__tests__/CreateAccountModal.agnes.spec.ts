@@ -59,3 +59,13 @@ describe('CreateAccountModal ChatAnywhere account type', () => {
     expect(source).toContain("form.platform !== 'tokenrhythm' && form.platform !== 'chatanywhere'")
   })
 })
+
+describe('CreateAccountModal GLM account type', () => {
+  it('offers API-key setup with the fixed mainland Zhipu endpoint', () => {
+    expect(source).toContain('data-testid="glm-platform"')
+    expect(source).toContain('data-testid="glm-account-type-api-key"')
+    expect(source).toContain("newPlatform === 'glm'")
+    expect(source).toContain('https://open.bigmodel.cn/api/paas/v4')
+    expect(source).toContain("form.platform !== 'chatanywhere' && form.platform !== 'glm'")
+  })
+})
