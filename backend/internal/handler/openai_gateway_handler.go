@@ -459,6 +459,7 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 	// 生图意图只影响能力路由与图片计费，不关门：混合 /v1/responses 请求的
 	// token 计费部分仍受利润门保护，独立图片/视频端点才在门外。
 	pricingCtx, pricingAt := h.gatewayService.WithOpenAIRequestPricingContext(c.Request.Context(), apiKey.GroupID)
+	pricingCtx = service.WithOpenAICompatibleInputTokensForScheduling(pricingCtx, body, "responses")
 	c.Request = c.Request.WithContext(pricingCtx)
 
 	for {
@@ -1065,6 +1066,7 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 
 	// 分组利润控制：Messages 文本入口同样请求级装门并固定 pricingAt。
 	msgPricingCtx, pricingAt := h.gatewayService.WithOpenAIRequestPricingContext(c.Request.Context(), apiKey.GroupID)
+	msgPricingCtx = service.WithOpenAICompatibleInputTokensForScheduling(msgPricingCtx, body, "messages")
 	c.Request = c.Request.WithContext(msgPricingCtx)
 
 	for {
@@ -1382,7 +1384,11 @@ func (h *OpenAIGatewayHandler) handleAnthropicFailoverExhausted(c *gin.Context, 
 		h.anthropicStreamingAwareError(c, status, "api_error", message, streamStarted)
 		return
 	}
-	status, errType, errMsg := h.mapUpstreamError(failoverErr.StatusCode)
+	statusCode := failoverErr.StatusCode
+	if service.IsChatAnywhereContextRateLimitError(failoverErr) {
+		statusCode = http.StatusBadGateway
+	}
+	status, errType, errMsg := h.mapUpstreamError(statusCode)
 	h.anthropicStreamingAwareError(c, status, errType, errMsg, streamStarted)
 }
 
@@ -2668,6 +2674,9 @@ func (h *OpenAIGatewayHandler) handleFailoverExhausted(c *gin.Context, failoverE
 		return
 	}
 	statusCode := failoverErr.StatusCode
+	if service.IsChatAnywhereContextRateLimitError(failoverErr) {
+		statusCode = http.StatusBadGateway
+	}
 	responseBody := failoverErr.ResponseBody
 	if service.IsOpenAISilentRefusalErrorBody(responseBody) {
 		service.SetOpsUpstreamError(c, statusCode, service.OpenAISilentRefusalClientMessage(), "")
@@ -3053,7 +3062,11 @@ func closeOpenAIWSFailoverExhausted(conn *coderws.Conn, failoverErr *service.Ups
 		closeOpenAIClientWS(conn, coderws.StatusTryAgainLater, service.GrokCredentialUnavailableClientMessage)
 		return
 	}
-	switch failoverErr.StatusCode {
+	statusCode := failoverErr.StatusCode
+	if service.IsChatAnywhereContextRateLimitError(failoverErr) {
+		statusCode = http.StatusBadGateway
+	}
+	switch statusCode {
 	case http.StatusTooManyRequests:
 		closeOpenAIClientWS(conn, coderws.StatusTryAgainLater, "upstream rate limit exceeded, please retry later")
 	case 529, http.StatusInternalServerError, http.StatusBadGateway, http.StatusServiceUnavailable, http.StatusGatewayTimeout:

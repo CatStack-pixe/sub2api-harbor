@@ -38,6 +38,9 @@ func (a *Account) getRateLimitRemainingForKey(key string) time.Duration {
 
 func (a *Account) isModelRateLimitedWithContext(ctx context.Context, requestedModel string) bool {
 	for _, key := range a.modelRateLimitKeysForRequest(ctx, requestedModel) {
+		if key == chatAnywhereContextRateLimitKey && !chatAnywhereContextLimitExceeded(ctx) {
+			continue
+		}
 		if a.isRateLimitActiveForKey(key) {
 			return true
 		}
@@ -54,6 +57,9 @@ func (a *Account) GetModelRateLimitRemainingTime(requestedModel string) time.Dur
 func (a *Account) GetModelRateLimitRemainingTimeWithContext(ctx context.Context, requestedModel string) time.Duration {
 	remaining := time.Duration(0)
 	for _, key := range a.modelRateLimitKeysForRequest(ctx, requestedModel) {
+		if key == chatAnywhereContextRateLimitKey && !chatAnywhereContextLimitExceeded(ctx) {
+			continue
+		}
 		if keyRemaining := a.getRateLimitRemainingForKey(key); keyRemaining > remaining {
 			remaining = keyRemaining
 		}
@@ -71,11 +77,14 @@ func (a *Account) modelRateLimitKeysForRequest(ctx context.Context, requestedMod
 		modelKey = resolveFinalAntigravityModelKey(ctx, a, requestedModel)
 	}
 	modelKey = strings.TrimSpace(modelKey)
-	if modelKey == "" {
+	if modelKey == "" && a.Platform != PlatformChatAnywhere {
 		return nil
 	}
 
-	keys := []string{modelKey}
+	keys := make([]string, 0, 3)
+	if modelKey != "" {
+		keys = append(keys, modelKey)
+	}
 	switch a.Platform {
 	case PlatformAntigravity:
 		if isAntigravityGeminiModel(modelKey) && modelKey != antigravityGeminiModelRateLimitKey {
@@ -89,6 +98,8 @@ func (a *Account) modelRateLimitKeysForRequest(ctx context.Context, requestedMod
 		if isAnthropicFableModel(modelKey) && modelKey != anthropicFableRateLimitKey {
 			keys = append(keys, anthropicFableRateLimitKey)
 		}
+	case PlatformChatAnywhere:
+		keys = append(keys, chatAnywhereContextRateLimitKey)
 	}
 	return keys
 }

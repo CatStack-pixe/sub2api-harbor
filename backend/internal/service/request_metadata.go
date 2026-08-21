@@ -18,6 +18,7 @@ type RequestMetadata struct {
 	PrefetchedStickyGroupID    *int64
 	SingleAccountRetry         *bool
 	AccountSwitchCount         *int
+	OpenAIRequestInputTokens   *int
 }
 
 var (
@@ -114,6 +115,35 @@ func WithAccountSwitchCount(ctx context.Context, value int, bridgeOldKeys bool) 
 	}, func(base context.Context) context.Context {
 		return context.WithValue(base, ctxkey.AccountSwitchCount, value)
 	})
+}
+
+func WithOpenAIRequestInputTokens(ctx context.Context, value int, bridgeOldKeys bool) context.Context {
+	if value < 0 {
+		value = 0
+	}
+	return updateRequestMetadata(ctx, bridgeOldKeys, func(md *RequestMetadata) {
+		v := value
+		md.OpenAIRequestInputTokens = &v
+	}, func(base context.Context) context.Context {
+		return context.WithValue(base, ctxkey.OpenAIRequestInputTokens, value)
+	})
+}
+
+func OpenAIRequestInputTokensFromContext(ctx context.Context) (int, bool) {
+	if md := metadataFromContext(ctx); md != nil && md.OpenAIRequestInputTokens != nil {
+		return *md.OpenAIRequestInputTokens, true
+	}
+	if ctx == nil {
+		return 0, false
+	}
+	v := ctx.Value(ctxkey.OpenAIRequestInputTokens)
+	switch t := v.(type) {
+	case int:
+		return t, true
+	case int64:
+		return int(t), true
+	}
+	return 0, false
 }
 
 func IsMaxTokensOneHaikuRequestFromContext(ctx context.Context) (bool, bool) {

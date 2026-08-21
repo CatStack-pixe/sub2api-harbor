@@ -65,6 +65,10 @@ func (s *OpenAIGatewayService) handleOpenAIAccountUpstreamError(ctx context.Cont
 	if s == nil || account == nil {
 		return false
 	}
+	if s.rateLimitService != nil && account.Platform == PlatformChatAnywhere &&
+		isChatAnywhereContextQuotaExceededError(statusCode, "", responseBody) {
+		return s.rateLimitService.HandleUpstreamError(stateCtx, account, statusCode, headers, responseBody, canonicalModel...)
+	}
 	// Agnes reports daily free-credit exhaustion as 403. It is neither an
 	// authentication failure nor a permanent account fault; the forwarding
 	// path falls back to agnes-2.0-flash and probes the primary model again

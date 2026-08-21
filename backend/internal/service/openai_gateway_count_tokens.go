@@ -72,6 +72,56 @@ func EstimateGrokCountTokens(body []byte) (int, error) {
 	return estimated, nil
 }
 
+// EstimateOpenAICompatibleInputTokens estimates the input tokens for the
+// supported OpenAI-compatible request formats without making an upstream call.
+func EstimateOpenAICompatibleInputTokens(body []byte, protocol string) (int, error) {
+	var req openAIInputTokensCountRequest
+	switch protocol {
+	case "responses":
+		if err := json.Unmarshal(body, &req); err != nil {
+			return 0, fmt.Errorf("parse responses request: %w", err)
+		}
+	case "chat_completions":
+		var chatReq apicompat.ChatCompletionsRequest
+		if err := json.Unmarshal(body, &chatReq); err != nil {
+			return 0, fmt.Errorf("parse chat completions request: %w", err)
+		}
+		responsesReq, err := apicompat.ChatCompletionsToResponses(&chatReq)
+		if err != nil {
+			return 0, fmt.Errorf("convert chat completions request: %w", err)
+		}
+		req = openAIInputTokensCountRequest{
+			Model:        responsesReq.Model,
+			Instructions: responsesReq.Instructions,
+			Input:        responsesReq.Input,
+			Tools:        responsesReq.Tools,
+			ToolChoice:   responsesReq.ToolChoice,
+		}
+	case "messages":
+		return EstimateGrokCountTokens(body)
+	default:
+		return 0, fmt.Errorf("unsupported input token protocol: %s", protocol)
+	}
+	if strings.TrimSpace(req.Model) == "" {
+		return 0, fmt.Errorf("parse %s request: model is required", protocol)
+	}
+	return estimateOpenAIInputTokens(req)
+}
+
+// WithOpenAICompatibleInputTokensForScheduling adds token metadata used by
+// account-level context cooldown policies. Small payloads avoid tokenization
+// because byte length is a conservative upper bound for BPE token count.
+func WithOpenAICompatibleInputTokensForScheduling(ctx context.Context, body []byte, protocol string) context.Context {
+	if len(body) <= chatAnywhereContextLimitTokens {
+		return WithOpenAIRequestInputTokens(ctx, len(body), false)
+	}
+	estimated, err := EstimateOpenAICompatibleInputTokens(body, protocol)
+	if err != nil {
+		return WithOpenAIRequestInputTokens(ctx, len(body), false)
+	}
+	return WithOpenAIRequestInputTokens(ctx, estimated, false)
+}
+
 // ForwardCountTokensAsAnthropic bridges Anthropic /v1/messages/count_tokens to
 // OpenAI POST /v1/responses/input_tokens and returns Anthropic-compatible output.
 func (s *OpenAIGatewayService) ForwardCountTokensAsAnthropic(

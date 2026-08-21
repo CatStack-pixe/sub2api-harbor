@@ -41,6 +41,9 @@ const (
 	// AccountSwitchCount 表示请求过程中发生的账号切换次数
 	AccountSwitchCount Key = "ctx_account_switch_count"
 
+	// OpenAIRequestInputTokens stores the estimated input token count for scheduling decisions.
+	OpenAIRequestInputTokens Key = "ctx_openai_request_input_tokens"
+
 	// IsClaudeCodeClient 标识当前请求是否来自 Claude Code 客户端
 	IsClaudeCodeClient Key = "ctx_is_claude_code_client"
 

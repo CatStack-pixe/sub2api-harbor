@@ -100,6 +100,7 @@ func (h *GatewayHandler) ChatCompletions(c *gin.Context) {
 	setOpsRequestContext(c, reqModel, reqStream)
 	setOpsEndpointContext(c, "", int16(service.RequestTypeFromLegacy(reqStream, false)))
 	pricingCtx, pricingAt := service.WithGatewayTokenRequestPricing(c.Request.Context())
+	pricingCtx = service.WithOpenAICompatibleInputTokensForScheduling(pricingCtx, body, "chat_completions")
 	c.Request = c.Request.WithContext(pricingCtx)
 
 	// 解析渠道级模型映射
@@ -391,7 +392,7 @@ func (h *GatewayHandler) handleCCFailoverExhausted(c *gin.Context, lastErr *serv
 		return
 	}
 	statusCode := http.StatusBadGateway
-	if lastErr != nil && lastErr.StatusCode > 0 {
+	if lastErr != nil && lastErr.StatusCode > 0 && !service.IsChatAnywhereContextRateLimitError(lastErr) {
 		statusCode = lastErr.StatusCode
 	}
 	if lastErr != nil && service.IsOpenAISilentRefusalErrorBody(lastErr.ResponseBody) {
