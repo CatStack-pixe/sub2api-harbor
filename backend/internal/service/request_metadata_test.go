@@ -15,6 +15,7 @@ func TestRequestMetadataWriteAndRead_NoBridge(t *testing.T) {
 	ctx = WithPrefetchedStickySession(ctx, 123, 456, false)
 	ctx = WithSingleAccountRetry(ctx, true, false)
 	ctx = WithAccountSwitchCount(ctx, 2, false)
+	ctx = WithOpenAIRequestInputTokens(ctx, 1234, false)
 
 	isHaiku, ok := IsMaxTokensOneHaikuRequestFromContext(ctx)
 	require.True(t, ok)
@@ -40,12 +41,17 @@ func TestRequestMetadataWriteAndRead_NoBridge(t *testing.T) {
 	require.True(t, ok)
 	require.Equal(t, 2, switchCount)
 
+	inputTokens, ok := OpenAIRequestInputTokensFromContext(ctx)
+	require.True(t, ok)
+	require.Equal(t, 1234, inputTokens)
+
 	require.Nil(t, ctx.Value(ctxkey.IsMaxTokensOneHaikuRequest))
 	require.Nil(t, ctx.Value(ctxkey.ThinkingEnabled))
 	require.Nil(t, ctx.Value(ctxkey.PrefetchedStickyAccountID))
 	require.Nil(t, ctx.Value(ctxkey.PrefetchedStickyGroupID))
 	require.Nil(t, ctx.Value(ctxkey.SingleAccountRetry))
 	require.Nil(t, ctx.Value(ctxkey.AccountSwitchCount))
+	require.Nil(t, ctx.Value(ctxkey.OpenAIRequestInputTokens))
 }
 
 func TestRequestMetadataWrite_BridgeLegacyKeys(t *testing.T) {
@@ -55,6 +61,7 @@ func TestRequestMetadataWrite_BridgeLegacyKeys(t *testing.T) {
 	ctx = WithPrefetchedStickySession(ctx, 123, 456, true)
 	ctx = WithSingleAccountRetry(ctx, true, true)
 	ctx = WithAccountSwitchCount(ctx, 2, true)
+	ctx = WithOpenAIRequestInputTokens(ctx, 1234, true)
 
 	require.Equal(t, true, ctx.Value(ctxkey.IsMaxTokensOneHaikuRequest))
 	require.Equal(t, true, ctx.Value(ctxkey.ThinkingEnabled))
@@ -62,6 +69,7 @@ func TestRequestMetadataWrite_BridgeLegacyKeys(t *testing.T) {
 	require.Equal(t, int64(456), ctx.Value(ctxkey.PrefetchedStickyGroupID))
 	require.Equal(t, true, ctx.Value(ctxkey.SingleAccountRetry))
 	require.Equal(t, 2, ctx.Value(ctxkey.AccountSwitchCount))
+	require.Equal(t, 1234, ctx.Value(ctxkey.OpenAIRequestInputTokens))
 }
 
 func TestRequestMetadataRead_LegacyFallbackAndStats(t *testing.T) {
