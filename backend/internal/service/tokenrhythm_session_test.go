@@ -132,6 +132,7 @@ func TestCreateTokenRhythmAPIKeyResolvesSessionAndCreatesKey(t *testing.T) {
 	require.Equal(t, http.MethodPost, upstream.requests[1].Method)
 	require.Equal(t, tokenRhythmAPIKeyURL, upstream.requests[1].URL.String())
 	require.Equal(t, "tr_session=sess_rotated; tr_csrf=csrf-value", upstream.requests[1].Header.Get("Cookie"))
+	require.Equal(t, "csrf-value", upstream.requests[1].Header.Get("X-CSRF-Token"))
 	require.Equal(t, "https://tokenrhythm.studio", upstream.requests[1].Header.Get("Origin"))
 	require.JSONEq(t, `{"name":"sub2api"}`, string(upstream.bodies[0]))
 	require.Equal(t, "socks5://proxy.example:1080", upstream.lastProxyURL)

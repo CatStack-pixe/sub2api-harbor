@@ -179,6 +179,10 @@ func (s *AccountTestService) CreateTokenRhythmAPIKey(ctx context.Context, sessio
 	if err != nil {
 		return nil, err
 	}
+	session, csrf, err := parseTokenRhythmCookie(resolved.TokenRhythmCookie)
+	if err != nil {
+		return nil, fmt.Errorf("parse resolved TokenRhythm cookie: %w", err)
+	}
 
 	payload, err := json.Marshal(map[string]string{"name": name})
 	if err != nil {
@@ -193,6 +197,7 @@ func (s *AccountTestService) CreateTokenRhythmAPIKey(ctx context.Context, sessio
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Cookie", resolved.TokenRhythmCookie)
+	req.Header.Set("X-CSRF-Token", csrf)
 	req.Header.Set("Referer", "https://tokenrhythm.studio/account/keys")
 	req.Header.Set("Origin", "https://tokenrhythm.studio")
 	req.Header.Set("User-Agent", tokenRhythmSessionProbeUserAgent)
@@ -243,10 +248,6 @@ func (s *AccountTestService) CreateTokenRhythmAPIKey(ctx context.Context, sessio
 		return nil, infraerrors.New(http.StatusBadGateway, "TOKENRHYTHM_API_KEY_MISSING", "TokenRhythm did not return a usable API key")
 	}
 
-	session, csrf, err := parseTokenRhythmCookie(resolved.TokenRhythmCookie)
-	if err != nil {
-		return nil, fmt.Errorf("parse resolved TokenRhythm cookie: %w", err)
-	}
 	if rotatedSession, rotatedCSRF := tokenRhythmCookieUpdates(resp); rotatedSession != "" || rotatedCSRF != "" {
 		if rotatedSession != "" {
 			session = rotatedSession
