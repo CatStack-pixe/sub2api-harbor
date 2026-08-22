@@ -752,6 +752,7 @@ export default {
       syncUpstreamModelsSuccess: 'Synced {count} new model(s) from upstream ({total} upstream total)',
       syncUpstreamModelsNoChanges: 'All {count} upstream model(s) are already in the whitelist',
       syncUpstreamModelsEmpty: 'Upstream returned no models to sync',
+      syncUpstreamModelsFallback: 'Upstream model list unavailable; added built-in TokenRhythm models',
       syncUpstreamModelsFailed: 'Failed to sync upstream models',
       syncUpstreamModelsError: 'Failed to sync upstream models: {message}',
       clearAllModels: 'Clear all models',

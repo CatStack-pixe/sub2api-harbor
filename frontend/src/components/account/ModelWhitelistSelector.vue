@@ -104,6 +104,7 @@
       <button
         v-if="canSyncUpstream"
         type="button"
+        data-testid="sync-upstream-models"
         @click="syncUpstreamModels"
         :disabled="isSyncingUpstream"
         class="rounded-lg border border-emerald-200 px-3 py-1.5 text-sm text-emerald-600 hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-emerald-800 dark:text-emerald-400 dark:hover:bg-emerald-900/30"
@@ -211,6 +212,13 @@ const canSyncUpstream = computed(() => {
   return false
 })
 
+const isTokenRhythmPlatform = computed(() => {
+  if (props.syncCredentials) {
+    return props.syncCredentials.platform.toLowerCase() === 'tokenrhythm'
+  }
+  return normalizedPlatforms.value.some(platform => platform.toLowerCase() === 'tokenrhythm')
+})
+
 const availableOptions = computed(() => {
   if (normalizedPlatforms.value.length === 0) {
     return allModels
@@ -299,7 +307,19 @@ const syncUpstreamModels = async () => {
 
     const upstreamModels = result.models.map(model => model.trim()).filter(Boolean)
     if (upstreamModels.length === 0) {
-      appStore.showInfo(t('admin.accounts.syncUpstreamModelsEmpty'))
+      if (isTokenRhythmPlatform.value) {
+        const fallbackModels = getModelsByPlatform('tokenrhythm')
+        const newModels = [...props.modelValue]
+        for (const model of fallbackModels) {
+          if (!newModels.includes(model)) {
+            newModels.push(model)
+          }
+        }
+        emit('update:modelValue', newModels)
+        appStore.showInfo(t('admin.accounts.syncUpstreamModelsFallback'))
+      } else {
+        appStore.showInfo(t('admin.accounts.syncUpstreamModelsEmpty'))
+      }
       return
     }
 
@@ -319,6 +339,18 @@ const syncUpstreamModels = async () => {
       appStore.showInfo(t('admin.accounts.syncUpstreamModelsNoChanges', { count: upstreamModels.length }))
     }
   } catch (error) {
+    if (isTokenRhythmPlatform.value) {
+      const fallbackModels = getModelsByPlatform('tokenrhythm')
+      const newModels = [...props.modelValue]
+      for (const model of fallbackModels) {
+        if (!newModels.includes(model)) {
+          newModels.push(model)
+        }
+      }
+      emit('update:modelValue', newModels)
+      appStore.showInfo(t('admin.accounts.syncUpstreamModelsFallback'))
+      return
+    }
     const message = error instanceof Error ? error.message : t('admin.accounts.syncUpstreamModelsFailed')
     appStore.showError(t('admin.accounts.syncUpstreamModelsError', { message }))
   } finally {

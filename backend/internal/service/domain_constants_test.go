@@ -50,6 +50,19 @@ func TestChatAnywhereDefaultModelIDs(t *testing.T) {
 	}
 }
 
+func TestTokenRhythmDefaultModelIDs(t *testing.T) {
+	want := []string{"deepseek-v4-pro", "deepseek-v4-flash"}
+	got := TokenRhythmDefaultModelIDs()
+	if len(got) != len(want) {
+		t.Fatalf("TokenRhythmDefaultModelIDs() = %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("TokenRhythmDefaultModelIDs() = %v, want %v", got, want)
+		}
+	}
+}
+
 // TestSettingKeyDefaultPlatformQuotas 验证新的系统层 JSON key 常量值正确。
 func TestSettingKeyDefaultPlatformQuotas(t *testing.T) {
 	if SettingKeyDefaultPlatformQuotas != "default_platform_quotas" {

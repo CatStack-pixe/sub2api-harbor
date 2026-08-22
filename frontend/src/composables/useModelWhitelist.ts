@@ -192,9 +192,10 @@ const moonshotModels = [
   'moonshot-v1-8k', 'moonshot-v1-32k', 'moonshot-v1-128k', 'kimi-latest'
 ]
 
-// TokenRhythm is OpenAI-compatible; keep only channel-neutral IDs as fallback.
+// TokenRhythm's known channel models are DeepSeek V4. Keep them available
+// when the provider model-list endpoint is unavailable.
 const tokenRhythmModels = [
-  'gpt-4o', 'gpt-4o-mini', 'gpt-4.1', 'gpt-5', 'gpt-5-mini'
+  'deepseek-v4-pro', 'deepseek-v4-flash'
 ]
 
 // ChatAnywhere exposes a mixed OpenAI/Anthropic catalog; these IDs provide a

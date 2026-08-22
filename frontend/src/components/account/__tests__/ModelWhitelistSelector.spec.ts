@@ -1,7 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 
-const copyToClipboard = vi.fn().mockResolvedValue(true)
+const { copyToClipboard, syncUpstreamModels, showInfo } = vi.hoisted(() => ({
+  copyToClipboard: vi.fn().mockResolvedValue(true),
+  syncUpstreamModels: vi.fn(),
+  showInfo: vi.fn()
+}))
 
 vi.mock('vue-i18n', async () => {
   const actual = await vi.importActual<typeof import('vue-i18n')>('vue-i18n')
@@ -17,8 +21,15 @@ vi.mock('@/stores/app', () => ({
   useAppStore: () => ({
     showError: vi.fn(),
     showSuccess: vi.fn(),
-    showInfo: vi.fn()
+    showInfo
   })
+}))
+
+vi.mock('@/api/admin/accounts', () => ({
+  accountsAPI: {
+    syncUpstreamModels,
+    syncUpstreamModelsPreview: syncUpstreamModels
+  }
 }))
 
 vi.mock('@/composables/useClipboard', () => ({
@@ -43,6 +54,21 @@ function mountSelector() {
   })
 }
 
+function mountTokenRhythmSelector() {
+  return mount(ModelWhitelistSelector, {
+    props: {
+      modelValue: [],
+      platform: 'tokenrhythm',
+      accountId: 42
+    },
+    global: {
+      stubs: {
+        ModelIcon: true
+      }
+    }
+  })
+}
+
 function findModelRow(wrapper: ReturnType<typeof mountSelector>, modelId: string) {
   const row = wrapper
     .findAll('[data-testid="model-option"]')
@@ -58,6 +84,8 @@ function findModelRow(wrapper: ReturnType<typeof mountSelector>, modelId: string
 describe('ModelWhitelistSelector', () => {
   beforeEach(() => {
     copyToClipboard.mockClear()
+    syncUpstreamModels.mockReset()
+    showInfo.mockClear()
   })
 
   it('copies a model ID without selecting the model', async () => {
@@ -85,5 +113,16 @@ describe('ModelWhitelistSelector', () => {
 
     expect(wrapper.emitted('update:modelValue')).toEqual([[['gpt-5.6-sol']]])
     expect(copyToClipboard).not.toHaveBeenCalled()
+  })
+
+  it('falls back to built-in TokenRhythm models when upstream sync fails', async () => {
+    syncUpstreamModels.mockRejectedValue(new Error('upstream unavailable'))
+    const wrapper = mountTokenRhythmSelector()
+
+    await wrapper.get('[data-testid="sync-upstream-models"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.emitted('update:modelValue')).toEqual([[['deepseek-v4-pro', 'deepseek-v4-flash']]])
+    expect(showInfo).toHaveBeenCalledWith('admin.accounts.syncUpstreamModelsFallback')
   })
 })
