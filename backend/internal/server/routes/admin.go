@@ -142,6 +142,7 @@ func registerDeepSeekRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 func registerTokenRhythmRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 	tokenRhythm := admin.Group("/tokenrhythm")
 	{
+		tokenRhythm.POST("/session/resolve", h.Admin.Account.ResolveTokenRhythmSession)
 		tokenRhythm.GET("/accounts/:id/balance", h.Admin.Account.GetTokenRhythmBalance)
 	}
 }

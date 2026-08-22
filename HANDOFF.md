@@ -1,5 +1,14 @@
 # Handoff
 
+## 2026-08-22 TokenRhythm sess and referral resolver (in progress)
+
+- Work is isolated in `E:\文件\Python Script\sub2api\sub2api-tokenrhythm-sess` on branch `feat/tokenrhythm-session-referral`, based on current `origin/main`. The original dirty `sub2api-harbor` worktree was not modified.
+- Added an admin-only `POST /api/v1/admin/tokenrhythm/session/resolve` flow. It accepts a `sess_...` value plus an optional existing proxy ID, sends the credential only to the fixed TokenRhythm referral endpoint with redirects disabled and a 15-second timeout, captures the provider `tr_csrf`, and returns the minimal account Cookie, referral code, official `/i/{code}` link, and three allowlisted status booleans. It does not create an account or persist the submitted sess.
+- Added a reusable TokenRhythm session resolver control to both create-account and edit-account forms. A successful resolve fills the existing Cookie field and displays the referral link/code; the raw sess is cleared and is never included in account create/update payloads.
+- Local verification completed: frontend typecheck, full ESLint, frontend build, the new component tests, existing TokenRhythm account-selection source tests, and `git diff --check` passed. The resolver route now has an explicit audit action and its credential-bearing request body is omitted from persistent audit logs, covered by a middleware regression test. Focused Go tests remain locally unavailable because this Windows environment has no Go toolchain; GitHub CI is the authoritative backend compile/test gate.
+- Version target is `0.1.176-nvidia.21-tokenrhythm-1`; the working tree is still uncommitted. Remaining before release: commit with an English Conventional Commit message; push, create and label the PR with `gh`, review it, squash-merge it, wait for the GitHub release/GHCR artifact, back up production, deploy only the new immutable `sub2api` image, and verify health plus the new endpoint. No production service has been changed or restarted.
+- No sess, Cookie, API key, referral code/link, proxy credential, or administrator credential is recorded in this document.
+
 ## 2026-08-18 TokenRhythm DS Balance-Gated Scheduling
 
 - Scope: DS group `18` (`deepseek-025`) contains 19 TokenRhythm API-key accounts. User `3933240147@qq.com` is `user_id=17`; the previous 72-hour sample had 386 operations, 68 final errors, and 28 transport-related errors. Account `6202` is already in `error` with `Payment required (402): 余额不足`.

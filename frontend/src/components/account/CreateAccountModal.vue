@@ -1438,6 +1438,10 @@
         </div>
 
         <div v-if="form.platform === 'tokenrhythm'">
+          <TokenRhythmSessionResolver
+            :proxy-id="form.proxy_id"
+            @resolved="tokenRhythmCookie = $event"
+          />
           <label class="input-label">{{ t('admin.accounts.tokenrhythm.cookie') }}</label>
           <textarea
             v-model="tokenRhythmCookie"
@@ -3905,6 +3909,7 @@ import QuotaLimitCard from '@/components/account/QuotaLimitCard.vue'
 import Toggle from '@/components/common/Toggle.vue'
 import GrokBaseUrlPresets from '@/components/account/GrokBaseUrlPresets.vue'
 import HeaderOverrideEditor from '@/components/account/HeaderOverrideEditor.vue'
+import TokenRhythmSessionResolver from '@/components/account/TokenRhythmSessionResolver.vue'
 import {
   applyAntigravityProjectID,
   applyHeaderOverride,
