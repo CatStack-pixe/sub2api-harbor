@@ -614,6 +614,28 @@ export async function resolveTokenRhythmSession(
   return data
 }
 
+export interface CreateTokenRhythmAPIKeyRequest {
+  sess: string
+  name: string
+  proxy_id?: number | null
+}
+
+export interface CreateTokenRhythmAPIKeyResult {
+  api_key: string
+  tokenrhythm_cookie: string
+  name: string
+}
+
+export async function createTokenRhythmAPIKey(
+  request: CreateTokenRhythmAPIKeyRequest
+): Promise<CreateTokenRhythmAPIKeyResult> {
+  const { data } = await apiClient.post<CreateTokenRhythmAPIKeyResult>(
+    '/admin/tokenrhythm/api-keys',
+    request
+  )
+  return data
+}
+
 export interface KimiBalanceResult {
   is_available: boolean
   available_balance?: number
@@ -1103,6 +1125,7 @@ export const accountsAPI = {
   getDeepSeekBalance,
   getTokenRhythmBalance,
   resolveTokenRhythmSession,
+  createTokenRhythmAPIKey,
   getKimiBalance,
   syncUpstreamModels,
   syncUpstreamModelsPreview,
