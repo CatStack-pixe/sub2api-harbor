@@ -1,12 +1,15 @@
 # Handoff
 
-## 2026-08-22 TokenRhythm built-in model sync fallback (in progress)
+## 2026-08-22 TokenRhythm built-in model sync fallback (completed)
 
 - Root cause: TokenRhythm model sync uses the generic OpenAI-compatible `/v1/models` request. A provider timeout, non-2xx response, or empty model list was surfaced directly as a failed sync; the existing built-in model catalog was only used by the separate fill-related-models action. Production logs confirmed repeated TokenRhythm upstream sync failures while normal TokenRhythm chat requests remained healthy.
 - Changed the TokenRhythm built-in catalog to the two production DeepSeek V4 model IDs: `deepseek-v4-pro` and `deepseek-v4-flash`, aligned across backend defaults and frontend whitelist options.
 - When TokenRhythm upstream model sync fails or returns an empty list, the model whitelist control now adds those built-in models and displays an explicit fallback notice. Other platforms retain the existing error behavior; the fallback never claims the models came from upstream.
-- Verification passed: frontend typecheck, full ESLint, frontend build, model whitelist tests, TokenRhythm fallback component test, and `git diff --check`. Go tests remain unavailable locally because Go is not installed; CI is authoritative. No credential, Cookie, API key, or production data is recorded here.
-- Remaining: commit, PR review/merge, release, deploy only `sub2api`, and verify the fallback through the production UI/API.
+- Verification passed: frontend typecheck, full ESLint, frontend build, model whitelist tests, TokenRhythm fallback component test, and `git diff --check`. Go tests remain unavailable locally because Go is not installed; GitHub CI is authoritative. The post-merge main CI run `32574998352`, tag CI run `32575540868`, and tag Security Scan run `32575540887` all passed.
+- PR [#80](https://github.com/CatStack-pixe/sub2api-harbor/pull/80) was labeled `bug` and `enhancement`, received the required code-audit review with no blocking findings, and was squash-merged as `75f03542bb1da208a0063cffb034bbfc3583ce7d`. Release [v0.1.176-nvidia.21-tokenrhythm-2](https://github.com/CatStack-pixe/sub2api-harbor/releases/tag/v0.1.176-nvidia.21-tokenrhythm-2) completed successfully. The immutable amd64 image is pinned to digest `sha256:5a0f6bf95390c35a83ac80c3ad47e4e06c0df74e3d811fbe6ab9dab53dcf6a08`.
+- Production deployment completed on `root@154.37.212.18` (`instance-0GDSx0Ws`) with strict SSH authentication using the configured client key path. The protected backup `/opt/sub2api/backups/pre-release-0.1.176-nvidia.21-tokenrhythm-2-20260822T133050Z` has directory mode `700`, file mode `600`, a PostgreSQL custom-format dump of `138840570` bytes, and passing `SHA256SUMS` verification. The private key and all credentials were omitted from output and documentation.
+- Only `sub2api` was recreated with `docker compose up -d --no-deps --wait sub2api`; PostgreSQL, Redis, and Mihomo were not restarted. `sub2api` is `running/healthy` with restart count `0`, and Compose pins the new immutable image. Public `/health` returned HTTP `200` with `{"status":"ok"}`, and public settings report version `0.1.176-nvidia.21-tokenrhythm-2`.
+- No credential, Cookie, API key, sess value, referral code/link, account, group, proxy, or production data configuration is recorded here.
 
 ## 2026-08-22 TokenRhythm sess and referral resolver release
 
