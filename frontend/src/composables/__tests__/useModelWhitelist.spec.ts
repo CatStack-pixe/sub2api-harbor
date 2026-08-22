@@ -16,6 +16,10 @@ describe('useModelWhitelist', () => {
     expect(getPresetMappingsByPlatform('deepseek')).toEqual([])
   })
 
+  it('uses DeepSeek V4 models as the TokenRhythm built-in catalog', () => {
+    expect(getModelsByPlatform('tokenrhythm')).toEqual(['deepseek-v4-pro', 'deepseek-v4-flash'])
+  })
+
   it('openai 模型列表包含 GPT-5.4 官方快照', () => {
     const models = getModelsByPlatform('openai')
 

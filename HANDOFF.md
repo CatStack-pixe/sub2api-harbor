@@ -1,5 +1,13 @@
 # Handoff
 
+## 2026-08-22 TokenRhythm built-in model sync fallback (in progress)
+
+- Root cause: TokenRhythm model sync uses the generic OpenAI-compatible `/v1/models` request. A provider timeout, non-2xx response, or empty model list was surfaced directly as a failed sync; the existing built-in model catalog was only used by the separate fill-related-models action. Production logs confirmed repeated TokenRhythm upstream sync failures while normal TokenRhythm chat requests remained healthy.
+- Changed the TokenRhythm built-in catalog to the two production DeepSeek V4 model IDs: `deepseek-v4-pro` and `deepseek-v4-flash`, aligned across backend defaults and frontend whitelist options.
+- When TokenRhythm upstream model sync fails or returns an empty list, the model whitelist control now adds those built-in models and displays an explicit fallback notice. Other platforms retain the existing error behavior; the fallback never claims the models came from upstream.
+- Verification passed: frontend typecheck, full ESLint, frontend build, model whitelist tests, TokenRhythm fallback component test, and `git diff --check`. Go tests remain unavailable locally because Go is not installed; CI is authoritative. No credential, Cookie, API key, or production data is recorded here.
+- Remaining: commit, PR review/merge, release, deploy only `sub2api`, and verify the fallback through the production UI/API.
+
 ## 2026-08-22 TokenRhythm sess and referral resolver release
 
 - Work is isolated in `E:\文件\Python Script\sub2api\sub2api-tokenrhythm-sess` on branch `feat/tokenrhythm-session-referral`, based on current `origin/main`. The original dirty `sub2api-harbor` worktree was not modified.

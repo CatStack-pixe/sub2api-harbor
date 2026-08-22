@@ -106,10 +106,10 @@ func GLMDefaultModelIDs() []string {
 	return []string{"glm-5.2", "glm-5.1", "glm-5", "glm-5-turbo", "glm-4.7", "glm-4.5-air", "glm-4.7-flashx", "glm-4.7-flash"}
 }
 
-// TokenRhythmDefaultModelIDs are OpenAI-compatible fallbacks used until the
-// upstream model list is synchronized.
+// TokenRhythmDefaultModelIDs are the DeepSeek V4 models exposed by the
+// TokenRhythm channel when its live model list is unavailable.
 func TokenRhythmDefaultModelIDs() []string {
-	return []string{"gpt-4o", "gpt-4o-mini", "gpt-4.1", "gpt-5", "gpt-5-mini"}
+	return []string{"deepseek-v4-pro", "deepseek-v4-flash"}
 }
 
 // AllowedSchedulingThresholdPlatforms 是允许设置账号自动停调阈值的平台列表。
