@@ -590,6 +590,30 @@ export async function getTokenRhythmBalance(id: number, signal?: AbortSignal): P
   return data
 }
 
+export interface ResolveTokenRhythmSessionRequest {
+  sess: string
+  proxy_id?: number | null
+}
+
+export interface TokenRhythmSessionResult {
+  tokenrhythm_cookie: string
+  referral_code: string
+  referral_link: string
+  eligible: boolean
+  public_enabled: boolean
+  registration_allowed: boolean
+}
+
+export async function resolveTokenRhythmSession(
+  request: ResolveTokenRhythmSessionRequest
+): Promise<TokenRhythmSessionResult> {
+  const { data } = await apiClient.post<TokenRhythmSessionResult>(
+    '/admin/tokenrhythm/session/resolve',
+    request
+  )
+  return data
+}
+
 export interface KimiBalanceResult {
   is_available: boolean
   available_balance?: number
@@ -1078,6 +1102,7 @@ export const accountsAPI = {
   getAvailableModels,
   getDeepSeekBalance,
   getTokenRhythmBalance,
+  resolveTokenRhythmSession,
   getKimiBalance,
   syncUpstreamModels,
   syncUpstreamModelsPreview,

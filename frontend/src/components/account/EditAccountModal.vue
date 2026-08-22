@@ -114,6 +114,10 @@
         </div>
 
         <div v-if="account.platform === 'tokenrhythm'">
+          <TokenRhythmSessionResolver
+            :proxy-id="form.proxy_id"
+            @resolved="tokenRhythmCookie = $event"
+          />
           <label class="input-label">{{ t('admin.accounts.tokenrhythm.cookie') }}</label>
           <textarea
             v-model="tokenRhythmCookie"
@@ -2778,6 +2782,7 @@ import BaseDialog from '@/components/common/BaseDialog.vue'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import Select from '@/components/common/Select.vue'
 import Toggle from '@/components/common/Toggle.vue'
+import TokenRhythmSessionResolver from '@/components/account/TokenRhythmSessionResolver.vue'
 import Icon from '@/components/icons/Icon.vue'
 import ProxySelector from '@/components/common/ProxySelector.vue'
 import ProxyAdBanner from '@/components/common/ProxyAdBanner.vue'
