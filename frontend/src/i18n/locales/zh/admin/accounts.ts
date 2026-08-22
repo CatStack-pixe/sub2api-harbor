@@ -722,7 +722,19 @@ export default {
         cookiePlaceholder: 'tr_session=sess_...; tr_csrf=...',
         cookieHint: '仅用于余额查询，服务端只保存必需的 TokenRhythm Cookie。',
         cookieEditHint: '留空保留已存的余额查询 Cookie；粘贴新的完整 Cookie 请求头可替换。',
-        cookieRequired: '查询 TokenRhythm 余额需要提供 Cookie 请求头。'
+        cookieRequired: '查询 TokenRhythm 余额需要提供 Cookie 请求头。',
+        manageKey: '管理 API Key',
+        keyName: 'Key 名称',
+        keyNamePlaceholder: 'sub2api-tokenrhythm',
+        manageKeyHint: '使用 TokenRhythm Sess 在服务器端创建新 Key，成功后会自动回填本表单。Sess 不会保存。',
+        createKey: '创建 Key',
+        creatingKey: '创建中',
+        keyCreated: 'TokenRhythm API Key 已创建并回填',
+        keyCreateFailed: 'TokenRhythm API Key 创建失败',
+        keyCreatedOnce: '新建 Key 只会在本次返回后查看，请立即保存。',
+        copyKey: '复制 Key',
+        keyCopied: 'Key 已复制',
+        keyCopyFailed: '复制失败'
       },
       kimi: {
         baseUrlHint: '可使用预设地址，也可填写自定义 OpenAI 兼容 Base URL；自定义地址不支持 Kimi 官方余额查询。',

@@ -143,6 +143,7 @@ func registerTokenRhythmRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 	tokenRhythm := admin.Group("/tokenrhythm")
 	{
 		tokenRhythm.POST("/session/resolve", h.Admin.Account.ResolveTokenRhythmSession)
+		tokenRhythm.POST("/api-keys", h.Admin.Account.CreateTokenRhythmAPIKey)
 		tokenRhythm.GET("/accounts/:id/balance", h.Admin.Account.GetTokenRhythmBalance)
 	}
 }

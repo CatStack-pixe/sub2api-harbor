@@ -1,8 +1,9 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { resolveSessionMock, showErrorMock, showSuccessMock } = vi.hoisted(() => ({
+const { resolveSessionMock, createKeyMock, showErrorMock, showSuccessMock } = vi.hoisted(() => ({
   resolveSessionMock: vi.fn(),
+  createKeyMock: vi.fn(),
   showErrorMock: vi.fn(),
   showSuccessMock: vi.fn()
 }))
@@ -10,7 +11,8 @@ const { resolveSessionMock, showErrorMock, showSuccessMock } = vi.hoisted(() => 
 vi.mock('@/api/admin', () => ({
   adminAPI: {
     accounts: {
-      resolveTokenRhythmSession: resolveSessionMock
+      resolveTokenRhythmSession: resolveSessionMock,
+      createTokenRhythmAPIKey: createKeyMock
     }
   }
 }))
@@ -37,6 +39,7 @@ import TokenRhythmSessionResolver from '../TokenRhythmSessionResolver.vue'
 describe('TokenRhythmSessionResolver', () => {
   beforeEach(() => {
     resolveSessionMock.mockReset()
+    createKeyMock.mockReset()
     showErrorMock.mockReset()
     showSuccessMock.mockReset()
   })
@@ -75,5 +78,45 @@ describe('TokenRhythmSessionResolver', () => {
 
     expect(wrapper.find('[data-testid="tokenrhythm-referral-result"]').exists()).toBe(false)
     expect(showErrorMock).toHaveBeenCalledWith('invalid session')
+  })
+
+  it('creates a provider key and emits the generated credentials for the account form', async () => {
+    createKeyMock.mockResolvedValue({
+      api_key: 'sk_tr_created',
+      tokenrhythm_cookie: 'tr_session=session; tr_csrf=csrf',
+      name: 'sub2api-demo'
+    })
+    const wrapper = mount(TokenRhythmSessionResolver, {
+      props: { proxyId: 18, accountName: 'demo' },
+      global: {
+        stubs: {
+          BaseDialog: {
+            props: ['show'],
+            template: '<div v-if="show"><slot /></div>'
+          }
+        }
+      }
+    })
+
+    await wrapper.get('[data-testid="tokenrhythm-manage-key"]').trigger('click')
+    await wrapper.get('[data-testid="tokenrhythm-key-session-input"]').setValue('sess_value')
+    await wrapper.get('[data-testid="tokenrhythm-key-name-input"]').setValue('sub2api-demo')
+    await wrapper.get('[data-testid="tokenrhythm-key-form"]').trigger('submit')
+    await flushPromises()
+
+    expect(createKeyMock).toHaveBeenCalledWith({
+      sess: 'sess_value',
+      name: 'sub2api-demo',
+      proxy_id: 18
+    })
+    expect(wrapper.emitted('apiKeyCreated')).toEqual([[
+      {
+        api_key: 'sk_tr_created',
+        tokenrhythm_cookie: 'tr_session=session; tr_csrf=csrf',
+        name: 'sub2api-demo'
+      }
+    ]])
+    expect(wrapper.emitted('resolved')).toEqual([['tr_session=session; tr_csrf=csrf']])
+    expect(wrapper.get('[data-testid="tokenrhythm-key-session-input"]').element).toHaveProperty('value', '')
   })
 })

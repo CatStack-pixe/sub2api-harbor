@@ -65,6 +65,14 @@
 - Full frontend Vitest has two pre-existing transform failures caused by duplicate `getLiveCapability` declarations in the baseline GroupsView tests; unrelated assertions now pass.
 - Go is unavailable in the local Windows environment. Run the repository GitHub Actions CI before release to execute Go generation, unit tests, integration tests, and frontend build.
 
+## 2026-08-23 TokenRhythm server-side API-key management
+
+- Replaced the earlier local-only provisioner direction with an in-product implementation on branch `fix/tokenrhythm-built-in-model-sync`. Added `POST /api/v1/admin/tokenrhythm/api-keys`, which accepts a short-lived `sess`, key name, and optional proxy ID; the server resolves the provider CSRF/session cookie, calls the official TokenRhythm `POST /api/api-keys`, and returns the generated `sk_tr_...` plus normalized `tr_session`/`tr_csrf` Cookie. The sess is never persisted or returned.
+- Added a shared TokenRhythm “Manage API Key” dialog to both account create and edit forms. It fills the generated API key and Cookie back into the form; saving the account remains an explicit user action. The sess input is cleared after the request, and the new key is shown only in the dialog response.
+- Added audit action `admin.tokenrhythm.api_key.create` and omitted request bodies for both TokenRhythm session/key-management routes so sess values are not written to audit logs.
+- Verification: frontend `vue-tsc --noEmit`, production `pnpm run build`, and focused TokenRhythm component tests pass (`3/3`). Backend service tests were added for proxy routing, Cookie rotation, key response parsing, invalid names, and missing keys. Local Go/gofmt are unavailable; run GitHub Actions CI before release.
+- No production deployment, account mutation, provider key creation, or server restart was performed in this source-change turn.
+
 ## Release / Deploy
 
 - Branch: create a feature branch from the current merged base before submitting the Kimi change.

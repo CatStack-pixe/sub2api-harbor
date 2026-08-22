@@ -647,7 +647,19 @@ export default {
         cookiePlaceholder: 'tr_session=sess_...; tr_csrf=...',
         cookieHint: 'Used only for the balance query. The server stores only the required TokenRhythm cookies.',
         cookieEditHint: 'Leave empty to keep the stored balance-query cookie. Paste a new full Cookie header to replace it.',
-        cookieRequired: 'A TokenRhythm Cookie header is required to query the account balance.'
+        cookieRequired: 'A TokenRhythm Cookie header is required to query the account balance.',
+        manageKey: 'Manage API Key',
+        keyName: 'Key name',
+        keyNamePlaceholder: 'sub2api-tokenrhythm',
+        manageKeyHint: 'Create a new provider key on the server with a TokenRhythm sess. The generated key and Cookie are filled into this form; the sess is never stored.',
+        createKey: 'Create Key',
+        creatingKey: 'Creating',
+        keyCreated: 'TokenRhythm API Key created and filled into the form',
+        keyCreateFailed: 'Failed to create the TokenRhythm API Key',
+        keyCreatedOnce: 'The new key is shown only once. Save it now.',
+        copyKey: 'Copy Key',
+        keyCopied: 'Key copied',
+        keyCopyFailed: 'Failed to copy the key'
       },
       nvidia: {
         baseUrlHint: 'OpenAI-compatible NVIDIA NIM endpoint. The default includes /v1.',

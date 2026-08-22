@@ -100,3 +100,71 @@ func TestResolveTokenRhythmSessionPreservesAuthenticationFailure(t *testing.T) {
 	require.Equal(t, "TOKENRHYTHM_SESSION_INVALID", infraerrors.Reason(err))
 	require.NotContains(t, err.Error(), "expired secret")
 }
+
+func TestCreateTokenRhythmAPIKeyResolvesSessionAndCreatesKey(t *testing.T) {
+	upstream := &httpUpstreamRecorder{responses: []*http.Response{
+		{
+			StatusCode: http.StatusOK,
+			Header: http.Header{"Set-Cookie": []string{
+				"tr_session=sess_rotated; Path=/; Secure",
+				"tr_csrf=csrf-value; Path=/; Secure",
+			}},
+			Body: io.NopCloser(strings.NewReader(`{"code":0,"data":{"code":"invite-code"}}`)),
+		},
+		{
+			StatusCode: http.StatusOK,
+			Header: http.Header{"Set-Cookie": []string{
+				"tr_csrf=csrf-rotated; Path=/; Secure",
+			}},
+			Body: io.NopCloser(strings.NewReader(`{"code":0,"data":{"key":"sk_tr_created","name":"sub2api"}}`)),
+		},
+	}}
+	svc := &AccountTestService{httpUpstream: upstream}
+
+	result, err := svc.CreateTokenRhythmAPIKey(context.Background(), "sess_original", "sub2api", "socks5://proxy.example:1080")
+	require.NoError(t, err)
+	require.Equal(t, "sk_tr_created", result.APIKey)
+	require.Equal(t, "tr_session=sess_rotated; tr_csrf=csrf-rotated", result.TokenRhythmCookie)
+	require.Equal(t, "sub2api", result.Name)
+	require.Len(t, upstream.requests, 2)
+	require.Equal(t, http.MethodGet, upstream.requests[0].Method)
+	require.Equal(t, tokenRhythmReferralURL, upstream.requests[0].URL.String())
+	require.Equal(t, http.MethodPost, upstream.requests[1].Method)
+	require.Equal(t, tokenRhythmAPIKeyURL, upstream.requests[1].URL.String())
+	require.Equal(t, "tr_session=sess_rotated; tr_csrf=csrf-value", upstream.requests[1].Header.Get("Cookie"))
+	require.Equal(t, "csrf-value", upstream.requests[1].Header.Get("X-CSRF-Token"))
+	require.Equal(t, "https://tokenrhythm.studio", upstream.requests[1].Header.Get("Origin"))
+	require.JSONEq(t, `{"name":"sub2api"}`, string(upstream.bodies[0]))
+	require.Equal(t, "socks5://proxy.example:1080", upstream.lastProxyURL)
+}
+
+func TestCreateTokenRhythmAPIKeyRejectsMissingProviderKey(t *testing.T) {
+	upstream := &httpUpstreamRecorder{responses: []*http.Response{
+		{
+			StatusCode: http.StatusOK,
+			Header: http.Header{"Set-Cookie": []string{"tr_csrf=csrf-value; Path=/; Secure"}},
+			Body: io.NopCloser(strings.NewReader(`{"code":0,"data":{"code":"invite-code"}}`)),
+		},
+		{
+			StatusCode: http.StatusOK,
+			Header: make(http.Header),
+			Body: io.NopCloser(strings.NewReader(`{"code":0,"data":{"name":"sub2api"}}`)),
+		},
+	}}
+	svc := &AccountTestService{httpUpstream: upstream}
+
+	_, err := svc.CreateTokenRhythmAPIKey(context.Background(), "sess_value", "sub2api", "")
+	require.Error(t, err)
+	require.Equal(t, http.StatusBadGateway, infraerrors.Code(err))
+	require.Equal(t, "TOKENRHYTHM_API_KEY_MISSING", infraerrors.Reason(err))
+}
+
+func TestCreateTokenRhythmAPIKeyRejectsInvalidNameBeforeUpstream(t *testing.T) {
+	upstream := &httpUpstreamRecorder{}
+	svc := &AccountTestService{httpUpstream: upstream}
+
+	_, err := svc.CreateTokenRhythmAPIKey(context.Background(), "sess_value", strings.Repeat("x", tokenRhythmAPIKeyNameLimit+1), "")
+	require.Error(t, err)
+	require.Equal(t, http.StatusBadRequest, infraerrors.Code(err))
+	require.Empty(t, upstream.requests)
+}
