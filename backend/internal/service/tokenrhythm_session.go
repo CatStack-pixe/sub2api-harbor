@@ -42,9 +42,9 @@ type TokenRhythmSessionResult struct {
 // TokenRhythmAPIKeyResult is returned by the administrator key-management
 // action. The sess value is deliberately never included in the result.
 type TokenRhythmAPIKeyResult struct {
-	APIKey             string `json:"api_key"`
-	TokenRhythmCookie  string `json:"tokenrhythm_cookie"`
-	Name               string `json:"name"`
+	APIKey            string `json:"api_key"`
+	TokenRhythmCookie string `json:"tokenrhythm_cookie"`
+	Name              string `json:"name"`
 }
 
 type tokenRhythmReferralWire struct {
