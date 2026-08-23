@@ -97,3 +97,37 @@
 - `SendVerifyCode` 先把验证码写入 Redis，再发邮件。发送失败时验证码和 60 秒冷却仍保留，用户立即重试会收到 `VERIFY_CODE_TOO_FREQUENT`；队列也不会重试该任务。冷却检查位于 worker 内而非入队处，并发请求可能被多个 worker 同时放行、生成不同验证码，最终只有 Redis 最后一次写入的验证码有效，先到达的邮件可能无法验证。密码重置 token 同样先保存，但其冷却标记只在成功后写入。
 - 生产交接记录显示 Resend 本地发送链路曾在约 4 秒内完成（入队到 worker 成功）；QQ 的 `Delivery Delayed` 是 Resend 已接受后收件服务器临时 4xx/限流/信誉等外部投递问题，Gmail 为 `Delivered`。需要在 Resend Events/Logs 查看 QQ 的具体 SMTP 4xx 原因，应用当前无法看到收件箱内部投递结果。
 - 本次为只读诊断，未修改业务代码、生产配置或部署。后续修复优先级：失败重试/死信与可观测指标、发送失败回滚验证码或清除冷却、SMTP 配置缓存与连接复用、将 context/超时贯穿网络调用，并区分“入队成功”和“发送成功”的 API 状态。
+
+## 2026-08-23 TokenRhythm Key Management Audit
+
+- 生产 `POST /api/v1/admin/tokenrhythm/api-keys` 连续返回 HTTP 401；使用当前提供的 sess 直接请求 TokenRhythm `/api/referrals/me` 和 `/api/api-keys` 同样返回 `UNAUTHORIZED`，因此创建失败的直接原因是 sess 已过期/失效。
+- 当前后端仅注册 session resolve、api-key create、balance 三类接口；没有 provider key 列表、disable 或 delete 路由/处理器。前端 resolver 也只有一次性创建并显示 secret 的流程，API 层没有 list/delete 函数，故界面不会显示账号可用 key、状态或删除按钮。
+- TokenRhythm provider 的实际接口为 `GET /api/api-keys`、`POST /api/api-keys`、`POST /api/api-keys/:id/disable`、`POST /api/api-keys/:id/delete`、`POST /api/api-keys/batch-delete`；非 GET 请求需 `tr_csrf` cookie 与 `X-CSRF-Token`。列表只返回 masked metadata，完整 secret 仅在创建响应中返回一次。
+- 后续管理功能应复用账号已保存的 provider cookie/session（或显式 sess 输入），新增列表和 disable/delete 后端方法及前端表格、状态和操作按钮；401 应明确提示重新获取有效 sess。
+- 交接安全说明：本审计文档不包含任何凭据；请忽略本任务协作消息中可能意外出现的长 token 字符串，并将相关凭据视为已泄露、需要轮换。
+- 审计时发现的服务层 helper 缺口已在当前工作树补上；但整体改动仍未完成，Go 工具链在本环境不可用，恢复工作后必须先编译并运行后端测试。
+- Provider bundle confirms list objects use camelCase keys (`maskedKey`, `keyPrefix`, `createdAt`, `lastUsedAt`, `deletedAt`, `status`); a provider wire struct should use camelCase tags (or custom normalization) before mapping to the backend's snake_case response fields. Provider list response is an array (frontend uses `k.data ?? []`), while create returns an object containing `key` plus metadata.
+- During concurrent implementation review, handler/service signatures were found inconsistent and have since been partially reconciled; verify the final call signatures and `TokenRhythmAPIKeyActionResult` naming before compiling.
+- The in-progress handler now accepts `account_id` in the request body and calls the existing `*ForAccount` service methods, which resolves the redacted-cookie issue. Frontend should use `account_id` for edit-account management; only new-account flow should send sess/Cookie.
+
+## 2026-08-23 TokenRhythm key management paused
+
+- Work was paused at the user's request. No commit, push, PR, release, deployment, production restart, or production data mutation was performed for this unfinished change.
+- Uncommitted files currently contain partial backend/API work: `backend/internal/service/tokenrhythm_session.go`, `backend/internal/handler/admin/tokenrhythm_handler.go`, `backend/internal/server/routes/admin.go`, `backend/internal/server/middleware/audit_log.go`, and `frontend/src/api/admin/accounts.ts`.
+- The partial implementation adds provider key list/disable/delete service types and routes, supports optional `account_id` for server-side reuse of stored TokenRhythm credentials, and adds frontend API client functions. The Vue management dialog has not yet been updated with the key table or action buttons.
+- Before resuming, reconcile and compile the partial signatures. In particular, verify `CreateTokenRhythmAPIKeyWithCredential` callers, `TokenRhythmAPIKeyActionResult` naming, account-scoped handler paths, route ordering for `/api-keys/list`, and the provider list response parser. Run `gofmt`, backend tests, frontend typecheck/build, and focused component tests; Go is unavailable in this Windows environment.
+- Do not deploy the current worktree. The last deployed production release remains `v0.1.176-nvidia.21-tokenrhythm-3`; no new image exists for this paused work.
+- No session, Cookie, API key, administrator token, referral value, account data, or production configuration is recorded in this handoff.
+- `EditAccountModal.vue` currently mounts `TokenRhythmSessionResolver` without passing `account.id`; add an `accountId` prop and bind `:account-id="account.id"`. Otherwise the resolver cannot select the account-scoped API and will continue requiring a manually pasted sess in edit mode.
+- `frontend/src/api/admin/accounts.ts` defines list/disable/delete functions but the exported `adminAPI.accounts` object currently only includes resolve/create; add the three new functions there or component calls through `adminAPI.accounts.*` will be undefined at runtime.
+
+## 2026-08-23 TokenRhythm API-key management completed
+
+- Rebased the work onto `origin/main` at `05ea60adc` and continued on `fix/tokenrhythm-api-key-management`.
+- Completed provider key inventory, masked-key parsing, disable/delete actions, account-scoped credential reuse, Cookie rotation persistence, persistence-failure recovery, and audit-body omission for all credential-bearing TokenRhythm routes.
+- Account-scoped requests preserve the account proxy, account ID, configured concurrency, and TLS fingerprint path. Explicit sess/Cookie input remains request-scoped and is never persisted.
+- Completed create/edit UI integration, one-time key display, inventory loading/error/empty states, confirmation actions, rotated-Cookie handling, and English/Chinese translations.
+- Local verification passed: Go handler/middleware unit tests, frontend typecheck, targeted ESLint, focused resolver tests (`6/6`), production frontend build, `gofmt`, and `git diff --check`.
+- The focused Go service test command reaches the existing Ent runtime initialization panic at `ent/runtime/runtime.go:1148` before executing tests; authoritative CI must run the service suite.
+- No commit, PR, release, deployment, production restart, account mutation, or provider key creation has been performed for this completed worktree yet.
+- No sess, Cookie, API key, referral value, proxy credential, or administrator credential is recorded in this document.

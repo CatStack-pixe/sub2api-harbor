@@ -242,3 +242,17 @@ func TestTokenRhythmSessionResolverRouteOmitsAuditBody(t *testing.T) {
 	require.Equal(t, "<credential-bearing body omitted>", logs[0].RequestBody)
 	require.NotContains(t, logs[0].RequestBody, "audit-canary")
 }
+
+func TestTokenRhythmAPIKeyManagementRoutesHaveStableActionsAndOmitBodies(t *testing.T) {
+	expected := map[string]string{
+		"POST /api/v1/admin/tokenrhythm/api-keys":             "admin.tokenrhythm.api_key.create",
+		"POST /api/v1/admin/tokenrhythm/api-keys/list":        "admin.tokenrhythm.api_key.list",
+		"POST /api/v1/admin/tokenrhythm/api-keys/:id/disable": "admin.tokenrhythm.api_key.disable",
+		"POST /api/v1/admin/tokenrhythm/api-keys/:id/delete":  "admin.tokenrhythm.api_key.delete",
+	}
+	for route, action := range expected {
+		require.Equal(t, action, auditActionOverrides[route])
+		_, omitted := auditBodyOmittedRoutes[route]
+		require.Truef(t, omitted, "%s must not persist session or Cookie credentials", route)
+	}
+}

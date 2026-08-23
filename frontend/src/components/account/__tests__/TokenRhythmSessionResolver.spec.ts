@@ -1,18 +1,25 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { resolveSessionMock, createKeyMock, showErrorMock, showSuccessMock } = vi.hoisted(() => ({
+const { resolveSessionMock, createKeyMock, listKeysMock, disableKeyMock, deleteKeyMock, showErrorMock, showSuccessMock, showWarningMock } = vi.hoisted(() => ({
   resolveSessionMock: vi.fn(),
   createKeyMock: vi.fn(),
+  listKeysMock: vi.fn(),
+  disableKeyMock: vi.fn(),
+  deleteKeyMock: vi.fn(),
   showErrorMock: vi.fn(),
-  showSuccessMock: vi.fn()
+  showSuccessMock: vi.fn(),
+  showWarningMock: vi.fn()
 }))
 
 vi.mock('@/api/admin', () => ({
   adminAPI: {
     accounts: {
       resolveTokenRhythmSession: resolveSessionMock,
-      createTokenRhythmAPIKey: createKeyMock
+      createTokenRhythmAPIKey: createKeyMock,
+      listTokenRhythmAPIKeys: listKeysMock,
+      disableTokenRhythmAPIKey: disableKeyMock,
+      deleteTokenRhythmAPIKey: deleteKeyMock
     }
   }
 }))
@@ -20,7 +27,8 @@ vi.mock('@/api/admin', () => ({
 vi.mock('@/stores/app', () => ({
   useAppStore: () => ({
     showError: showErrorMock,
-    showSuccess: showSuccessMock
+    showSuccess: showSuccessMock,
+    showWarning: showWarningMock
   })
 }))
 
@@ -40,8 +48,12 @@ describe('TokenRhythmSessionResolver', () => {
   beforeEach(() => {
     resolveSessionMock.mockReset()
     createKeyMock.mockReset()
+    listKeysMock.mockReset()
+    disableKeyMock.mockReset()
+    deleteKeyMock.mockReset()
     showErrorMock.mockReset()
     showSuccessMock.mockReset()
+    showWarningMock.mockReset()
   })
 
   it('resolves through the selected proxy and emits only the normalized Cookie', async () => {
@@ -118,5 +130,97 @@ describe('TokenRhythmSessionResolver', () => {
     ]])
     expect(wrapper.emitted('resolved')).toEqual([['tr_session=session; tr_csrf=csrf']])
     expect(wrapper.get('[data-testid="tokenrhythm-key-session-input"]').element).toHaveProperty('value', '')
+  })
+
+  it('uses the saved account credential for inventory and key creation', async () => {
+    listKeysMock.mockResolvedValue({
+      keys: [{ id: 'key-1', name: 'primary', masked_key: 'sk_tr_***', status: 'active' }],
+      tokenrhythm_cookie: 'tr_session=rotated; tr_csrf=csrf'
+    })
+    createKeyMock.mockResolvedValue({
+      api_key: 'sk_tr_created',
+      tokenrhythm_cookie: 'tr_session=rotated; tr_csrf=csrf',
+      name: 'sub2api-demo'
+    })
+    const wrapper = mount(TokenRhythmSessionResolver, {
+      props: { accountId: 42, proxyId: 18, accountName: 'demo' },
+      global: { stubs: { BaseDialog: { props: ['show'], template: '<div v-if="show"><slot /></div>' } } }
+    })
+
+    await wrapper.get('[data-testid="tokenrhythm-list-keys"]').trigger('click')
+    await flushPromises()
+    expect(listKeysMock).toHaveBeenCalledWith({ account_id: 42, sess: undefined, cookie: undefined, proxy_id: 18 })
+    expect(wrapper.get('[data-testid="tokenrhythm-key-inventory"]').text()).toContain('sk_tr_***')
+
+    await wrapper.get('[data-testid="tokenrhythm-manage-key"]').trigger('click')
+    await wrapper.get('[data-testid="tokenrhythm-key-form"]').trigger('submit')
+    await flushPromises()
+    expect(createKeyMock).toHaveBeenCalledWith({
+      sess: undefined,
+      cookie: 'tr_session=rotated; tr_csrf=csrf',
+      name: 'sub2api-demo',
+      proxy_id: 18,
+      account_id: undefined
+    })
+  })
+
+  it('creates with a pasted Cookie and confirms disable/delete actions', async () => {
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
+    const cookie = 'tr_session=session; tr_csrf=csrf'
+    listKeysMock.mockResolvedValue({
+      keys: [{ id: 'key-1', name: 'primary', masked_key: 'sk_tr_***', status: 'active' }],
+      tokenrhythm_cookie: cookie
+    })
+    createKeyMock.mockResolvedValue({ api_key: 'sk_tr_created', tokenrhythm_cookie: cookie, name: 'manual' })
+    disableKeyMock.mockResolvedValue({ id: 'key-1', tokenrhythm_cookie: cookie })
+    deleteKeyMock.mockResolvedValue({ id: 'key-1', tokenrhythm_cookie: cookie })
+    const wrapper = mount(TokenRhythmSessionResolver, {
+      props: { credentialCookie: cookie },
+      global: { stubs: { BaseDialog: { props: ['show'], template: '<div v-if="show"><slot /></div>' } } }
+    })
+
+    await wrapper.get('[data-testid="tokenrhythm-manage-key"]').trigger('click')
+    await wrapper.get('[data-testid="tokenrhythm-key-name-input"]').setValue('manual')
+    await wrapper.get('[data-testid="tokenrhythm-key-form"]').trigger('submit')
+    await flushPromises()
+    expect(createKeyMock).toHaveBeenCalledWith({ sess: undefined, cookie, name: 'manual', proxy_id: undefined, account_id: undefined })
+
+    await wrapper.get('[data-testid="tokenrhythm-list-keys"]').trigger('click')
+    await flushPromises()
+    await wrapper.get('[data-testid="tokenrhythm-disable-key-1"]').trigger('click')
+    await flushPromises()
+    expect(disableKeyMock).toHaveBeenCalledWith('key-1', { account_id: undefined, sess: undefined, cookie, proxy_id: undefined })
+
+    await wrapper.get('[data-testid="tokenrhythm-delete-key-1"]').trigger('click')
+    await flushPromises()
+    expect(deleteKeyMock).toHaveBeenCalledWith('key-1', { account_id: undefined, sess: undefined, cookie, proxy_id: undefined })
+    expect(confirmSpy).toHaveBeenCalledTimes(2)
+    confirmSpy.mockRestore()
+  })
+
+  it('prefers a newly resolved Cookie over the saved account credential and surfaces persistence warnings', async () => {
+    const cookie = 'tr_session=new-session; tr_csrf=new-csrf'
+    listKeysMock.mockResolvedValue({
+      keys: [],
+      tokenrhythm_cookie: cookie,
+      credential_persist_warning: 'persistence failed'
+    })
+    const wrapper = mount(TokenRhythmSessionResolver, {
+      props: { accountId: 42, credentialCookie: cookie }
+    })
+
+    await wrapper.get('[data-testid="tokenrhythm-list-keys"]').trigger('click')
+    await flushPromises()
+
+    expect(listKeysMock).toHaveBeenCalledWith({
+      account_id: undefined,
+      sess: undefined,
+      cookie,
+      proxy_id: undefined
+    })
+    expect(wrapper.emitted('resolved')).toEqual([[cookie]])
+    expect(showWarningMock).toHaveBeenCalledWith(
+      'admin.accounts.tokenrhythm.credentialPersistWarning'
+    )
   })
 })

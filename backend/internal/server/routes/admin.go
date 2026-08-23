@@ -144,6 +144,9 @@ func registerTokenRhythmRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 	{
 		tokenRhythm.POST("/session/resolve", h.Admin.Account.ResolveTokenRhythmSession)
 		tokenRhythm.POST("/api-keys", h.Admin.Account.CreateTokenRhythmAPIKey)
+		tokenRhythm.POST("/api-keys/list", h.Admin.Account.ListTokenRhythmAPIKeys)
+		tokenRhythm.POST("/api-keys/:id/disable", h.Admin.Account.DisableTokenRhythmAPIKey)
+		tokenRhythm.POST("/api-keys/:id/delete", h.Admin.Account.DeleteTokenRhythmAPIKey)
 		tokenRhythm.GET("/accounts/:id/balance", h.Admin.Account.GetTokenRhythmBalance)
 	}
 }
