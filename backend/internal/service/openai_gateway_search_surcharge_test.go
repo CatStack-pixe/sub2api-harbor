@@ -5,6 +5,7 @@ package service
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/timezone"
 	"github.com/stretchr/testify/require"
@@ -39,6 +40,8 @@ func TestCalculateOpenAIRecordUsageCost_SearchIsAdditiveToTokens(t *testing.T) {
 		"",
 		false,
 		timezone.Now(),
+		boolPtr(false),
+		time.Time{},
 	)
 	require.NoError(t, err)
 	require.NotNil(t, cost)
@@ -70,6 +73,8 @@ func TestCalculateOpenAIRecordUsageCost_SearchOnlyWhenNoTokenPricing(t *testing.
 		"",
 		false,
 		timezone.Now(),
+		boolPtr(false),
+		time.Time{},
 	)
 	require.NoError(t, err)
 	require.NotNil(t, cost)
@@ -116,6 +121,8 @@ func TestCalculateOpenAIRecordUsageCost_TokenPricingErrorNotSwallowedBySearch(t 
 		"",
 		false,
 		timezone.Now(),
+		boolPtr(false),
+		time.Time{},
 	)
 	require.Error(t, err)
 	require.Nil(t, cost)

@@ -17,7 +17,7 @@ export interface DefaultSubscriptionSetting {
 }
 
 // ── 平台限额类型 ──────────────────────────────────────────────────
-export type PlatformType = "anthropic" | "openai" | "gemini" | "antigravity" | "grok" | "agnes" | "deepseek" | "kimi" | "nvidia" | "tokenrhythm" | "chatanywhere" | "glm"
+export type PlatformType = "anthropic" | "openai" | "gemini" | "antigravity" | "grok" | "agnes" | "deepseek" | "kimi" | "zhipu" | "nvidia" | "tokenrhythm" | "chatanywhere" | "glm"
 export type QuotaWindowType = "daily" | "weekly" | "monthly"
 
 /** 单平台三档限额；null = 不限制，undefined = 未填（等价 null） */
@@ -30,19 +30,25 @@ export interface PlatformQuotaLimits {
 /** 全平台默认限额 map（key = PlatformType） */
 export type DefaultPlatformQuotasMap = Partial<Record<PlatformType, PlatformQuotaLimits>>
 
-const PLATFORMS: PlatformType[] = ["anthropic", "openai", "gemini", "antigravity", "grok", "agnes", "deepseek", "kimi", "nvidia", "tokenrhythm", "chatanywhere", "glm"]
+const PLATFORMS: PlatformType[] = ["anthropic", "openai", "gemini", "antigravity", "grok", "agnes", "deepseek", "kimi", "zhipu", "nvidia", "tokenrhythm", "chatanywhere", "glm"]
 
 export type SchedulingThresholdPlatformType =
   | "openai"
   | "anthropic"
   | "grok"
+  | "kimi"
+  | "zhipu"
 
 export type AccountSchedulingThresholdsMap = Record<SchedulingThresholdPlatformType, number>
 
+// 与后端 AllowedSchedulingThresholdPlatforms 保持一致（deepseek 为余额型，
+// 走余额检测而非用量阈值）。
 export const SCHEDULING_THRESHOLD_PLATFORMS: SchedulingThresholdPlatformType[] = [
   "openai",
   "anthropic",
   "grok",
+  "kimi",
+  "zhipu",
 ]
 
 export function normalizeAccountSchedulingThresholdsMap(
@@ -713,6 +719,7 @@ export interface SystemSettings {
   channel_monitor_mode?: 'v1' | 'v2';
   channel_monitor_default_interval_seconds: number;
   channel_monitor_hide_throughput?: boolean;
+  channel_monitor_show_quota?: boolean;
 
   // Available Channels feature switch
   available_channels_enabled: boolean;
@@ -1012,6 +1019,7 @@ export interface UpdateSettingsRequest {
   channel_monitor_mode?: 'v1' | 'v2';
   channel_monitor_default_interval_seconds?: number;
   channel_monitor_hide_throughput?: boolean;
+  channel_monitor_show_quota?: boolean;
 
   // Available Channels feature switch
   available_channels_enabled?: boolean;

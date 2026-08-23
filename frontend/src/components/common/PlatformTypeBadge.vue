@@ -97,6 +97,7 @@ const platformLabel = computed(() => {
   if (props.platform === 'tokenrhythm') return 'TokenRhythm'
   if (props.platform === 'chatanywhere') return 'ChatAnywhere'
   if (props.platform === 'glm') return 'GLM'
+  if (props.platform === 'zhipu') return 'Zhipu GLM'
   return 'Gemini'
 })
 
@@ -216,6 +217,9 @@ const platformClass = computed(() => {
   if (props.platform === 'glm') {
     return 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300'
   }
+  if (props.platform === 'zhipu') {
+    return 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400'
+  }
   return 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
 })
 
@@ -252,6 +256,9 @@ const typeClass = computed(() => {
   }
   if (props.platform === 'glm') {
     return 'bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-300'
+  }
+  if (props.platform === 'zhipu') {
+    return 'bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400'
   }
   return 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400'
 })

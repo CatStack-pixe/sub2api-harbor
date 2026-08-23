@@ -28,10 +28,14 @@ const (
 	PlatformNvidia       = "nvidia"
 	PlatformTokenRhythm  = "tokenrhythm"
 	PlatformKimi         = "kimi"
+	PlatformZhipu        = "zhipu"
 	PlatformChatAnywhere = "chatanywhere"
 	PlatformGLM          = "glm"
 	PlatformComposite    = "composite"
 )
+
+// PlatformDeepseek keeps compatibility with upstream's identifier spelling.
+const PlatformDeepseek = PlatformDeepSeek
 
 const (
 	AgnesDefaultBaseURL       = "https://apihub.agnes-ai.com/v1"
@@ -45,6 +49,19 @@ const (
 	ChatAnywhereChinaBaseURL  = "https://api.chatanywhere.tech/v1"
 	ChatAnywhereGlobalBaseURL = "https://api.chatanywhere.org/v1"
 	GLMDefaultBaseURL         = "https://open.bigmodel.cn/api/paas/v4"
+)
+
+// Account modes are independent from the upstream API protocol.
+const (
+	AccountModePayG   = "payg"
+	AccountModeCoding = "coding"
+)
+
+const (
+	APIProtocolChatCompletions = "chat_completions"
+	APIProtocolAnthropic       = "anthropic"
+	APIProtocolResponses       = "responses"
+	APIProtocolAdaptive        = "adaptive"
 )
 
 // Account type constants

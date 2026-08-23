@@ -189,7 +189,8 @@ const yiModels = [
 // Moonshot/Kimi
 const moonshotModels = [
   'kimi-k3', 'kimi-k2.6', 'kimi-k2.5', 'kimi-k2-thinking',
-  'moonshot-v1-8k', 'moonshot-v1-32k', 'moonshot-v1-128k', 'kimi-latest'
+  'moonshot-v1-8k', 'moonshot-v1-32k', 'moonshot-v1-128k',
+  'kimi-latest', 'kimi-for-coding', 'kimi-k2'
 ]
 
 // TokenRhythm's known channel models are DeepSeek V4. Keep them available
@@ -475,7 +476,7 @@ export function getModelsByPlatform(platform: string): string[] {
 
 // 按平台获取预设映射
 export function getPresetMappingsByPlatform(platform: string) {
-  if (platform === 'agnes' || platform === 'deepseek' || platform === 'kimi' || platform === 'nvidia' || platform === 'tokenrhythm' || platform === 'chatanywhere' || platform === 'glm') return []
+  if (platform === 'agnes' || platform === 'deepseek' || platform === 'kimi' || platform === 'zhipu' || platform === 'nvidia' || platform === 'tokenrhythm' || platform === 'chatanywhere' || platform === 'glm') return []
   if (platform === 'openai') return openaiPresetMappings
   if (platform === 'gemini') return geminiPresetMappings
   if (platform === 'grok' || platform === 'xai') return grokPresetMappings

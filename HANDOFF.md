@@ -1,5 +1,15 @@
 # Handoff
 
+## 2026-08-23 Upstream v0.1.179 sync (local integration complete; GitHub validation pending)
+
+- The integration is isolated on branch `sync/upstream-v0.1.179` in `.codex-worktrees/upstream-v179-sync`, based on fork `origin/main` commit `0fcf9100c750f0542e9fbcf5be04830813737231`. The original dirty worktree remains untouched.
+- The stable official `v0.1.179` release is being integrated against the explicit official `v0.1.176` merge base. Fork behavior remains authoritative: Agnes, NVIDIA, TokenRhythm, ChatAnywhere, Kimi, DeepSeek, and GLM are preserved, including fork routing, pricing, quota, and provider-specific usage behavior.
+- Upstream CN-provider adaptive protocols, Zhipu support, Composite routing, channel time/tier/context pricing, quota monitoring, usage rollups, Codex turn state, remote compaction, WebSocket bridge, client-tools, failover, and usage-accounting fixes are included where compatible. `glm` remains the fork platform and upstream `zhipu` is represented separately.
+- Migration `229_restore_fork_platform_constraints.sql` restores the complete 13-platform union after the fork and upstream duplicate-number migration sequences execute in full-filename order.
+- Frontend verification passed: typecheck, ESLint, and the full Vitest suite (`251` files, `1738` tests). `git diff --check` and conflict-marker checks also passed. Backend compilation and tests must run through GitHub Actions because Go is intentionally not installed locally.
+- Independent provider and merge-artifact audits found no remaining fork-provider regression; all reported duplicate declarations, fields, and conflict-splice artifacts were resolved before submission. The supported migration path is fork `origin/main` to this sync; databases that previously ran official v0.1.177-v0.1.179 may require a separate checksum-compatible migration path.
+- The branch is ready for its integration commit and GitHub PR. It has not yet been pushed, merged, released, deployed, or applied to production data.
+
 ## 2026-08-22 TokenRhythm built-in model sync fallback (completed)
 
 - Root cause: TokenRhythm model sync uses the generic OpenAI-compatible `/v1/models` request. A provider timeout, non-2xx response, or empty model list was surfaced directly as a failed sync; the existing built-in model catalog was only used by the separate fill-related-models action. Production logs confirmed repeated TokenRhythm upstream sync failures while normal TokenRhythm chat requests remained healthy.

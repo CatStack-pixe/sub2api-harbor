@@ -35,11 +35,13 @@ func TestDetectModelPlatform(t *testing.T) {
 		{name: "kimi prefix", model: "kimi/kimi-k2.5", platform: PlatformKimi, ok: true},
 		{name: "glm", model: "glm-5.2", platform: PlatformGLM, ok: true},
 		{name: "glm prefix", model: "glm/glm-5.2", platform: PlatformGLM, ok: true},
-		{name: "zhipu prefix", model: "zhipu/glm-5.2", platform: PlatformGLM, ok: true},
+		{name: "zhipu prefix", model: "zhipu/glm-5.2", platform: PlatformZhipu, ok: true},
+		{name: "bigmodel prefix", model: "bigmodel/glm-5.2", platform: PlatformZhipu, ok: true},
 		// NVIDIA NIM publishes models under the z-ai namespace too. Keep that
 		// ambiguous prefix unresolved unless an explicit composite route exists.
 		{name: "ambiguous z-ai prefix", model: "z-ai/glm-5.2", ok: false},
 		{name: "ambiguous zai prefix", model: "zai/glm-5.2", ok: false},
+		{name: "moonshot prefix", model: "moonshot/moonshot-v1-32k", platform: PlatformKimi, ok: true},
 		{name: "unknown", model: "llama-4-maverick", ok: false},
 	}
 
@@ -74,7 +76,14 @@ func TestCompositeGroupSchedulerHasAllCanonicalPlatformBuckets(t *testing.T) {
 		platforms = append(platforms, platform)
 	}
 	require.ElementsMatch(t,
-		[]string{PlatformAnthropic, PlatformGemini, PlatformOpenAI, PlatformAntigravity, PlatformGrok, PlatformAgnes, PlatformDeepSeek, PlatformNvidia, PlatformTokenRhythm, PlatformKimi, PlatformChatAnywhere, PlatformGLM},
+		[]string{PlatformAnthropic, PlatformGemini, PlatformOpenAI, PlatformAntigravity, PlatformGrok, PlatformAgnes, PlatformDeepSeek, PlatformNvidia, PlatformTokenRhythm, PlatformKimi, PlatformZhipu, PlatformChatAnywhere, PlatformGLM},
 		platforms,
 	)
+}
+
+func TestCompositeConcretePlatformsIncludeCNProviders(t *testing.T) {
+	for _, platform := range []string{PlatformKimi, PlatformZhipu, PlatformDeepSeek} {
+		require.True(t, isConcreteRequestPlatform(platform))
+		require.True(t, canCopyAccountsFromGroupPlatform(PlatformComposite, platform))
+	}
 }
