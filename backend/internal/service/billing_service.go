@@ -1144,7 +1144,6 @@ type CostInput struct {
 	Resolver                  *ModelPricingResolver // 定价解析器
 	Resolved                  *ResolvedPricing      // 可选：预解析的定价结果（避免重复 Resolve 调用）
 	LongContextBillingEnabled *bool
-	PricingAt                 time.Time
 }
 
 // CalculateCostUnified 统一计费入口，支持三种计费模式。

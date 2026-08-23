@@ -315,17 +315,13 @@ func (s *OpenAIGatewayService) proxyOpenAIWSHTTPBridgeTurn(
 
 	upstreamCtx, releaseUpstreamCtx := detachUpstreamContext(ctx)
 	var upstreamReq *http.Request
-	var clientToolMapping apicompat.ResponsesClientToolMapping
 	if account.Platform == PlatformGrok {
 		upstreamModel := resolveGrokWSUpstreamModel(account, body, originalModel)
-		grokIntentSourceBody := body
-		body, clientToolMapping, err = patchGrokResponsesBodyWithClientTools(body, upstreamModel)
 		body, err = patchGrokResponsesBody(body, upstreamModel)
 		if err != nil {
 			releaseUpstreamCtx()
 			return nil, err
 		}
-		setGrokResponsesClientToolMapping(c, clientToolMapping)
 		grokMixedCacheIntentBody := append([]byte(nil), body...)
 		body, err = applyGrokResponsesCacheIdentity(body, grokIntentSourceBody, grokCacheIdentity, account.IsGrokOAuth())
 		if err != nil {
@@ -466,8 +462,6 @@ func (s *OpenAIGatewayService) proxyOpenAIWSHTTPBridgeTurn(
 	if s.cfg != nil && s.cfg.Gateway.MaxLineSize > 0 {
 		maxLineSize = s.cfg.Gateway.MaxLineSize
 	}
-	if account.Platform == PlatformGrok && hasGrokResponsesClientToolMapping(clientToolMapping) {
-		resp.Body = newGrokResponsesClientToolStreamBody(resp.Body, clientToolMapping, maxLineSize)
 	if hasResponsesClientToolMapping(clientToolMapping) {
 		resp.Body = newResponsesClientToolStreamBody(resp.Body, clientToolMapping, maxLineSize)
 	}

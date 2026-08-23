@@ -13,8 +13,13 @@ func TestAllPlatformsIncludesEveryConcretePlatform(t *testing.T) {
 		"gemini",
 		"antigravity",
 		"grok",
+		"agnes",
+		"deepseek",
+		"nvidia",
+		"tokenrhythm",
 		"kimi",
 		"zhipu",
-		"deepseek",
+		"chatanywhere",
+		"glm",
 	}, AllPlatforms())
 }

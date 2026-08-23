@@ -876,6 +876,17 @@ func groupMediaPricingLooksIncomplete(group *Group) bool {
 }
 
 func (s *OpenAIGatewayService) resolveOpenAIChannelPricingAt(ctx context.Context, billingModel string, apiKey *APIKey, pricingAt time.Time) *ResolvedPricing {
+	if s.resolver == nil || apiKey == nil || apiKey.Group == nil {
+		return nil
+	}
+	gid := apiKey.Group.ID
+	resolved := s.resolver.Resolve(ctx, PricingInput{Model: billingModel, GroupID: &gid, Group: apiKey.Group, PricingAt: pricingAt})
+	if resolved.Source == PricingSourceGroup || resolved.Source == PricingSourceChannel {
+		return resolved
+	}
+	return nil
+}
+
 // filterCNProviderBillingModelCandidates 过滤国产供应商（kimi/zhipu/deepseek）
 // 账号的计费候选模型名：claude-* 候选仅在运营者显式配置了分组/渠道定价时保留。
 //
@@ -911,7 +922,7 @@ func (s *OpenAIGatewayService) resolveOpenAIChannelPricing(ctx context.Context, 
 		return nil
 	}
 	gid := apiKey.Group.ID
-	resolved := s.resolver.Resolve(ctx, PricingInput{Model: billingModel, GroupID: &gid, Group: apiKey.Group, PricingAt: pricingAt})
+	resolved := s.resolver.Resolve(ctx, PricingInput{Model: billingModel, GroupID: &gid, Group: apiKey.Group})
 	if resolved.Source == PricingSourceGroup || resolved.Source == PricingSourceChannel {
 		return resolved
 	}
