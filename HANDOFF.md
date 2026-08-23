@@ -131,3 +131,13 @@
 - The focused Go service test command reaches the existing Ent runtime initialization panic at `ent/runtime/runtime.go:1148` before executing tests; authoritative CI must run the service suite.
 - No commit, PR, release, deployment, production restart, account mutation, or provider key creation has been performed for this completed worktree yet.
 - No sess, Cookie, API key, referral value, proxy credential, or administrator credential is recorded in this document.
+
+## 2026-08-23 TokenRhythm API-key management released
+
+- PR [#83](https://github.com/CatStack-pixe/sub2api-harbor/pull/83) was labeled `enhancement` and `security`, received the required no-blocker code-audit review, and was squash-merged as `68945e8cee9ce0ca69d5489889b49abaf6b7d816` (`feat(tokenrhythm): manage provider API keys`).
+- Release [v0.1.176-nvidia.21-tokenrhythm-4](https://github.com/CatStack-pixe/sub2api-harbor/releases/tag/v0.1.176-nvidia.21-tokenrhythm-4) completed successfully in GitHub Actions run `32618926232`; the VERSION sync job also passed and `origin/main` now points to `158be676d`.
+- The immutable GHCR image is published as `ghcr.io/catstack-pixe/sub2api:0.1.176-nvidia.21-tokenrhythm-4`. Production target is `root@154.37.212.18` (`instance-0GDSx0Ws`), deployment directory `/opt/sub2api`.
+- Deployment completed with a protected backup at `/opt/sub2api/backups/pre-release-0.1.176-nvidia.21-tokenrhythm-4-20260823T050313Z` (directory `700`, files `600`, PostgreSQL dump about `137M`, restore list `1220` entries, all SHA-256 checks passing). Only `sub2api` was recreated; PostgreSQL, Redis, and Mihomo were not restarted.
+- Production pins `ghcr.io/catstack-pixe/sub2api:0.1.176-nvidia.21-tokenrhythm-4@sha256:78f94604e5d99c21ac9be15982c9bbeb2c96f4dc0e58cc756db7200bfe903dd8`, OCI revision `68945e8cee9ce0ca69d5489889b49abaf6b7d816`. The container is `running/healthy` with restart count `0`; local and public `/health` return `{"status":"ok"}` and public settings report version `0.1.176-nvidia.21-tokenrhythm-4`.
+- Local checks and PR CI are green: frontend typecheck/build, focused resolver tests (`6/6`), targeted ESLint, handler/middleware unit tests, gofmt, diff checks, backend CI, frontend CI, lint, shell, and security scans. The focused local service test remains blocked before test execution by the existing Ent runtime nil-to-bool panic; CI is authoritative.
+- No sess, Cookie, API key, referral value, proxy credential, administrator credential, account mutation, or provider key creation is recorded in this document.
