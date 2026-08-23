@@ -141,3 +141,10 @@
 - Production pins `ghcr.io/catstack-pixe/sub2api:0.1.176-nvidia.21-tokenrhythm-4@sha256:78f94604e5d99c21ac9be15982c9bbeb2c96f4dc0e58cc756db7200bfe903dd8`, OCI revision `68945e8cee9ce0ca69d5489889b49abaf6b7d816`. The container is `running/healthy` with restart count `0`; local and public `/health` return `{"status":"ok"}` and public settings report version `0.1.176-nvidia.21-tokenrhythm-4`.
 - Local checks and PR CI are green: frontend typecheck/build, focused resolver tests (`6/6`), targeted ESLint, handler/middleware unit tests, gofmt, diff checks, backend CI, frontend CI, lint, shell, and security scans. The focused local service test remains blocked before test execution by the existing Ent runtime nil-to-bool panic; CI is authoritative.
 - No sess, Cookie, API key, referral value, proxy credential, administrator credential, account mutation, or provider key creation is recorded in this document.
+
+## 2026-08-23 TokenRhythm generated API-key form autofill
+
+- Fixed the account create/edit forms so the TokenRhythm Manage API Key dialog writes the newly generated provider key through an explicit `v-model:api-key` binding. The generated `api_key` is now guaranteed to populate the form API Key field, while the existing `apiKeyCreated` event continues to update the rotated Cookie.
+- Added a focused resolver regression assertion for the `update:apiKey` event. The frontend targeted test and TypeScript typecheck pass locally.
+- The generated provider key is shown only once by TokenRhythm. If a user closes the dialog after generating it on an older build, the lost value cannot be recovered from the masked inventory; generate a replacement key or paste the still-visible value into the account API Key field.
+- This fix is local and has not yet been committed, pushed, reviewed, merged, released, or deployed. Do not claim the production UI contains it until the next immutable release is deployed.
