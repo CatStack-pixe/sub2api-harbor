@@ -286,24 +286,18 @@ func OpenAIResponsesKeepaliveAdjustedWrittenSize(c *gin.Context) int {
 	if !ok || k == nil {
 		return c.Writer.Size()
 	}
+	k.mu.Lock()
+	size := k.writer.Size()
+	responsesKeepaliveBytes := k.bytes
+	k.mu.Unlock()
 	streamKeepaliveBytes := 0
 	if value, ok := c.Get(openAIStreamKeepaliveBytesKey); ok {
 		streamKeepaliveBytes, _ = value.(int)
 	}
-	size := c.Writer.Size()
-	compactKeepaliveBytes := 0
-	if value, ok := c.Get(openAICompactSSEKeepaliveKey); ok {
-		if k, valid := value.(*openAICompactSSEKeepalive); valid && k != nil {
-			k.mu.Lock()
-			size = k.writer.Size()
-			compactKeepaliveBytes = k.bytes
-			k.mu.Unlock()
-		}
-	}
 	if size < 0 {
 		return size
 	}
-	keepaliveBytes := compactKeepaliveBytes + streamKeepaliveBytes
+	keepaliveBytes := responsesKeepaliveBytes + streamKeepaliveBytes
 	if keepaliveBytes <= 0 {
 		return size
 	}
