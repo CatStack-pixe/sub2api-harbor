@@ -615,15 +615,19 @@ export async function resolveTokenRhythmSession(
 }
 
 export interface CreateTokenRhythmAPIKeyRequest {
-  sess: string
+  sess?: string
+  cookie?: string
   name: string
   proxy_id?: number | null
+  account_id?: number | null
 }
 
 export interface CreateTokenRhythmAPIKeyResult {
   api_key: string
-  tokenrhythm_cookie: string
+  tokenrhythm_cookie?: string
   name: string
+  credential_persisted?: boolean
+  credential_persist_warning?: string
 }
 
 export async function createTokenRhythmAPIKey(
@@ -631,6 +635,69 @@ export async function createTokenRhythmAPIKey(
 ): Promise<CreateTokenRhythmAPIKeyResult> {
   const { data } = await apiClient.post<CreateTokenRhythmAPIKeyResult>(
     '/admin/tokenrhythm/api-keys',
+    request
+  )
+  return data
+}
+
+export interface TokenRhythmAPIKeyCredentialRequest {
+  sess?: string
+  cookie?: string
+  proxy_id?: number | null
+  account_id?: number | null
+}
+
+export interface TokenRhythmAPIKeyListItem {
+  id: string
+  name: string
+  masked_key?: string
+  key_prefix?: string
+  status?: string
+  created_at?: string
+  last_used_at?: string
+  deleted_at?: string
+}
+
+export interface TokenRhythmAPIKeyListResult {
+  keys: TokenRhythmAPIKeyListItem[]
+  tokenrhythm_cookie?: string
+  credential_persist_warning?: string
+}
+
+export interface TokenRhythmAPIKeyActionResult {
+  id: string
+  tokenrhythm_cookie?: string
+  credential_persisted?: boolean
+  credential_persist_warning?: string
+}
+
+export async function listTokenRhythmAPIKeys(
+  request: TokenRhythmAPIKeyCredentialRequest
+): Promise<TokenRhythmAPIKeyListResult> {
+  const { data } = await apiClient.post<TokenRhythmAPIKeyListResult>(
+    '/admin/tokenrhythm/api-keys/list',
+    request
+  )
+  return data
+}
+
+export async function disableTokenRhythmAPIKey(
+  id: string,
+  request: TokenRhythmAPIKeyCredentialRequest
+): Promise<TokenRhythmAPIKeyActionResult> {
+  const { data } = await apiClient.post<TokenRhythmAPIKeyActionResult>(
+    `/admin/tokenrhythm/api-keys/${encodeURIComponent(id)}/disable`,
+    request
+  )
+  return data
+}
+
+export async function deleteTokenRhythmAPIKey(
+  id: string,
+  request: TokenRhythmAPIKeyCredentialRequest
+): Promise<TokenRhythmAPIKeyActionResult> {
+  const { data } = await apiClient.post<TokenRhythmAPIKeyActionResult>(
+    `/admin/tokenrhythm/api-keys/${encodeURIComponent(id)}/delete`,
     request
   )
   return data
@@ -1126,6 +1193,9 @@ export const accountsAPI = {
   getTokenRhythmBalance,
   resolveTokenRhythmSession,
   createTokenRhythmAPIKey,
+  listTokenRhythmAPIKeys,
+  disableTokenRhythmAPIKey,
+  deleteTokenRhythmAPIKey,
   getKimiBalance,
   syncUpstreamModels,
   syncUpstreamModelsPreview,

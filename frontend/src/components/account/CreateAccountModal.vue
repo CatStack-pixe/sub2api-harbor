@@ -1441,8 +1441,9 @@
           <TokenRhythmSessionResolver
             :proxy-id="form.proxy_id"
             :account-name="form.name"
+            :credential-cookie="tokenRhythmCookie"
             @resolved="tokenRhythmCookie = $event"
-            @api-key-created="apiKeyValue = $event.api_key; tokenRhythmCookie = $event.tokenrhythm_cookie"
+            @api-key-created="apiKeyValue = $event.api_key; tokenRhythmCookie = $event.tokenrhythm_cookie || tokenRhythmCookie"
           />
           <label class="input-label">{{ t('admin.accounts.tokenrhythm.cookie') }}</label>
           <textarea

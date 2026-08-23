@@ -4,6 +4,7 @@ package admin
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -84,13 +85,13 @@ func TestCreateTokenRhythmAPIKeyHandler(t *testing.T) {
 		responses: []*http.Response{
 			{
 				StatusCode: http.StatusOK,
-				Header: http.Header{"Set-Cookie": []string{"tr_csrf=csrf-value; Path=/; Secure"}},
-				Body: io.NopCloser(bytes.NewBufferString(`{"code":0,"data":{"code":"invite-code"}}`)),
+				Header:     http.Header{"Set-Cookie": []string{"tr_csrf=csrf-value; Path=/; Secure"}},
+				Body:       io.NopCloser(bytes.NewBufferString(`{"code":0,"data":{"code":"invite-code"}}`)),
 			},
 			{
 				StatusCode: http.StatusOK,
-				Header: http.Header{"Set-Cookie": []string{"tr_csrf=csrf-value; Path=/; Secure"}},
-				Body: io.NopCloser(bytes.NewBufferString(`{"code":0,"data":{"key":"sk_tr_created"}}`)),
+				Header:     http.Header{"Set-Cookie": []string{"tr_csrf=csrf-value; Path=/; Secure"}},
+				Body:       io.NopCloser(bytes.NewBufferString(`{"code":0,"data":{"key":"sk_tr_created"}}`)),
 			},
 		},
 	}
@@ -107,6 +108,51 @@ func TestCreateTokenRhythmAPIKeyHandler(t *testing.T) {
 	require.Equal(t, http.StatusOK, response.Code)
 	require.Equal(t, "no-store", response.Header().Get("Cache-Control"))
 	require.JSONEq(t, `{"code":0,"message":"success","data":{"api_key":"sk_tr_created","tokenrhythm_cookie":"tr_session=sess_value; tr_csrf=csrf-value","name":"sub2api"}}`, response.Body.String())
+}
+
+type tokenRhythmHandlerAccountRepo struct {
+	service.AccountRepository
+	account *service.Account
+}
+
+func (r *tokenRhythmHandlerAccountRepo) GetByID(_ context.Context, id int64) (*service.Account, error) {
+	if r.account == nil || r.account.ID != id {
+		return nil, nil
+	}
+	return r.account, nil
+}
+
+func TestListTokenRhythmAPIKeysForAccountHandlerDoesNotExposeStoredCookie(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	repo := &tokenRhythmHandlerAccountRepo{account: &service.Account{
+		ID:       17,
+		Platform: service.PlatformTokenRhythm,
+		Credentials: map[string]any{
+			"tr_session": "sess_stored",
+			"tr_csrf":    "csrf-stored",
+		},
+	}}
+	serviceUpstream := &serviceHTTPUpstreamSequence{responses: []*http.Response{{
+		StatusCode: http.StatusOK,
+		Header:     make(http.Header),
+		Body:       io.NopCloser(bytes.NewBufferString(`[{"id":"key-17","name":"primary","maskedKey":"sk_tr_****"}]`)),
+	}}}
+	testService := service.NewAccountTestService(repo, nil, nil, nil, nil, serviceUpstream, nil, nil)
+	handler := NewAccountHandler(nil, nil, nil, nil, nil, nil, nil, nil, testService, nil, nil, nil, nil, nil)
+	router := gin.New()
+	router.POST("/api-keys/list", handler.ListTokenRhythmAPIKeys)
+
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/api-keys/list", bytes.NewBufferString(`{"account_id":17}`))
+	request.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(response, request)
+
+	require.Equal(t, http.StatusOK, response.Code)
+	require.Equal(t, "no-store", response.Header().Get("Cache-Control"))
+	require.NotContains(t, response.Body.String(), "sess_stored")
+	require.NotContains(t, response.Body.String(), "csrf-stored")
+	require.NotContains(t, response.Body.String(), "tokenrhythm_cookie")
+	require.JSONEq(t, `{"code":0,"message":"success","data":{"keys":[{"id":"key-17","name":"primary","masked_key":"sk_tr_****"}]}}`, response.Body.String())
 }
 
 type serviceHTTPUpstreamSequence struct {

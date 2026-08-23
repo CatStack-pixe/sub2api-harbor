@@ -734,7 +734,21 @@ export default {
         keyCreatedOnce: '新建 Key 只会在本次返回后查看，请立即保存。',
         copyKey: '复制 Key',
         keyCopied: 'Key 已复制',
-        keyCopyFailed: '复制失败'
+        keyCopyFailed: '复制失败',
+        keyInventory: '上游 API Key',
+        keyInventoryHint: '仅返回名称、状态和脱敏标识，不会显示已有密钥全文。',
+        listKeys: '加载 Key',
+        loadingKeys: '加载中',
+        noKeys: '未找到上游 API Key。',
+        unknownStatus: '状态未知',
+        disableKey: '禁用',
+        working: '处理中',
+        disableConfirm: '确认禁用上游 Key「{name}」？',
+        deleteConfirm: '确认永久删除上游 Key「{name}」？',
+        keyListFailed: '加载 TokenRhythm API Key 失败',
+        keyActionFailed: '更新 TokenRhythm API Key 失败',
+        accountCredentialSource: '默认使用当前账户已保存的凭据；重新解析会话后使用新凭据。',
+        credentialPersistWarning: '上游操作已成功，但轮换后的 Cookie 未能自动保存。请先保存当前账户再继续操作。'
       },
       kimi: {
         baseUrlHint: '可使用预设地址，也可填写自定义 OpenAI 兼容 Base URL；自定义地址不支持 Kimi 官方余额查询。',
