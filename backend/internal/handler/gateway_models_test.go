@@ -332,6 +332,27 @@ func TestGatewayModels_CompositeCustomModelsListFiltersAcrossConcretePlatforms(t
 							},
 						},
 					},
+					{
+						ID:       4,
+						Platform: service.PlatformKimi,
+						Credentials: map[string]any{
+							"model_mapping": map[string]any{"kimi-custom": "kimi-upstream"},
+						},
+					},
+					{
+						ID:       5,
+						Platform: service.PlatformZhipu,
+						Credentials: map[string]any{
+							"model_mapping": map[string]any{"glm-custom": "glm-upstream"},
+						},
+					},
+					{
+						ID:       6,
+						Platform: service.PlatformDeepSeek,
+						Credentials: map[string]any{
+							"model_mapping": map[string]any{"deepseek-custom": "deepseek-upstream"},
+						},
+					},
 				},
 			},
 		},
@@ -346,7 +367,7 @@ func TestGatewayModels_CompositeCustomModelsListFiltersAcrossConcretePlatforms(t
 			Platform: service.PlatformComposite,
 			ModelsListConfig: service.GroupModelsListConfig{
 				Enabled: true,
-				Models:  []string{"gemini-2.5-flash", "missing-model", "ag-custom-model", "gpt-5.5"},
+				Models:  []string{"gemini-2.5-flash", "missing-model", "ag-custom-model", "gpt-5.5", "kimi-custom", "glm-custom", "deepseek-custom"},
 			},
 		},
 	})
@@ -357,7 +378,7 @@ func TestGatewayModels_CompositeCustomModelsListFiltersAcrossConcretePlatforms(t
 
 	var got gatewayModelsResponseForTest
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &got))
-	require.Equal(t, []string{"gemini-2.5-flash", "ag-custom-model", "gpt-5.5"}, modelIDsForTest(got.Data))
+	require.Equal(t, []string{"gemini-2.5-flash", "ag-custom-model", "gpt-5.5", "kimi-custom", "glm-custom", "deepseek-custom"}, modelIDsForTest(got.Data))
 }
 
 func TestGatewayModels_CompositeUnmappedAccountsFallbackToLinkedPlatformsOnly(t *testing.T) {
@@ -394,6 +415,60 @@ func TestGatewayModels_CompositeUnmappedAccountsFallbackToLinkedPlatformsOnly(t 
 	require.Contains(t, ids, "grok-4.3")
 	require.NotContains(t, ids, "claude-sonnet-4-6")
 	require.NotContains(t, ids, "gemini-2.5-flash")
+}
+
+// CN 供应商没有静态默认模型列表：composite 下无映射的可调度 CN 账号不得把
+// defaultModelIDsForPlatform default 分支的 Claude 列表挂到 CN 平台名下。
+func TestGatewayModels_CompositeUnmappedCNAccountsContributeNoDefaults(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	groupID := int64(35)
+	h := newGatewayModelsHandlerForTest(
+		&gatewayModelsAccountRepoStub{
+			byGroup: map[int64][]service.Account{
+				groupID: {
+					{ID: 1, Platform: service.PlatformOpenAI},
+					{ID: 2, Platform: service.PlatformKimi},
+					{ID: 3, Platform: service.PlatformZhipu},
+					{ID: 4, Platform: service.PlatformDeepSeek},
+				},
+			},
+		},
+	)
+
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Request = httptest.NewRequest(http.MethodGet, "/v1/models", nil)
+	c.Set(string(middleware2.ContextKeyAPIKey), &service.APIKey{
+		Group: &service.Group{ID: groupID, Platform: service.PlatformComposite},
+	})
+
+	h.Models(c)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	var got gatewayModelsResponseForTest
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &got))
+
+	ids := modelIDsForTest(got.Data)
+	require.Contains(t, ids, "gpt-5.5")
+	require.NotContains(t, ids, "claude-sonnet-4-6")
+}
+
+// 独立 CN 分组保留各平台自己的默认模型语义；没有静态目录的 Zhipu
+// 依赖账号同步结果，不得回退到 Claude 模型。
+func TestDefaultModelIDsForPlatform_CNProvidersKeepProviderDefaults(t *testing.T) {
+	tests := []struct {
+		platform string
+		want     []string
+	}{
+		{platform: service.PlatformKimi, want: service.KimiDefaultModelIDs()},
+		{platform: service.PlatformZhipu, want: nil},
+		{platform: service.PlatformDeepSeek, want: service.DeepSeekDefaultModelIDs()},
+	}
+	for _, tt := range tests {
+		require.Equal(t, tt.want, defaultModelIDsForPlatform(tt.platform), "platform=%s", tt.platform)
+	}
 }
 
 func TestGatewayModels_CustomModelsListKeepsConcreteModelAllowedByWildcardMapping(t *testing.T) {

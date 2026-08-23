@@ -588,6 +588,7 @@ func (s *SchedulerSnapshotService) handleBulkAccountEvent(ctx context.Context, p
 	}
 
 	// 缺失账户无法确定原平台，保留所有平台重建以避免遗留旧快照。
+	// 缺失账户无法确定原平台，保留全平台重建以避免遗留旧快照。
 	if !allAccountsFound {
 		return s.rebuildByGroupIDs(ctx, rebuildGroupIDs, "account_bulk_change", seen)
 	}
@@ -609,7 +610,9 @@ func (s *SchedulerSnapshotService) handleBulkAccountEvent(ctx context.Context, p
 		}
 		accountGroupIDs := s.normalizeGroupIDs(account.GroupIDs)
 		switch account.Platform {
-		case PlatformAnthropic, PlatformGemini, PlatformOpenAI, PlatformGrok, PlatformAgnes, PlatformDeepSeek, PlatformNvidia, PlatformTokenRhythm, PlatformKimi, PlatformChatAnywhere, PlatformGLM:
+		case PlatformAnthropic, PlatformGemini, PlatformOpenAI, PlatformGrok, PlatformAgnes,
+			PlatformDeepSeek, PlatformNvidia, PlatformTokenRhythm, PlatformKimi, PlatformZhipu,
+			PlatformChatAnywhere, PlatformGLM:
 			addPlatformGroups(account.Platform, accountGroupIDs)
 			if account.Platform == PlatformTokenRhythm {
 				addPlatformGroups(PlatformDeepSeek, accountGroupIDs)
@@ -830,8 +833,10 @@ func (s *SchedulerSnapshotService) rebuildByAccount(ctx context.Context, account
 	return s.rebuildBuckets(ctx, buckets, reason)
 }
 
-func schedulerSnapshotPlatforms() [12]string {
-	return [12]string{PlatformAnthropic, PlatformGemini, PlatformOpenAI, PlatformAntigravity, PlatformGrok, PlatformAgnes, PlatformDeepSeek, PlatformNvidia, PlatformTokenRhythm, PlatformKimi, PlatformChatAnywhere, PlatformGLM}
+func schedulerSnapshotPlatforms() [13]string {
+	return [13]string{PlatformAnthropic, PlatformGemini, PlatformOpenAI, PlatformAntigravity,
+		PlatformGrok, PlatformAgnes, PlatformDeepSeek, PlatformNvidia, PlatformTokenRhythm,
+		PlatformKimi, PlatformZhipu, PlatformChatAnywhere, PlatformGLM}
 }
 
 // 生命周期辅助函数有意排除 group0；full rebuild 构造 group0 canonical 集时必须显式调用 canonical helper。
@@ -843,7 +848,7 @@ func schedulerBucketsForGroup(groupID int64) []SchedulerBucket {
 }
 
 func schedulerCanonicalBuckets(groupID int64) []SchedulerBucket {
-	buckets := make([]SchedulerBucket, 0, 12)
+	buckets := make([]SchedulerBucket, 0, 18)
 	for _, platform := range schedulerSnapshotPlatforms() {
 		buckets = append(buckets,
 			SchedulerBucket{GroupID: groupID, Platform: platform, Mode: SchedulerModeSingle},
@@ -861,7 +866,7 @@ func (s *SchedulerSnapshotService) rebuildByGroupIDs(ctx context.Context, groupI
 	if len(groupIDs) == 0 {
 		return nil
 	}
-	buckets := make([]SchedulerBucket, 0, len(groupIDs)*12)
+	buckets := make([]SchedulerBucket, 0, len(groupIDs)*18)
 	for _, platform := range schedulerSnapshotPlatforms() {
 		buckets = append(buckets, s.bucketsForPlatform(platform, groupIDs, seen)...)
 	}

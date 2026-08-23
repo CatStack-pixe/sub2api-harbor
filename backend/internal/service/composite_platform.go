@@ -114,12 +114,14 @@ func DetectModelPlatform(model string) (string, bool) {
 			return PlatformNvidia, true
 		case "tokenrhythm":
 			return PlatformTokenRhythm, true
-		case "kimi":
+		case "kimi", "moonshot":
 			return PlatformKimi, true
 		case "chatanywhere":
 			return PlatformChatAnywhere, true
-		case "glm", "zhipu":
+		case "glm":
 			return PlatformGLM, true
+		case "zhipu", "bigmodel":
+			return PlatformZhipu, true
 		case "z-ai", "zai":
 			// NVIDIA NIM also publishes models under these namespaces. Leave
 			// ambiguous names unresolved unless a composite route is explicit.
@@ -157,7 +159,8 @@ func DetectModelPlatform(model string) (string, bool) {
 		return PlatformDeepSeek, true
 	case strings.HasPrefix(normalized, "nvidia-"):
 		return PlatformNvidia, true
-	case strings.HasPrefix(normalized, "kimi-"):
+	case strings.HasPrefix(normalized, "kimi-"),
+		strings.HasPrefix(normalized, "moonshot-"):
 		return PlatformKimi, true
 	case strings.HasPrefix(normalized, "glm-"):
 		return PlatformGLM, true
@@ -207,7 +210,9 @@ func (s *GatewayService) resolveCompositeRouteDecision(ctx context.Context, grou
 
 func isConcreteRequestPlatform(platform string) bool {
 	switch platform {
-	case PlatformAnthropic, PlatformOpenAI, PlatformGemini, PlatformAntigravity, PlatformGrok, PlatformAgnes, PlatformDeepSeek, PlatformNvidia, PlatformTokenRhythm, PlatformKimi, PlatformChatAnywhere, PlatformGLM:
+	case PlatformAnthropic, PlatformOpenAI, PlatformGemini, PlatformAntigravity, PlatformGrok,
+		PlatformAgnes, PlatformDeepSeek, PlatformNvidia, PlatformTokenRhythm, PlatformKimi,
+		PlatformZhipu, PlatformChatAnywhere, PlatformGLM:
 		return true
 	default:
 		return false

@@ -96,21 +96,29 @@ func TestUpdateUserPlatformQuotas_Success(t *testing.T) {
 	cache := &billingCacheStub{}
 	h := buildTestHandler(repo, cache)
 
-	body := `{"quotas":[
-		{"platform":"anthropic","daily_limit_usd":10.0,"weekly_limit_usd":null,"monthly_limit_usd":100.0},
-		{"platform":"openai","daily_limit_usd":80.0,"weekly_limit_usd":300.0,"monthly_limit_usd":null},
-		{"platform":"gemini","daily_limit_usd":null,"weekly_limit_usd":null,"monthly_limit_usd":null},
-		{"platform":"antigravity","daily_limit_usd":null,"weekly_limit_usd":null,"monthly_limit_usd":null},
-		{"platform":"grok","daily_limit_usd":null,"weekly_limit_usd":null,"monthly_limit_usd":null},
-		{"platform":"agnes","daily_limit_usd":null,"weekly_limit_usd":null,"monthly_limit_usd":null},
-		{"platform":"deepseek","daily_limit_usd":null,"weekly_limit_usd":null,"monthly_limit_usd":null},
-		{"platform":"nvidia","daily_limit_usd":null,"weekly_limit_usd":null,"monthly_limit_usd":null},
-		{"platform":"tokenrhythm","daily_limit_usd":null,"weekly_limit_usd":null,"monthly_limit_usd":null},
-		{"platform":"kimi","daily_limit_usd":null,"weekly_limit_usd":null,"monthly_limit_usd":null},
-		{"platform":"chatanywhere","daily_limit_usd":null,"weekly_limit_usd":null,"monthly_limit_usd":null},
-		{"platform":"glm","daily_limit_usd":null,"weekly_limit_usd":null,"monthly_limit_usd":null}
-	]}`
-	c, w := putReq(t, body)
+	quotas := make([]map[string]any, 0, len(service.AllowedQuotaPlatforms))
+	for _, platform := range service.AllowedQuotaPlatforms {
+		quota := map[string]any{
+			"platform":          platform,
+			"daily_limit_usd":   nil,
+			"weekly_limit_usd":  nil,
+			"monthly_limit_usd": nil,
+		}
+		switch platform {
+		case service.PlatformAnthropic:
+			quota["daily_limit_usd"] = 10.0
+			quota["monthly_limit_usd"] = 100.0
+		case service.PlatformOpenAI:
+			quota["daily_limit_usd"] = 80.0
+			quota["weekly_limit_usd"] = 300.0
+		}
+		quotas = append(quotas, quota)
+	}
+	body, err := json.Marshal(map[string]any{"quotas": quotas})
+	if err != nil {
+		t.Fatalf("marshal request: %v", err)
+	}
+	c, w := putReq(t, string(body))
 	h.UpdateUserPlatformQuotas(c)
 
 	if w.Code != http.StatusOK {
@@ -119,10 +127,11 @@ func TestUpdateUserPlatformQuotas_Success(t *testing.T) {
 	if len(repo.upsertCalls) != 1 {
 		t.Fatalf("UpsertForUser should be called once, got %d", len(repo.upsertCalls))
 	}
+	// 请求覆盖全部允许平台，因此 upsert 数量必须随平台目录同步增长。
 	if repo.upsertCalls[0].userID != 42 || len(repo.upsertCalls[0].records) != len(service.AllowedQuotaPlatforms) {
 		t.Errorf("unexpected upsert call: %+v", repo.upsertCalls[0])
 	}
-	// 缓存失效：按全部允许平台统一失效。
+	// 缓存失效：按全部允许平台统一失效（含 kimi/zhipu/deepseek）。
 	if len(cache.deleteCalls) != len(service.AllowedQuotaPlatforms) {
 		t.Errorf("expected %d cache delete calls, got %d: %+v", len(service.AllowedQuotaPlatforms), len(cache.deleteCalls), cache.deleteCalls)
 	}

@@ -325,7 +325,7 @@ func newGroupLifecycleTestService(cache SchedulerCache, accounts AccountReposito
 }
 
 func expectedGroupLifecycleBuckets(groupID int64) []SchedulerBucket {
-	platforms := []string{PlatformAnthropic, PlatformGemini, PlatformOpenAI, PlatformAntigravity, PlatformGrok, PlatformAgnes, PlatformDeepSeek, PlatformNvidia, PlatformTokenRhythm, PlatformKimi, PlatformChatAnywhere, PlatformGLM}
+	platforms := schedulerSnapshotPlatforms()
 	buckets := make([]SchedulerBucket, 0, len(platforms)*2+2)
 	for _, platform := range platforms {
 		buckets = append(buckets,
@@ -584,6 +584,10 @@ func TestSchedulerGroupLifecycleSeenIsIndependentAndDeduplicatesGroupEvents(t *t
 		seen[batchSeenKey{groupID: groupID, platform: platform}] = struct{}{}
 	}
 
+	require.NoError(t, svc.handleGroupEvent(context.Background(), ptrInt64(groupID), seen))
+	require.Equal(t, 1, groups.callCount())
+	require.Equal(t, expectedSchedulerPlatformQueryCount(), accounts.callCount())
+	requireLifecycleSeen(t, seen, groupID)
 	require.NoError(t, svc.handleGroupEvent(context.Background(), ptrInt64(groupID), seen))
 	require.Equal(t, 1, groups.callCount())
 	require.Equal(t, expectedSchedulerPlatformQueryCount(), accounts.callCount())

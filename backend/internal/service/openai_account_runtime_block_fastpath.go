@@ -35,7 +35,7 @@ func isGrokOAuthAccount(account *Account) bool {
 }
 
 func isOpenAIAccount(account *Account) bool {
-	return account != nil && (account.Platform == PlatformOpenAI || account.Platform == PlatformGrok || account.Platform == PlatformAgnes || account.Platform == PlatformDeepSeek || account.Platform == PlatformNvidia || account.Platform == PlatformTokenRhythm || account.Platform == PlatformKimi || account.Platform == PlatformChatAnywhere || account.Platform == PlatformGLM)
+	return account != nil && (account.Platform == PlatformOpenAI || account.Platform == PlatformGrok || account.Platform == PlatformAgnes || account.Platform == PlatformDeepSeek || account.Platform == PlatformNvidia || account.Platform == PlatformTokenRhythm || account.Platform == PlatformKimi || account.Platform == PlatformZhipu || account.Platform == PlatformChatAnywhere || account.Platform == PlatformGLM)
 }
 
 // handleOpenAIAccountUpstreamError expects canonicalModel to be the model used
@@ -47,6 +47,11 @@ func (s *OpenAIGatewayService) handleOpenAIAccountUpstreamError(ctx context.Cont
 	// Any non-2xx upstream HTTP response means the model request was actually sent.
 	if s != nil {
 		scheduleOllamaCloudUsageActivity(s.deferredService, account)
+	}
+	// Capacity shedding describes this request, not account health. Keep the
+	// account schedulable while the request-local retry budget handles recovery.
+	if account != nil && account.Platform == PlatformOpenAI && isOpenAIRequestScopedCapacityShed("", responseBody) {
+		return false
 	}
 	stateCtx, cancel := openAIAccountStateContext(ctx)
 	defer cancel()
@@ -75,6 +80,10 @@ func (s *OpenAIGatewayService) handleOpenAIAccountUpstreamError(ctx context.Cont
 	// after the daily reset.
 	if isAgnesInsufficientQuotaResponse(account, statusCode, responseBody) {
 		return false
+	}
+	// Team 联动熔断必须先于 model-not-found 与账户级临时不可调度规则的早退。
+	if s.rateLimitService != nil {
+		s.rateLimitService.maybeHandleOpenAITeamLinkedError(stateCtx, account, statusCode, responseBody)
 	}
 	stateCtx = withTempUnschedulableModel(stateCtx, canonicalModel)
 	if s.rateLimitService != nil && len(canonicalModel) > 0 && s.rateLimitService.HandleUpstreamModelNotFound(stateCtx, account, canonicalModel[0], statusCode, responseBody) {

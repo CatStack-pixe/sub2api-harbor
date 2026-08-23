@@ -14,7 +14,8 @@ import (
 func ValidateAccountPlatform(platform string) error {
 	switch strings.TrimSpace(platform) {
 	case PlatformAnthropic, PlatformOpenAI, PlatformGemini, PlatformAntigravity,
-		PlatformGrok, PlatformAgnes, PlatformDeepSeek, PlatformNvidia, PlatformTokenRhythm, PlatformKimi, PlatformChatAnywhere, PlatformGLM:
+		PlatformGrok, PlatformAgnes, PlatformDeepSeek, PlatformNvidia, PlatformTokenRhythm,
+		PlatformKimi, PlatformZhipu, PlatformChatAnywhere, PlatformGLM:
 		return nil
 	default:
 		return infraerrors.BadRequest("UNSUPPORTED_ACCOUNT_PLATFORM", "unsupported account platform")
@@ -24,7 +25,8 @@ func ValidateAccountPlatform(platform string) error {
 func ValidateGroupPlatform(platform string) error {
 	switch strings.TrimSpace(platform) {
 	case PlatformAnthropic, PlatformOpenAI, PlatformGemini, PlatformAntigravity,
-		PlatformGrok, PlatformAgnes, PlatformDeepSeek, PlatformNvidia, PlatformTokenRhythm, PlatformKimi, PlatformChatAnywhere, PlatformGLM, PlatformComposite:
+		PlatformGrok, PlatformAgnes, PlatformDeepSeek, PlatformNvidia, PlatformTokenRhythm,
+		PlatformKimi, PlatformZhipu, PlatformChatAnywhere, PlatformGLM, PlatformComposite:
 		return nil
 	default:
 		return infraerrors.BadRequest("UNSUPPORTED_GROUP_PLATFORM", "unsupported group platform")
@@ -52,7 +54,7 @@ func validateAccountCredentials(platform, accountType string, credentials map[st
 	if err := ValidateAccountPlatform(platform); err != nil {
 		return err
 	}
-	if platform != PlatformDeepSeek && platform != PlatformNvidia && platform != PlatformTokenRhythm && platform != PlatformKimi && platform != PlatformChatAnywhere && platform != PlatformGLM {
+	if platform != PlatformDeepSeek && platform != PlatformNvidia && platform != PlatformTokenRhythm && platform != PlatformKimi && platform != PlatformZhipu && platform != PlatformChatAnywhere && platform != PlatformGLM {
 		return nil
 	}
 	platformName := "DeepSeek"
@@ -68,6 +70,10 @@ func validateAccountCredentials(platform, accountType string, credentials map[st
 	if platform == PlatformKimi {
 		platformName = "Kimi"
 		errorPrefix = "KIMI"
+	}
+	if platform == PlatformZhipu {
+		platformName = "Zhipu"
+		errorPrefix = "ZHIPU"
 	}
 	if platform == PlatformChatAnywhere {
 		platformName = "ChatAnywhere"

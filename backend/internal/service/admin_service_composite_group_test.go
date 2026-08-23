@@ -174,6 +174,13 @@ func TestAdminService_CompositeModelsListCandidatesIncludeConcreteAccountMapping
 					"model_mapping": map[string]any{"gemini-custom": "gemini-2.5-flash"},
 				},
 			},
+			{
+				ID:       3,
+				Platform: PlatformKimi,
+				Credentials: map[string]any{
+					"model_mapping": map[string]any{"kimi-custom": "kimi-k2"},
+				},
+			},
 		},
 	}
 	groupRepo := &groupRepoStubForAdmin{
@@ -188,6 +195,23 @@ func TestAdminService_CompositeModelsListCandidatesIncludeConcreteAccountMapping
 	require.NoError(t, err)
 	require.Contains(t, candidates, "gpt-custom")
 	require.Contains(t, candidates, "gemini-custom")
+	require.Contains(t, candidates, "kimi-custom")
 	require.Contains(t, candidates, "gpt-5.5")
 	require.Contains(t, candidates, "gemini-2.5-flash")
+}
+
+// 独立 CN 分组保留各平台自己的默认模型语义；没有静态目录的 Zhipu
+// 依赖账号同步结果，不得回退到 Claude 模型。
+func TestAdminService_CNProviderModelsListCandidatesKeepProviderDefaults(t *testing.T) {
+	tests := []struct {
+		platform string
+		want     []string
+	}{
+		{platform: PlatformKimi, want: KimiDefaultModelIDs()},
+		{platform: PlatformZhipu, want: nil},
+		{platform: PlatformDeepSeek, want: DeepSeekDefaultModelIDs()},
+	}
+	for _, tt := range tests {
+		require.Equal(t, tt.want, defaultModelsListCandidateIDs(tt.platform), "platform=%s", tt.platform)
+	}
 }

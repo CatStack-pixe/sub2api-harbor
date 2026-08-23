@@ -5,8 +5,8 @@ package service
 import (
 	"context"
 	"testing"
+	"time"
 
-	"github.com/Wei-Shaw/sub2api/internal/pkg/timezone"
 	"github.com/stretchr/testify/require"
 )
 
@@ -26,7 +26,7 @@ func TestCalculateOpenAIRecordUsageCost_SearchIsAdditiveToTokens(t *testing.T) {
 	// claude-sonnet-4 fallback: Input $3/MTok, Output $15/MTok
 	// 1000 in + 500 out → 0.003 + 0.0075 = 0.0105
 	// + 100 searches → +1.0 → total 1.0105
-	cost, err := svc.calculateOpenAIRecordUsageCostAt(
+	cost, err := svc.calculateOpenAIRecordUsageCost(
 		context.Background(),
 		&OpenAIForwardResult{SearchCount: 100},
 		apiKey,
@@ -37,8 +37,8 @@ func TestCalculateOpenAIRecordUsageCost_SearchIsAdditiveToTokens(t *testing.T) {
 		1.0,
 		UsageTokens{InputTokens: 1000, OutputTokens: 500},
 		"",
-		false,
-		timezone.Now(),
+		boolPtr(false),
+		time.Time{},
 	)
 	require.NoError(t, err)
 	require.NotNil(t, cost)
@@ -57,7 +57,7 @@ func TestCalculateOpenAIRecordUsageCost_SearchOnlyWhenNoTokenPricing(t *testing.
 		Group: &Group{SearchPricePer1k: &price},
 	}
 	// Empty model list: token path fails; search-only surcharge still bills.
-	cost, err := svc.calculateOpenAIRecordUsageCostAt(
+	cost, err := svc.calculateOpenAIRecordUsageCost(
 		context.Background(),
 		&OpenAIForwardResult{SearchCount: 100},
 		apiKey,
@@ -68,8 +68,8 @@ func TestCalculateOpenAIRecordUsageCost_SearchOnlyWhenNoTokenPricing(t *testing.
 		1.0,
 		UsageTokens{},
 		"",
-		false,
-		timezone.Now(),
+		boolPtr(false),
+		time.Time{},
 	)
 	require.NoError(t, err)
 	require.NotNil(t, cost)
@@ -103,7 +103,7 @@ func TestCalculateOpenAIRecordUsageCost_TokenPricingErrorNotSwallowedBySearch(t 
 		Group: &Group{SearchPricePer1k: &price},
 	}
 	// Unknown model → token pricing fails; search must not replace that with $0/$search bill.
-	cost, err := svc.calculateOpenAIRecordUsageCostAt(
+	cost, err := svc.calculateOpenAIRecordUsageCost(
 		context.Background(),
 		&OpenAIForwardResult{SearchCount: 100},
 		apiKey,
@@ -114,8 +114,8 @@ func TestCalculateOpenAIRecordUsageCost_TokenPricingErrorNotSwallowedBySearch(t 
 		1.0,
 		UsageTokens{InputTokens: 1000, OutputTokens: 500},
 		"",
-		false,
-		timezone.Now(),
+		boolPtr(false),
+		time.Time{},
 	)
 	require.Error(t, err)
 	require.Nil(t, cost)
