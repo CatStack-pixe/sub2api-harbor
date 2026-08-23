@@ -1,14 +1,14 @@
 # Handoff
 
-## 2026-08-23 Upstream v0.1.179 sync (local integration complete; GitHub validation pending)
+## 2026-08-23 Upstream v0.1.179 sync (GitHub validation complete; final review pending)
 
-- The integration is isolated on branch `sync/upstream-v0.1.179` in `.codex-worktrees/upstream-v179-sync`, based on fork `origin/main` commit `0fcf9100c750f0542e9fbcf5be04830813737231`. The original dirty worktree remains untouched.
-- The stable official `v0.1.179` release is being integrated against the explicit official `v0.1.176` merge base. Fork behavior remains authoritative: Agnes, NVIDIA, TokenRhythm, ChatAnywhere, Kimi, DeepSeek, and GLM are preserved, including fork routing, pricing, quota, and provider-specific usage behavior.
+- The integration is isolated on branch `sync/upstream-v0.1.179` in `.codex-worktrees/upstream-v179-sync`, based on fork `origin/main` commit `0fcf9100c750f0542e9fbcf5be04830813737231`. PR [#87](https://github.com/CatStack-pixe/sub2api-harbor/pull/87) carries the required `enhancement` label. The original dirty worktree remains untouched.
+- The stable official `v0.1.179` release is integrated against the explicit official `v0.1.176` merge base. Fork behavior remains authoritative: Agnes, NVIDIA, TokenRhythm, ChatAnywhere, Kimi, DeepSeek, and GLM are preserved, including fork routing, model defaults and synchronization, pricing, quota, failover, and provider-specific usage behavior.
 - Upstream CN-provider adaptive protocols, Zhipu support, Composite routing, channel time/tier/context pricing, quota monitoring, usage rollups, Codex turn state, remote compaction, WebSocket bridge, client-tools, failover, and usage-accounting fixes are included where compatible. `glm` remains the fork platform and upstream `zhipu` is represented separately.
 - Migration `229_restore_fork_platform_constraints.sql` restores the complete 13-platform union after the fork and upstream duplicate-number migration sequences execute in full-filename order.
-- Frontend verification passed: typecheck, ESLint, and the full Vitest suite (`251` files, `1738` tests). `git diff --check` and conflict-marker checks also passed. Backend compilation and tests must run through GitHub Actions because Go is intentionally not installed locally.
-- Independent provider and merge-artifact audits found no remaining fork-provider regression; all reported duplicate declarations, fields, and conflict-splice artifacts were resolved before submission. The supported migration path is fork `origin/main` to this sync; databases that previously ran official v0.1.177-v0.1.179 may require a separate checksum-compatible migration path.
-- The branch is ready for its integration commit and GitHub PR. It has not yet been pushed, merged, released, deployed, or applied to production data.
+- Frontend verification passed locally: typecheck, ESLint, and the full Vitest suite (`251` files, `1738` tests). `git diff --check` and conflict-marker checks also passed. Implementation commit `c7fd06a40` passed duplicate GitHub CI runs `32634732960` and `32634735269` (unit tests, integration tests, golangci-lint, frontend, and shell) plus Security Scan runs `32634732958` and `32634735254` (backend and frontend security).
+- Independent provider, migration/CI, and merge-artifact audits found no remaining fork-provider regression or blocking issue; all reported duplicate declarations, fields, and conflict-splice artifacts were resolved before submission. The supported migration path is fork `origin/main` to this sync; databases that previously ran official v0.1.177-v0.1.179 may require a separate checksum-compatible migration path.
+- PR #87 is awaiting the required final post-label code review and squash merge. It has not been released, deployed, or applied to production data.
 
 ## 2026-08-22 TokenRhythm built-in model sync fallback (completed)
 
