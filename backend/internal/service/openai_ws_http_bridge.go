@@ -317,11 +317,12 @@ func (s *OpenAIGatewayService) proxyOpenAIWSHTTPBridgeTurn(
 	var upstreamReq *http.Request
 	if account.Platform == PlatformGrok {
 		upstreamModel := resolveGrokWSUpstreamModel(account, body, originalModel)
-		body, err = patchGrokResponsesBodyBase(body, upstreamModel, hasResponsesClientToolMapping(clientToolMapping))
+		body, err = patchGrokResponsesBodyBase(body, upstreamModel, false)
 		if err != nil {
 			releaseUpstreamCtx()
 			return nil, err
 		}
+		setGrokResponsesClientToolMapping(c, clientToolMapping)
 		grokMixedCacheIntentBody := append([]byte(nil), body...)
 		body, err = applyGrokResponsesCacheIdentity(body, grokIntentSourceBody, grokCacheIdentity, account.IsGrokOAuth())
 		if err != nil {

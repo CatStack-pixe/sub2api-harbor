@@ -430,11 +430,15 @@ func patchGrokResponsesBodyWithClientTools(body []byte, upstreamModel string) ([
 	if err != nil {
 		return nil, apicompat.ResponsesClientToolMapping{}, err
 	}
-	patched, err := patchGrokResponsesBodyBase(adapted, upstreamModel, hasResponsesClientToolMapping(mapping))
+	patched, err := patchGrokResponsesBodyBase(adapted, upstreamModel, preservesGrokClientToolChoice(mapping))
 	if err != nil {
 		return nil, apicompat.ResponsesClientToolMapping{}, err
 	}
 	return patched, mapping, nil
+}
+
+func preservesGrokClientToolChoice(mapping apicompat.ResponsesClientToolMapping) bool {
+	return len(mapping.CustomTools) > 0 || mapping.ToolSearch
 }
 
 func patchGrokResponsesBodyBase(body []byte, upstreamModel string, preserveClientToolChoice bool) ([]byte, error) {
