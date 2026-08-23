@@ -128,6 +128,7 @@ describe('TokenRhythmSessionResolver', () => {
         name: 'sub2api-demo'
       }
     ]])
+    expect(wrapper.emitted('update:apiKey')).toEqual([['sk_tr_created']])
     expect(wrapper.emitted('resolved')).toEqual([['tr_session=session; tr_csrf=csrf']])
     expect(wrapper.get('[data-testid="tokenrhythm-key-session-input"]').element).toHaveProperty('value', '')
   })

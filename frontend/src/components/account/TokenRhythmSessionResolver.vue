@@ -182,14 +182,17 @@ const props = withDefaults(defineProps<{
   accountName?: string
   accountId?: number | null
   credentialCookie?: string
+  apiKey?: string
 }>(), {
   accountName: '',
   accountId: null,
-  credentialCookie: ''
+  credentialCookie: '',
+  apiKey: ''
 })
 
 const emit = defineEmits<{
   resolved: [cookie: string]
+  'update:apiKey': [apiKey: string]
   apiKeyCreated: [result: CreateTokenRhythmAPIKeyResult]
 }>()
 
@@ -333,6 +336,7 @@ const createApiKey = async () => {
       account_id: useStoredAccountCredential ? props.accountId ?? undefined : undefined
     })
     createdKey.value = generated.api_key
+    emit('update:apiKey', generated.api_key)
     emit('apiKeyCreated', generated)
     applyCredentialResult(generated.tokenrhythm_cookie, generated.credential_persist_warning)
     keySess.value = ''

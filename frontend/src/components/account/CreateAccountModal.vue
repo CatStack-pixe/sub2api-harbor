@@ -1439,11 +1439,12 @@
 
         <div v-if="form.platform === 'tokenrhythm'">
           <TokenRhythmSessionResolver
+            v-model:api-key="apiKeyValue"
             :proxy-id="form.proxy_id"
             :account-name="form.name"
             :credential-cookie="tokenRhythmCookie"
             @resolved="tokenRhythmCookie = $event"
-            @api-key-created="apiKeyValue = $event.api_key; tokenRhythmCookie = $event.tokenrhythm_cookie || tokenRhythmCookie"
+            @api-key-created="tokenRhythmCookie = $event.tokenrhythm_cookie || tokenRhythmCookie"
           />
           <label class="input-label">{{ t('admin.accounts.tokenrhythm.cookie') }}</label>
           <textarea
