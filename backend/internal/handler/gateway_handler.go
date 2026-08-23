@@ -1416,16 +1416,10 @@ func defaultModelIDsForPlatform(platform string) []string {
 		return xai.DefaultModelIDs()
 	case service.PlatformAgnes:
 		return []string{service.AgnesDefaultModel}
-	case service.PlatformDeepSeek:
-		return service.DeepSeekDefaultModelIDs()
 	case service.PlatformNvidia:
 		return service.NvidiaDefaultModelIDs()
 	case service.PlatformTokenRhythm:
 		return openai.DefaultModelIDs()
-	case service.PlatformKimi:
-		return service.KimiDefaultModelIDs()
-	case service.PlatformZhipu:
-		return nil
 	case service.PlatformChatAnywhere:
 		return service.ChatAnywhereDefaultModelIDs()
 	case service.PlatformGLM:

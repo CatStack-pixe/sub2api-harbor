@@ -496,27 +496,6 @@ func openAILongContextBillingGate(account *Account) *bool {
 	return &enabled
 }
 
-func (s *OpenAIGatewayService) calculateOpenAIRecordUsageCostAt(
-	ctx context.Context,
-	result *OpenAIForwardResult,
-	apiKey *APIKey,
-	billingModels []string,
-	multiplier float64,
-	imageMultiplier float64,
-	videoMultiplier float64,
-	webSearchMultiplier float64,
-	tokens UsageTokens,
-	serviceTier string,
-	longContextBillingEnabled bool,
-	pricingAt time.Time,
-) (*CostBreakdown, error) {
-	return s.calculateOpenAIRecordUsageCost(
-		ctx, result, apiKey, billingModels, multiplier, imageMultiplier,
-		videoMultiplier, webSearchMultiplier, tokens, serviceTier,
-		&longContextBillingEnabled, pricingAt,
-	)
-}
-
 func (s *OpenAIGatewayService) calculateOpenAIRecordUsageCost(
 	ctx context.Context,
 	result *OpenAIForwardResult,

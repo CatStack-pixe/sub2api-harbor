@@ -297,13 +297,6 @@ func TestSchedulerFullRebuildActiveTombstoneDoesNotBlockFollowingGroupEvent(t *t
 		require.True(t, held)
 	}
 	require.Equal(t, expectedSchedulerPlatformQueryCount()*3, accounts.callCount())
-	require.Len(t, cache.tokens(), 36, "full rebuild and the following group event must each run fresh authority")
-	_, reopenHeld := cache.lifecycleMutationLeaseStates()
-	require.Len(t, reopenHeld, 36)
-	for _, held := range reopenHeld {
-		require.True(t, held)
-	}
-	require.Equal(t, 30, accounts.callCount())
 }
 
 func TestSchedulerFullRebuildGlobalReadErrorsFailBeforeMutationOrDB(t *testing.T) {

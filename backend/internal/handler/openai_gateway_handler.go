@@ -108,7 +108,7 @@ func resolveOpenAIMessagesDispatchMappedModel(c *gin.Context, apiKey *service.AP
 	// 默认值是 openai 专属,发给这些上游必错）,模型改写交给账号级 model_mapping。
 	if apiKey.Group.Platform == service.PlatformComposite && c != nil && c.Request != nil {
 		if platform, ok := service.ResolvedTargetPlatformFromContext(c.Request.Context()); ok &&
-			(platform == service.PlatformGrok || service.IsCNProvider(platform)) {
+			openAIMessagesDispatchBypassPlatform(platform) {
 			return ""
 		}
 	}
@@ -203,14 +203,7 @@ func allowOpenAICompatibleMessagesDispatch(c *gin.Context, apiKey *service.APIKe
 	if apiKey == nil || apiKey.Group == nil {
 		return true
 	}
-	if apiKey.Group.Platform == service.PlatformGrok || apiKey.Group.Platform == service.PlatformAgnes || apiKey.Group.Platform == service.PlatformNvidia || apiKey.Group.Platform == service.PlatformTokenRhythm || apiKey.Group.Platform == service.PlatformChatAnywhere || apiKey.Group.Platform == service.PlatformGLM {
-		return true
-	}
-	// 国产供应商分组与 grok 同语义:/v1/messages 就是其主要服务形态(anthropic
-	// 协议账号原生直通 Claude Code),无需 allow_messages_dispatch 开关授权——
-	// 该开关对非 openai 平台恒被 sanitizeGroupMessagesDispatchFields 置 false,
-	// 若不豁免,CN 分组将永远 403。
-	if service.IsCNProvider(apiKey.Group.Platform) {
+	if openAIMessagesDispatchBypassPlatform(apiKey.Group.Platform) {
 		return true
 	}
 	// composite 分组解析到 grok/CN 目标时与对应独立分组同语义豁免：sanitize
@@ -218,11 +211,24 @@ func allowOpenAICompatibleMessagesDispatch(c *gin.Context, apiKey *service.APIKe
 	// 解析到 openai 目标仍受开关控制,维持现状。
 	if apiKey.Group.Platform == service.PlatformComposite && c != nil && c.Request != nil {
 		if platform, ok := service.ResolvedTargetPlatformFromContext(c.Request.Context()); ok &&
-			(platform == service.PlatformGrok || service.IsCNProvider(platform)) {
+			openAIMessagesDispatchBypassPlatform(platform) {
 			return true
 		}
 	}
 	return apiKey.Group.AllowMessagesDispatch
+}
+
+func openAIMessagesDispatchBypassPlatform(platform string) bool {
+	if service.IsCNProvider(platform) {
+		return true
+	}
+	switch platform {
+	case service.PlatformGrok, service.PlatformAgnes, service.PlatformNvidia,
+		service.PlatformTokenRhythm, service.PlatformChatAnywhere, service.PlatformGLM:
+		return true
+	default:
+		return false
+	}
 }
 
 func openAICompatibleTextTargetAllowed(c *gin.Context, apiKey *service.APIKey, model string) bool {
@@ -721,6 +727,10 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 			} else {
 				var failoverErr *service.UpstreamFailoverError
 				if errors.As(err, &failoverErr) {
+					if service.IsOpenAINvidiaResponsesStreamBeforeBusinessOutput(c) {
+						h.handleFailoverExhausted(c, failoverErr, streamStarted)
+						return
+					}
 					if failoverClientGone(c) {
 						reqLog.Info("openai.failover_aborted_client_disconnected",
 							zap.Int64("account_id", account.ID),
@@ -2330,7 +2340,7 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 				)
 				return updated, err
 			},
-			TurnStarted:             recordTurnStart,
+			TurnStarted: recordTurnStart,
 			BeforeRequest: func(turn int, payload []byte, originalModel string) error {
 				c.Set(securityAuditWSTurnContextKey, turn)
 				if turn == 1 {
