@@ -148,3 +148,11 @@
 - Added a focused resolver regression assertion for the `update:apiKey` event. The frontend targeted test and TypeScript typecheck pass locally.
 - The generated provider key is shown only once by TokenRhythm. If a user closes the dialog after generating it on an older build, the lost value cannot be recovered from the masked inventory; generate a replacement key or paste the still-visible value into the account API Key field.
 - This fix is local and has not yet been committed, pushed, reviewed, merged, released, or deployed. Do not claim the production UI contains it until the next immutable release is deployed.
+
+## 2026-08-23 TokenRhythm API-key form autofill released and deployed
+
+- PR [#85](https://github.com/CatStack-pixe/sub2api-harbor/pull/85) was labeled `bug`, received a no-blocker code-audit comment, passed all backend, frontend, lint, shell, and security checks, and was squash-merged as `7527ecb22cae5812eac3105f38fcc6183de4e3d7` (`fix(tokenrhythm): autofill generated API key`).
+- Release [v0.1.176-nvidia.21-tokenrhythm-5](https://github.com/CatStack-pixe/sub2api-harbor/releases/tag/v0.1.176-nvidia.21-tokenrhythm-5) completed in Actions run `32621441872`. The immutable GHCR image digest is `sha256:1bbbc511b9c8ba6ec672adfb6b5a2a0e6ba4b9e356747654550cd46f95bd93c3`, with OCI revision `7527ecb22cae5812eac3105f38fcc6183de4e3d7`.
+- Production backup: `/opt/sub2api/backups/pre-release-0.1.176-nvidia.21-tokenrhythm-5-20260823T062601Z`; directory mode `700`, files `600`, PostgreSQL custom dump `143956464` bytes, restore list `1220` lines, and every SHA-256 entry passed.
+- Only `sub2api` was recreated. It is `running/healthy` with restart count `0`; PostgreSQL, Redis, and Mihomo retained their `2026-08-14` start times and restart count `0`. Local and public health return `{"status":"ok"}`, public settings report `0.1.176-nvidia.21-tokenrhythm-5`, and the startup log scan found no panic, fatal, migration, or database startup errors.
+- Generated TokenRhythm keys now populate the account API Key field in both create and edit forms. The Cookie continues to update separately. A key lost after closing an older one-time dialog cannot be recovered from the masked inventory; create a replacement or paste the still-visible key manually.
