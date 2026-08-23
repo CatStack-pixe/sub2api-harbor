@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/antigravity"
-	"github.com/Wei-Shaw/sub2api/internal/pkg/claude"
 	middleware2 "github.com/Wei-Shaw/sub2api/internal/server/middleware"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/gin-gonic/gin"
@@ -456,15 +455,19 @@ func TestGatewayModels_CompositeUnmappedCNAccountsContributeNoDefaults(t *testin
 	require.NotContains(t, ids, "claude-sonnet-4-6")
 }
 
-// 独立 CN 分组沿用 default 分支的 Claude 默认列表（Claude Code 客户端请求的
-// 就是这些模型名并经账号 model_mapping 转换），composite 支持不得改变该回退。
-func TestDefaultModelIDsForPlatform_CNProvidersKeepClaudeDefaults(t *testing.T) {
-	want := make([]string, 0, len(claude.DefaultModels))
-	for _, model := range claude.DefaultModels {
-		want = append(want, model.ID)
+// 独立 CN 分组保留各平台自己的默认模型语义；没有静态目录的 Zhipu
+// 依赖账号同步结果，不得回退到 Claude 模型。
+func TestDefaultModelIDsForPlatform_CNProvidersKeepProviderDefaults(t *testing.T) {
+	tests := []struct {
+		platform string
+		want     []string
+	}{
+		{platform: service.PlatformKimi, want: service.KimiDefaultModelIDs()},
+		{platform: service.PlatformZhipu, want: nil},
+		{platform: service.PlatformDeepSeek, want: service.DeepSeekDefaultModelIDs()},
 	}
-	for _, platform := range []string{service.PlatformKimi, service.PlatformZhipu, service.PlatformDeepSeek} {
-		require.Equal(t, want, defaultModelIDsForPlatform(platform), "platform=%s", platform)
+	for _, tt := range tests {
+		require.Equal(t, tt.want, defaultModelIDsForPlatform(tt.platform), "platform=%s", tt.platform)
 	}
 }
 

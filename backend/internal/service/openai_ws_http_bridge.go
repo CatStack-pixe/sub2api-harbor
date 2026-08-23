@@ -317,7 +317,7 @@ func (s *OpenAIGatewayService) proxyOpenAIWSHTTPBridgeTurn(
 	var upstreamReq *http.Request
 	if account.Platform == PlatformGrok {
 		upstreamModel := resolveGrokWSUpstreamModel(account, body, originalModel)
-		body, err = patchGrokResponsesBody(body, upstreamModel)
+		body, err = patchGrokResponsesBodyBase(body, upstreamModel, hasResponsesClientToolMapping(clientToolMapping))
 		if err != nil {
 			releaseUpstreamCtx()
 			return nil, err

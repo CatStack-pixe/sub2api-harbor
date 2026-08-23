@@ -415,7 +415,7 @@ func trimGrokInvalidEncryptedContentRetryBody(body []byte) ([]byte, bool, error)
 }
 
 func patchGrokResponsesBody(body []byte, upstreamModel string) ([]byte, error) {
-	return patchGrokResponsesBodyBase(body, upstreamModel)
+	return patchGrokResponsesBodyBase(body, upstreamModel, false)
 }
 
 func patchGrokResponsesBodyWithClientTools(body []byte, upstreamModel string) ([]byte, apicompat.ResponsesClientToolMapping, error) {
@@ -430,14 +430,14 @@ func patchGrokResponsesBodyWithClientTools(body []byte, upstreamModel string) ([
 	if err != nil {
 		return nil, apicompat.ResponsesClientToolMapping{}, err
 	}
-	patched, err := patchGrokResponsesBodyBase(adapted, upstreamModel)
+	patched, err := patchGrokResponsesBodyBase(adapted, upstreamModel, hasResponsesClientToolMapping(mapping))
 	if err != nil {
 		return nil, apicompat.ResponsesClientToolMapping{}, err
 	}
 	return patched, mapping, nil
 }
 
-func patchGrokResponsesBodyBase(body []byte, upstreamModel string) ([]byte, error) {
+func patchGrokResponsesBodyBase(body []byte, upstreamModel string, preserveClientToolChoice bool) ([]byte, error) {
 	if !json.Valid(body) {
 		return nil, fmt.Errorf("invalid json request body")
 	}
@@ -507,9 +507,14 @@ func patchGrokResponsesBodyBase(body []byte, upstreamModel string) ([]byte, erro
 	if err != nil {
 		return nil, err
 	}
-	out, err = normalizeGrokForcedFunctionToolChoice(out)
-	if err != nil {
-		return nil, err
+	// Codex client tools are lowered to function tools through a reversible
+	// mapping. Keep their named choice and the complete declaration set intact;
+	// collapsing them to a single required tool destroys that round trip.
+	if !preserveClientToolChoice {
+		out, err = normalizeGrokForcedFunctionToolChoice(out)
+		if err != nil {
+			return nil, err
+		}
 	}
 	out, err = normalizeGrokSimpleFunctionToolInput(out)
 	if err != nil {
