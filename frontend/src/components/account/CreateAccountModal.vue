@@ -272,6 +272,62 @@
             <PlatformIcon platform="glm" size="sm" />
             GLM
           </button>
+          <button
+            type="button"
+            data-testid="modelscope-platform"
+            @click="form.platform = 'modelscope'"
+            :class="[
+              'flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium transition-all',
+              form.platform === 'modelscope'
+                ? 'bg-white text-sky-700 shadow-sm dark:bg-dark-600 dark:text-sky-300'
+                : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200'
+            ]"
+          >
+            <PlatformIcon platform="modelscope" size="sm" />
+            ModelScope
+          </button>
+          <button
+            type="button"
+            data-testid="dashscope-platform"
+            @click="form.platform = 'dashscope'"
+            :class="[
+              'flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium transition-all',
+              form.platform === 'dashscope'
+                ? 'bg-white text-orange-700 shadow-sm dark:bg-dark-600 dark:text-orange-300'
+                : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200'
+            ]"
+          >
+            <PlatformIcon platform="dashscope" size="sm" />
+            DashScope
+          </button>
+          <button
+            type="button"
+            data-testid="minimax-platform"
+            @click="form.platform = 'minimax'"
+            :class="[
+              'flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium transition-all',
+              form.platform === 'minimax'
+                ? 'bg-white text-blue-700 shadow-sm dark:bg-dark-600 dark:text-blue-300'
+                : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200'
+            ]"
+          >
+            <PlatformIcon platform="minimax" size="sm" />
+            MiniMax
+          </button>
+          <button
+            type="button"
+            data-testid="volcengine-platform"
+            @click="form.platform = 'volcengine'"
+            :class="[
+              'flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium transition-all',
+              form.platform === 'volcengine'
+                ? 'bg-white text-red-700 shadow-sm dark:bg-dark-600 dark:text-red-300'
+                : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200'
+            ]"
+          >
+            <PlatformIcon platform="volcengine" size="sm" />
+            Volcengine Ark
+          </button>
         </div>
       </div>
 
@@ -1581,7 +1637,7 @@
 
         <!-- 上游倍率自动探测：支持的 API-key 平台可用，DeepSeek 使用独立余额探测。 -->
         <div
-          v-if="form.platform !== 'deepseek' && form.platform !== 'kimi' && form.platform !== 'tokenrhythm' && form.platform !== 'chatanywhere' && form.platform !== 'glm'"
+          v-if="form.platform !== 'deepseek' && form.platform !== 'kimi' && form.platform !== 'tokenrhythm' && form.platform !== 'chatanywhere' && form.platform !== 'glm' && form.platform !== 'modelscope' && form.platform !== 'dashscope' && form.platform !== 'minimax' && form.platform !== 'volcengine'"
           class="flex items-center justify-between gap-4 border-t border-gray-200 pt-4 dark:border-dark-600"
         >
           <div>
@@ -4103,6 +4159,10 @@ const baseUrlHint = computed(() => {
   if (form.platform === 'chatanywhere') return t('admin.accounts.chatanywhere.baseUrlHint')
   if (form.platform === 'glm') return t('admin.accounts.glm.baseUrlHint')
   if (form.platform === 'nvidia') return t('admin.accounts.nvidia.baseUrlHint')
+  if (form.platform === 'modelscope') return t('admin.accounts.modelscope.baseUrlHint')
+  if (form.platform === 'dashscope') return t('admin.accounts.dashscope.baseUrlHint')
+  if (form.platform === 'minimax') return t('admin.accounts.minimax.baseUrlHint')
+  if (form.platform === 'volcengine') return t('admin.accounts.volcengine.baseUrlHint')
   return t('admin.accounts.baseUrlHint')
 })
 
@@ -4117,6 +4177,10 @@ const apiKeyHint = computed(() => {
   if (form.platform === 'chatanywhere') return t('admin.accounts.chatanywhere.apiKeyHint')
   if (form.platform === 'glm') return t('admin.accounts.glm.apiKeyHint')
   if (form.platform === 'nvidia') return t('admin.accounts.nvidia.apiKeyHint')
+  if (form.platform === 'modelscope') return t('admin.accounts.modelscope.apiKeyHint')
+  if (form.platform === 'dashscope') return t('admin.accounts.dashscope.apiKeyHint')
+  if (form.platform === 'minimax') return t('admin.accounts.minimax.apiKeyHint')
+  if (form.platform === 'volcengine') return t('admin.accounts.volcengine.apiKeyHint')
   return t('admin.accounts.apiKeyHint')
 })
 
@@ -4142,6 +4206,14 @@ const apiKeyBaseUrlPlaceholder = computed(() => {
       return 'https://api.chatanywhere.tech/v1'
     case 'glm':
       return 'https://open.bigmodel.cn/api/paas/v4'
+    case 'modelscope':
+      return 'https://api-inference.modelscope.cn/v1'
+    case 'dashscope':
+      return 'https://dashscope.aliyuncs.com/compatible-mode/v1'
+    case 'minimax':
+      return 'https://api.minimaxi.com/v1'
+    case 'volcengine':
+      return 'https://ark.cn-beijing.volces.com/api/v3'
     default:
       return 'https://api.anthropic.com'
   }
@@ -4169,6 +4241,13 @@ const apiKeyValuePlaceholder = computed(() => {
       return 'sk-...'
     case 'glm':
       return '<api-key>.<secret>'
+    case 'modelscope':
+      return 'ms-...'
+    case 'dashscope':
+    case 'minimax':
+      return 'sk-...'
+    case 'volcengine':
+      return 'ark-...'
     default:
       return 'sk-ant-...'
   }
@@ -4895,6 +4974,14 @@ watch(
                 ? 'https://integrate.api.nvidia.com/v1'
                 : newPlatform === 'deepseek'
                 ? 'https://api.deepseek.com'
+                : newPlatform === 'modelscope'
+                ? 'https://api-inference.modelscope.cn/v1'
+                : newPlatform === 'dashscope'
+                ? 'https://dashscope.aliyuncs.com/compatible-mode/v1'
+                : newPlatform === 'minimax'
+                ? 'https://api.minimaxi.com/v1'
+                : newPlatform === 'volcengine'
+                ? 'https://ark.cn-beijing.volces.com/api/v3'
                 : 'https://api.anthropic.com'
     if (newPlatform === 'kimi' || newPlatform === 'zhipu' || newPlatform === 'deepseek') {
       apiKeyBaseUrl.value = defaultCNBaseUrl(newPlatform, accountMode.value, apiProtocol.value)
@@ -5863,6 +5950,14 @@ const handleSubmit = async () => {
                 ? 'https://integrate.api.nvidia.com/v1'
                 : form.platform === 'deepseek'
                   ? 'https://api.deepseek.com'
+                  : form.platform === 'modelscope'
+                    ? 'https://api-inference.modelscope.cn/v1'
+                    : form.platform === 'dashscope'
+                      ? 'https://dashscope.aliyuncs.com/compatible-mode/v1'
+                      : form.platform === 'minimax'
+                        ? 'https://api.minimaxi.com/v1'
+                        : form.platform === 'volcengine'
+                          ? 'https://ark.cn-beijing.volces.com/api/v3'
                   : 'https://api.anthropic.com'
 
   // Build credentials with optional model mapping
@@ -5960,7 +6055,7 @@ const handleSubmit = async () => {
     group_ids: form.group_ids,
     extra,
     upstream_billing_probe_enabled:
-      form.platform === 'deepseek' || form.platform === 'kimi' || form.platform === 'chatanywhere' || form.platform === 'glm'
+      form.platform === 'deepseek' || form.platform === 'kimi' || form.platform === 'chatanywhere' || form.platform === 'glm' || form.platform === 'modelscope' || form.platform === 'dashscope' || form.platform === 'minimax' || form.platform === 'volcengine'
         ? undefined
         : form.platform === 'tokenrhythm'
           ? true
@@ -6099,7 +6194,7 @@ const createAccountAndFinish = async (
       type === 'apikey'
         ? form.platform === 'tokenrhythm'
           ? true
-          : form.platform !== 'deepseek' && form.platform !== 'kimi' && form.platform !== 'chatanywhere' && form.platform !== 'glm'
+          : form.platform !== 'deepseek' && form.platform !== 'kimi' && form.platform !== 'chatanywhere' && form.platform !== 'glm' && form.platform !== 'modelscope' && form.platform !== 'dashscope' && form.platform !== 'minimax' && form.platform !== 'volcengine'
             ? upstreamBillingAutoProbeEnabled.value
             : undefined
         : undefined,

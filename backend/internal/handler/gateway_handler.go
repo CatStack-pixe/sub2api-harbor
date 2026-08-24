@@ -1190,7 +1190,8 @@ func (h *GatewayHandler) compositeAvailableModels(ctx context.Context, groupID *
 	for _, platform := range []string{service.PlatformAnthropic, service.PlatformGemini, service.PlatformOpenAI,
 		service.PlatformAntigravity, service.PlatformGrok, service.PlatformAgnes, service.PlatformDeepSeek,
 		service.PlatformNvidia, service.PlatformTokenRhythm, service.PlatformKimi, service.PlatformZhipu,
-		service.PlatformChatAnywhere, service.PlatformGLM} {
+		service.PlatformChatAnywhere, service.PlatformGLM, service.PlatformModelScope, service.PlatformDashScope,
+		service.PlatformMiniMax, service.PlatformVolcengine} {
 		platformModels := h.gatewayService.GetAvailableModels(ctx, groupID, platform)
 		if len(platformModels) == 0 {
 			// CN 供应商没有静态默认模型列表（defaultModelIDsForPlatform 的
@@ -1430,13 +1431,16 @@ func defaultModelIDsForPlatform(platform string) []string {
 		return service.ChatAnywhereDefaultModelIDs()
 	case service.PlatformGLM:
 		return service.GLMDefaultModelIDs()
+	case service.PlatformModelScope, service.PlatformDashScope, service.PlatformMiniMax, service.PlatformVolcengine:
+		return nil
 	case service.PlatformComposite:
 		ids := make([]string, 0)
 		seen := make(map[string]struct{})
 		for _, concretePlatform := range []string{service.PlatformAnthropic, service.PlatformGemini, service.PlatformOpenAI,
 			service.PlatformAntigravity, service.PlatformGrok, service.PlatformAgnes, service.PlatformDeepSeek,
 			service.PlatformNvidia, service.PlatformTokenRhythm, service.PlatformKimi, service.PlatformZhipu,
-			service.PlatformChatAnywhere, service.PlatformGLM} {
+			service.PlatformChatAnywhere, service.PlatformGLM, service.PlatformModelScope, service.PlatformDashScope,
+			service.PlatformMiniMax, service.PlatformVolcengine} {
 			for _, id := range defaultModelIDsForPlatform(concretePlatform) {
 				if _, ok := seen[id]; ok {
 					continue

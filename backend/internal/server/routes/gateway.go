@@ -50,7 +50,8 @@ func RegisterGatewayRoutes(
 		case service.PlatformOpenAI, service.PlatformGrok, service.PlatformAgnes,
 			service.PlatformDeepSeek, service.PlatformNvidia, service.PlatformTokenRhythm,
 			service.PlatformKimi, service.PlatformZhipu, service.PlatformChatAnywhere,
-			service.PlatformGLM:
+			service.PlatformGLM, service.PlatformModelScope, service.PlatformDashScope,
+			service.PlatformMiniMax, service.PlatformVolcengine:
 			return true
 		default:
 			return false
@@ -60,7 +61,9 @@ func RegisterGatewayRoutes(
 		switch getGroupPlatform(c) {
 		case service.PlatformOpenAI, service.PlatformGrok, service.PlatformAgnes,
 			service.PlatformDeepSeek, service.PlatformTokenRhythm, service.PlatformKimi,
-			service.PlatformZhipu, service.PlatformChatAnywhere, service.PlatformGLM:
+			service.PlatformZhipu, service.PlatformChatAnywhere, service.PlatformGLM,
+			service.PlatformModelScope, service.PlatformDashScope, service.PlatformMiniMax,
+			service.PlatformVolcengine:
 			return true
 		default:
 			return false
@@ -76,7 +79,7 @@ func RegisterGatewayRoutes(
 		switch getGroupPlatform(c) {
 		case service.PlatformOpenAI, service.PlatformKimi, service.PlatformZhipu, service.PlatformDeepSeek:
 			h.OpenAIGateway.CountTokens(c)
-		case service.PlatformGrok, service.PlatformAgnes, service.PlatformNvidia, service.PlatformChatAnywhere, service.PlatformGLM:
+		case service.PlatformGrok, service.PlatformAgnes, service.PlatformNvidia, service.PlatformChatAnywhere, service.PlatformGLM, service.PlatformModelScope, service.PlatformDashScope, service.PlatformMiniMax, service.PlatformVolcengine:
 			h.OpenAIGateway.GrokCountTokens(c)
 		default:
 			h.Gateway.CountTokens(c)

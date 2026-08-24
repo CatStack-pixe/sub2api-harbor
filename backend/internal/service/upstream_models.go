@@ -140,7 +140,8 @@ func (s *AccountTestService) buildUpstreamModelsRequest(ctx context.Context, acc
 	case account.IsDeepSeek():
 		return s.buildDeepSeekUpstreamModelsRequest(ctx, account)
 	case account.IsOpenAI() || account.IsAgnes() || account.IsNvidia() || account.IsTokenRhythm() ||
-		account.IsCNProvider() || account.IsChatAnywhere() || account.IsGLM():
+		account.IsCNProvider() || account.IsChatAnywhere() || account.IsGLM() || account.IsModelScope() ||
+		account.IsDashScope() || account.IsMiniMax() || account.IsVolcengine():
 		// 国产 OpenAI 兼容供应商（kimi/zhipu/deepseek）复用 OpenAI /v1/models 探测。
 		return s.buildOpenAIUpstreamModelsRequest(ctx, account)
 	case account.IsGemini():
@@ -512,6 +513,9 @@ func buildV1ModelsURL(base string) string {
 }
 
 func buildOpenAIModelsURL(base string) string {
+	if strings.Contains(strings.ToLower(strings.TrimRight(strings.TrimSpace(base), "/")), "/api/v3") {
+		return strings.TrimRight(strings.TrimSpace(base), "/") + "/models"
+	}
 	return buildOpenAIEndpointURL(base, "/v1/models")
 }
 

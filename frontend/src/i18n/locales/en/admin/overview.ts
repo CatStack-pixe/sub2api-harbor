@@ -956,6 +956,10 @@ export default {
         chatanywhere: 'ChatAnywhere',
         glm: 'GLM',
         zhipu: 'Zhipu GLM',
+        modelscope: 'ModelScope',
+        dashscope: 'DashScope',
+        minimax: 'MiniMax',
+        volcengine: 'Volcengine Ark',
         composite: 'Composite',
       },
       deleteConfirm:

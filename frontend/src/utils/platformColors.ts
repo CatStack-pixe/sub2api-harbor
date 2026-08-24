@@ -19,6 +19,10 @@ export type Platform =
   | 'zhipu'
   | 'chatanywhere'
   | 'glm'
+  | 'modelscope'
+  | 'dashscope'
+  | 'minimax'
+  | 'volcengine'
   | 'composite'
 
 // ── Badge (bg + text + border, for inline badges with border) ───────
@@ -36,6 +40,10 @@ const BADGE: Record<Platform, string> = {
   chatanywhere: 'bg-violet-500/10 text-violet-700 border-violet-500/30 dark:text-violet-300',
   glm: 'bg-rose-500/10 text-rose-700 border-rose-500/30 dark:text-rose-300',
   zhipu: 'bg-indigo-500/10 text-indigo-600 border-indigo-500/30 dark:text-indigo-400',
+  modelscope: 'bg-sky-500/10 text-sky-700 border-sky-500/30 dark:text-sky-300',
+  dashscope: 'bg-orange-500/10 text-orange-700 border-orange-500/30 dark:text-orange-300',
+  minimax: 'bg-blue-500/10 text-blue-700 border-blue-500/30 dark:text-blue-300',
+  volcengine: 'bg-red-500/10 text-red-700 border-red-500/30 dark:text-red-300',
   composite: 'bg-cyan-500/10 text-cyan-700 border-cyan-500/30 dark:text-cyan-300',
 }
 const BADGE_DEFAULT = 'bg-slate-500/10 text-slate-600 border-slate-500/30 dark:text-slate-400'
@@ -55,6 +63,10 @@ const BADGE_LIGHT: Record<Platform, string> = {
   chatanywhere: 'bg-violet-500/10 text-violet-700 dark:bg-violet-500/10 dark:text-violet-300',
   glm: 'bg-rose-500/10 text-rose-700 dark:bg-rose-500/10 dark:text-rose-300',
   zhipu: 'bg-indigo-500/10 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-300',
+  modelscope: 'bg-sky-500/10 text-sky-700 dark:bg-sky-500/10 dark:text-sky-300',
+  dashscope: 'bg-orange-500/10 text-orange-700 dark:bg-orange-500/10 dark:text-orange-300',
+  minimax: 'bg-blue-500/10 text-blue-700 dark:bg-blue-500/10 dark:text-blue-300',
+  volcengine: 'bg-red-500/10 text-red-700 dark:bg-red-500/10 dark:text-red-300',
   composite: 'bg-cyan-500/10 text-cyan-700 dark:bg-cyan-500/10 dark:text-cyan-300',
 }
 
@@ -73,6 +85,10 @@ const BORDER: Record<Platform, string> = {
   chatanywhere: 'border-violet-500/20 dark:border-violet-500/20',
   glm: 'border-rose-500/20 dark:border-rose-500/20',
   zhipu: 'border-indigo-500/20 dark:border-indigo-500/20',
+  modelscope: 'border-sky-500/20 dark:border-sky-500/20',
+  dashscope: 'border-orange-500/20 dark:border-orange-500/20',
+  minimax: 'border-blue-500/20 dark:border-blue-500/20',
+  volcengine: 'border-red-500/20 dark:border-red-500/20',
   composite: 'border-cyan-500/20 dark:border-cyan-500/20',
 }
 const BORDER_DEFAULT = 'border-gray-200 dark:border-dark-700'
@@ -92,6 +108,10 @@ const BORDER_STRONG: Record<Platform, string> = {
   chatanywhere: 'border-violet-500/35 dark:border-violet-500/30',
   glm: 'border-rose-500/35 dark:border-rose-500/30',
   zhipu: 'border-indigo-500/35 dark:border-indigo-500/30',
+  modelscope: 'border-sky-500/35 dark:border-sky-500/30',
+  dashscope: 'border-orange-500/35 dark:border-orange-500/30',
+  minimax: 'border-blue-500/35 dark:border-blue-500/30',
+  volcengine: 'border-red-500/35 dark:border-red-500/30',
   composite: 'border-cyan-500/35 dark:border-cyan-500/30',
 }
 const BORDER_STRONG_DEFAULT = 'border-gray-300 dark:border-dark-600'
@@ -112,6 +132,10 @@ const ACCENT: Record<Platform, string> = {
   chatanywhere: '#7c3aed', // violet-600
   glm: '#e11d48', // rose-600
   zhipu: '#6366f1', // indigo-500
+  modelscope: '#0284c7', // sky-600
+  dashscope: '#ea580c', // orange-600
+  minimax: '#2563eb', // blue-600
+  volcengine: '#dc2626', // red-600
   composite: '#06b6d4', // cyan-500
 }
 const ACCENT_DEFAULT = '#14b8a6' // primary-500 (teal)
@@ -131,6 +155,10 @@ const ACCENT_BAR: Record<Platform, string> = {
   chatanywhere: 'bg-gradient-to-r from-violet-500 to-fuchsia-600',
   glm: 'bg-gradient-to-r from-rose-500 to-pink-600',
   zhipu: 'bg-gradient-to-r from-indigo-400 to-indigo-500',
+  modelscope: 'bg-gradient-to-r from-sky-500 to-cyan-600',
+  dashscope: 'bg-gradient-to-r from-orange-500 to-amber-600',
+  minimax: 'bg-gradient-to-r from-blue-500 to-indigo-600',
+  volcengine: 'bg-gradient-to-r from-red-500 to-orange-600',
   composite: 'bg-gradient-to-r from-slate-500 to-cyan-500',
 }
 const ACCENT_BAR_DEFAULT = 'bg-gradient-to-r from-primary-400 to-primary-500'
@@ -150,6 +178,10 @@ const TEXT: Record<Platform, string> = {
   chatanywhere: 'text-violet-700 dark:text-violet-300',
   glm: 'text-rose-700 dark:text-rose-300',
   zhipu: 'text-indigo-600 dark:text-indigo-400',
+  modelscope: 'text-sky-700 dark:text-sky-300',
+  dashscope: 'text-orange-700 dark:text-orange-300',
+  minimax: 'text-blue-700 dark:text-blue-300',
+  volcengine: 'text-red-700 dark:text-red-300',
   composite: 'text-cyan-700 dark:text-cyan-300',
 }
 const TEXT_DEFAULT = 'text-primary-600 dark:text-primary-400'
@@ -169,6 +201,10 @@ const ICON: Record<Platform, string> = {
   chatanywhere: 'text-violet-600 dark:text-violet-300',
   glm: 'text-rose-600 dark:text-rose-300',
   zhipu: 'text-indigo-500 dark:text-indigo-400',
+  modelscope: 'text-sky-600 dark:text-sky-300',
+  dashscope: 'text-orange-600 dark:text-orange-300',
+  minimax: 'text-blue-600 dark:text-blue-300',
+  volcengine: 'text-red-600 dark:text-red-300',
   composite: 'text-cyan-600 dark:text-cyan-300',
 }
 const ICON_DEFAULT = 'text-primary-500 dark:text-primary-400'
@@ -188,6 +224,10 @@ const BUTTON: Record<Platform, string> = {
   chatanywhere: 'bg-violet-600 text-white hover:bg-violet-700 active:bg-violet-800 dark:bg-violet-600/80 dark:hover:bg-violet-600',
   glm: 'bg-rose-600 text-white hover:bg-rose-700 active:bg-rose-800 dark:bg-rose-600/80 dark:hover:bg-rose-600',
   zhipu: 'bg-indigo-500 text-white hover:bg-indigo-600 active:bg-indigo-700 dark:bg-indigo-500/80 dark:hover:bg-indigo-500',
+  modelscope: 'bg-sky-600 text-white hover:bg-sky-700 active:bg-sky-800 dark:bg-sky-600/80 dark:hover:bg-sky-600',
+  dashscope: 'bg-orange-600 text-white hover:bg-orange-700 active:bg-orange-800 dark:bg-orange-600/80 dark:hover:bg-orange-600',
+  minimax: 'bg-blue-600 text-white hover:bg-blue-700 active:bg-blue-800 dark:bg-blue-600/80 dark:hover:bg-blue-600',
+  volcengine: 'bg-red-600 text-white hover:bg-red-700 active:bg-red-800 dark:bg-red-600/80 dark:hover:bg-red-600',
   composite: 'bg-cyan-700 text-white hover:bg-cyan-800 active:bg-cyan-900 dark:bg-cyan-600 dark:hover:bg-cyan-500',
 }
 const BUTTON_DEFAULT = 'bg-primary-500 text-white hover:bg-primary-600 dark:bg-primary-600 dark:hover:bg-primary-500'
@@ -207,6 +247,10 @@ const DISCOUNT: Record<Platform, string> = {
   chatanywhere: 'bg-violet-100 text-violet-800 dark:bg-violet-900/40 dark:text-violet-300',
   glm: 'bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300',
   zhipu: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300',
+  modelscope: 'bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-300',
+  dashscope: 'bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-300',
+  minimax: 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300',
+  volcengine: 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300',
   composite: 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/40 dark:text-cyan-300',
 }
 const DISCOUNT_DEFAULT = 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300'
@@ -226,6 +270,10 @@ const GRADIENT: Record<Platform, string> = {
   chatanywhere: 'from-violet-600 to-fuchsia-700',
   glm: 'from-rose-600 to-pink-700',
   zhipu: 'from-indigo-500 to-indigo-600',
+  modelscope: 'from-sky-600 to-cyan-700',
+  dashscope: 'from-orange-600 to-amber-700',
+  minimax: 'from-blue-600 to-indigo-700',
+  volcengine: 'from-red-600 to-orange-700',
   composite: 'from-slate-600 to-cyan-600',
 }
 const GRADIENT_DEFAULT = 'from-primary-500 to-primary-600'
@@ -245,6 +293,10 @@ const GRADIENT_TEXT: Record<Platform, string> = {
   chatanywhere: 'text-violet-100',
   glm: 'text-rose-100',
   zhipu: 'text-indigo-100',
+  modelscope: 'text-sky-100',
+  dashscope: 'text-orange-100',
+  minimax: 'text-blue-100',
+  volcengine: 'text-red-100',
   composite: 'text-cyan-100',
 }
 const GRADIENT_TEXT_DEFAULT = 'text-primary-100'
@@ -263,6 +315,10 @@ const GRADIENT_SUBTEXT: Record<Platform, string> = {
   chatanywhere: 'text-violet-200',
   glm: 'text-rose-200',
   zhipu: 'text-indigo-200',
+  modelscope: 'text-sky-200',
+  dashscope: 'text-orange-200',
+  minimax: 'text-blue-200',
+  volcengine: 'text-red-200',
   composite: 'text-cyan-200',
 }
 const GRADIENT_SUBTEXT_DEFAULT = 'text-primary-200'
@@ -284,6 +340,10 @@ function isPlatform(p: string): p is Platform {
     p === 'zhipu' ||
     p === 'chatanywhere' ||
     p === 'glm' ||
+    p === 'modelscope' ||
+    p === 'dashscope' ||
+    p === 'minimax' ||
+    p === 'volcengine' ||
     p === 'composite'
   )
 }
@@ -355,6 +415,10 @@ export function platformLabel(p: string): string {
     case 'chatanywhere': return 'ChatAnywhere'
     case 'glm': return 'GLM'
     case 'zhipu': return 'Zhipu GLM'
+    case 'modelscope': return 'ModelScope'
+    case 'dashscope': return 'DashScope'
+    case 'minimax': return 'MiniMax'
+    case 'volcengine': return 'Volcengine Ark'
     case 'composite': return 'Composite'
     default: return p || 'API'
   }

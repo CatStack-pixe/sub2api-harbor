@@ -49,6 +49,10 @@ const (
 	PlatformZhipu        = domain.PlatformZhipu
 	PlatformChatAnywhere = domain.PlatformChatAnywhere
 	PlatformGLM          = domain.PlatformGLM
+	PlatformModelScope   = domain.PlatformModelScope
+	PlatformDashScope    = domain.PlatformDashScope
+	PlatformMiniMax      = domain.PlatformMiniMax
+	PlatformVolcengine   = domain.PlatformVolcengine
 )
 
 // AllPlatforms 返回所有支持的平台列表
@@ -67,6 +71,10 @@ func AllPlatforms() []string {
 		PlatformZhipu,
 		PlatformChatAnywhere,
 		PlatformGLM,
+		PlatformModelScope,
+		PlatformDashScope,
+		PlatformMiniMax,
+		PlatformVolcengine,
 	}
 }
 

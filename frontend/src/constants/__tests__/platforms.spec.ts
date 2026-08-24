@@ -14,7 +14,11 @@ const concretePlatforms = [
   'kimi',
   'zhipu',
   'chatanywhere',
-  'glm'
+  'glm',
+  'modelscope',
+  'dashscope',
+  'minimax',
+  'volcengine'
 ]
 
 describe('platform option catalogs', () => {

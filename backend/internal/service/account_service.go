@@ -550,6 +550,8 @@ func (s *AccountService) TestCredentials(ctx context.Context, id int64) error {
 		return validateAccountCredentials(account.Platform, account.Type, account.Credentials)
 	case PlatformZhipu:
 		return validateAccountCredentials(account.Platform, account.Type, account.Credentials)
+	case PlatformModelScope, PlatformDashScope, PlatformMiniMax, PlatformVolcengine:
+		return validateAccountCredentials(account.Platform, account.Type, account.Credentials)
 	default:
 		return fmt.Errorf("unsupported platform: %s", account.Platform)
 	}

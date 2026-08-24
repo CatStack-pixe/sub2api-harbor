@@ -58,14 +58,22 @@
                       ? 'https://api.x.ai/v1'
                       : account.platform === 'agnes'
                         ? 'https://apihub.agnes-ai.com/v1'
-                        : account.platform === 'tokenrhythm'
-                          ? 'https://tokenrhythm.studio/v1'
-                        : account.platform === 'nvidia'
-                          ? 'https://integrate.api.nvidia.com/v1'
+                          : account.platform === 'tokenrhythm'
+                            ? 'https://tokenrhythm.studio/v1'
+                          : account.platform === 'nvidia'
+                            ? 'https://integrate.api.nvidia.com/v1'
                           : account.platform === 'deepseek'
                           ? 'https://api.deepseek.com'
                           : account.platform === 'glm'
                           ? 'https://open.bigmodel.cn/api/paas/v4'
+                          : account.platform === 'modelscope'
+                          ? 'https://api-inference.modelscope.cn/v1'
+                          : account.platform === 'dashscope'
+                          ? 'https://dashscope.aliyuncs.com/compatible-mode/v1'
+                          : account.platform === 'minimax'
+                          ? 'https://api.minimaxi.com/v1'
+                          : account.platform === 'volcengine'
+                          ? 'https://ark.cn-beijing.volces.com/api/v3'
                           : 'https://api.anthropic.com'
             "
           />
@@ -172,6 +180,14 @@
                             ? 'sk-...'
                           : account.platform === 'glm'
                             ? '...'
+                          : account.platform === 'modelscope'
+                            ? 'ms-...'
+                          : account.platform === 'dashscope'
+                            ? 'sk-...'
+                          : account.platform === 'minimax'
+                            ? 'sk-...'
+                          : account.platform === 'volcengine'
+                            ? 'ark-...'
                           : 'sk-ant-...'
             "
           />
@@ -2947,6 +2963,10 @@ const baseUrlHint = computed(() => {
   if (props.account.platform === 'chatanywhere') return t('admin.accounts.chatanywhere.baseUrlHint')
   if (props.account.platform === 'glm') return t('admin.accounts.glm.baseUrlHint')
   if (props.account.platform === 'nvidia') return t('admin.accounts.nvidia.baseUrlHint')
+  if (props.account.platform === 'modelscope') return t('admin.accounts.modelscope.baseUrlHint')
+  if (props.account.platform === 'dashscope') return t('admin.accounts.dashscope.baseUrlHint')
+  if (props.account.platform === 'minimax') return t('admin.accounts.minimax.baseUrlHint')
+  if (props.account.platform === 'volcengine') return t('admin.accounts.volcengine.baseUrlHint')
   return t('admin.accounts.baseUrlHint')
 })
 
@@ -3532,6 +3552,10 @@ const defaultBaseUrl = computed(() => {
   if (props.account?.platform === 'tokenrhythm') return 'https://tokenrhythm.studio/v1'
   if (props.account?.platform === 'chatanywhere') return 'https://api.chatanywhere.tech/v1'
   if (props.account?.platform === 'glm') return 'https://open.bigmodel.cn/api/paas/v4'
+  if (props.account?.platform === 'modelscope') return 'https://api-inference.modelscope.cn/v1'
+  if (props.account?.platform === 'dashscope') return 'https://dashscope.aliyuncs.com/compatible-mode/v1'
+  if (props.account?.platform === 'minimax') return 'https://api.minimaxi.com/v1'
+  if (props.account?.platform === 'volcengine') return 'https://ark.cn-beijing.volces.com/api/v3'
   // CN 供应商：按当前模式/协议回落到官方预设（清空输入框提交时使用），
   // 不能落到 anthropic 默认值（会被当 CC base 拼出错误端点）。
   if (
@@ -3697,7 +3721,7 @@ const syncFormFromAccount = (newAccount: Account | null) => {
 	autoPause7dThreshold.value = typeof extra?.auto_pause_7d_threshold === 'number' ? extra.auto_pause_7d_threshold * 100 : null
 	autoPause5hDisabled.value = extra?.auto_pause_5h_disabled === true
 	autoPause7dDisabled.value = extra?.auto_pause_7d_disabled === true
-	upstreamBillingAutoProbeEnabled.value = newAccount.platform !== 'deepseek' && newAccount.platform !== 'kimi' && newAccount.platform !== 'tokenrhythm' && newAccount.platform !== 'chatanywhere' && newAccount.platform !== 'glm' && extra?.upstream_billing_probe_enabled === true
+	upstreamBillingAutoProbeEnabled.value = newAccount.platform !== 'deepseek' && newAccount.platform !== 'kimi' && newAccount.platform !== 'tokenrhythm' && newAccount.platform !== 'chatanywhere' && newAccount.platform !== 'glm' && newAccount.platform !== 'modelscope' && newAccount.platform !== 'dashscope' && newAccount.platform !== 'minimax' && newAccount.platform !== 'volcengine' && extra?.upstream_billing_probe_enabled === true
   upstreamBillingRateSyncEnabled.value =
     upstreamBillingAutoProbeEnabled.value && extra?.upstream_billing_rate_sync_enabled === true
 
@@ -3955,7 +3979,11 @@ const syncFormFromAccount = (newAccount: Account | null) => {
           tokenrhythm: 'https://tokenrhythm.studio/v1',
           chatanywhere: 'https://api.chatanywhere.tech/v1',
           glm: 'https://open.bigmodel.cn/api/paas/v4',
-          nvidia: 'https://integrate.api.nvidia.com/v1'
+          nvidia: 'https://integrate.api.nvidia.com/v1',
+          modelscope: 'https://api-inference.modelscope.cn/v1',
+          dashscope: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+          minimax: 'https://api.minimaxi.com/v1',
+          volcengine: 'https://ark.cn-beijing.volces.com/api/v3'
         }
     const platformDefaultUrl = cnPlatform
       ? defaultCNBaseUrl(cnPlatform, editAccountMode.value, editApiProtocol.value)
@@ -4047,6 +4075,14 @@ const syncFormFromAccount = (newAccount: Account | null) => {
                 ? 'https://integrate.api.nvidia.com/v1'
                 : newAccount.platform === 'deepseek'
                   ? 'https://api.deepseek.com'
+                : newAccount.platform === 'modelscope'
+                  ? 'https://api-inference.modelscope.cn/v1'
+                : newAccount.platform === 'dashscope'
+                  ? 'https://dashscope.aliyuncs.com/compatible-mode/v1'
+                : newAccount.platform === 'minimax'
+                  ? 'https://api.minimaxi.com/v1'
+                : newAccount.platform === 'volcengine'
+                  ? 'https://ark.cn-beijing.volces.com/api/v3'
                 : 'https://api.anthropic.com'
     editBaseUrl.value = platformDefaultUrl
 
@@ -4626,7 +4662,7 @@ const handleSubmit = async () => {
       updatePayload.load_factor = 0
     }
     updatePayload.auto_pause_on_expired = autoPauseOnExpired.value
-    if (props.account.type === 'apikey' && props.account.platform !== 'deepseek' && props.account.platform !== 'kimi' && props.account.platform !== 'tokenrhythm' && props.account.platform !== 'chatanywhere' && props.account.platform !== 'glm') {
+    if (props.account.type === 'apikey' && props.account.platform !== 'deepseek' && props.account.platform !== 'kimi' && props.account.platform !== 'tokenrhythm' && props.account.platform !== 'chatanywhere' && props.account.platform !== 'glm' && props.account.platform !== 'modelscope' && props.account.platform !== 'dashscope' && props.account.platform !== 'minimax' && props.account.platform !== 'volcengine') {
       updatePayload.upstream_billing_probe_enabled = upstreamBillingAutoProbeEnabled.value
       updatePayload.upstream_billing_rate_sync_enabled = upstreamBillingRateSyncEnabled.value
       if (upstreamBillingRateSyncEnabled.value) {

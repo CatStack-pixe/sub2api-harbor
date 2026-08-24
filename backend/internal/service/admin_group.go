@@ -294,7 +294,7 @@ func compositeDefaultModelsListCandidateIDs() []string {
 	ids := make([]string, 0)
 	for _, platform := range []string{PlatformAnthropic, PlatformGemini, PlatformOpenAI, PlatformAntigravity,
 		PlatformGrok, PlatformAgnes, PlatformDeepSeek, PlatformNvidia, PlatformTokenRhythm,
-		PlatformKimi, PlatformZhipu, PlatformChatAnywhere, PlatformGLM} {
+		PlatformKimi, PlatformZhipu, PlatformChatAnywhere, PlatformGLM, PlatformModelScope, PlatformDashScope, PlatformMiniMax, PlatformVolcengine} {
 		for _, id := range defaultModelsListCandidateIDs(platform) {
 			if _, ok := seen[id]; ok {
 				continue

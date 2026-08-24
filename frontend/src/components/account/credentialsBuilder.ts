@@ -48,7 +48,11 @@ export function isHeaderOverrideCapable(platform: string, type: string): boolean
     platform === 'nvidia' ||
     platform === 'tokenrhythm' ||
     platform === 'chatanywhere' ||
-    platform === 'glm'
+    platform === 'glm' ||
+    platform === 'modelscope' ||
+    platform === 'dashscope' ||
+    platform === 'minimax' ||
+    platform === 'volcengine'
   ) {
     return type === 'apikey'
   }

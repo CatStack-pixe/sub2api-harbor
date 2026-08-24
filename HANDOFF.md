@@ -166,3 +166,10 @@
 - Production backup: `/opt/sub2api/backups/pre-release-0.1.176-nvidia.21-tokenrhythm-5-20260823T062601Z`; directory mode `700`, files `600`, PostgreSQL custom dump `143956464` bytes, restore list `1220` lines, and every SHA-256 entry passed.
 - Only `sub2api` was recreated. It is `running/healthy` with restart count `0`; PostgreSQL, Redis, and Mihomo retained their `2026-08-14` start times and restart count `0`. Local and public health return `{"status":"ok"}`, public settings report `0.1.176-nvidia.21-tokenrhythm-5`, and the startup log scan found no panic, fatal, migration, or database startup errors.
 - Generated TokenRhythm keys now populate the account API Key field in both create and edit forms. The Cookie continues to update separately. A key lost after closing an older one-time dialog cannot be recovered from the masked inventory; create a replacement or paste the still-visible key manually.
+
+## 2026-08-24 Official account platform frontend support
+
+- Added frontend platform identifiers, selectors, defaults, API-key hints, icons, colors, model whitelist mappings, quota lists, channel ordering, and English/Chinese labels for ModelScope, Alibaba Cloud DashScope, MiniMax, and Volcengine Ark.
+- New account creation remains ungrouped by default when no group is selected; the new providers use their OpenAI-compatible API endpoints and do not enable the generic upstream billing probe.
+- Verification passed in the clean `official-platforms` worktree: `vue-tsc --noEmit`, ESLint, 6 focused Vitest files with 106 tests, and `git diff --check`. Existing test warnings include stale Browserslist data and unresolved `router-link` in the SettingsView test harness.
+- No commit, PR, release, deployment, production account mutation, or credential value is recorded here.

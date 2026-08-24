@@ -359,7 +359,7 @@ func matchingPlatforms(groupPlatform string) []string {
 	if groupPlatform == PlatformComposite {
 		return []string{PlatformAnthropic, PlatformGemini, PlatformOpenAI, PlatformAntigravity,
 			PlatformGrok, PlatformAgnes, PlatformDeepSeek, PlatformNvidia, PlatformTokenRhythm,
-			PlatformKimi, PlatformZhipu, PlatformChatAnywhere, PlatformGLM}
+			PlatformKimi, PlatformZhipu, PlatformChatAnywhere, PlatformGLM, PlatformModelScope, PlatformDashScope, PlatformMiniMax, PlatformVolcengine}
 	}
 	return []string{groupPlatform}
 }

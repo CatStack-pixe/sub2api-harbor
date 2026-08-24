@@ -224,7 +224,8 @@ func openAIMessagesDispatchBypassPlatform(platform string) bool {
 	}
 	switch platform {
 	case service.PlatformGrok, service.PlatformAgnes, service.PlatformNvidia,
-		service.PlatformTokenRhythm, service.PlatformChatAnywhere, service.PlatformGLM:
+		service.PlatformTokenRhythm, service.PlatformChatAnywhere, service.PlatformGLM,
+		service.PlatformModelScope, service.PlatformDashScope, service.PlatformMiniMax, service.PlatformVolcengine:
 		return true
 	default:
 		return false
@@ -236,7 +237,7 @@ func openAICompatibleTextTargetAllowed(c *gin.Context, apiKey *service.APIKey, m
 		service.PlatformOpenAI, service.PlatformGrok, service.PlatformAgnes,
 		service.PlatformDeepSeek, service.PlatformNvidia, service.PlatformTokenRhythm,
 		service.PlatformKimi, service.PlatformZhipu, service.PlatformChatAnywhere,
-		service.PlatformGLM)
+		service.PlatformGLM, service.PlatformModelScope, service.PlatformDashScope, service.PlatformMiniMax, service.PlatformVolcengine)
 }
 
 // isResponsesWebSocketCompositePlatform 限定 composite 分组在 Responses WebSocket
