@@ -15,7 +15,8 @@ func ValidateAccountPlatform(platform string) error {
 	switch strings.TrimSpace(platform) {
 	case PlatformAnthropic, PlatformOpenAI, PlatformGemini, PlatformAntigravity,
 		PlatformGrok, PlatformAgnes, PlatformDeepSeek, PlatformNvidia, PlatformTokenRhythm,
-		PlatformKimi, PlatformZhipu, PlatformChatAnywhere, PlatformGLM:
+		PlatformKimi, PlatformZhipu, PlatformChatAnywhere, PlatformGLM, PlatformModelScope,
+		PlatformDashScope, PlatformMiniMax, PlatformVolcengine:
 		return nil
 	default:
 		return infraerrors.BadRequest("UNSUPPORTED_ACCOUNT_PLATFORM", "unsupported account platform")
@@ -26,7 +27,8 @@ func ValidateGroupPlatform(platform string) error {
 	switch strings.TrimSpace(platform) {
 	case PlatformAnthropic, PlatformOpenAI, PlatformGemini, PlatformAntigravity,
 		PlatformGrok, PlatformAgnes, PlatformDeepSeek, PlatformNvidia, PlatformTokenRhythm,
-		PlatformKimi, PlatformZhipu, PlatformChatAnywhere, PlatformGLM, PlatformComposite:
+		PlatformKimi, PlatformZhipu, PlatformChatAnywhere, PlatformGLM, PlatformModelScope,
+		PlatformDashScope, PlatformMiniMax, PlatformVolcengine, PlatformComposite:
 		return nil
 	default:
 		return infraerrors.BadRequest("UNSUPPORTED_GROUP_PLATFORM", "unsupported group platform")
@@ -54,7 +56,7 @@ func validateAccountCredentials(platform, accountType string, credentials map[st
 	if err := ValidateAccountPlatform(platform); err != nil {
 		return err
 	}
-	if platform != PlatformDeepSeek && platform != PlatformNvidia && platform != PlatformTokenRhythm && platform != PlatformKimi && platform != PlatformZhipu && platform != PlatformChatAnywhere && platform != PlatformGLM {
+	if platform != PlatformDeepSeek && platform != PlatformNvidia && platform != PlatformTokenRhythm && platform != PlatformKimi && platform != PlatformZhipu && platform != PlatformChatAnywhere && platform != PlatformGLM && platform != PlatformModelScope && platform != PlatformDashScope && platform != PlatformMiniMax && platform != PlatformVolcengine {
 		return nil
 	}
 	platformName := "DeepSeek"
@@ -83,6 +85,22 @@ func validateAccountCredentials(platform, accountType string, credentials map[st
 		platformName = "GLM"
 		errorPrefix = "GLM"
 	}
+	if platform == PlatformModelScope {
+		platformName = "ModelScope"
+		errorPrefix = "MODELSCOPE"
+	}
+	if platform == PlatformDashScope {
+		platformName = "DashScope"
+		errorPrefix = "DASHSCOPE"
+	}
+	if platform == PlatformMiniMax {
+		platformName = "MiniMax"
+		errorPrefix = "MINIMAX"
+	}
+	if platform == PlatformVolcengine {
+		platformName = "Volcengine"
+		errorPrefix = "VOLCENGINE"
+	}
 	if accountType != AccountTypeAPIKey {
 		return infraerrors.BadRequest(errorPrefix+"_ACCOUNT_TYPE_UNSUPPORTED", platformName+" accounts must use the apikey account type")
 	}
@@ -103,6 +121,21 @@ func validateAccountCredentials(platform, accountType string, credentials map[st
 		}
 		if _, _, err := TokenRhythmCookieCredentials(credentials); err != nil {
 			return infraerrors.BadRequest(errorPrefix+"_COOKIE_INVALID", err.Error())
+		}
+		return nil
+	}
+	if platform == PlatformModelScope || platform == PlatformDashScope || platform == PlatformMiniMax || platform == PlatformVolcengine {
+		if rawBaseURL, exists := credentials["base_url"]; exists && rawBaseURL != nil {
+			baseURL, ok := rawBaseURL.(string)
+			if !ok {
+				return infraerrors.BadRequest(errorPrefix+"_BASE_URL_INVALID", platformName+" base_url must be an absolute http(s) URL")
+			}
+			if strings.TrimSpace(baseURL) != "" {
+				parsed, err := url.ParseRequestURI(strings.TrimSpace(baseURL))
+				if err != nil || parsed.Scheme == "" || parsed.Host == "" || (parsed.Scheme != "http" && parsed.Scheme != "https") {
+					return infraerrors.BadRequest(errorPrefix+"_BASE_URL_INVALID", platformName+" base_url must be an absolute http(s) URL")
+				}
+			}
 		}
 		return nil
 	}

@@ -724,6 +724,22 @@ export default {
         baseUrlHint: 'GLM uses the fixed mainland Zhipu AI Open Platform endpoint.',
         apiKeyHint: 'Your mainland Zhipu AI Open Platform API key'
       },
+      modelscope: {
+        baseUrlHint: 'OpenAI-compatible ModelScope inference endpoint. The default includes /v1.',
+        apiKeyHint: 'Your ModelScope access token'
+      },
+      dashscope: {
+        baseUrlHint: 'OpenAI-compatible Alibaba Cloud DashScope endpoint.',
+        apiKeyHint: 'Your DashScope API key'
+      },
+      minimax: {
+        baseUrlHint: 'OpenAI-compatible MiniMax endpoint. The default includes /v1.',
+        apiKeyHint: 'Your MiniMax API key'
+      },
+      volcengine: {
+        baseUrlHint: 'OpenAI-compatible Volcengine Ark endpoint.',
+        apiKeyHint: 'Your Volcengine Ark API key'
+      },
       grok: {
         baseUrlHint: 'Grok OAuth accounts forward to the official xAI API base URL.',
         apiKeyHint: 'Grok subscription support uses OAuth refresh tokens; API keys are out of scope for this account type.',

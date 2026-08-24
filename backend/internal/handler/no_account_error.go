@@ -158,6 +158,14 @@ func openAICompatibleSelectionErrorForLog(err error, platform string) error {
 		provider = "ChatAnywhere"
 	case service.PlatformGLM:
 		provider = "GLM"
+	case service.PlatformModelScope:
+		provider = "ModelScope"
+	case service.PlatformDashScope:
+		provider = "DashScope"
+	case service.PlatformMiniMax:
+		provider = "MiniMax"
+	case service.PlatformVolcengine:
+		provider = "Volcengine"
 	default:
 		return err
 	}

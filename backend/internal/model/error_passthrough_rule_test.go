@@ -21,5 +21,9 @@ func TestAllPlatformsIncludesEveryConcretePlatform(t *testing.T) {
 		"zhipu",
 		"chatanywhere",
 		"glm",
+		"modelscope",
+		"dashscope",
+		"minimax",
+		"volcengine",
 	}, AllPlatforms())
 }

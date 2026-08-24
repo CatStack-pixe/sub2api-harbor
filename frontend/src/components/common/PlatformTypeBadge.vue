@@ -98,6 +98,10 @@ const platformLabel = computed(() => {
   if (props.platform === 'chatanywhere') return 'ChatAnywhere'
   if (props.platform === 'glm') return 'GLM'
   if (props.platform === 'zhipu') return 'Zhipu GLM'
+  if (props.platform === 'modelscope') return 'ModelScope'
+  if (props.platform === 'dashscope') return 'DashScope'
+  if (props.platform === 'minimax') return 'MiniMax'
+  if (props.platform === 'volcengine') return 'Volcengine Ark'
   return 'Gemini'
 })
 
@@ -220,6 +224,10 @@ const platformClass = computed(() => {
   if (props.platform === 'zhipu') {
     return 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400'
   }
+  if (props.platform === 'modelscope') return 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300'
+  if (props.platform === 'dashscope') return 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300'
+  if (props.platform === 'minimax') return 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
+  if (props.platform === 'volcengine') return 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
   return 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
 })
 
@@ -260,6 +268,10 @@ const typeClass = computed(() => {
   if (props.platform === 'zhipu') {
     return 'bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400'
   }
+  if (props.platform === 'modelscope') return 'bg-sky-100 text-sky-600 dark:bg-sky-900/30 dark:text-sky-300'
+  if (props.platform === 'dashscope') return 'bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-300'
+  if (props.platform === 'minimax') return 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-300'
+  if (props.platform === 'volcengine') return 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-300'
   return 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400'
 })
 

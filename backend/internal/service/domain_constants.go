@@ -52,6 +52,10 @@ const (
 	PlatformDeepseek          = domain.PlatformDeepseek
 	PlatformChatAnywhere      = domain.PlatformChatAnywhere
 	PlatformGLM               = domain.PlatformGLM
+	PlatformModelScope        = domain.PlatformModelScope
+	PlatformDashScope         = domain.PlatformDashScope
+	PlatformMiniMax           = domain.PlatformMiniMax
+	PlatformVolcengine        = domain.PlatformVolcengine
 	PlatformComposite         = domain.PlatformComposite
 	PlatformKiro              = "kiro"
 	AgnesDefaultBaseURL       = domain.AgnesDefaultBaseURL
@@ -65,6 +69,10 @@ const (
 	ChatAnywhereChinaBaseURL  = domain.ChatAnywhereChinaBaseURL
 	ChatAnywhereGlobalBaseURL = domain.ChatAnywhereGlobalBaseURL
 	GLMDefaultBaseURL         = domain.GLMDefaultBaseURL
+	ModelScopeDefaultBaseURL  = domain.ModelScopeDefaultBaseURL
+	DashScopeDefaultBaseURL   = domain.DashScopeDefaultBaseURL
+	MiniMaxDefaultBaseURL     = domain.MiniMaxDefaultBaseURL
+	VolcengineDefaultBaseURL  = domain.VolcengineDefaultBaseURL
 )
 
 // 账号接入模式（国产供应商）：按量付费 vs Coding Plan。
@@ -127,6 +135,10 @@ var AllowedQuotaPlatforms = []string{
 	PlatformZhipu,
 	PlatformChatAnywhere,
 	PlatformGLM,
+	PlatformModelScope,
+	PlatformDashScope,
+	PlatformMiniMax,
+	PlatformVolcengine,
 }
 
 // DeepSeekDefaultModelIDs are the public DeepSeek V4 model IDs shown in default selections.

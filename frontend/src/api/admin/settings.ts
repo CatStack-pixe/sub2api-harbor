@@ -17,7 +17,7 @@ export interface DefaultSubscriptionSetting {
 }
 
 // ── 平台限额类型 ──────────────────────────────────────────────────
-export type PlatformType = "anthropic" | "openai" | "gemini" | "antigravity" | "grok" | "agnes" | "deepseek" | "kimi" | "zhipu" | "nvidia" | "tokenrhythm" | "chatanywhere" | "glm"
+export type PlatformType = "anthropic" | "openai" | "gemini" | "antigravity" | "grok" | "agnes" | "deepseek" | "kimi" | "zhipu" | "nvidia" | "tokenrhythm" | "chatanywhere" | "glm" | "modelscope" | "dashscope" | "minimax" | "volcengine"
 export type QuotaWindowType = "daily" | "weekly" | "monthly"
 
 /** 单平台三档限额；null = 不限制，undefined = 未填（等价 null） */
@@ -30,7 +30,7 @@ export interface PlatformQuotaLimits {
 /** 全平台默认限额 map（key = PlatformType） */
 export type DefaultPlatformQuotasMap = Partial<Record<PlatformType, PlatformQuotaLimits>>
 
-const PLATFORMS: PlatformType[] = ["anthropic", "openai", "gemini", "antigravity", "grok", "agnes", "deepseek", "kimi", "zhipu", "nvidia", "tokenrhythm", "chatanywhere", "glm"]
+const PLATFORMS: PlatformType[] = ["anthropic", "openai", "gemini", "antigravity", "grok", "agnes", "deepseek", "kimi", "zhipu", "nvidia", "tokenrhythm", "chatanywhere", "glm", "modelscope", "dashscope", "minimax", "volcengine"]
 
 export type SchedulingThresholdPlatformType =
   | "openai"

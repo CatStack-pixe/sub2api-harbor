@@ -186,6 +186,10 @@ const labelClass = computed(() => {
   if (props.platform === 'zhipu') {
     return `${base} bg-indigo-200/60 text-indigo-800 dark:bg-indigo-800/40 dark:text-indigo-300`
   }
+  if (props.platform === 'modelscope') return `${base} bg-sky-200/70 text-sky-900 dark:bg-sky-900/50 dark:text-sky-300`
+  if (props.platform === 'dashscope') return `${base} bg-orange-200/70 text-orange-900 dark:bg-orange-900/50 dark:text-orange-300`
+  if (props.platform === 'minimax') return `${base} bg-blue-200/70 text-blue-900 dark:bg-blue-900/50 dark:text-blue-300`
+  if (props.platform === 'volcengine') return `${base} bg-red-200/70 text-red-900 dark:bg-red-900/50 dark:text-red-300`
   if (props.platform === 'composite') {
     return `${base} bg-cyan-200/70 text-cyan-900 dark:bg-cyan-900/50 dark:text-cyan-300`
   }
@@ -263,6 +267,26 @@ const badgeClass = computed(() => {
     return isSubscription.value
       ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400'
       : 'bg-indigo-50 text-indigo-700 dark:bg-indigo-900/20 dark:text-indigo-400'
+  }
+  if (props.platform === 'modelscope') {
+    return isSubscription.value
+      ? 'bg-sky-100 text-sky-800 dark:bg-sky-900/30 dark:text-sky-300'
+      : 'bg-sky-50 text-sky-800 dark:bg-sky-900/20 dark:text-sky-300'
+  }
+  if (props.platform === 'dashscope') {
+    return isSubscription.value
+      ? 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300'
+      : 'bg-orange-50 text-orange-800 dark:bg-orange-900/20 dark:text-orange-300'
+  }
+  if (props.platform === 'minimax') {
+    return isSubscription.value
+      ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300'
+      : 'bg-blue-50 text-blue-800 dark:bg-blue-900/20 dark:text-blue-300'
+  }
+  if (props.platform === 'volcengine') {
+    return isSubscription.value
+      ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'
+      : 'bg-red-50 text-red-800 dark:bg-red-900/20 dark:text-red-300'
   }
   if (props.platform === 'composite') {
     return isSubscription.value

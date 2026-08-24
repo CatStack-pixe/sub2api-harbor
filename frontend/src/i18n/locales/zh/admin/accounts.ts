@@ -805,6 +805,22 @@ export default {
         baseUrlHint: 'GLM 使用智谱官方 OpenAI 兼容端点，地址不可修改。',
         apiKeyHint: '智谱 AI 开放平台（中国大陆）API Key'
       },
+      modelscope: {
+        baseUrlHint: 'ModelScope OpenAI 兼容推理接口，默认地址包含 /v1。',
+        apiKeyHint: '您的 ModelScope 访问令牌'
+      },
+      dashscope: {
+        baseUrlHint: '阿里云百炼 DashScope OpenAI 兼容接口。',
+        apiKeyHint: '您的 DashScope API Key'
+      },
+      minimax: {
+        baseUrlHint: 'MiniMax OpenAI 兼容接口，默认地址包含 /v1。',
+        apiKeyHint: '您的 MiniMax API Key'
+      },
+      volcengine: {
+        baseUrlHint: '火山引擎 Ark OpenAI 兼容接口。',
+        apiKeyHint: '您的火山引擎 Ark API Key'
+      },
       grok: {
         baseUrlHint: 'Grok OAuth 账号会转发到官方 xAI API Base URL。',
         apiKeyHint: 'Grok 订阅支持使用 OAuth refresh token；API Key 账号不在本次范围内。',

@@ -23,7 +23,11 @@ export const CONCRETE_PLATFORM_OPTIONS = [
   { value: 'kimi', label: 'Kimi' },
   { value: 'zhipu', label: 'Zhipu GLM' },
   { value: 'chatanywhere', label: 'ChatAnywhere' },
-  { value: 'glm', label: 'GLM' }
+  { value: 'glm', label: 'GLM' },
+  { value: 'modelscope', label: 'ModelScope' },
+  { value: 'dashscope', label: 'DashScope' },
+  { value: 'minimax', label: 'MiniMax' },
+  { value: 'volcengine', label: 'Volcengine Ark' }
 ] as const satisfies readonly PlatformOption<AccountPlatform>[]
 
 /** Platforms that can own a group. */

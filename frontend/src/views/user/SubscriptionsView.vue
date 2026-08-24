@@ -278,6 +278,10 @@ function platformAccentDotClass(p: string): string {
     case 'nvidia': return 'bg-lime-500'
     case 'chatanywhere': return 'bg-violet-500'
     case 'glm': return 'bg-rose-500'
+    case 'modelscope': return 'bg-sky-500'
+    case 'dashscope': return 'bg-orange-500'
+    case 'minimax': return 'bg-blue-500'
+    case 'volcengine': return 'bg-red-500'
     default: return 'bg-gray-400'
   }
 }

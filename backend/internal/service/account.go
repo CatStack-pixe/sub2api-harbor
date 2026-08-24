@@ -295,6 +295,22 @@ func (a *Account) IsGLM() bool {
 	return a != nil && a.Platform == PlatformGLM
 }
 
+func (a *Account) IsModelScope() bool {
+	return a != nil && a.Platform == PlatformModelScope
+}
+
+func (a *Account) IsDashScope() bool {
+	return a != nil && a.Platform == PlatformDashScope
+}
+
+func (a *Account) IsMiniMax() bool {
+	return a != nil && a.Platform == PlatformMiniMax
+}
+
+func (a *Account) IsVolcengine() bool {
+	return a != nil && a.Platform == PlatformVolcengine
+}
+
 func (a *Account) IsGrokOAuth() bool {
 	return a.IsGrok() && a.Type == AccountTypeOAuth
 }
@@ -312,7 +328,7 @@ func (a *Account) IsCNProvider() bool {
 // openai/grok 原生走 OpenAI 网关；kimi/zhipu/deepseek 同为 OpenAI Chat Completions
 // 兼容上游，也经 OpenAI 网关转发。
 func (a *Account) IsOpenAICompatible() bool {
-	return a != nil && (a.Platform == PlatformOpenAI || a.Platform == PlatformGrok || a.Platform == PlatformAgnes || a.Platform == PlatformDeepSeek || a.Platform == PlatformNvidia || a.Platform == PlatformTokenRhythm || a.Platform == PlatformKimi || a.Platform == PlatformZhipu || a.Platform == PlatformChatAnywhere || a.Platform == PlatformGLM)
+	return a != nil && (a.Platform == PlatformOpenAI || a.Platform == PlatformGrok || a.Platform == PlatformAgnes || a.Platform == PlatformDeepSeek || a.Platform == PlatformNvidia || a.Platform == PlatformTokenRhythm || a.Platform == PlatformKimi || a.Platform == PlatformZhipu || a.Platform == PlatformChatAnywhere || a.Platform == PlatformGLM || a.Platform == PlatformModelScope || a.Platform == PlatformDashScope || a.Platform == PlatformMiniMax || a.Platform == PlatformVolcengine)
 }
 
 // ShouldUseOpenAIResponsesAPI reports whether this OpenAI-compatible account
@@ -333,7 +349,7 @@ func (a *Account) ShouldUseOpenAIResponsesAPI() bool {
 		}
 	}
 	return !a.IsAgnes() && !a.IsDeepSeek() && !a.IsNvidia() && !a.IsTokenRhythm() &&
-		!a.IsKimi() && !a.IsChatAnywhere() && !a.IsGLM() &&
+		!a.IsKimi() && !a.IsChatAnywhere() && !a.IsGLM() && !a.IsModelScope() && !a.IsDashScope() && !a.IsMiniMax() && !a.IsVolcengine() &&
 		openai_compat.ShouldUseResponsesAPI(a.Extra)
 }
 
@@ -1361,7 +1377,7 @@ func (a *Account) IsOpenAIApiKey() bool {
 // 适用 openai 与国产 OpenAI 兼容供应商（kimi/zhipu/deepseek）；grok 走 GetGrokBaseURL，
 // 此处对 grok 返回 "" 以保持原有行为。
 func (a *Account) GetOpenAIBaseURL() string {
-	if a == nil || (!a.IsOpenAI() && !a.IsAgnes() && !a.IsDeepSeek() && !a.IsNvidia() && !a.IsTokenRhythm() && !a.IsKimi() && !a.IsZhipu() && !a.IsChatAnywhere() && !a.IsGLM()) {
+	if a == nil || (!a.IsOpenAI() && !a.IsAgnes() && !a.IsDeepSeek() && !a.IsNvidia() && !a.IsTokenRhythm() && !a.IsKimi() && !a.IsZhipu() && !a.IsChatAnywhere() && !a.IsGLM() && !a.IsModelScope() && !a.IsDashScope() && !a.IsMiniMax() && !a.IsVolcengine()) {
 		return ""
 	}
 	if a.IsChatAnywhere() {
@@ -1434,6 +1450,30 @@ func (a *Account) GetOpenAIBaseURL() string {
 	}
 	if a.IsTokenRhythm() {
 		return TokenRhythmDefaultBaseURL
+	}
+	if a.IsModelScope() {
+		if baseURL := strings.TrimRight(strings.TrimSpace(a.GetCredential("base_url")), "/"); baseURL != "" {
+			return baseURL
+		}
+		return ModelScopeDefaultBaseURL
+	}
+	if a.IsDashScope() {
+		if baseURL := strings.TrimRight(strings.TrimSpace(a.GetCredential("base_url")), "/"); baseURL != "" {
+			return baseURL
+		}
+		return DashScopeDefaultBaseURL
+	}
+	if a.IsMiniMax() {
+		if baseURL := strings.TrimRight(strings.TrimSpace(a.GetCredential("base_url")), "/"); baseURL != "" {
+			return baseURL
+		}
+		return MiniMaxDefaultBaseURL
+	}
+	if a.IsVolcengine() {
+		if baseURL := strings.TrimRight(strings.TrimSpace(a.GetCredential("base_url")), "/"); baseURL != "" {
+			return baseURL
+		}
+		return VolcengineDefaultBaseURL
 	}
 	return "https://api.openai.com"
 }
@@ -1740,14 +1780,14 @@ func (a *Account) GetOpenAIApiKey() string {
 }
 
 // GetOpenAIProtocolAPIKey 返回 OpenAI 协议族 APIKey 账号的密钥。
-// 覆盖 openai 原生账号与国产 OpenAI 兼容供应商（kimi/zhipu/deepseek）账号，
+// 覆盖 openai 原生账号与 OpenAI 兼容供应商账号，
 // 供转发鉴权、模型列表同步等协议族共用路径使用。注意 IsOpenAIApiKey 语义上
 // 仅指 openai 平台账号，调度倍率/WS 能力门控继续以其为准，不受本方法影响。
 func (a *Account) GetOpenAIProtocolAPIKey() string {
 	if a == nil {
 		return ""
 	}
-	if a.IsCNProvider() {
+	if a.IsCNProvider() || a.IsModelScope() || a.IsDashScope() || a.IsMiniMax() || a.IsVolcengine() {
 		if a.Type != AccountTypeAPIKey {
 			return ""
 		}

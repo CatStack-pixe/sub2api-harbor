@@ -450,6 +450,8 @@ export function getModelsByPlatform(platform: string): string[] {
     case 'antigravity': return antigravityModels
     case 'zhipu': return zhipuModels
     case 'qwen': return qwenModels
+    case 'modelscope': return qwenModels
+    case 'dashscope': return qwenModels
     case 'deepseek': return deepseekModels
     case 'nvidia': return nvidiaModels
     case 'mistral': return mistralModels
@@ -465,6 +467,7 @@ export function getModelsByPlatform(platform: string): string[] {
     case 'chatanywhere': return chatAnywhereModels
     case 'glm': return glmModels
     case 'doubao': return doubaoModels
+    case 'volcengine': return doubaoModels
     case 'minimax': return minimaxModels
     case 'baidu': return baiduModels
     case 'spark': return sparkModels
@@ -476,7 +479,7 @@ export function getModelsByPlatform(platform: string): string[] {
 
 // 按平台获取预设映射
 export function getPresetMappingsByPlatform(platform: string) {
-  if (platform === 'agnes' || platform === 'deepseek' || platform === 'kimi' || platform === 'zhipu' || platform === 'nvidia' || platform === 'tokenrhythm' || platform === 'chatanywhere' || platform === 'glm') return []
+  if (platform === 'agnes' || platform === 'deepseek' || platform === 'kimi' || platform === 'zhipu' || platform === 'nvidia' || platform === 'tokenrhythm' || platform === 'chatanywhere' || platform === 'glm' || platform === 'modelscope' || platform === 'dashscope' || platform === 'minimax' || platform === 'volcengine') return []
   if (platform === 'openai') return openaiPresetMappings
   if (platform === 'gemini') return geminiPresetMappings
   if (platform === 'grok' || platform === 'xai') return grokPresetMappings

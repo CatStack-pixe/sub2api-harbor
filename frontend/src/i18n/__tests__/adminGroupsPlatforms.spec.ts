@@ -18,6 +18,10 @@ describe('admin group platform translations', () => {
       'tokenrhythm',
       'chatanywhere',
       'glm',
+      'modelscope',
+      'dashscope',
+      'minimax',
+      'volcengine',
       'composite',
     ] as const
 

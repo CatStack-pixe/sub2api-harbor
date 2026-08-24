@@ -213,7 +213,11 @@ const upstreamSyncPlatforms = new Set([
   'tokenrhythm',
   'zhipu',
   'chatanywhere',
-  'glm'
+  'glm',
+  'modelscope',
+  'dashscope',
+  'minimax',
+  'volcengine'
 ])
 const canSyncUpstream = computed(() => {
   if (props.accountId) {

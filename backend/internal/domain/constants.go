@@ -31,6 +31,10 @@ const (
 	PlatformZhipu        = "zhipu"
 	PlatformChatAnywhere = "chatanywhere"
 	PlatformGLM          = "glm"
+	PlatformModelScope   = "modelscope"
+	PlatformDashScope    = "dashscope"
+	PlatformMiniMax      = "minimax"
+	PlatformVolcengine   = "volcengine"
 	PlatformComposite    = "composite"
 )
 
@@ -49,6 +53,10 @@ const (
 	ChatAnywhereChinaBaseURL  = "https://api.chatanywhere.tech/v1"
 	ChatAnywhereGlobalBaseURL = "https://api.chatanywhere.org/v1"
 	GLMDefaultBaseURL         = "https://open.bigmodel.cn/api/paas/v4"
+	ModelScopeDefaultBaseURL  = "https://api-inference.modelscope.cn/v1"
+	DashScopeDefaultBaseURL   = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+	MiniMaxDefaultBaseURL     = "https://api.minimaxi.com/v1"
+	VolcengineDefaultBaseURL  = "https://ark.cn-beijing.volces.com/api/v3"
 )
 
 // Account modes are independent from the upstream API protocol.
