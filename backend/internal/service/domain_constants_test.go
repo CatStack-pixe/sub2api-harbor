@@ -80,3 +80,34 @@ func TestSettingKeyAuthSourcePlatformQuotas(t *testing.T) {
 		t.Fatalf("got %q, want %q", got, "auth_source_default_dingtalk_platform_quotas")
 	}
 }
+
+func TestOfficialOpenAICompatibleDefaultModelIDs(t *testing.T) {
+	tests := []struct {
+		name string
+		got  func() []string
+		want string
+	}{
+		{name: "modelscope", got: ModelScopeDefaultModelIDs, want: "Qwen/Qwen3.5-397B-A17B"},
+		{name: "dashscope", got: DashScopeDefaultModelIDs, want: "qwen3.5-plus"},
+		{name: "minimax", got: MiniMaxDefaultModelIDs, want: "MiniMax-M3"},
+		{name: "volcengine", got: VolcengineDefaultModelIDs, want: "doubao-seed-2-1-pro-260628"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.got()
+			if len(got) == 0 {
+				t.Fatalf("%s default model list is empty", tt.name)
+			}
+			found := false
+			for _, modelID := range got {
+				if modelID == tt.want {
+					found = true
+					break
+				}
+			}
+			if !found {
+				t.Fatalf("%s default model list %v does not contain %q", tt.name, got, tt.want)
+			}
+		})
+	}
+}

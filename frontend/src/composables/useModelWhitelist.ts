@@ -107,6 +107,33 @@ const qwenModels = [
   'qwq-32b', 'qwq-32b-preview'
 ]
 
+// ModelScope's live OpenAI-compatible catalog is account-dependent. Keep the
+// observed high-value IDs here as a reference until account sync fills in the
+// complete catalog.
+const modelscopeModels = [
+  'Qwen/Qwen3.5-397B-A17B',
+  'Qwen/Qwen3.5-122B-A10B',
+  'Qwen/Qwen3-235B-A22B-Instruct-2507',
+  'Qwen/Qwen3-Coder-30B-A3B-Instruct',
+  'deepseek-ai/DeepSeek-V4-Pro',
+  'deepseek-ai/DeepSeek-V4-Flash-0731',
+  'ZhipuAI/GLM-5.2'
+]
+
+// DashScope live model references gathered from account model sync.
+const dashscopeModels = [
+  'qwen-plus',
+  'qwen-max',
+  'qwen3.5-plus',
+  'qwen3.5-flash',
+  'qwen3-max',
+  'qwen3-coder-plus',
+  'deepseek-v3.2',
+  'deepseek-r1',
+  'glm-5.2',
+  'kimi-k2.6'
+]
+
 // DeepSeek
 const deepseekModels = [
   'deepseek-v4-pro', 'deepseek-v4-flash'
@@ -221,8 +248,24 @@ const doubaoModels = [
   'doubao-1.5-pro-vision-32k', 'doubao-1.5-thinking-pro'
 ]
 
+// Volcengine live model references. Account sync remains the source of truth
+// because endpoint-specific catalogs can contain many dated model IDs.
+const volcengineModels = [
+  'doubao-seed-2-0-code-preview-260215',
+  'doubao-seed-2-0-pro-260215',
+  'doubao-seed-2-1-pro-260628',
+  'doubao-seed-2-1-turbo-260628',
+  'deepseek-v3-2-251201',
+  'deepseek-v4-pro-ga-260813',
+  'glm-5-2-260617',
+  'kimi-k2-thinking-251104'
+]
+
 // MiniMax
 const minimaxModels = [
+  'MiniMax-M2', 'MiniMax-M2.1', 'MiniMax-M2.1-highspeed',
+  'MiniMax-M2.5', 'MiniMax-M2.5-highspeed', 'MiniMax-M2.7',
+  'MiniMax-M2.7-highspeed', 'MiniMax-M3',
   'abab6.5-chat', 'abab6.5s-chat', 'abab6.5s-chat-pro',
   'abab6-chat',
   'abab5.5-chat', 'abab5.5s-chat'
@@ -265,6 +308,8 @@ const allModelsList: string[] = [
   ...geminiModels,
   ...zhipuModels,
   ...qwenModels,
+  ...modelscopeModels,
+  ...dashscopeModels,
   ...deepseekModels,
   ...nvidiaModels,
   ...mistralModels,
@@ -275,6 +320,7 @@ const allModelsList: string[] = [
   ...moonshotModels,
   ...tokenRhythmModels,
   ...doubaoModels,
+  ...volcengineModels,
   ...minimaxModels,
   ...baiduModels,
   ...sparkModels,
@@ -450,8 +496,8 @@ export function getModelsByPlatform(platform: string): string[] {
     case 'antigravity': return antigravityModels
     case 'zhipu': return zhipuModels
     case 'qwen': return qwenModels
-    case 'modelscope': return qwenModels
-    case 'dashscope': return qwenModels
+    case 'modelscope': return modelscopeModels
+    case 'dashscope': return dashscopeModels
     case 'deepseek': return deepseekModels
     case 'nvidia': return nvidiaModels
     case 'mistral': return mistralModels
@@ -467,7 +513,7 @@ export function getModelsByPlatform(platform: string): string[] {
     case 'chatanywhere': return chatAnywhereModels
     case 'glm': return glmModels
     case 'doubao': return doubaoModels
-    case 'volcengine': return doubaoModels
+    case 'volcengine': return volcengineModels
     case 'minimax': return minimaxModels
     case 'baidu': return baiduModels
     case 'spark': return sparkModels
