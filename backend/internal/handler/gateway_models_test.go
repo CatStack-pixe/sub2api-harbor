@@ -465,6 +465,10 @@ func TestDefaultModelIDsForPlatform_CNProvidersKeepProviderDefaults(t *testing.T
 		{platform: service.PlatformKimi, want: service.KimiDefaultModelIDs()},
 		{platform: service.PlatformZhipu, want: nil},
 		{platform: service.PlatformDeepSeek, want: service.DeepSeekDefaultModelIDs()},
+		{platform: service.PlatformModelScope, want: service.ModelScopeDefaultModelIDs()},
+		{platform: service.PlatformDashScope, want: service.DashScopeDefaultModelIDs()},
+		{platform: service.PlatformMiniMax, want: service.MiniMaxDefaultModelIDs()},
+		{platform: service.PlatformVolcengine, want: service.VolcengineDefaultModelIDs()},
 	}
 	for _, tt := range tests {
 		require.Equal(t, tt.want, defaultModelIDsForPlatform(tt.platform), "platform=%s", tt.platform)

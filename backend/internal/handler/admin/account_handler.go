@@ -2710,6 +2710,33 @@ func (h *AccountHandler) GetAvailableModels(c *gin.Context) {
 		return
 	}
 
+	if account.IsModelScope() || account.IsDashScope() || account.IsMiniMax() || account.IsVolcengine() {
+		var modelIDs []string
+		switch {
+		case account.IsModelScope():
+			modelIDs = service.ModelScopeDefaultModelIDs()
+		case account.IsDashScope():
+			modelIDs = service.DashScopeDefaultModelIDs()
+		case account.IsMiniMax():
+			modelIDs = service.MiniMaxDefaultModelIDs()
+		case account.IsVolcengine():
+			modelIDs = service.VolcengineDefaultModelIDs()
+		}
+		if mapping := account.GetModelMapping(); len(mapping) > 0 {
+			modelIDs = modelIDs[:0]
+			for requestedModel := range mapping {
+				modelIDs = append(modelIDs, requestedModel)
+			}
+			sort.Strings(modelIDs)
+		}
+		models := make([]openai.Model, 0, len(modelIDs))
+		for _, modelID := range modelIDs {
+			models = append(models, openai.Model{ID: modelID, Object: "model", Type: "model", DisplayName: modelID})
+		}
+		response.Success(c, models)
+		return
+	}
+
 	// Handle Gemini accounts
 	if account.IsGemini() {
 		// For OAuth accounts: return default Gemini models

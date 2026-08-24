@@ -20,6 +20,17 @@ describe('useModelWhitelist', () => {
     expect(getModelsByPlatform('tokenrhythm')).toEqual(['deepseek-v4-pro', 'deepseek-v4-flash'])
   })
 
+  it('uses the synced reference catalogs for the official OpenAI-compatible platforms', () => {
+    expect(getModelsByPlatform('modelscope')).toContain('Qwen/Qwen3.5-397B-A17B')
+    expect(getModelsByPlatform('dashscope')).toContain('qwen3.5-plus')
+    expect(getModelsByPlatform('minimax')).toContain('MiniMax-M3')
+    expect(getModelsByPlatform('volcengine')).toContain('doubao-seed-2-1-pro-260628')
+    expect(getPresetMappingsByPlatform('modelscope')).toEqual([])
+    expect(getPresetMappingsByPlatform('dashscope')).toEqual([])
+    expect(getPresetMappingsByPlatform('minimax')).toEqual([])
+    expect(getPresetMappingsByPlatform('volcengine')).toEqual([])
+  })
+
   it('openai 模型列表包含 GPT-5.4 官方快照', () => {
     const models = getModelsByPlatform('openai')
 

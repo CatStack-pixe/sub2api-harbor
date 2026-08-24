@@ -1194,8 +1194,8 @@ func (h *GatewayHandler) compositeAvailableModels(ctx context.Context, groupID *
 		service.PlatformMiniMax, service.PlatformVolcengine} {
 		platformModels := h.gatewayService.GetAvailableModels(ctx, groupID, platform)
 		if len(platformModels) == 0 {
-			// CN 供应商没有静态默认模型列表（defaultModelIDsForPlatform 的
-			// default 分支是 Claude 列表），composite 下只暴露账号映射键。
+			// Use provider-specific defaults where available. Providers without a
+			// static catalog still contribute only explicitly synced model IDs.
 			if _, ok := schedulablePlatforms[platform]; ok && !service.IsCNProvider(platform) {
 				platformModels = defaultModelIDsForPlatform(platform)
 			}
@@ -1431,8 +1431,14 @@ func defaultModelIDsForPlatform(platform string) []string {
 		return service.ChatAnywhereDefaultModelIDs()
 	case service.PlatformGLM:
 		return service.GLMDefaultModelIDs()
-	case service.PlatformModelScope, service.PlatformDashScope, service.PlatformMiniMax, service.PlatformVolcengine:
-		return nil
+	case service.PlatformModelScope:
+		return service.ModelScopeDefaultModelIDs()
+	case service.PlatformDashScope:
+		return service.DashScopeDefaultModelIDs()
+	case service.PlatformMiniMax:
+		return service.MiniMaxDefaultModelIDs()
+	case service.PlatformVolcengine:
+		return service.VolcengineDefaultModelIDs()
 	case service.PlatformComposite:
 		ids := make([]string, 0)
 		seen := make(map[string]struct{})
