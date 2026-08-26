@@ -487,6 +487,23 @@ type OpenAIGatewayService struct {
 	openaiCodexTurnStateWrites  atomic.Uint64
 }
 
+// ReserveAccountRequestQuota performs the final, serialized request admission
+// check. It is intentionally separate from account selection so wait plans,
+// candidate rechecks, and profit vetoes cannot consume quota prematurely.
+func (s *OpenAIGatewayService) ReserveAccountRequestQuota(ctx context.Context, account *Account) (bool, error) {
+	if account == nil || !account.HasRequestQuotaLimit() {
+		return true, nil
+	}
+	if s.accountRepo == nil {
+		return false, errors.New("request quota storage is unavailable")
+	}
+	reservoir, ok := s.accountRepo.(AccountRequestQuotaReservoir)
+	if !ok {
+		return false, errors.New("request quota storage is unavailable")
+	}
+	return reservoir.ReserveRequestQuota(ctx, account.ID)
+}
+
 // NewOpenAIGatewayService creates a new OpenAIGatewayService
 func NewOpenAIGatewayService(
 	accountRepo AccountRepository,

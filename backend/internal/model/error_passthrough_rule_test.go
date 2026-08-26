@@ -8,13 +8,8 @@ import (
 
 func TestAllPlatformsIncludesEveryConcretePlatform(t *testing.T) {
 	require.ElementsMatch(t, []string{
-		"anthropic",
-		"openai",
-		"gemini",
-		"antigravity",
-		"grok",
-		"kimi",
-		"zhipu",
-		"deepseek",
+		"anthropic", "openai", "gemini", "antigravity", "grok", "agnes",
+		"deepseek", "nvidia", "tokenrhythm", "kimi", "zhipu", "chatanywhere",
+		"glm", "modelscope", "dashscope", "minimax", "volcengine",
 	}, AllPlatforms())
 }

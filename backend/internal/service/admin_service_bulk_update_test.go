@@ -298,9 +298,9 @@ func TestAdminService_BulkUpdateAccountsStripsGrokProviderManagedCredentials(t *
 
 	require.NoError(t, err)
 	require.NotNil(t, result)
-	require.Equal(t, "https://api.x.ai/v1", repo.bulkUpdate.Credentials["base_url"])
-	require.NotContains(t, repo.bulkUpdate.Credentials, "subscription_tier")
-	require.NotContains(t, repo.bulkUpdate.Credentials, "entitlement_status")
+	require.Equal(t, "https://api.x.ai/v1", repo.lastBulkUpdate.Credentials["base_url"])
+	require.NotContains(t, repo.lastBulkUpdate.Credentials, "subscription_tier")
+	require.NotContains(t, repo.lastBulkUpdate.Credentials, "entitlement_status")
 }
 
 func TestAdminService_BulkUpdateAccounts_NilGroupRepoReturnsError(t *testing.T) {

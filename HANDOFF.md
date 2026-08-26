@@ -11,6 +11,7 @@
 - Plugin migrations use `231_plugins.sql` and `232_plugin_artifacts.sql`; existing fork migrations `229_restore_fork_platform_constraints.sql` and `230_add_official_platform_constraints.sql` remain unchanged. The plugin SQL uses idempotent DDL.
 - Post-merge compatibility audit restored the complete fork provider set across routing, model synchronization, account URL/auth defaults, header overrides, failover/error passthrough, quota validation, billing probes, admin channel mapping, and frontend account/key controls. DeepSeek retains its dedicated `/models` sync endpoint; TokenRhythm session fields remain redacted; Anthropic API-key passthrough normalization and provider-managed credential sanitation run during account creation.
 - The audit also preserved upstream Codex catalog, auto-reset credit, adaptive CN protocol, and service-tier behavior. Duplicate plaza test declarations were renamed without removing either the upstream Model Plaza coverage or the fork Channel Plaza coverage.
+- The CI remediation restores atomic request-quota admission across Responses, Messages, Chat Completions, and WebSocket turns; preserves the fork GLM detector and all OpenAI-compatible composite targets; restores the default-enabled long-context group field; fixes stale test stubs/helpers; and expands platform quota contract fixtures to the complete fork set.
 
 ### Build and Verification Policy
 

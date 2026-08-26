@@ -242,6 +242,11 @@ func (h *OpenAIGatewayHandler) ChatCompletions(c *gin.Context) {
 			}
 			continue
 		}
+		if slotResult == openAISlotAcquireQuotaExhausted {
+			quotaAccountExhausted = true
+			failedAccountIDs[account.ID] = struct{}{}
+			continue
+		}
 		if slotResult != openAISlotAcquireOK {
 			return
 		}

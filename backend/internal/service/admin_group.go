@@ -336,6 +336,10 @@ func (s *adminServiceImpl) CreateGroup(ctx context.Context, input *CreateGroupIn
 	if err != nil {
 		return nil, err
 	}
+	longContextPricingEnabled := true
+	if input.LongContextPricingEnabled != nil {
+		longContextPricingEnabled = *input.LongContextPricingEnabled
+	}
 	maxReasoningEffort, err := normalizeMaxReasoningEffortForPlatform(platform, input.MaxReasoningEffort)
 	if err != nil {
 		return nil, infraerrors.Newf(http.StatusBadRequest, "INVALID_MAX_REASONING_EFFORT", "%v", err)
@@ -494,7 +498,7 @@ func (s *adminServiceImpl) CreateGroup(ctx context.Context, input *CreateGroupIn
 		DailyLimitUSD:                   dailyLimit,
 		WeeklyLimitUSD:                  weeklyLimit,
 		MonthlyLimitUSD:                 monthlyLimit,
-		LongContextPricingEnabled:       input.LongContextPricingEnabled,
+		LongContextPricingEnabled:       longContextPricingEnabled,
 		ModelPricing:                    modelPricing,
 		AllowImageGeneration:            allowImageGeneration,
 		AllowBatchImageGeneration:       allowBatchImageGeneration,

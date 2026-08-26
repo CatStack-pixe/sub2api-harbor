@@ -341,6 +341,25 @@ func forceChatResponsesFallbackAccount() *Account {
 	return account
 }
 
+func waitForFallbackRecorderBody(t *testing.T, recorder *openAIResponseFlushRecorder, want string) string {
+	t.Helper()
+	deadline := time.NewTimer(3 * time.Second)
+	defer deadline.Stop()
+	ticker := time.NewTicker(time.Millisecond)
+	defer ticker.Stop()
+	for {
+		body, _ := recorder.snapshot()
+		if strings.Contains(body, want) {
+			return body
+		}
+		select {
+		case <-deadline.C:
+			t.Fatalf("timed out waiting for %q in response body; got %q", want, body)
+		case <-ticker.C:
+		}
+	}
+}
+
 // reasoningRecordingCache 记录 reasoning 缓存写入、并按需响应回查。
 type reasoningRecordingCache struct {
 	stubGatewayCache

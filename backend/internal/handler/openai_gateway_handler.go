@@ -45,6 +45,8 @@ type OpenAIGatewayHandler struct {
 	cfg                        *config.Config
 }
 
+const openAIRequestQuotaReservedContextKey = "openai_request_quota_reserved_accounts"
+
 type openAIWSTurnChannelMappingSnapshot struct {
 	turn    int
 	mapping service.ChannelMappingResult
@@ -122,7 +124,7 @@ func resolveOpenAIMessagesDispatchMappedModel(c *gin.Context, apiKey *service.AP
 	// 默认值是 openai 专属,发给这些上游必错）,模型改写交给账号级 model_mapping。
 	if apiKey.Group.Platform == service.PlatformComposite && c != nil && c.Request != nil {
 		if platform, ok := service.ResolvedTargetPlatformFromContext(c.Request.Context()); ok &&
-			(platform == service.PlatformGrok || service.IsCNProvider(platform)) {
+			openAIMessagesDispatchBypassPlatform(platform) {
 			return ""
 		}
 	}
@@ -232,7 +234,7 @@ func allowOpenAICompatibleMessagesDispatch(c *gin.Context, apiKey *service.APIKe
 	// 解析到 openai 目标则受 composite 分组自身的可配置开关控制。
 	if apiKey.Group.Platform == service.PlatformComposite && c != nil && c.Request != nil {
 		if platform, ok := service.ResolvedTargetPlatformFromContext(c.Request.Context()); ok &&
-			(platform == service.PlatformGrok || service.IsCNProvider(platform)) {
+			openAIMessagesDispatchBypassPlatform(platform) {
 			return true
 		}
 	}
@@ -255,8 +257,11 @@ func openAIMessagesDispatchBypassPlatform(platform string) bool {
 
 func openAICompatibleTextTargetAllowed(c *gin.Context, apiKey *service.APIKey, model string) bool {
 	return compositeTargetPlatformAllowed(c, apiKey, model,
-		service.PlatformOpenAI, service.PlatformGrok,
-		service.PlatformKimi, service.PlatformZhipu, service.PlatformDeepseek)
+		service.PlatformOpenAI, service.PlatformGrok, service.PlatformAgnes,
+		service.PlatformDeepSeek, service.PlatformNvidia, service.PlatformTokenRhythm,
+		service.PlatformKimi, service.PlatformZhipu, service.PlatformChatAnywhere,
+		service.PlatformGLM, service.PlatformModelScope, service.PlatformDashScope,
+		service.PlatformMiniMax, service.PlatformVolcengine)
 }
 
 // isResponsesWebSocketCompositePlatform 限定 composite 分组在 Responses WebSocket
@@ -692,6 +697,11 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 				h.handleOpenAIProfitVetoExhausted(c, streamStarted, reqLog, profitVetoCount)
 				return
 			}
+			continue
+		}
+		if slotResult == openAISlotAcquireQuotaExhausted {
+			quotaAccountExhausted = true
+			failedAccountIDs[account.ID] = struct{}{}
 			continue
 		}
 		if slotResult != openAISlotAcquireOK {
@@ -1290,6 +1300,11 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 			}
 			continue
 		}
+		if slotResult == openAISlotAcquireQuotaExhausted {
+			quotaAccountExhausted = true
+			failedAccountIDs[account.ID] = struct{}{}
+			continue
+		}
 		if slotResult != openAISlotAcquireOK {
 			return
 		}
@@ -1606,6 +1621,9 @@ const (
 	openAISlotAcquireOK openAISlotAcquireResult = iota
 	// openAISlotAcquireFailed：错误响应已写出，调用方直接 return。
 	openAISlotAcquireFailed
+	// openAISlotAcquireQuotaExhausted: the account is excluded and the request
+	// is retried against another schedulable account.
+	openAISlotAcquireQuotaExhausted
 	// openAISlotAcquireProfitVetoed：槽位获取成功后利润终检否决。槽位已释放、
 	// 未写任何响应；调用方应经 recordOpenAIProfitVeto 把该账号加入本请求排除集
 	// 后重新选号，全池耗尽由下一轮选号返回标准 no available accounts。
@@ -1723,6 +1741,21 @@ func (h *OpenAIGatewayHandler) acquireOpenAIAccountSlot(
 		selection.Account = latest
 		// 调度器已抢槽路径无门时由选号内部完成 eager 绑定；门下选号内部
 		// 推迟绑定，这里在终检通过后补准入后绑定。
+		allowed, err := h.reserveAccountRequestQuota(c, ctx, account)
+		if err != nil {
+			if selection.ReleaseFunc != nil {
+				selection.ReleaseFunc()
+			}
+			status, errType, message := concurrencyErrorResponse(err, "account")
+			writeError(status, errType, message)
+			return nil, openAISlotAcquireFailed
+		}
+		if !allowed {
+			if selection.ReleaseFunc != nil {
+				selection.ReleaseFunc()
+			}
+			return nil, openAISlotAcquireQuotaExhausted
+		}
 		if selection.ProfitGateActive() {
 			if err := h.gatewayService.BindStickySessionAfterProfitAdmission(ctx, groupID, sessionHash, account.ID); err != nil {
 				reqLog.Warn("openai.bind_sticky_session_after_profit_admission_failed", zap.Int64("account_id", account.ID), zap.Error(err))
@@ -1760,6 +1793,21 @@ func (h *OpenAIGatewayHandler) acquireOpenAIAccountSlot(
 		}
 		account = latest
 		selection.Account = latest
+		allowed, err := h.reserveAccountRequestQuota(c, ctx, account)
+		if err != nil {
+			if fastReleaseFunc != nil {
+				fastReleaseFunc()
+			}
+			status, errType, message := concurrencyErrorResponse(err, "account")
+			writeError(status, errType, message)
+			return nil, openAISlotAcquireFailed
+		}
+		if !allowed {
+			if fastReleaseFunc != nil {
+				fastReleaseFunc()
+			}
+			return nil, openAISlotAcquireQuotaExhausted
+		}
 		if err := h.gatewayService.BindStickySessionAfterProfitAdmission(ctx, groupID, sessionHash, account.ID); err != nil {
 			reqLog.Warn("openai.bind_sticky_session_after_profit_admission_failed", zap.Int64("account_id", account.ID), zap.Error(err))
 		}
@@ -1816,10 +1864,47 @@ func (h *OpenAIGatewayHandler) acquireOpenAIAccountSlot(
 	}
 	account = latest
 	selection.Account = latest
+	allowed, err := h.reserveAccountRequestQuota(c, ctx, account)
+	if err != nil {
+		if accountReleaseFunc != nil {
+			accountReleaseFunc()
+		}
+		status, errType, message := concurrencyErrorResponse(err, "account")
+		writeError(status, errType, message)
+		return nil, openAISlotAcquireFailed
+	}
+	if !allowed {
+		if accountReleaseFunc != nil {
+			accountReleaseFunc()
+		}
+		return nil, openAISlotAcquireQuotaExhausted
+	}
 	if err := h.gatewayService.BindStickySessionAfterProfitAdmission(ctx, groupID, sessionHash, account.ID); err != nil {
 		reqLog.Warn("openai.bind_sticky_session_after_profit_admission_failed", zap.Int64("account_id", account.ID), zap.Error(err))
 	}
 	return wrapReleaseOnDone(ctx, accountReleaseFunc), openAISlotAcquireOK
+}
+
+func (h *OpenAIGatewayHandler) reserveAccountRequestQuota(c *gin.Context, ctx context.Context, account *service.Account) (bool, error) {
+	if account == nil || !account.HasRequestQuotaLimit() {
+		return true, nil
+	}
+	reserved := map[int64]struct{}{}
+	if value, exists := c.Get(openAIRequestQuotaReservedContextKey); exists {
+		if existing, ok := value.(map[int64]struct{}); ok {
+			reserved = existing
+		}
+	}
+	if _, exists := reserved[account.ID]; exists {
+		return true, nil
+	}
+	allowed, err := h.gatewayService.ReserveAccountRequestQuota(ctx, account)
+	if err != nil || !allowed {
+		return allowed, err
+	}
+	reserved[account.ID] = struct{}{}
+	c.Set(openAIRequestQuotaReservedContextKey, reserved)
+	return true, nil
 }
 
 // ResponsesWebSocket handles OpenAI Responses API WebSocket ingress endpoint
@@ -2268,6 +2353,28 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 			selection.Account = latest
 			accountReleaseFunc = fastReleaseFunc
 		}
+		reserveWSRequestQuota := func(quotaCtx context.Context) error {
+			allowed, err := h.gatewayService.ReserveAccountRequestQuota(quotaCtx, account)
+			if err != nil {
+				return service.NewOpenAIWSClientCloseError(coderws.StatusInternalError, "failed to reserve account request quota", err)
+			}
+			if !allowed {
+				return service.NewOpenAIWSClientCloseError(coderws.StatusTryAgainLater, "account request quota exhausted; retry after 24 hours", nil)
+			}
+			return nil
+		}
+		if quotaErr := reserveWSRequestQuota(admissionCtx); quotaErr != nil {
+			if accountReleaseFunc != nil {
+				accountReleaseFunc()
+			}
+			var closeErr *service.OpenAIWSClientCloseError
+			if errors.As(quotaErr, &closeErr) {
+				closeOpenAIClientWS(wsConn, closeErr.StatusCode(), closeErr.Reason())
+			} else {
+				closeOpenAIClientWS(wsConn, coderws.StatusInternalError, "failed to reserve account request quota")
+			}
+			return
+		}
 		// 准入完成：门并入连接 ctx，turn 级复核与 failover 重选共用。
 		ctx = admissionCtx
 		// Account selection starts a fresh upstream attempt. Clear any model
@@ -2423,7 +2530,17 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 				}
 				currentUserRelease = wrapReleaseOnDone(ctx, userReleaseFunc)
 				currentAccountRelease = wrapReleaseOnDone(ctx, accountReleaseFunc)
+				if quotaErr := reserveWSRequestQuota(ctx); quotaErr != nil {
+					releaseTurnSlots()
+					return quotaErr
+				}
 				return nil
+			},
+			BeforeTurnAdmission: func(turn int) error {
+				if turn <= 1 {
+					return nil
+				}
+				return reserveWSRequestQuota(ctx)
 			},
 			AfterTurn: func(turn int, result *service.OpenAIForwardResult, turnErr error) {
 				turnStart := getTurnStart(turn)

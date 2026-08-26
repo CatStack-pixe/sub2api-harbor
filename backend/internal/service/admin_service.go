@@ -217,7 +217,7 @@ type CreateGroupInput struct {
 	DailyLimitUSD             *float64 // 日限额 (USD)
 	WeeklyLimitUSD            *float64 // 周限额 (USD)
 	MonthlyLimitUSD           *float64 // 月限额 (USD)
-	LongContextPricingEnabled bool
+	LongContextPricingEnabled *bool
 	ModelPricing              []ChannelModelPricing
 	GlobalPromptEnabled       bool
 	GlobalPrompt              string
