@@ -1,5 +1,17 @@
 # Handoff
 
+## 2026-08-27 Production Recovery and v0.1.183-nvidia.29 Deployment
+
+- Production target: `root@154.37.212.18` (`instance-0GDSx0Ws`), deployment directory `/opt/sub2api`.
+- Incident: the first `v0.1.183-nvidia.27` deployment failed during startup because migration `224_user_platform_quotas_add_cn_providers.sql` had an existing database checksum of `98f0eabfbfc8a6e5761f3cb1d19a17a0064696a173a56e933e6e0764cc8126cb`, while the image contained `5227db3c1a6a1e2e422a9f9ba9d1f490c708b6c6dd91ce89f3c48115421a3e55`.
+- The corrective `v0.1.183-nvidia.28` image then exposed the same class of issue in migration `227_composite_routes_add_cn_providers.sql`: database checksum `c04b5b5b38121f820514622967092ec71b92f346c842cecc223ddd9cbeda3224` versus image checksum `ff6e3323b4bcb195a4f11bfa9b1b22286e77169f551b5c4294ab3d31828d8ff8`.
+- Both failed releases were rolled back without changing database checksum rows. The known-good `0.1.179-nvidia.26-amd64` image remains the rollback target at digest `sha256:82d876029debad13a332b224af415e82467f74ecb18b23bbd4b6ece66622e0b2`.
+- PR [#93](https://github.com/CatStack-pixe/sub2api-harbor/pull/93) restored the applied content and checksum for migration 224 and was squash-merged as `13bacae5e5f8a2e945b78e3a91f6a251c8ae535e`. PR [#94](https://github.com/CatStack-pixe/sub2api-harbor/pull/94) restored migration 227, preserved the complete fork platform set, and was squash-merged as `11110a5f4d22b7d62c2d603a20a752047290eeda`. Both PRs were labeled `enhancement`, audited after labeling, and passed GitHub CI and Security Scan.
+- Release [v0.1.183-nvidia.29](https://github.com/CatStack-pixe/sub2api-harbor/releases/tag/v0.1.183-nvidia.29) was built only by GitHub Actions run `33006796305` using Go `1.27.0`. The immutable amd64 GHCR image is `ghcr.io/catstack-pixe/sub2api:0.1.183-nvidia.29@sha256:5fb2ee6a5daf66ba452e8ad1aa47a1c2155c9d251699bc6cccff508ae0b875d4`.
+- Pre-deployment backup passed `sha256sum -c` at `/opt/sub2api/backups/pre-release-0.1.183-nvidia.29-20260826T195126Z`; it includes Compose, environment, container inspection, and a PostgreSQL custom-format dump of `168644426` bytes. The backup directory is mode `700` and protected files are mode `600`.
+- Deployment completed by recreating only `sub2api` with `docker compose up -d --no-deps --wait sub2api`. PostgreSQL, Redis, and Mihomo were not restarted. The application is `running/healthy`, restart count `0`, and Compose pins the digest above. Local and public `/health` return `{"status":"ok"}`; public settings report version `0.1.183-nvidia.29`; no recent panic, fatal, checksum-mismatch, or initialization-error patterns were found.
+- Status: production is live on `v0.1.183-nvidia.29`. Releases `.27` and `.28` are superseded and must not be redeployed. No local Go toolchain, compilation, test, generation, lint, or release build was used; backend validation and image construction ran in GitHub Actions. The original dirty worktree remains untouched.
+
 ## 2026-08-26 Upstream v0.1.183 Integration
 
 - Working tree: `.codex-worktrees/upstream-v183-merge-test`; the original dirty worktree was not modified.
@@ -28,7 +40,7 @@
 - PR label: `enhancement`.
 - Required process: perform one post-label code audit, wait for GitHub CI and Security Scan, then squash-merge and delete the sync branch.
 - Production target: `root@154.37.212.18`, deployment directory `/opt/sub2api`.
-- Deployment status: pending. After merge, create a protected backup, deploy only the GitHub-built immutable GHCR image, preserve PostgreSQL/Redis/Mihomo, run health and critical-log checks, and record the image digest, backup path, and health result here.
+- Deployment status: superseded by the corrective recovery and production deployment recorded above.
 ---
 
 ## 2026-08-23 Upstream v0.1.179 sync (GitHub validation complete; final review pending)
