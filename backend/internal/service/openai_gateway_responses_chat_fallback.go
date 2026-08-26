@@ -278,6 +278,10 @@ func (s *OpenAIGatewayService) streamChatCompletionsAsResponses(
 			return resultWithScan(scan), fmt.Errorf("stream usage incomplete: %w", streamErr)
 		}
 
+		if err := state.ValidateToolCallArguments(); err != nil {
+			return resultWithScan(scan), fmt.Errorf("invalid tool call arguments from upstream: %w", err)
+		}
+
 		writeEvents(apicompat.FinalizeChatCompletionsResponsesStream(state))
 		if !clientDisconnected {
 			writeStreamHeaders()

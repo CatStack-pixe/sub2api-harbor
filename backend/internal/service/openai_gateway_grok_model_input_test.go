@@ -122,7 +122,9 @@ func TestPatchGrokResponsesBodyCombinesAdditionalToolsAndDropsOrphanControls(t *
 	require.NoError(t, err)
 	require.Equal(t, int64(1), gjson.GetBytes(patched, "tools.#").Int())
 	require.Equal(t, "lookup", gjson.GetBytes(patched, "tools.0.name").String())
-	require.Equal(t, "message", gjson.GetBytes(patched, "input.0.type").String())
+	// The simple function-tool compatibility path deliberately flattens a
+	// single plain-text message after the additional_tools carrier is removed.
+	require.Equal(t, "hi", gjson.GetBytes(patched, "input").String())
 
 	withoutTools, err := patchGrokResponsesBody([]byte(`{"input":"hi","tool_choice":"auto","parallel_tool_calls":true}`), "grok-4.5")
 	require.NoError(t, err)
