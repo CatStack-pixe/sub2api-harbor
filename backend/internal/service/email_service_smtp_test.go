@@ -4,14 +4,18 @@ package service
 
 import (
 	"bufio"
+	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"errors"
+	"fmt"
 	"math/big"
 	"net"
+	"net/smtp"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -277,33 +281,46 @@ func smtpTestConfig(port int, useTLS bool) *SMTPConfig {
 	}
 }
 
-// 465 语义：UseTLS=true + 隐式 TLS 服务器，原有路径保持可用。
+// Port 465 selects implicit TLS.
 func TestSMTPConnectionImplicitTLS(t *testing.T) {
 	srv, port := startFakeSMTPServer(t, true, false)
 	svc := &EmailService{}
+	config := smtpTestConfig(465, true)
+	addr := net.JoinHostPort("127.0.0.1", fmt.Sprintf("%d", port))
 
-	if err := svc.TestSMTPConnectionWithConfig(smtpTestConfig(port, true)); err != nil {
+	client, err := svc.connectSMTPAt(context.Background(), config, addr)
+	if err != nil {
 		t.Fatalf("expected implicit TLS connection to succeed, got: %v", err)
+	}
+	defer client.close()
+	if err := client.Auth(smtp.PlainAuth("", config.Username, config.Password, config.Host)); err != nil {
+		t.Fatalf("expected implicit TLS authentication to succeed, got: %v", err)
 	}
 	if !srv.sawCommand("EHLO") {
 		t.Fatal("expected server to receive EHLO")
 	}
 }
 
-// 587 语义（#1470/#1488 核心场景）：UseTLS=true + 明文问候的 STARTTLS 服务器，
-// 隐式 TLS 失败后必须自动降级为强制 STARTTLS 并成功。
-func TestSMTPConnectionStartTLSFallbackWhenTLSEnabled(t *testing.T) {
+// Port 587 selects required STARTTLS without an implicit TLS probe.
+func TestSMTPConnectionStartTLSUsesSingleConnectionWhenTLSEnabled(t *testing.T) {
 	srv, port := startFakeSMTPServer(t, false, true)
 	svc := &EmailService{}
+	config := smtpTestConfig(587, true)
+	addr := net.JoinHostPort("127.0.0.1", fmt.Sprintf("%d", port))
 
-	if err := svc.TestSMTPConnectionWithConfig(smtpTestConfig(port, true)); err != nil {
-		t.Fatalf("expected STARTTLS fallback to succeed, got: %v", err)
+	client, err := svc.connectSMTPAt(context.Background(), config, addr)
+	if err != nil {
+		t.Fatalf("expected STARTTLS connection to succeed, got: %v", err)
+	}
+	defer client.close()
+	if err := client.Auth(smtp.PlainAuth("", config.Username, config.Password, config.Host)); err != nil {
+		t.Fatalf("expected STARTTLS authentication to succeed, got: %v", err)
 	}
 	if !srv.sawCommand("STARTTLS") {
 		t.Fatal("expected server to receive STARTTLS command")
 	}
-	if got := srv.conns.Load(); got < 2 {
-		t.Fatalf("expected implicit TLS attempt before STARTTLS fallback (>=2 connections), got %d", got)
+	if got := srv.conns.Load(); got != 1 {
+		t.Fatalf("expected exactly one STARTTLS connection, got %d", got)
 	}
 }
 
@@ -311,9 +328,12 @@ func TestSMTPConnectionStartTLSFallbackWhenTLSEnabled(t *testing.T) {
 func TestSMTPConnectionMandatoryStartTLSRefusesPlaintext(t *testing.T) {
 	srv, port := startFakeSMTPServer(t, false, false)
 	svc := &EmailService{}
+	config := smtpTestConfig(587, true)
+	addr := net.JoinHostPort("127.0.0.1", fmt.Sprintf("%d", port))
 
-	err := svc.TestSMTPConnectionWithConfig(smtpTestConfig(port, true))
+	client, err := svc.connectSMTPAt(context.Background(), config, addr)
 	if err == nil {
+		client.close()
 		t.Fatal("expected error when server does not support STARTTLS")
 	}
 	if !strings.Contains(err.Error(), "STARTTLS") {
@@ -351,14 +371,16 @@ func TestSMTPConnectionPlainWhenNoStartTLS(t *testing.T) {
 	}
 }
 
-// 发送路径全流程：UseTLS=true + STARTTLS 服务器（587 语义）完整走完 MAIL/RCPT/DATA。
-func TestSendEmailWithConfigStartTLSFallback(t *testing.T) {
+// The port 587 send path completes MAIL/RCPT/DATA over one STARTTLS connection.
+func TestSendEmailWithConfigStartTLSSingleConnection(t *testing.T) {
 	srv, port := startFakeSMTPServer(t, false, true)
 	svc := &EmailService{}
+	config := smtpTestConfig(587, true)
+	addr := net.JoinHostPort("127.0.0.1", fmt.Sprintf("%d", port))
 
-	err := svc.SendEmailWithConfig(smtpTestConfig(port, true), "rcpt@example.com", "subject", "<p>body</p>")
+	err := svc.sendEmailWithConfigAt(context.Background(), config, "rcpt@example.com", "subject", "<p>body</p>", addr)
 	if err != nil {
-		t.Fatalf("expected send via STARTTLS fallback to succeed, got: %v", err)
+		t.Fatalf("expected send via STARTTLS to succeed, got: %v", err)
 	}
 	if !srv.sawCommand("STARTTLS") {
 		t.Fatal("expected send path to upgrade via STARTTLS")
@@ -366,18 +388,63 @@ func TestSendEmailWithConfigStartTLSFallback(t *testing.T) {
 	if !srv.sawCommand("DATA") {
 		t.Fatal("expected send path to reach DATA")
 	}
+	if got := srv.conns.Load(); got != 1 {
+		t.Fatalf("expected exactly one STARTTLS connection, got %d", got)
+	}
 }
 
-// 发送路径全流程：UseTLS=true + 隐式 TLS 服务器（465 语义）保持既有行为。
+// The port 465 send path completes MAIL/RCPT/DATA over implicit TLS.
 func TestSendEmailWithConfigImplicitTLS(t *testing.T) {
 	srv, port := startFakeSMTPServer(t, true, false)
 	svc := &EmailService{}
+	config := smtpTestConfig(465, true)
+	addr := net.JoinHostPort("127.0.0.1", fmt.Sprintf("%d", port))
 
-	err := svc.SendEmailWithConfig(smtpTestConfig(port, true), "rcpt@example.com", "subject", "<p>body</p>")
+	err := svc.sendEmailWithConfigAt(context.Background(), config, "rcpt@example.com", "subject", "<p>body</p>", addr)
 	if err != nil {
 		t.Fatalf("expected send via implicit TLS to succeed, got: %v", err)
 	}
 	if !srv.sawCommand("DATA") {
 		t.Fatal("expected send path to reach DATA")
+	}
+}
+
+func TestSMTPConnectionContextCancellationInterruptsGreeting(t *testing.T) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("listen: %v", err)
+	}
+	defer func() { _ = listener.Close() }()
+
+	serverDone := make(chan struct{})
+	go func() {
+		defer close(serverDone)
+		conn, acceptErr := listener.Accept()
+		if acceptErr != nil {
+			return
+		}
+		defer func() { _ = conn.Close() }()
+		buffer := make([]byte, 1)
+		_, _ = conn.Read(buffer)
+	}()
+
+	port := listener.Addr().(*net.TCPAddr).Port
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	cancelTimer := time.AfterFunc(100*time.Millisecond, cancel)
+	defer cancelTimer.Stop()
+	started := time.Now()
+	err = (&EmailService{}).TestSMTPConnectionWithConfigContext(ctx, smtpTestConfig(port, false))
+
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("expected context cancellation error, got: %v", err)
+	}
+	if elapsed := time.Since(started); elapsed > 2*time.Second {
+		t.Fatalf("expected cancellation to interrupt SMTP greeting promptly, took %s", elapsed)
+	}
+	select {
+	case <-serverDone:
+	case <-time.After(2 * time.Second):
+		t.Fatal("SMTP server did not observe the canceled connection closing")
 	}
 }
