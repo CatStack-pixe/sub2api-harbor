@@ -23,14 +23,16 @@ func (r *heartbeatProvisioningRepository) Enqueue(ctx context.Context, input ser
 		return errors.New("nil heartbeat provisioning database")
 	}
 	_, err := r.db.ExecContext(ctx, `
-		INSERT INTO heartbeat_provision_jobs (provider, fingerprint, session_key_ciphertext, source_balance, source_checked_at)
-		VALUES ('ds', $1, $2, $3, NULLIF($4::timestamptz, 'epoch'::timestamptz))
+		INSERT INTO heartbeat_provision_jobs (provider, fingerprint, session_key_ciphertext, source_balance, source_checked_at, target_group_id, target_proxy_group_id)
+		VALUES ('ds', $1, $2, $3, NULLIF($4::timestamptz, 'epoch'::timestamptz), $5, $6)
 		ON CONFLICT (provider, fingerprint) DO UPDATE SET
 			session_key_ciphertext = EXCLUDED.session_key_ciphertext,
 			source_balance = EXCLUDED.source_balance,
 			source_checked_at = COALESCE(EXCLUDED.source_checked_at, heartbeat_provision_jobs.source_checked_at),
+			target_group_id = EXCLUDED.target_group_id,
+			target_proxy_group_id = EXCLUDED.target_proxy_group_id,
 			updated_at = NOW()
-	`, input.Fingerprint, input.SessionKeyCiphertext, input.SourceBalance, input.SourceCheckedAt)
+	`, input.Fingerprint, input.SessionKeyCiphertext, input.SourceBalance, input.SourceCheckedAt, input.TargetGroupID, input.TargetProxyGroupID)
 	return err
 }
 
@@ -57,15 +59,22 @@ func (r *heartbeatProvisioningRepository) Claim(ctx context.Context, workerID st
 			locked_until = NOW() + ($2 * INTERVAL '1 second'), updated_at = NOW()
 		FROM candidate
 		WHERE job.id = candidate.id
-		RETURNING job.id, job.fingerprint, job.session_key_ciphertext, job.attempts, job.account_id, job.proxy_id
+		RETURNING job.id, job.fingerprint, job.session_key_ciphertext, job.attempts,
+			job.target_group_id, job.target_proxy_group_id, job.account_id, job.proxy_id
 	`, workerID, seconds)
 	job := &service.HeartbeatProvisioningJob{}
-	var accountID, proxyID sql.NullInt64
-	if err := row.Scan(&job.ID, &job.Fingerprint, &job.SessionKeyCiphertext, &job.Attempts, &accountID, &proxyID); err != nil {
+	var targetGroupID, targetProxyGroupID, accountID, proxyID sql.NullInt64
+	if err := row.Scan(&job.ID, &job.Fingerprint, &job.SessionKeyCiphertext, &job.Attempts, &targetGroupID, &targetProxyGroupID, &accountID, &proxyID); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
 		return nil, err
+	}
+	if targetGroupID.Valid {
+		job.TargetGroupID = targetGroupID.Int64
+	}
+	if targetProxyGroupID.Valid {
+		job.TargetProxyGroupID = targetProxyGroupID.Int64
 	}
 	if accountID.Valid {
 		value := accountID.Int64
@@ -76,6 +85,33 @@ func (r *heartbeatProvisioningRepository) Claim(ctx context.Context, workerID st
 		job.ProxyID = &value
 	}
 	return job, nil
+}
+
+func (r *heartbeatProvisioningRepository) Stats(ctx context.Context) (*service.HeartbeatQueueStats, error) {
+	if r == nil || r.db == nil {
+		return nil, errors.New("nil heartbeat provisioning database")
+	}
+	row := r.db.QueryRowContext(ctx, `
+		SELECT
+			COUNT(*) FILTER (WHERE status = 'queued'),
+			COUNT(*) FILTER (WHERE status = 'processing'),
+			COUNT(*) FILTER (WHERE status = 'retry'),
+			COUNT(*) FILTER (WHERE status = 'failed'),
+			COUNT(*) FILTER (WHERE status = 'complete'),
+			COALESCE((SELECT last_error FROM heartbeat_provision_jobs WHERE last_error IS NOT NULL AND last_error <> '' ORDER BY updated_at DESC LIMIT 1), ''),
+			(SELECT updated_at FROM heartbeat_provision_jobs WHERE last_error IS NOT NULL AND last_error <> '' ORDER BY updated_at DESC LIMIT 1)
+		FROM heartbeat_provision_jobs
+	`)
+	stats := &service.HeartbeatQueueStats{}
+	var lastErrorAt sql.NullTime
+	if err := row.Scan(&stats.Queued, &stats.Processing, &stats.Retry, &stats.Failed, &stats.Complete, &stats.LastError, &lastErrorAt); err != nil {
+		return nil, err
+	}
+	if lastErrorAt.Valid {
+		value := lastErrorAt.Time
+		stats.LastErrorAt = &value
+	}
+	return stats, nil
 }
 
 func (r *heartbeatProvisioningRepository) SetProxy(ctx context.Context, jobID, proxyID int64) error {

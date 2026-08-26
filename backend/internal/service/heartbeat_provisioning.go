@@ -30,6 +30,7 @@ const (
 	heartbeatMaxClockSkew = 15 * time.Minute
 	heartbeatLease        = 20 * time.Minute
 	heartbeatMinInterval  = 10 * time.Second
+	heartbeatSettingKey   = SettingKeyHeartbeatProvisioningConfig
 )
 
 var (
@@ -44,6 +45,7 @@ type HeartbeatKeyInput struct {
 	Provider    string
 	Balance     float64
 	CheckedAt   time.Time
+	GroupID     *int64
 }
 
 type HeartbeatProvisioningJob struct {
@@ -51,6 +53,8 @@ type HeartbeatProvisioningJob struct {
 	Fingerprint          string
 	SessionKeyCiphertext string
 	Attempts             int
+	TargetGroupID        int64
+	TargetProxyGroupID   int64
 	AccountID            *int64
 	ProxyID              *int64
 }
@@ -60,6 +64,50 @@ type HeartbeatProvisioningEnqueueInput struct {
 	SessionKeyCiphertext string
 	SourceBalance        float64
 	SourceCheckedAt      time.Time
+	TargetGroupID        int64
+	TargetProxyGroupID   int64
+}
+
+type HeartbeatQueueStats struct {
+	Queued      int64
+	Processing  int64
+	Retry       int64
+	Failed      int64
+	Complete    int64
+	LastError   string
+	LastErrorAt *time.Time
+}
+
+type HeartbeatProvisioningStatus struct {
+	Enabled         bool       `json:"enabled"`
+	Running         bool       `json:"running"`
+	ConfigSource    string     `json:"config_source"`
+	LastHeartbeatAt *time.Time `json:"last_heartbeat_at,omitempty"`
+	Queued          int64      `json:"queued"`
+	Processing      int64      `json:"processing"`
+	Retry           int64      `json:"retry"`
+	Failed          int64      `json:"failed"`
+	Complete        int64      `json:"complete"`
+	LastError       string     `json:"last_error,omitempty"`
+	LastErrorAt     *time.Time `json:"last_error_at,omitempty"`
+}
+
+type HeartbeatGroupOption struct {
+	ID       int64  `json:"id"`
+	Name     string `json:"name"`
+	Platform string `json:"platform"`
+	Status   string `json:"status"`
+}
+
+type HeartbeatProxyGroupOption struct {
+	ID               int64  `json:"id"`
+	Name             string `json:"name"`
+	ActiveProxyCount int64  `json:"active_proxy_count"`
+}
+
+type HeartbeatProvisioningOptions struct {
+	Groups      []HeartbeatGroupOption      `json:"groups"`
+	ProxyGroups []HeartbeatProxyGroupOption `json:"proxy_groups"`
 }
 
 type HeartbeatProvisioningRepository interface {
@@ -70,88 +118,101 @@ type HeartbeatProvisioningRepository interface {
 	FindPendingAccountByFingerprint(ctx context.Context, fingerprint string) (*int64, error)
 	Complete(ctx context.Context, jobID int64) error
 	Retry(ctx context.Context, jobID int64, attempts int, availableAt time.Time, terminal bool, lastError string) error
+	Stats(ctx context.Context) (*HeartbeatQueueStats, error)
+}
+
+type heartbeatPreparedConfig struct {
+	vaultURL *url.URL
+	allowed  map[netip.Addr]struct{}
+}
+
+type heartbeatProxyTier struct {
+	ids       []int64
+	expiresAt time.Time
 }
 
 type HeartbeatProvisioningService struct {
 	cfg       config.HeartbeatProvisioningConfig
+	source    string
 	repo      HeartbeatProvisioningRepository
+	settings  SettingRepository
 	encryptor SecretEncryptor
 	admin     AdminService
 	balance   *AccountTestService
-	vaultURL  *url.URL
 	http      *http.Client
+	vaultURL  *url.URL
 	allowed   map[netip.Addr]struct{}
 	workerID  string
 
-	ctx      context.Context
-	cancel   context.CancelFunc
-	start    sync.Once
-	stop     sync.Once
-	wg       sync.WaitGroup
-	running  atomic.Bool
+	cfgMu sync.RWMutex
+
+	ctx    context.Context
+	cancel context.CancelFunc
+
+	lifecycleMu  sync.Mutex
+	started      bool
+	stopped      bool
+	workerCancel context.CancelFunc
+	wg           sync.WaitGroup
+	running      atomic.Bool
+
+	updateMu sync.Mutex
 	rateMu   sync.Mutex
 	rateLast time.Time
 
+	lastHeartbeatNS atomic.Int64
+
 	proxyMu        sync.RWMutex
 	proxyRefreshMu sync.Mutex
-	proxyTier      []int64
-	proxyExpiresAt time.Time
+	proxyTiers     map[int64]heartbeatProxyTier
 }
 
-func NewHeartbeatProvisioningService(cfg *config.Config, repo HeartbeatProvisioningRepository, encryptor SecretEncryptor, admin AdminService, balance *AccountTestService) (*HeartbeatProvisioningService, error) {
+func NewHeartbeatProvisioningService(cfg *config.Config, repo HeartbeatProvisioningRepository, encryptor SecretEncryptor, admin AdminService, balance *AccountTestService, settings SettingRepository) (*HeartbeatProvisioningService, error) {
+	if cfg == nil {
+		return nil, errors.New("nil heartbeat configuration")
+	}
 	ctx, cancel := context.WithCancel(context.Background())
 	svc := &HeartbeatProvisioningService{
-		cfg:       cfg.HeartbeatProvisioning,
-		repo:      repo,
-		encryptor: encryptor,
-		admin:     admin,
-		balance:   balance,
-		http:      &http.Client{Timeout: 10 * time.Second, CheckRedirect: func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse }},
-		allowed:   make(map[netip.Addr]struct{}),
-		workerID:  fmt.Sprintf("heartbeat-%d", time.Now().UnixNano()),
-		ctx:       ctx,
-		cancel:    cancel,
+		cfg:        normalizeHeartbeatConfig(cfg.HeartbeatProvisioning),
+		source:     "deployment",
+		repo:       repo,
+		settings:   settings,
+		encryptor:  encryptor,
+		admin:      admin,
+		balance:    balance,
+		http:       &http.Client{Timeout: 10 * time.Second, CheckRedirect: func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse }},
+		workerID:   fmt.Sprintf("heartbeat-%d", time.Now().UnixNano()),
+		ctx:        ctx,
+		cancel:     cancel,
+		proxyTiers: make(map[int64]heartbeatProxyTier),
 	}
-	if !svc.cfg.Enabled {
-		return svc, nil
-	}
-	parsedURL, err := url.Parse(strings.TrimSpace(svc.cfg.VaultURL))
-	if err != nil || parsedURL == nil || parsedURL.Host == "" {
-		return nil, fmt.Errorf("parse heartbeat vault URL: %w", err)
-	}
-	if parsedURL.Scheme != "https" && (parsedURL.Scheme != "http" || !svc.cfg.AllowInsecureVault) {
-		return nil, errors.New("heartbeat vault must use HTTPS unless insecure vault access is explicitly enabled")
-	}
-	svc.vaultURL = parsedURL
-	for _, raw := range svc.cfg.AllowedSourceIPs {
-		addr, err := netip.ParseAddr(strings.TrimSpace(raw))
-		if err != nil {
-			return nil, fmt.Errorf("parse heartbeat source IP: %w", err)
+
+	if settings != nil {
+		stored, err := settings.GetValue(context.Background(), heartbeatSettingKey)
+		if err == nil {
+			storedConfig, decodeErr := decodeStoredHeartbeatConfig(stored)
+			if decodeErr != nil {
+				return nil, fmt.Errorf("decode stored heartbeat configuration: %w", decodeErr)
+			}
+			svc.cfg = normalizeHeartbeatConfig(storedConfig)
+			svc.source = "database"
+		} else if !errors.Is(err, ErrSettingNotFound) {
+			return nil, fmt.Errorf("load stored heartbeat configuration: %w", err)
 		}
-		svc.allowed[addr.Unmap()] = struct{}{}
 	}
-	preflightCtx, preflightCancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer preflightCancel()
-	group, err := admin.GetGroup(preflightCtx, svc.cfg.DeepSeekGroupID)
+
+	prepared, err := svc.prepareConfig(context.Background(), svc.cfg)
 	if err != nil {
-		return nil, fmt.Errorf("load heartbeat DeepSeek group: %w", err)
+		cancel()
+		return nil, err
 	}
-	if group == nil || group.Status != StatusActive || group.Platform != PlatformDeepSeek {
-		return nil, errors.New("heartbeat DeepSeek group must be active and use the deepseek platform")
-	}
-	proxyGroupID := svc.cfg.ProxyGroupID
-	_, proxyTotal, err := admin.ListProxies(preflightCtx, 1, 1, ProxyListFilters{Status: StatusActive, ProxyGroupID: &proxyGroupID}, "id", "asc")
-	if err != nil {
-		return nil, fmt.Errorf("load heartbeat proxy group: %w", err)
-	}
-	if proxyTotal == 0 {
-		return nil, errors.New("heartbeat proxy group has no active proxies")
-	}
+	svc.vaultURL = prepared.vaultURL
+	svc.allowed = prepared.allowed
 	return svc, nil
 }
 
-func ProvideHeartbeatProvisioningService(cfg *config.Config, repo HeartbeatProvisioningRepository, encryptor SecretEncryptor, admin AdminService, balance *AccountTestService) (*HeartbeatProvisioningService, error) {
-	svc, err := NewHeartbeatProvisioningService(cfg, repo, encryptor, admin, balance)
+func ProvideHeartbeatProvisioningService(cfg *config.Config, repo HeartbeatProvisioningRepository, encryptor SecretEncryptor, admin AdminService, balance *AccountTestService, settings SettingRepository) (*HeartbeatProvisioningService, error) {
+	svc, err := NewHeartbeatProvisioningService(cfg, repo, encryptor, admin, balance, settings)
 	if err != nil {
 		return nil, err
 	}
@@ -160,52 +221,155 @@ func ProvideHeartbeatProvisioningService(cfg *config.Config, repo HeartbeatProvi
 }
 
 func (s *HeartbeatProvisioningService) Start() {
-	if s == nil || !s.cfg.Enabled || s.repo == nil || s.encryptor == nil || s.admin == nil || s.balance == nil {
+	if s == nil {
 		return
 	}
-	s.start.Do(func() {
-		s.running.Store(true)
-		for i := 0; i < s.cfg.WorkerCount; i++ {
-			s.wg.Add(1)
-			go s.runWorker(i)
-		}
-	})
+	s.lifecycleMu.Lock()
+	defer s.lifecycleMu.Unlock()
+	if s.stopped || s.started {
+		return
+	}
+	s.started = true
+	s.startWorkersLocked()
+}
+
+func (s *HeartbeatProvisioningService) startWorkersLocked() {
+	if !s.enabledSnapshot() || s.workerCancel != nil || s.repo == nil || s.encryptor == nil || s.admin == nil || s.balance == nil {
+		return
+	}
+	cfg := s.configSnapshot()
+	workerCtx, cancel := context.WithCancel(s.ctx)
+	s.workerCancel = cancel
+	s.running.Store(true)
+	for i := 0; i < cfg.WorkerCount; i++ {
+		s.wg.Add(1)
+		go s.runWorker(workerCtx, i)
+	}
+}
+
+func (s *HeartbeatProvisioningService) stopWorkers() {
+	if s == nil {
+		return
+	}
+	s.lifecycleMu.Lock()
+	cancel := s.workerCancel
+	s.workerCancel = nil
+	s.lifecycleMu.Unlock()
+	if cancel != nil {
+		cancel()
+	}
+	s.wg.Wait()
+	s.running.Store(false)
 }
 
 func (s *HeartbeatProvisioningService) Stop() {
 	if s == nil {
 		return
 	}
-	s.stop.Do(func() {
-		s.cancel()
-		s.wg.Wait()
-		s.running.Store(false)
-	})
+	s.lifecycleMu.Lock()
+	if s.stopped {
+		s.lifecycleMu.Unlock()
+		return
+	}
+	s.stopped = true
+	s.started = false
+	cancel := s.workerCancel
+	s.workerCancel = nil
+	s.lifecycleMu.Unlock()
+	if cancel != nil {
+		cancel()
+	}
+	s.cancel()
+	s.wg.Wait()
+	s.running.Store(false)
 }
 
 func (s *HeartbeatProvisioningService) Enabled() bool {
-	return s != nil && s.cfg.Enabled
+	return s != nil && s.enabledSnapshot()
+}
+
+func (s *HeartbeatProvisioningService) Running() bool {
+	return s != nil && s.running.Load()
+}
+
+func (s *HeartbeatProvisioningService) ConfigSnapshot() (config.HeartbeatProvisioningConfig, string) {
+	if s == nil {
+		return config.HeartbeatProvisioningConfig{}, ""
+	}
+	s.cfgMu.RLock()
+	defer s.cfgMu.RUnlock()
+	return cloneHeartbeatConfig(s.cfg), s.source
+}
+
+func (s *HeartbeatProvisioningService) UpdateConfig(ctx context.Context, requested config.HeartbeatProvisioningConfig) error {
+	if s == nil {
+		return errors.New("nil heartbeat provisioning service")
+	}
+	s.updateMu.Lock()
+	defer s.updateMu.Unlock()
+	normalized := normalizeHeartbeatConfig(requested)
+	if err := validateHeartbeatRuntimeConfig(normalized); err != nil {
+		return err
+	}
+	prepared, err := s.prepareConfig(ctx, normalized)
+	if err != nil {
+		return err
+	}
+	if s.settings != nil {
+		encoded, encodeErr := encodeStoredHeartbeatConfig(normalized)
+		if encodeErr != nil {
+			return encodeErr
+		}
+		if err := s.settings.Set(ctx, heartbeatSettingKey, encoded); err != nil {
+			return fmt.Errorf("persist heartbeat configuration: %w", err)
+		}
+	}
+	s.cfgMu.Lock()
+	s.cfg = normalized
+	s.vaultURL = prepared.vaultURL
+	s.allowed = prepared.allowed
+	s.source = "database"
+	s.cfgMu.Unlock()
+	s.clearProxyCache()
+	s.restartWorkers()
+	return nil
+}
+
+func (s *HeartbeatProvisioningService) restartWorkers() {
+	s.stopWorkers()
+	s.lifecycleMu.Lock()
+	defer s.lifecycleMu.Unlock()
+	if !s.stopped && s.started {
+		s.startWorkersLocked()
+	}
 }
 
 func (s *HeartbeatProvisioningService) Queue(ctx context.Context, sourceIP, sessionKey string, timestamp time.Time, keys []HeartbeatKeyInput) (int, error) {
-	if !s.Enabled() {
+	cfg, allowed, enabled := s.runtimeSnapshot()
+	if !enabled {
 		return 0, ErrHeartbeatDisabled
 	}
 	addr, err := netip.ParseAddr(strings.TrimSpace(sourceIP))
 	if err != nil {
 		return 0, ErrHeartbeatUnauthorized
 	}
-	if _, ok := s.allowed[addr.Unmap()]; !ok {
+	if _, ok := allowed[addr.Unmap()]; !ok {
 		return 0, ErrHeartbeatUnauthorized
 	}
 	if !validHeartbeatSessionKey(sessionKey) || timestamp.IsZero() || time.Since(timestamp).Abs() > heartbeatMaxClockSkew || len(keys) == 0 || len(keys) > heartbeatMaxKeys {
 		return 0, ErrHeartbeatInvalidPayload
 	}
 
-	for _, key := range keys {
+	targets := make([]config.HeartbeatProvisioningTarget, len(keys))
+	for index, key := range keys {
 		if !strings.EqualFold(strings.TrimSpace(key.Provider), "ds") || !validHeartbeatFingerprint(key.Fingerprint) || key.CheckedAt.IsZero() {
 			return 0, ErrHeartbeatInvalidPayload
 		}
+		target, ok := resolveHeartbeatTarget(cfg, key.GroupID)
+		if !ok {
+			return 0, ErrHeartbeatInvalidPayload
+		}
+		targets[index] = target
 	}
 	ciphertext, err := s.encryptor.Encrypt(sessionKey)
 	if err != nil {
@@ -218,31 +382,34 @@ func (s *HeartbeatProvisioningService) Queue(ctx context.Context, sourceIP, sess
 		return 0, ErrHeartbeatRateLimited
 	}
 	accepted := 0
-	for _, key := range keys {
+	for index, key := range keys {
 		if err := s.repo.Enqueue(ctx, HeartbeatProvisioningEnqueueInput{
 			Fingerprint:          strings.ToLower(strings.TrimSpace(key.Fingerprint)),
 			SessionKeyCiphertext: ciphertext,
 			SourceBalance:        key.Balance,
 			SourceCheckedAt:      key.CheckedAt,
+			TargetGroupID:        targets[index].GroupID,
+			TargetProxyGroupID:   targets[index].ProxyGroupID,
 		}); err != nil {
 			return accepted, err
 		}
 		accepted++
 	}
 	s.rateLast = time.Now()
+	s.lastHeartbeatNS.Store(time.Now().UTC().UnixNano())
 	return accepted, nil
 }
 
-func (s *HeartbeatProvisioningService) runWorker(index int) {
+func (s *HeartbeatProvisioningService) runWorker(ctx context.Context, index int) {
 	defer s.wg.Done()
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
 	for {
-		if err := s.processOne(s.ctx, fmt.Sprintf("%s-%d", s.workerID, index)); err != nil && s.ctx.Err() == nil {
+		if err := s.processOne(ctx, fmt.Sprintf("%s-%d", s.workerID, index)); err != nil && ctx.Err() == nil {
 			slog.Warn("heartbeat provisioning worker failed", "error", heartbeatSafeError(err))
 		}
 		select {
-		case <-s.ctx.Done():
+		case <-ctx.Done():
 			return
 		case <-ticker.C:
 		}
@@ -265,7 +432,8 @@ func (s *HeartbeatProvisioningService) processOne(ctx context.Context, workerID 
 		_, _ = s.admin.UpdateAccount(context.Background(), *job.AccountID, &UpdateAccountInput{Status: StatusDisabled})
 		_, _ = s.admin.SetAccountSchedulable(context.Background(), *job.AccountID, falseValue)
 	}
-	terminal := job.Attempts >= s.cfg.MaxAttempts
+	cfg := s.configSnapshot()
+	terminal := job.Attempts >= cfg.MaxAttempts
 	return s.repo.Retry(context.Background(), job.ID, job.Attempts, time.Now().UTC().Add(heartbeatRetryDelay(job.Attempts)), terminal, heartbeatSafeError(err))
 }
 
@@ -273,10 +441,15 @@ func (s *HeartbeatProvisioningService) provision(ctx context.Context, job *Heart
 	if job == nil {
 		return errors.New("nil heartbeat job")
 	}
+	cfg := s.configSnapshot()
+	target, ok := resolveHeartbeatJobTarget(cfg, job)
+	if !ok {
+		return errors.New("heartbeat job target is not configured")
+	}
 	accountID := int64(0)
 	if job.AccountID != nil {
 		accountID = *job.AccountID
-		proxyID, err := s.selectProxy(ctx)
+		proxyID, err := s.selectProxy(ctx, target.ProxyGroupID, cfg)
 		if err != nil {
 			return err
 		}
@@ -298,7 +471,7 @@ func (s *HeartbeatProvisioningService) provision(ctx context.Context, job *Heart
 			job.AccountID = recoveredID
 			return s.provision(ctx, job)
 		}
-		proxyID, err := s.selectProxy(ctx)
+		proxyID, err := s.selectProxy(ctx, target.ProxyGroupID, cfg)
 		if err != nil {
 			return err
 		}
@@ -343,7 +516,7 @@ func (s *HeartbeatProvisioningService) provision(ctx context.Context, job *Heart
 	if !balance.IsAvailable {
 		return errors.New("DeepSeek balance is unavailable")
 	}
-	groupIDs := []int64{s.cfg.DeepSeekGroupID}
+	groupIDs := []int64{target.GroupID}
 	if _, err := s.admin.UpdateAccount(ctx, accountID, &UpdateAccountInput{GroupIDs: &groupIDs}); err != nil {
 		return err
 	}
@@ -354,27 +527,25 @@ func (s *HeartbeatProvisioningService) provision(ctx context.Context, job *Heart
 	return err
 }
 
-func (s *HeartbeatProvisioningService) selectProxy(ctx context.Context) (int64, error) {
+func (s *HeartbeatProvisioningService) selectProxy(ctx context.Context, proxyGroupID int64, cfg config.HeartbeatProvisioningConfig) (int64, error) {
 	now := time.Now()
 	s.proxyMu.RLock()
-	cached := append([]int64(nil), s.proxyTier...)
-	valid := len(cached) > 0 && now.Before(s.proxyExpiresAt)
+	cached, valid := s.proxyTiers[proxyGroupID]
 	s.proxyMu.RUnlock()
-	if valid {
-		return chooseHeartbeatProxy(cached)
+	if valid && len(cached.ids) > 0 && now.Before(cached.expiresAt) {
+		return chooseHeartbeatProxy(cached.ids)
 	}
 	s.proxyRefreshMu.Lock()
 	defer s.proxyRefreshMu.Unlock()
 	s.proxyMu.RLock()
-	cached = append([]int64(nil), s.proxyTier...)
-	valid = len(cached) > 0 && time.Now().Before(s.proxyExpiresAt)
+	cached, valid = s.proxyTiers[proxyGroupID]
 	s.proxyMu.RUnlock()
-	if valid {
-		return chooseHeartbeatProxy(cached)
+	if valid && len(cached.ids) > 0 && time.Now().Before(cached.expiresAt) {
+		return chooseHeartbeatProxy(cached.ids)
 	}
-	groupID := s.cfg.ProxyGroupID
 	proxies := make([]Proxy, 0)
 	for page := 1; ; page++ {
+		groupID := proxyGroupID
 		batch, total, err := s.admin.ListProxies(ctx, page, 500, ProxyListFilters{Status: StatusActive, ProxyGroupID: &groupID}, "id", "asc")
 		if err != nil {
 			return 0, err
@@ -387,8 +558,8 @@ func (s *HeartbeatProvisioningService) selectProxy(ctx context.Context) (int64, 
 	if len(proxies) == 0 {
 		return 0, errors.New("no active proxies in heartbeat target group")
 	}
-	if len(proxies) > s.cfg.ProxyProbeSampleSize {
-		sampled, err := sampleHeartbeatProxies(proxies, s.cfg.ProxyProbeSampleSize)
+	if len(proxies) > cfg.ProxyProbeSampleSize {
+		sampled, err := sampleHeartbeatProxies(proxies, cfg.ProxyProbeSampleSize)
 		if err != nil {
 			return 0, err
 		}
@@ -398,12 +569,12 @@ func (s *HeartbeatProvisioningService) selectProxy(ctx context.Context) (int64, 
 	input := make(chan Proxy)
 	output := make(chan probeResult, len(proxies))
 	var wg sync.WaitGroup
-	for i := 0; i < s.cfg.ProxyProbeWorkers; i++ {
+	for i := 0; i < cfg.ProxyProbeWorkers; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			for proxy := range input {
-				probeCtx, cancel := context.WithTimeout(ctx, time.Duration(s.cfg.ProxyProbeTimeoutS)*time.Second)
+				probeCtx, cancel := context.WithTimeout(ctx, time.Duration(cfg.ProxyProbeTimeoutS)*time.Second)
 				result, err := s.admin.TestProxy(probeCtx, proxy.ID)
 				cancel()
 				if err == nil && result != nil && result.Success && result.LatencyMs > 0 {
@@ -440,14 +611,19 @@ func (s *HeartbeatProvisioningService) selectProxy(ctx context.Context) (int64, 
 		tier[i] = results[i].id
 	}
 	s.proxyMu.Lock()
-	s.proxyTier = append([]int64(nil), tier...)
-	s.proxyExpiresAt = time.Now().Add(time.Duration(s.cfg.ProxySweepTTLSecond) * time.Second)
+	s.proxyTiers[proxyGroupID] = heartbeatProxyTier{ids: append([]int64(nil), tier...), expiresAt: time.Now().Add(time.Duration(cfg.ProxySweepTTLSecond) * time.Second)}
 	s.proxyMu.Unlock()
 	return chooseHeartbeatProxy(tier)
 }
 
 func (s *HeartbeatProvisioningService) fetchVaultKey(ctx context.Context, sessionKey, fingerprint string) (string, error) {
+	s.cfgMu.RLock()
+	if s.vaultURL == nil {
+		s.cfgMu.RUnlock()
+		return "", errors.New("heartbeat vault is not configured")
+	}
 	u := *s.vaultURL
+	s.cfgMu.RUnlock()
 	query := u.Query()
 	query.Set("session_key", sessionKey)
 	u.RawQuery = query.Encode()
@@ -483,6 +659,316 @@ func (s *HeartbeatProvisioningService) fetchVaultKey(ctx context.Context, sessio
 		}
 	}
 	return "", errors.New("matching DeepSeek key is not present in heartbeat vault")
+}
+
+func (s *HeartbeatProvisioningService) Options(ctx context.Context) (*HeartbeatProvisioningOptions, error) {
+	if s == nil || s.admin == nil {
+		return nil, errors.New("heartbeat admin service is unavailable")
+	}
+	groups, err := s.admin.GetAllGroupsByPlatform(ctx, PlatformDeepSeek)
+	if err != nil {
+		return nil, err
+	}
+	result := &HeartbeatProvisioningOptions{
+		Groups:      make([]HeartbeatGroupOption, 0, len(groups)),
+		ProxyGroups: make([]HeartbeatProxyGroupOption, 0),
+	}
+	for _, group := range groups {
+		result.Groups = append(result.Groups, HeartbeatGroupOption{ID: group.ID, Name: group.Name, Platform: group.Platform, Status: group.Status})
+	}
+	proxyGroups := make(map[int64]*HeartbeatProxyGroupOption)
+	for page := 1; ; page++ {
+		proxies, total, err := s.admin.ListProxies(ctx, page, 500, ProxyListFilters{Status: StatusActive}, "id", "asc")
+		if err != nil {
+			return nil, err
+		}
+		for _, proxy := range proxies {
+			if proxy.ProxyGroupID == nil {
+				continue
+			}
+			option := proxyGroups[*proxy.ProxyGroupID]
+			if option == nil {
+				option = &HeartbeatProxyGroupOption{ID: *proxy.ProxyGroupID, Name: proxy.ProxyGroupName}
+				proxyGroups[*proxy.ProxyGroupID] = option
+			}
+			option.ActiveProxyCount++
+		}
+		if len(proxies) == 0 || int64(page*500) >= total {
+			break
+		}
+	}
+	for _, group := range proxyGroups {
+		result.ProxyGroups = append(result.ProxyGroups, *group)
+	}
+	sort.Slice(result.ProxyGroups, func(i, j int) bool { return result.ProxyGroups[i].ID < result.ProxyGroups[j].ID })
+	return result, nil
+}
+
+func (s *HeartbeatProvisioningService) Status(ctx context.Context) (*HeartbeatProvisioningStatus, error) {
+	if s == nil {
+		return nil, errors.New("nil heartbeat provisioning service")
+	}
+	cfg, source := s.ConfigSnapshot()
+	stats := &HeartbeatQueueStats{}
+	if s.repo != nil {
+		loaded, err := s.repo.Stats(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if loaded != nil {
+			stats = loaded
+		}
+	}
+	var lastHeartbeat *time.Time
+	if ns := s.lastHeartbeatNS.Load(); ns > 0 {
+		value := time.Unix(0, ns).UTC()
+		lastHeartbeat = &value
+	}
+	return &HeartbeatProvisioningStatus{
+		Enabled:         cfg.Enabled,
+		Running:         s.Running(),
+		ConfigSource:    source,
+		LastHeartbeatAt: lastHeartbeat,
+		Queued:          stats.Queued,
+		Processing:      stats.Processing,
+		Retry:           stats.Retry,
+		Failed:          stats.Failed,
+		Complete:        stats.Complete,
+		LastError:       stats.LastError,
+		LastErrorAt:     stats.LastErrorAt,
+	}, nil
+}
+
+func (s *HeartbeatProvisioningService) prepareConfig(ctx context.Context, requested config.HeartbeatProvisioningConfig) (*heartbeatPreparedConfig, error) {
+	cfg := normalizeHeartbeatConfig(requested)
+	if cfg.Enabled {
+		if err := validateHeartbeatRuntimeConfig(cfg); err != nil {
+			return nil, err
+		}
+		if s.admin == nil {
+			return nil, errors.New("heartbeat admin service is unavailable")
+		}
+	}
+	prepared := &heartbeatPreparedConfig{allowed: make(map[netip.Addr]struct{}, len(cfg.AllowedSourceIPs))}
+	for _, rawIP := range cfg.AllowedSourceIPs {
+		addr, err := netip.ParseAddr(strings.TrimSpace(rawIP))
+		if err != nil {
+			return nil, fmt.Errorf("heartbeat source IP is invalid: %w", err)
+		}
+		prepared.allowed[addr.Unmap()] = struct{}{}
+	}
+	if !cfg.Enabled {
+		return prepared, nil
+	}
+	parsedURL, err := url.Parse(strings.TrimSpace(cfg.VaultURL))
+	if err != nil || parsedURL == nil || parsedURL.Host == "" {
+		return nil, fmt.Errorf("parse heartbeat vault URL: %w", err)
+	}
+	if parsedURL.Scheme != "https" && (parsedURL.Scheme != "http" || !cfg.AllowInsecureVault) {
+		return nil, errors.New("heartbeat vault must use HTTPS unless insecure vault access is explicitly enabled")
+	}
+	prepared.vaultURL = parsedURL
+	preflightCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	for _, target := range cfg.Targets {
+		group, err := s.admin.GetGroup(preflightCtx, target.GroupID)
+		if err != nil {
+			return nil, fmt.Errorf("load heartbeat target group %d: %w", target.GroupID, err)
+		}
+		if group == nil || group.Status != StatusActive || group.Platform != PlatformDeepSeek {
+			return nil, fmt.Errorf("heartbeat target group %d must be active and use the deepseek platform", target.GroupID)
+		}
+		proxyGroupID := target.ProxyGroupID
+		_, proxyTotal, err := s.admin.ListProxies(preflightCtx, 1, 1, ProxyListFilters{Status: StatusActive, ProxyGroupID: &proxyGroupID}, "id", "asc")
+		if err != nil {
+			return nil, fmt.Errorf("load heartbeat proxy group %d: %w", target.ProxyGroupID, err)
+		}
+		if proxyTotal == 0 {
+			return nil, fmt.Errorf("heartbeat proxy group %d has no active proxies", target.ProxyGroupID)
+		}
+	}
+	return prepared, nil
+}
+
+func (s *HeartbeatProvisioningService) configSnapshot() config.HeartbeatProvisioningConfig {
+	s.cfgMu.RLock()
+	defer s.cfgMu.RUnlock()
+	return cloneHeartbeatConfig(s.cfg)
+}
+
+func (s *HeartbeatProvisioningService) runtimeSnapshot() (config.HeartbeatProvisioningConfig, map[netip.Addr]struct{}, bool) {
+	s.cfgMu.RLock()
+	defer s.cfgMu.RUnlock()
+	return cloneHeartbeatConfig(s.cfg), s.allowed, s.cfg.Enabled
+}
+
+func (s *HeartbeatProvisioningService) enabledSnapshot() bool {
+	s.cfgMu.RLock()
+	defer s.cfgMu.RUnlock()
+	return s.cfg.Enabled
+}
+
+func (s *HeartbeatProvisioningService) clearProxyCache() {
+	s.proxyMu.Lock()
+	s.proxyTiers = make(map[int64]heartbeatProxyTier)
+	s.proxyMu.Unlock()
+}
+
+func resolveHeartbeatTarget(cfg config.HeartbeatProvisioningConfig, groupID *int64) (config.HeartbeatProvisioningTarget, bool) {
+	id := cfg.DefaultGroupID
+	if groupID != nil {
+		if *groupID <= 0 {
+			return config.HeartbeatProvisioningTarget{}, false
+		}
+		id = *groupID
+	}
+	for _, target := range cfg.Targets {
+		if target.GroupID == id {
+			return target, true
+		}
+	}
+	return config.HeartbeatProvisioningTarget{}, false
+}
+
+func resolveHeartbeatJobTarget(cfg config.HeartbeatProvisioningConfig, job *HeartbeatProvisioningJob) (config.HeartbeatProvisioningTarget, bool) {
+	if job.TargetGroupID > 0 && job.TargetProxyGroupID > 0 {
+		return config.HeartbeatProvisioningTarget{GroupID: job.TargetGroupID, ProxyGroupID: job.TargetProxyGroupID}, true
+	}
+	return resolveHeartbeatTarget(cfg, nil)
+}
+
+func normalizeHeartbeatConfig(input config.HeartbeatProvisioningConfig) config.HeartbeatProvisioningConfig {
+	output := cloneHeartbeatConfig(input)
+	output.VaultURL = strings.TrimSpace(output.VaultURL)
+	output.AllowedSourceIPs = normalizeHeartbeatIPs(output.AllowedSourceIPs)
+	if output.DefaultGroupID <= 0 {
+		output.DefaultGroupID = output.DeepSeekGroupID
+	}
+	if len(output.Targets) == 0 && output.DefaultGroupID > 0 && output.ProxyGroupID > 0 {
+		output.Targets = []config.HeartbeatProvisioningTarget{{GroupID: output.DefaultGroupID, ProxyGroupID: output.ProxyGroupID}}
+	}
+	if output.DefaultGroupID <= 0 && len(output.Targets) > 0 {
+		output.DefaultGroupID = output.Targets[0].GroupID
+	}
+	if output.DeepSeekGroupID <= 0 {
+		output.DeepSeekGroupID = output.DefaultGroupID
+	}
+	if output.ProxyGroupID <= 0 && len(output.Targets) == 1 {
+		output.ProxyGroupID = output.Targets[0].ProxyGroupID
+	}
+	return output
+}
+
+func normalizeHeartbeatIPs(values []string) []string {
+	result := make([]string, 0, len(values))
+	seen := make(map[string]struct{}, len(values))
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			continue
+		}
+		if _, exists := seen[value]; exists {
+			continue
+		}
+		seen[value] = struct{}{}
+		result = append(result, value)
+	}
+	return result
+}
+
+func cloneHeartbeatConfig(input config.HeartbeatProvisioningConfig) config.HeartbeatProvisioningConfig {
+	output := input
+	output.AllowedSourceIPs = append([]string(nil), input.AllowedSourceIPs...)
+	output.Targets = append([]config.HeartbeatProvisioningTarget(nil), input.Targets...)
+	return output
+}
+
+func validateHeartbeatRuntimeConfig(cfg config.HeartbeatProvisioningConfig) error {
+	if cfg.DefaultGroupID <= 0 || cfg.WorkerCount < 1 || cfg.WorkerCount > 64 || cfg.ProxyProbeWorkers < 1 || cfg.ProxyProbeWorkers > 128 || cfg.ProxyProbeSampleSize < 1 || cfg.ProxyProbeSampleSize > 10000 || cfg.ProxyProbeTimeoutS < 1 || cfg.ProxyProbeTimeoutS > 60 || cfg.ProxySweepTTLSecond < 1 || cfg.ProxySweepTTLSecond > 86400 || cfg.MaxAttempts < 1 || cfg.MaxAttempts > 20 {
+		return errors.New("heartbeat numeric settings are outside the allowed range")
+	}
+	if len(cfg.AllowedSourceIPs) == 0 {
+		return errors.New("heartbeat allowed_source_ips is required")
+	}
+	seenGroups := make(map[int64]struct{}, len(cfg.Targets))
+	hasDefault := false
+	for _, target := range cfg.Targets {
+		if target.GroupID <= 0 || target.ProxyGroupID <= 0 {
+			return errors.New("heartbeat targets must contain positive group_id and proxy_group_id")
+		}
+		if _, exists := seenGroups[target.GroupID]; exists {
+			return errors.New("heartbeat targets contain duplicate group_id")
+		}
+		seenGroups[target.GroupID] = struct{}{}
+		if target.GroupID == cfg.DefaultGroupID {
+			hasDefault = true
+		}
+	}
+	if len(cfg.Targets) == 0 || !hasDefault {
+		return errors.New("heartbeat default_group_id must be present in targets")
+	}
+	if cfg.Enabled && strings.TrimSpace(cfg.VaultURL) == "" {
+		return errors.New("heartbeat vault_url is required when enabled")
+	}
+	return nil
+}
+
+type heartbeatStoredConfig struct {
+	Enabled              bool                                 `json:"enabled"`
+	VaultURL             string                               `json:"vault_url"`
+	AllowInsecureVault   bool                                 `json:"allow_insecure_vault"`
+	AllowedSourceIPs     []string                             `json:"allowed_source_ips"`
+	DefaultGroupID       int64                                `json:"default_group_id"`
+	Targets              []config.HeartbeatProvisioningTarget `json:"targets"`
+	WorkerCount          int                                  `json:"worker_count"`
+	ProxyProbeWorkers    int                                  `json:"proxy_probe_workers"`
+	ProxyProbeSampleSize int                                  `json:"proxy_probe_sample_size"`
+	ProxyProbeTimeoutS   int                                  `json:"proxy_probe_timeout_seconds"`
+	ProxySweepTTLSecond  int                                  `json:"proxy_sweep_ttl_seconds"`
+	MaxAttempts          int                                  `json:"max_attempts"`
+}
+
+func encodeStoredHeartbeatConfig(cfg config.HeartbeatProvisioningConfig) (string, error) {
+	stored := heartbeatStoredConfig{
+		Enabled:              cfg.Enabled,
+		VaultURL:             cfg.VaultURL,
+		AllowInsecureVault:   cfg.AllowInsecureVault,
+		AllowedSourceIPs:     append([]string(nil), cfg.AllowedSourceIPs...),
+		DefaultGroupID:       cfg.DefaultGroupID,
+		Targets:              append([]config.HeartbeatProvisioningTarget(nil), cfg.Targets...),
+		WorkerCount:          cfg.WorkerCount,
+		ProxyProbeWorkers:    cfg.ProxyProbeWorkers,
+		ProxyProbeSampleSize: cfg.ProxyProbeSampleSize,
+		ProxyProbeTimeoutS:   cfg.ProxyProbeTimeoutS,
+		ProxySweepTTLSecond:  cfg.ProxySweepTTLSecond,
+		MaxAttempts:          cfg.MaxAttempts,
+	}
+	encoded, err := json.Marshal(stored)
+	if err != nil {
+		return "", fmt.Errorf("encode heartbeat configuration: %w", err)
+	}
+	return string(encoded), nil
+}
+
+func decodeStoredHeartbeatConfig(raw string) (config.HeartbeatProvisioningConfig, error) {
+	var stored heartbeatStoredConfig
+	if err := json.Unmarshal([]byte(raw), &stored); err != nil {
+		return config.HeartbeatProvisioningConfig{}, err
+	}
+	return normalizeHeartbeatConfig(config.HeartbeatProvisioningConfig{
+		Enabled:              stored.Enabled,
+		VaultURL:             stored.VaultURL,
+		AllowInsecureVault:   stored.AllowInsecureVault,
+		AllowedSourceIPs:     stored.AllowedSourceIPs,
+		DefaultGroupID:       stored.DefaultGroupID,
+		Targets:              stored.Targets,
+		WorkerCount:          stored.WorkerCount,
+		ProxyProbeWorkers:    stored.ProxyProbeWorkers,
+		ProxyProbeSampleSize: stored.ProxyProbeSampleSize,
+		ProxyProbeTimeoutS:   stored.ProxyProbeTimeoutS,
+		ProxySweepTTLSecond:  stored.ProxySweepTTLSecond,
+		MaxAttempts:          stored.MaxAttempts,
+	}), nil
 }
 
 func chooseHeartbeatProxy(candidates []int64) (int64, error) {

@@ -586,6 +586,10 @@ const (
 	// SettingKeyOpsRuntimeLogConfig stores JSON config for runtime log settings.
 	SettingKeyOpsRuntimeLogConfig = "ops_runtime_log_config"
 
+	// SettingKeyHeartbeatProvisioningConfig stores the admin-managed heartbeat
+	// runtime override. When absent, the deployment configuration is used.
+	SettingKeyHeartbeatProvisioningConfig = "heartbeat_provisioning_config"
+
 	// =========================
 	// Channel Monitor (渠道监控)
 	// =========================

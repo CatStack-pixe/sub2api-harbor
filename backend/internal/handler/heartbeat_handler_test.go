@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 )
@@ -65,5 +66,15 @@ func TestHeartbeatKeyParseCheckedAtSupportsBalanceCheckedAtAlias(t *testing.T) {
 	}
 	if _, err := conflicting.parseCheckedAt(); err == nil {
 		t.Fatal("parseCheckedAt() error = nil for conflicting timestamps")
+	}
+}
+
+func TestHeartbeatRequestSupportsPerKeyGroupID(t *testing.T) {
+	var request heartbeatRequest
+	if err := json.Unmarshal([]byte(`{"session_key":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","ts":1,"keys":[{"fp":"aaaaaaaaaaaaaaaaaaaaaaaa","provider":"ds","balance":1,"checked_at":"2026-08-13T08:34:21Z","group_id":13}]}`), &request); err != nil {
+		t.Fatalf("json.Unmarshal() error = %v", err)
+	}
+	if request.Keys[0].GroupID == nil || *request.Keys[0].GroupID != 13 {
+		t.Fatalf("group_id = %#v, want 13", request.Keys[0].GroupID)
 	}
 }

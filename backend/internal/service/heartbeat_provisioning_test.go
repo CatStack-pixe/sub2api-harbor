@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/stretchr/testify/require"
 )
 
@@ -33,4 +34,52 @@ func TestSampleHeartbeatProxiesKeepsUniqueMembers(t *testing.T) {
 		require.False(t, duplicate)
 		seen[proxy.ID] = struct{}{}
 	}
+}
+
+func TestNormalizeHeartbeatConfigKeepsLegacySingleTargetCompatible(t *testing.T) {
+	got := normalizeHeartbeatConfig(config.HeartbeatProvisioningConfig{
+		DeepSeekGroupID: 12,
+		ProxyGroupID:    3,
+	})
+
+	require.Equal(t, int64(12), got.DefaultGroupID)
+	require.Equal(t, []config.HeartbeatProvisioningTarget{{GroupID: 12, ProxyGroupID: 3}}, got.Targets)
+}
+
+func TestResolveHeartbeatTargetUsesDefaultWhenGroupIsOmitted(t *testing.T) {
+	cfg := config.HeartbeatProvisioningConfig{
+		DefaultGroupID: 12,
+		Targets: []config.HeartbeatProvisioningTarget{
+			{GroupID: 12, ProxyGroupID: 1},
+			{GroupID: 13, ProxyGroupID: 2},
+		},
+	}
+
+	target, ok := resolveHeartbeatTarget(cfg, nil)
+	require.True(t, ok)
+	require.Equal(t, config.HeartbeatProvisioningTarget{GroupID: 12, ProxyGroupID: 1}, target)
+
+	groupID := int64(13)
+	target, ok = resolveHeartbeatTarget(cfg, &groupID)
+	require.True(t, ok)
+	require.Equal(t, config.HeartbeatProvisioningTarget{GroupID: 13, ProxyGroupID: 2}, target)
+
+	unknown := int64(99)
+	_, ok = resolveHeartbeatTarget(cfg, &unknown)
+	require.False(t, ok)
+}
+
+func TestValidateHeartbeatRuntimeConfigRequiresDefaultMapping(t *testing.T) {
+	cfg := config.HeartbeatProvisioningConfig{
+		DefaultGroupID:       12,
+		AllowedSourceIPs:     []string{"192.0.2.10"},
+		Targets:              []config.HeartbeatProvisioningTarget{{GroupID: 13, ProxyGroupID: 1}},
+		WorkerCount:          1,
+		ProxyProbeWorkers:    1,
+		ProxyProbeSampleSize: 1,
+		ProxyProbeTimeoutS:   1,
+		ProxySweepTTLSecond:  1,
+		MaxAttempts:          1,
+	}
+	require.ErrorContains(t, validateHeartbeatRuntimeConfig(cfg), "default_group_id")
 }
