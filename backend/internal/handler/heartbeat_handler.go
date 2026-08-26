@@ -38,6 +38,7 @@ type heartbeatKey struct {
 	Balance          float64 `json:"balance"`
 	CheckedAt        string  `json:"checked_at"`
 	BalanceCheckedAt string  `json:"balance_checked_at"`
+	GroupID          *int64  `json:"group_id,omitempty"`
 }
 
 func parseHeartbeatCheckedAt(value string) (time.Time, error) {
@@ -100,11 +101,13 @@ func (h *HeartbeatHandler) Handle(c *gin.Context) {
 			Provider:    key.Provider,
 			Balance:     key.Balance,
 			CheckedAt:   checkedAt,
+			GroupID:     key.GroupID,
 		})
 	}
-	// Heartbeats are source-IP restricted. Resolve the IP only through Gin's
-	// configured trusted-proxy chain; never use compatibility forwarding headers.
-	sourceIP := ip.GetSecurityClientIP(c, false)
+	// Heartbeats are source-IP restricted. The legacy request snapshot can opt
+	// security paths into raw forwarding headers, so use the strict Gin chain
+	// directly for this endpoint.
+	sourceIP := ip.GetTrustedClientIP(c)
 	accepted, err := h.provisioning.Queue(c.Request.Context(), sourceIP, request.SessionKey, time.Unix(request.Timestamp, 0), keys)
 	if err != nil {
 		switch {

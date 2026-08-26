@@ -997,6 +997,11 @@ heartbeat_provisioning:
   allow_insecure_vault: false
   allowed_source_ips:
     - "47.97.207.205"
+  default_group_id: 12
+  targets:
+    - group_id: 12
+      proxy_group_id: 1
+  # Legacy single-group fields remain supported for older deployments.
   deepseek_group_id: 12
   proxy_group_id: 1
   worker_count: 2

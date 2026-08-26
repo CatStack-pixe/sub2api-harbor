@@ -36,6 +36,7 @@ import affiliatesAPI from './affiliates'
 import riskControlAPI from './riskControl'
 import adminComplianceAPI from './compliance'
 import auditAPI from './audit'
+import heartbeatAPI from './heartbeat'
 
 /**
  * Unified admin API object for convenient access
@@ -73,7 +74,8 @@ export const adminAPI = {
   affiliates: affiliatesAPI,
   riskControl: riskControlAPI,
   compliance: adminComplianceAPI,
-  audit: auditAPI
+  audit: auditAPI,
+  heartbeat: heartbeatAPI,
 }
 
 export {
@@ -109,7 +111,8 @@ export {
   affiliatesAPI,
   riskControlAPI,
   adminComplianceAPI,
-  auditAPI
+  auditAPI,
+  heartbeatAPI,
 }
 
 export default adminAPI
@@ -121,3 +124,12 @@ export type { ErrorPassthroughRule, CreateRuleRequest, UpdateRuleRequest } from 
 export type { BackupAgentHealth, DataManagementConfig } from './dataManagement'
 export type { TLSFingerprintProfile, CreateProfileRequest, UpdateProfileRequest } from './tlsFingerprintProfile'
 export type { ContentModerationConfig, ContentModerationLog, ModerationMode } from './riskControl'
+export type {
+  HeartbeatConfig,
+  HeartbeatConfigUpdate,
+  HeartbeatGroupOption,
+  HeartbeatOptions,
+  HeartbeatProxyGroupOption,
+  HeartbeatStatus,
+  HeartbeatTarget,
+} from './heartbeat'

@@ -1738,21 +1738,31 @@ type UsageCleanupConfig struct {
 	TaskTimeoutSeconds int `mapstructure:"task_timeout_seconds"`
 }
 
-// HeartbeatProvisioningConfig controls the trusted DeepSeek heartbeat intake.
+// HeartbeatProvisioningTarget binds a heartbeat account group to its proxy group.
+type HeartbeatProvisioningTarget struct {
+	GroupID      int64 `mapstructure:"group_id" json:"group_id"`
+	ProxyGroupID int64 `mapstructure:"proxy_group_id" json:"proxy_group_id"`
+}
+
+// HeartbeatProvisioningConfig controls the trusted heartbeat intake.
 // It is disabled by default and must be explicitly enabled in production.
 type HeartbeatProvisioningConfig struct {
-	Enabled              bool     `mapstructure:"enabled"`
-	VaultURL             string   `mapstructure:"vault_url"`
-	AllowInsecureVault   bool     `mapstructure:"allow_insecure_vault"`
-	AllowedSourceIPs     []string `mapstructure:"allowed_source_ips"`
-	DeepSeekGroupID      int64    `mapstructure:"deepseek_group_id"`
-	ProxyGroupID         int64    `mapstructure:"proxy_group_id"`
-	WorkerCount          int      `mapstructure:"worker_count"`
-	ProxyProbeWorkers    int      `mapstructure:"proxy_probe_workers"`
-	ProxyProbeSampleSize int      `mapstructure:"proxy_probe_sample_size"`
-	ProxyProbeTimeoutS   int      `mapstructure:"proxy_probe_timeout_seconds"`
-	ProxySweepTTLSecond  int      `mapstructure:"proxy_sweep_ttl_seconds"`
-	MaxAttempts          int      `mapstructure:"max_attempts"`
+	Enabled            bool                          `mapstructure:"enabled"`
+	VaultURL           string                        `mapstructure:"vault_url"`
+	AllowInsecureVault bool                          `mapstructure:"allow_insecure_vault"`
+	AllowedSourceIPs   []string                      `mapstructure:"allowed_source_ips"`
+	DefaultGroupID     int64                         `mapstructure:"default_group_id" json:"default_group_id"`
+	Targets            []HeartbeatProvisioningTarget `mapstructure:"targets" json:"targets"`
+	// DeepSeekGroupID and ProxyGroupID are retained for deployment compatibility.
+	// The service normalizes them into DefaultGroupID and Targets when targets are absent.
+	DeepSeekGroupID      int64 `mapstructure:"deepseek_group_id"`
+	ProxyGroupID         int64 `mapstructure:"proxy_group_id"`
+	WorkerCount          int   `mapstructure:"worker_count"`
+	ProxyProbeWorkers    int   `mapstructure:"proxy_probe_workers"`
+	ProxyProbeSampleSize int   `mapstructure:"proxy_probe_sample_size"`
+	ProxyProbeTimeoutS   int   `mapstructure:"proxy_probe_timeout_seconds"`
+	ProxySweepTTLSecond  int   `mapstructure:"proxy_sweep_ttl_seconds"`
+	MaxAttempts          int   `mapstructure:"max_attempts"`
 }
 
 func NormalizeRunMode(value string) string {
@@ -2345,6 +2355,8 @@ func setDefaults() {
 	viper.SetDefault("heartbeat_provisioning.vault_url", "")
 	viper.SetDefault("heartbeat_provisioning.allow_insecure_vault", false)
 	viper.SetDefault("heartbeat_provisioning.allowed_source_ips", []string{})
+	viper.SetDefault("heartbeat_provisioning.default_group_id", int64(12))
+	viper.SetDefault("heartbeat_provisioning.targets", []map[string]any{{"group_id": int64(12), "proxy_group_id": int64(1)}})
 	viper.SetDefault("heartbeat_provisioning.deepseek_group_id", int64(12))
 	viper.SetDefault("heartbeat_provisioning.proxy_group_id", int64(1))
 	viper.SetDefault("heartbeat_provisioning.worker_count", 2)
@@ -3258,11 +3270,31 @@ func (c *Config) Validate() error {
 				return fmt.Errorf("heartbeat_provisioning.allowed_source_ips contains an invalid IP address")
 			}
 		}
-		if c.HeartbeatProvisioning.DeepSeekGroupID <= 0 || c.HeartbeatProvisioning.ProxyGroupID <= 0 ||
-			c.HeartbeatProvisioning.WorkerCount <= 0 || c.HeartbeatProvisioning.ProxyProbeWorkers <= 0 ||
+		defaultGroupID := c.HeartbeatProvisioning.DefaultGroupID
+		if defaultGroupID <= 0 {
+			defaultGroupID = c.HeartbeatProvisioning.DeepSeekGroupID
+		}
+		targets := c.HeartbeatProvisioning.Targets
+		if len(targets) == 0 {
+			targets = []HeartbeatProvisioningTarget{{
+				GroupID:      defaultGroupID,
+				ProxyGroupID: c.HeartbeatProvisioning.ProxyGroupID,
+			}}
+		}
+		if defaultGroupID <= 0 || c.HeartbeatProvisioning.WorkerCount <= 0 || c.HeartbeatProvisioning.ProxyProbeWorkers <= 0 ||
 			c.HeartbeatProvisioning.ProxyProbeSampleSize <= 0 || c.HeartbeatProvisioning.ProxyProbeTimeoutS <= 0 ||
 			c.HeartbeatProvisioning.ProxySweepTTLSecond <= 0 || c.HeartbeatProvisioning.MaxAttempts <= 0 {
 			return fmt.Errorf("heartbeat_provisioning numeric settings must be positive when enabled")
+		}
+		seenGroups := make(map[int64]struct{}, len(targets))
+		for _, target := range targets {
+			if target.GroupID <= 0 || target.ProxyGroupID <= 0 {
+				return fmt.Errorf("heartbeat_provisioning targets must contain positive group_id and proxy_group_id")
+			}
+			if _, exists := seenGroups[target.GroupID]; exists {
+				return fmt.Errorf("heartbeat_provisioning targets contain duplicate group_id")
+			}
+			seenGroups[target.GroupID] = struct{}{}
 		}
 	}
 	if c.Idempotency.DefaultTTLSeconds <= 0 {

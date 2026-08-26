@@ -22236,6 +22236,8 @@ type GroupMutation struct {
 	long_context_pricing_enabled            *bool
 	model_pricing                           *json.RawMessage
 	appendmodel_pricing                     json.RawMessage
+	global_prompt_enabled                   *bool
+	global_prompt                           *string
 	claude_code_only                        *bool
 	fallback_group_id                       *int64
 	addfallback_group_id                    *int64
@@ -24560,6 +24562,78 @@ func (m *GroupMutation) ResetModelPricing() {
 	delete(m.clearedFields, group.FieldModelPricing)
 }
 
+// SetGlobalPromptEnabled sets the "global_prompt_enabled" field.
+func (m *GroupMutation) SetGlobalPromptEnabled(b bool) {
+	m.global_prompt_enabled = &b
+}
+
+// GlobalPromptEnabled returns the value of the "global_prompt_enabled" field in the mutation.
+func (m *GroupMutation) GlobalPromptEnabled() (r bool, exists bool) {
+	v := m.global_prompt_enabled
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldGlobalPromptEnabled returns the old "global_prompt_enabled" field's value of the Group entity.
+// If the Group object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *GroupMutation) OldGlobalPromptEnabled(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldGlobalPromptEnabled is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldGlobalPromptEnabled requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldGlobalPromptEnabled: %w", err)
+	}
+	return oldValue.GlobalPromptEnabled, nil
+}
+
+// ResetGlobalPromptEnabled resets all changes to the "global_prompt_enabled" field.
+func (m *GroupMutation) ResetGlobalPromptEnabled() {
+	m.global_prompt_enabled = nil
+}
+
+// SetGlobalPrompt sets the "global_prompt" field.
+func (m *GroupMutation) SetGlobalPrompt(s string) {
+	m.global_prompt = &s
+}
+
+// GlobalPrompt returns the value of the "global_prompt" field in the mutation.
+func (m *GroupMutation) GlobalPrompt() (r string, exists bool) {
+	v := m.global_prompt
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldGlobalPrompt returns the old "global_prompt" field's value of the Group entity.
+// If the Group object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *GroupMutation) OldGlobalPrompt(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldGlobalPrompt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldGlobalPrompt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldGlobalPrompt: %w", err)
+	}
+	return oldValue.GlobalPrompt, nil
+}
+
+// ResetGlobalPrompt resets all changes to the "global_prompt" field.
+func (m *GroupMutation) ResetGlobalPrompt() {
+	m.global_prompt = nil
+}
+
 // SetClaudeCodeOnly sets the "claude_code_only" field.
 func (m *GroupMutation) SetClaudeCodeOnly(b bool) {
 	m.claude_code_only = &b
@@ -25865,7 +25939,7 @@ func (m *GroupMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *GroupMutation) Fields() []string {
-	fields := make([]string, 0, 62)
+	fields := make([]string, 0, 64)
 	if m.created_at != nil {
 		fields = append(fields, group.FieldCreatedAt)
 	}
@@ -25988,6 +26062,12 @@ func (m *GroupMutation) Fields() []string {
 	}
 	if m.model_pricing != nil {
 		fields = append(fields, group.FieldModelPricing)
+	}
+	if m.global_prompt_enabled != nil {
+		fields = append(fields, group.FieldGlobalPromptEnabled)
+	}
+	if m.global_prompt != nil {
+		fields = append(fields, group.FieldGlobalPrompt)
 	}
 	if m.claude_code_only != nil {
 		fields = append(fields, group.FieldClaudeCodeOnly)
@@ -26142,6 +26222,10 @@ func (m *GroupMutation) Field(name string) (ent.Value, bool) {
 		return m.LongContextPricingEnabled()
 	case group.FieldModelPricing:
 		return m.ModelPricing()
+	case group.FieldGlobalPromptEnabled:
+		return m.GlobalPromptEnabled()
+	case group.FieldGlobalPrompt:
+		return m.GlobalPrompt()
 	case group.FieldClaudeCodeOnly:
 		return m.ClaudeCodeOnly()
 	case group.FieldFallbackGroupID:
@@ -26275,6 +26359,10 @@ func (m *GroupMutation) OldField(ctx context.Context, name string) (ent.Value, e
 		return m.OldLongContextPricingEnabled(ctx)
 	case group.FieldModelPricing:
 		return m.OldModelPricing(ctx)
+	case group.FieldGlobalPromptEnabled:
+		return m.OldGlobalPromptEnabled(ctx)
+	case group.FieldGlobalPrompt:
+		return m.OldGlobalPrompt(ctx)
 	case group.FieldClaudeCodeOnly:
 		return m.OldClaudeCodeOnly(ctx)
 	case group.FieldFallbackGroupID:
@@ -26612,6 +26700,20 @@ func (m *GroupMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetModelPricing(v)
+		return nil
+	case group.FieldGlobalPromptEnabled:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetGlobalPromptEnabled(v)
+		return nil
+	case group.FieldGlobalPrompt:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetGlobalPrompt(v)
 		return nil
 	case group.FieldClaudeCodeOnly:
 		v, ok := value.(bool)
@@ -27393,6 +27495,12 @@ func (m *GroupMutation) ResetField(name string) error {
 		return nil
 	case group.FieldModelPricing:
 		m.ResetModelPricing()
+		return nil
+	case group.FieldGlobalPromptEnabled:
+		m.ResetGlobalPromptEnabled()
+		return nil
+	case group.FieldGlobalPrompt:
+		m.ResetGlobalPrompt()
 		return nil
 	case group.FieldClaudeCodeOnly:
 		m.ResetClaudeCodeOnly()

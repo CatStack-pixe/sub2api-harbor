@@ -64,6 +64,7 @@ func RegisterAdminRoutes(
 		registerKimiRoutes(admin, h)
 		// 国产供应商（kimi/zhipu/deepseek）额度与余额
 		registerCNProviderRoutes(admin, h)
+		registerHeartbeatRoutes(admin, h)
 
 		// 代理管理
 		registerProxyRoutes(admin, h, stepUpAuth)
@@ -138,6 +139,19 @@ func registerDeepSeekRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 	deepseek := admin.Group("/deepseek")
 	{
 		deepseek.GET("/accounts/:id/balance", h.Admin.Account.GetDeepSeekBalance)
+	}
+}
+
+func registerHeartbeatRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
+	if h == nil || h.Admin == nil || h.Admin.Heartbeat == nil {
+		return
+	}
+	heartbeat := admin.Group("/heartbeat")
+	{
+		heartbeat.GET("/config", h.Admin.Heartbeat.GetConfig)
+		heartbeat.PUT("/config", h.Admin.Heartbeat.UpdateConfig)
+		heartbeat.GET("/options", h.Admin.Heartbeat.GetOptions)
+		heartbeat.GET("/status", h.Admin.Heartbeat.GetStatus)
 	}
 }
 
