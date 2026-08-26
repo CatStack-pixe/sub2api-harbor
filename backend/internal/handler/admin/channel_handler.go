@@ -687,7 +687,7 @@ var platformToLiteLLMProvider = map[string]string{
 	service.PlatformNvidia:       "nvidia_nim",
 	service.PlatformTokenRhythm:  "tokenrhythm",
 	service.PlatformKimi:         "moonshot",
-	service.PlatformZhipu:         "zhipu",
+	service.PlatformZhipu:        "zhipu",
 	service.PlatformChatAnywhere: "chatanywhere",
 	service.PlatformGLM:          "zai",
 	service.PlatformModelScope:   "modelscope",

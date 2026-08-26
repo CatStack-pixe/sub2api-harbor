@@ -203,6 +203,26 @@ func TestDuplicateGroupCopiesConfigurationDeeplyAndResetsRuntimeState(t *testing
 		DailyLimitUSD:                groupDuplicateTestPointer(11.0),
 		WeeklyLimitUSD:               groupDuplicateTestPointer(22.0),
 		MonthlyLimitUSD:              groupDuplicateTestPointer(33.0),
+		LongContextPricingEnabled:    true,
+		GlobalPromptEnabled:          true,
+		GlobalPrompt:                 "Follow the group policy.",
+		ModelPricing: []ChannelModelPricing{
+			{
+				Platform:    PlatformOpenAI,
+				Models:      []string{"gpt-5.4", "gpt-5-mini"},
+				BillingMode: BillingModeToken,
+				InputPrice:  groupDuplicateTestPointer(1.25e-6),
+				OutputPrice: groupDuplicateTestPointer(5e-6),
+				Intervals: []PricingInterval{
+					{
+						MinTokens:   0,
+						MaxTokens:   groupDuplicateTestPointer(200000),
+						InputPrice:  groupDuplicateTestPointer(1.25e-6),
+						OutputPrice: groupDuplicateTestPointer(5e-6),
+					},
+				},
+			},
+		},
 		DefaultValidityDays:          91,
 		AllowImageGeneration:         true,
 		AllowBatchImageGeneration:    true,

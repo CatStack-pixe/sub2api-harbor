@@ -1429,13 +1429,6 @@ func (a *Account) GetOpenAIBaseURL() string {
 		}
 		return GLMDefaultBaseURL
 	}
-	if a.IsCNProvider() && a.IsAdaptiveAPIProtocol() {
-		if baseURLs, ok := a.Credentials["api_base_urls"].(map[string]any); ok {
-			if baseURL, ok := baseURLs[APIProtocolChatCompletions].(string); ok && strings.TrimSpace(baseURL) != "" {
-				return strings.TrimRight(strings.TrimSpace(baseURL), "/")
-			}
-		}
-	}
 	if a.IsCNProvider() {
 		if a.IsKimi() {
 			_, hasMode := a.Credentials["account_mode"]
@@ -1446,6 +1439,18 @@ func (a *Account) GetOpenAIBaseURL() string {
 					return baseURL
 				}
 				return KimiDefaultBaseURL
+			}
+		}
+		if a.IsAdaptiveAPIProtocol() {
+			if baseURLs, ok := a.Credentials["api_base_urls"].(map[string]any); ok {
+				if baseURL, ok := baseURLs[APIProtocolChatCompletions].(string); ok && strings.TrimSpace(baseURL) != "" {
+					return strings.TrimRight(strings.TrimSpace(baseURL), "/")
+				}
+			}
+		}
+		if !a.IsKimi() && (a.Type == AccountTypeAPIKey || a.Type == AccountTypeUpstream) {
+			if baseURL := strings.TrimRight(strings.TrimSpace(a.GetCredential("base_url")), "/"); baseURL != "" {
+				return baseURL
 			}
 		}
 		// 平台默认 base_url：CN 供应商按 account_mode 选择 payg / coding 默认值。
@@ -1554,6 +1559,11 @@ func (a *Account) GetCNProtocolBaseURL(protocol string) string {
 			if baseURL := strings.TrimSpace(a.GetCredential("base_url")); baseURL != "" {
 				return baseURL
 			}
+		}
+	}
+	if !a.IsAdaptiveAPIProtocol() && !a.IsKimi() && (a.Type == AccountTypeAPIKey || a.Type == AccountTypeUpstream) {
+		if baseURL := strings.TrimRight(strings.TrimSpace(a.GetCredential("base_url")), "/"); baseURL != "" {
+			return baseURL
 		}
 	}
 	return a.defaultCNProtocolBaseURL(protocol)
