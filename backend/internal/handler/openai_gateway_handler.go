@@ -2889,6 +2889,13 @@ func (h *OpenAIGatewayHandler) handleFailoverExhausted(c *gin.Context, failoverE
 		statusCode = http.StatusBadGateway
 	}
 	responseBody := failoverErr.ResponseBody
+	// Preserve provider-specific transport status for NVIDIA before the first
+	// Responses business event; generic OpenAI failover mapping stays unchanged.
+	if !streamStarted && service.IsOpenAINvidiaResponsesStreamBeforeBusinessOutput(c) && statusCode >= 500 {
+		service.SetOpsUpstreamError(c, statusCode, "Upstream request failed", "")
+		h.handleStreamingAwareError(c, statusCode, "upstream_error", "Upstream request failed", false)
+		return
+	}
 	if service.IsOpenAISilentRefusalErrorBody(responseBody) {
 		service.SetOpsUpstreamError(c, statusCode, service.OpenAISilentRefusalClientMessage(), "")
 		h.handleStreamingAwareError(c, http.StatusBadGateway, "upstream_error", service.OpenAISilentRefusalClientMessage(), streamStarted)
