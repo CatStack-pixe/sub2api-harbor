@@ -7,7 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/Wei-Shaw/sub2api/internal/pkg/claude"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/antigravity"
 	middleware2 "github.com/Wei-Shaw/sub2api/internal/server/middleware"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/gin-gonic/gin"
@@ -762,16 +762,12 @@ func TestGatewayModels_CompositeUnmappedCNAccountsContributeNoDefaults(t *testin
 	require.NotContains(t, ids, "claude-sonnet-4-6")
 }
 
-// 独立 CN 分组沿用 default 分支的 Claude 默认列表（Claude Code 客户端请求的
-// 就是这些模型名并经账号 model_mapping 转换），composite 支持不得改变该回退。
-func TestDefaultModelIDsForPlatform_CNProvidersKeepClaudeDefaults(t *testing.T) {
-	want := make([]string, 0, len(claude.DefaultModels))
-	for _, model := range claude.DefaultModels {
-		want = append(want, model.ID)
-	}
-	for _, platform := range []string{service.PlatformKimi, service.PlatformZhipu, service.PlatformDeepseek} {
-		require.Equal(t, want, defaultModelIDsForPlatform(platform), "platform=%s", platform)
-	}
+// Fork providers keep their own static defaults so model discovery remains
+// useful before a live provider catalog has been synchronized.
+func TestDefaultModelIDsForPlatform_CNProvidersKeepProviderDefaults(t *testing.T) {
+	require.Equal(t, service.KimiDefaultModelIDs(), defaultModelIDsForPlatform(service.PlatformKimi))
+	require.Empty(t, defaultModelIDsForPlatform(service.PlatformZhipu))
+	require.Equal(t, service.DeepSeekDefaultModelIDs(), defaultModelIDsForPlatform(service.PlatformDeepseek))
 }
 
 func TestDefaultCodexModelIDsForPlatform_DeepSeekUsesDeepSeekModels(t *testing.T) {

@@ -98,6 +98,10 @@ const (
 	FieldLongContextPricingEnabled = "long_context_pricing_enabled"
 	// FieldModelPricing holds the string denoting the model_pricing field in the database.
 	FieldModelPricing = "model_pricing"
+	// FieldGlobalPromptEnabled holds the string denoting the global_prompt_enabled field in the database.
+	FieldGlobalPromptEnabled = "global_prompt_enabled"
+	// FieldGlobalPrompt holds the string denoting the global_prompt field in the database.
+	FieldGlobalPrompt = "global_prompt"
 	// FieldClaudeCodeOnly holds the string denoting the claude_code_only field in the database.
 	FieldClaudeCodeOnly = "claude_code_only"
 	// FieldFallbackGroupID holds the string denoting the fallback_group_id field in the database.
@@ -256,6 +260,8 @@ var Columns = []string{
 	FieldAudioSttPricePerHour,
 	FieldLongContextPricingEnabled,
 	FieldModelPricing,
+	FieldGlobalPromptEnabled,
+	FieldGlobalPrompt,
 	FieldClaudeCodeOnly,
 	FieldFallbackGroupID,
 	FieldFallbackGroupIDOnInvalidRequest,
@@ -372,6 +378,12 @@ var (
 	AudioSttPricePerHourValidator func(float64) error
 	// DefaultLongContextPricingEnabled holds the default value on creation for the "long_context_pricing_enabled" field.
 	DefaultLongContextPricingEnabled bool
+	// DefaultGlobalPromptEnabled holds the default value on creation for the "global_prompt_enabled" field.
+	DefaultGlobalPromptEnabled bool
+	// DefaultGlobalPrompt holds the default value on creation for the "global_prompt" field.
+	DefaultGlobalPrompt string
+	// GlobalPromptValidator is a validator for the "global_prompt" field. It is called by the builders before save.
+	GlobalPromptValidator func(string) error
 	// DefaultClaudeCodeOnly holds the default value on creation for the "claude_code_only" field.
 	DefaultClaudeCodeOnly bool
 	// DefaultModelRoutingEnabled holds the default value on creation for the "model_routing_enabled" field.
@@ -615,6 +627,16 @@ func ByAudioSttPricePerHour(opts ...sql.OrderTermOption) OrderOption {
 // ByLongContextPricingEnabled orders the results by the long_context_pricing_enabled field.
 func ByLongContextPricingEnabled(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldLongContextPricingEnabled, opts...).ToFunc()
+}
+
+// ByGlobalPromptEnabled orders the results by the global_prompt_enabled field.
+func ByGlobalPromptEnabled(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldGlobalPromptEnabled, opts...).ToFunc()
+}
+
+// ByGlobalPrompt orders the results by the global_prompt field.
+func ByGlobalPrompt(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldGlobalPrompt, opts...).ToFunc()
 }
 
 // ByClaudeCodeOnly orders the results by the claude_code_only field.

@@ -136,7 +136,7 @@ func TestProxyOpenAIWSHTTPBridgeTurn_UpstreamDefaultWinsOverFastAlias(t *testing
 		"local observer's upstream-echoed default must win over the fast alias")
 }
 
-func TestProxyOpenAIWSHTTPBridgeTurnAPIKeyAdaptsClientTools(t *testing.T) {
+func TestProxyOpenAIWSHTTPBridgeTurnAPIKeyAdaptsClientToolsLegacy(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	sse := strings.Join([]string{
@@ -211,7 +211,7 @@ func TestProxyOpenAIWSHTTPBridgeTurnAPIKeyAdaptsClientTools(t *testing.T) {
 	require.Equal(t, "pwd", gjson.GetBytes(result.wsReplayInput[0], "input").String())
 }
 
-func TestProxyOpenAIWSHTTPBridgeTurnAPIKeyRestoresClientToolsInResponseDone(t *testing.T) {
+func TestProxyOpenAIWSHTTPBridgeTurnAPIKeyRestoresClientToolsInResponseDoneLegacy(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	sse := strings.Join([]string{
@@ -265,7 +265,7 @@ func TestProxyOpenAIWSHTTPBridgeTurnAPIKeyRestoresClientToolsInResponseDone(t *t
 	require.Equal(t, "custom_tool_call", gjson.GetBytes(result.wsReplayInput[0], "type").String())
 }
 
-func TestProxyOpenAIWSHTTPBridgeTurnGrokPromotesDiscoveryAndRestoresNamespaceSSE(t *testing.T) {
+func TestProxyOpenAIWSHTTPBridgeTurnGrokPromotesDiscoveryAndRestoresNamespaceSSELegacy(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	sse := strings.Join([]string{
@@ -334,7 +334,7 @@ func TestProxyOpenAIWSHTTPBridgeTurnGrokPromotesDiscoveryAndRestoresNamespaceSSE
 	require.Equal(t, "multi_agent_v1", gjson.GetBytes(events[3], "response.output.0.namespace").String())
 }
 
-func TestProxyOpenAIWSHTTPBridgeTurnGrokInheritsToolSearchAndPromotesFollowupDiscovery(t *testing.T) {
+func TestProxyOpenAIWSHTTPBridgeTurnGrokInheritsToolSearchAndPromotesFollowupDiscoveryLegacy(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	firstSSE := "data: {\"type\":\"response.completed\",\"response\":{\"id\":\"resp_first\",\"output\":[],\"usage\":{\"input_tokens\":1,\"output_tokens\":1}}}\n\n"
@@ -390,7 +390,7 @@ func TestProxyOpenAIWSHTTPBridgeTurnGrokInheritsToolSearchAndPromotesFollowupDis
 	require.Equal(t, "multi_agent_v1", gjson.GetBytes(events[0], "response.output.0.namespace").String())
 }
 
-func TestOpenAIWSHTTPBridgeAPIKeyReusesClientToolMappingWhenFollowupOmitsTools(t *testing.T) {
+func TestOpenAIWSHTTPBridgeAPIKeyReusesClientToolMappingWhenFollowupOmitsToolsLegacy(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	firstSSEBody := strings.Join([]string{

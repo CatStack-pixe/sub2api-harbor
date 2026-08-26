@@ -1633,6 +1633,15 @@ func isTokenCountRequestPath(path string) bool {
 	return strings.Contains(path, "/count_tokens") || strings.Contains(path, "/responses/input_tokens")
 }
 
+func applyOpsSessionID(c *gin.Context, entry *service.OpsInsertErrorLogInput) {
+	if c == nil || entry == nil {
+		return
+	}
+	if sessionID := service.ExtractClientSessionID(c); sessionID != "" {
+		entry.SessionID = &sessionID
+	}
+}
+
 func applyOpsLatencyFieldsFromContext(c *gin.Context, entry *service.OpsInsertErrorLogInput) {
 	if c == nil || entry == nil {
 		return

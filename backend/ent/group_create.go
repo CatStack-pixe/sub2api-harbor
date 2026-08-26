@@ -580,6 +580,34 @@ func (_c *GroupCreate) SetModelPricing(v jsontext.Value) *GroupCreate {
 	return _c
 }
 
+// SetGlobalPromptEnabled sets the "global_prompt_enabled" field.
+func (_c *GroupCreate) SetGlobalPromptEnabled(v bool) *GroupCreate {
+	_c.mutation.SetGlobalPromptEnabled(v)
+	return _c
+}
+
+// SetNillableGlobalPromptEnabled sets the "global_prompt_enabled" field if the given value is not nil.
+func (_c *GroupCreate) SetNillableGlobalPromptEnabled(v *bool) *GroupCreate {
+	if v != nil {
+		_c.SetGlobalPromptEnabled(*v)
+	}
+	return _c
+}
+
+// SetGlobalPrompt sets the "global_prompt" field.
+func (_c *GroupCreate) SetGlobalPrompt(v string) *GroupCreate {
+	_c.mutation.SetGlobalPrompt(v)
+	return _c
+}
+
+// SetNillableGlobalPrompt sets the "global_prompt" field if the given value is not nil.
+func (_c *GroupCreate) SetNillableGlobalPrompt(v *string) *GroupCreate {
+	if v != nil {
+		_c.SetGlobalPrompt(*v)
+	}
+	return _c
+}
+
 // SetClaudeCodeOnly sets the "claude_code_only" field.
 func (_c *GroupCreate) SetClaudeCodeOnly(v bool) *GroupCreate {
 	_c.mutation.SetClaudeCodeOnly(v)
@@ -1067,6 +1095,14 @@ func (_c *GroupCreate) defaults() error {
 		v := group.DefaultLongContextPricingEnabled
 		_c.mutation.SetLongContextPricingEnabled(v)
 	}
+	if _, ok := _c.mutation.GlobalPromptEnabled(); !ok {
+		v := group.DefaultGlobalPromptEnabled
+		_c.mutation.SetGlobalPromptEnabled(v)
+	}
+	if _, ok := _c.mutation.GlobalPrompt(); !ok {
+		v := group.DefaultGlobalPrompt
+		_c.mutation.SetGlobalPrompt(v)
+	}
 	if _, ok := _c.mutation.ClaudeCodeOnly(); !ok {
 		v := group.DefaultClaudeCodeOnly
 		_c.mutation.SetClaudeCodeOnly(v)
@@ -1264,6 +1300,17 @@ func (_c *GroupCreate) check() error {
 	}
 	if _, ok := _c.mutation.LongContextPricingEnabled(); !ok {
 		return &ValidationError{Name: "long_context_pricing_enabled", err: errors.New(`ent: missing required field "Group.long_context_pricing_enabled"`)}
+	}
+	if _, ok := _c.mutation.GlobalPromptEnabled(); !ok {
+		return &ValidationError{Name: "global_prompt_enabled", err: errors.New(`ent: missing required field "Group.global_prompt_enabled"`)}
+	}
+	if _, ok := _c.mutation.GlobalPrompt(); !ok {
+		return &ValidationError{Name: "global_prompt", err: errors.New(`ent: missing required field "Group.global_prompt"`)}
+	}
+	if v, ok := _c.mutation.GlobalPrompt(); ok {
+		if err := group.GlobalPromptValidator(v); err != nil {
+			return &ValidationError{Name: "global_prompt", err: fmt.Errorf(`ent: validator failed for field "Group.global_prompt": %w`, err)}
+		}
 	}
 	if _, ok := _c.mutation.ClaudeCodeOnly(); !ok {
 		return &ValidationError{Name: "claude_code_only", err: errors.New(`ent: missing required field "Group.claude_code_only"`)}
@@ -1519,6 +1566,14 @@ func (_c *GroupCreate) createSpec() (*Group, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.ModelPricing(); ok {
 		_spec.SetField(group.FieldModelPricing, field.TypeJSON, value)
 		_node.ModelPricing = value
+	}
+	if value, ok := _c.mutation.GlobalPromptEnabled(); ok {
+		_spec.SetField(group.FieldGlobalPromptEnabled, field.TypeBool, value)
+		_node.GlobalPromptEnabled = value
+	}
+	if value, ok := _c.mutation.GlobalPrompt(); ok {
+		_spec.SetField(group.FieldGlobalPrompt, field.TypeString, value)
+		_node.GlobalPrompt = value
 	}
 	if value, ok := _c.mutation.ClaudeCodeOnly(); ok {
 		_spec.SetField(group.FieldClaudeCodeOnly, field.TypeBool, value)
@@ -2459,6 +2514,30 @@ func (u *GroupUpsert) UpdateModelPricing() *GroupUpsert {
 // ClearModelPricing clears the value of the "model_pricing" field.
 func (u *GroupUpsert) ClearModelPricing() *GroupUpsert {
 	u.SetNull(group.FieldModelPricing)
+	return u
+}
+
+// SetGlobalPromptEnabled sets the "global_prompt_enabled" field.
+func (u *GroupUpsert) SetGlobalPromptEnabled(v bool) *GroupUpsert {
+	u.Set(group.FieldGlobalPromptEnabled, v)
+	return u
+}
+
+// UpdateGlobalPromptEnabled sets the "global_prompt_enabled" field to the value that was provided on create.
+func (u *GroupUpsert) UpdateGlobalPromptEnabled() *GroupUpsert {
+	u.SetExcluded(group.FieldGlobalPromptEnabled)
+	return u
+}
+
+// SetGlobalPrompt sets the "global_prompt" field.
+func (u *GroupUpsert) SetGlobalPrompt(v string) *GroupUpsert {
+	u.Set(group.FieldGlobalPrompt, v)
+	return u
+}
+
+// UpdateGlobalPrompt sets the "global_prompt" field to the value that was provided on create.
+func (u *GroupUpsert) UpdateGlobalPrompt() *GroupUpsert {
+	u.SetExcluded(group.FieldGlobalPrompt)
 	return u
 }
 
@@ -3632,6 +3711,34 @@ func (u *GroupUpsertOne) UpdateModelPricing() *GroupUpsertOne {
 func (u *GroupUpsertOne) ClearModelPricing() *GroupUpsertOne {
 	return u.Update(func(s *GroupUpsert) {
 		s.ClearModelPricing()
+	})
+}
+
+// SetGlobalPromptEnabled sets the "global_prompt_enabled" field.
+func (u *GroupUpsertOne) SetGlobalPromptEnabled(v bool) *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.SetGlobalPromptEnabled(v)
+	})
+}
+
+// UpdateGlobalPromptEnabled sets the "global_prompt_enabled" field to the value that was provided on create.
+func (u *GroupUpsertOne) UpdateGlobalPromptEnabled() *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.UpdateGlobalPromptEnabled()
+	})
+}
+
+// SetGlobalPrompt sets the "global_prompt" field.
+func (u *GroupUpsertOne) SetGlobalPrompt(v string) *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.SetGlobalPrompt(v)
+	})
+}
+
+// UpdateGlobalPrompt sets the "global_prompt" field to the value that was provided on create.
+func (u *GroupUpsertOne) UpdateGlobalPrompt() *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.UpdateGlobalPrompt()
 	})
 }
 
@@ -5022,6 +5129,34 @@ func (u *GroupUpsertBulk) UpdateModelPricing() *GroupUpsertBulk {
 func (u *GroupUpsertBulk) ClearModelPricing() *GroupUpsertBulk {
 	return u.Update(func(s *GroupUpsert) {
 		s.ClearModelPricing()
+	})
+}
+
+// SetGlobalPromptEnabled sets the "global_prompt_enabled" field.
+func (u *GroupUpsertBulk) SetGlobalPromptEnabled(v bool) *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.SetGlobalPromptEnabled(v)
+	})
+}
+
+// UpdateGlobalPromptEnabled sets the "global_prompt_enabled" field to the value that was provided on create.
+func (u *GroupUpsertBulk) UpdateGlobalPromptEnabled() *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.UpdateGlobalPromptEnabled()
+	})
+}
+
+// SetGlobalPrompt sets the "global_prompt" field.
+func (u *GroupUpsertBulk) SetGlobalPrompt(v string) *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.SetGlobalPrompt(v)
+	})
+}
+
+// UpdateGlobalPrompt sets the "global_prompt" field to the value that was provided on create.
+func (u *GroupUpsertBulk) UpdateGlobalPrompt() *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.UpdateGlobalPrompt()
 	})
 }
 

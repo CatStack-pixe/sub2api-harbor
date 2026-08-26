@@ -1053,6 +1053,23 @@ func upstreamBillingProbeEnabled(account *Account) bool {
 	return ok && enabled
 }
 
+// tokenRhythmBalanceProbeAllowsScheduling is deliberately opt-in. Existing
+// TokenRhythm accounts keep their current behavior until the administrator
+// enables the upstream billing probe for them. Once enabled, a missing,
+// failed, stale, or zero-available-balance snapshot removes the account from
+// request scheduling until the next successful probe.
+func tokenRhythmBalanceProbeAllowsScheduling(account *Account, now time.Time) bool {
+	if account == nil || !account.IsTokenRhythm() || !upstreamBillingProbeEnabled(account) {
+		return true
+	}
+	snapshot := decodeUpstreamBillingProbeSnapshot(account.Extra)
+	if snapshot == nil || snapshot.Status != UpstreamBillingProbeStatusOK || snapshot.FreshUntil == nil || !snapshot.FreshUntil.After(now) {
+		return false
+	}
+	available, ok := resolveAccountExtraNumber(snapshot.Data, "available_balance_cny")
+	return ok && available > 0
+}
+
 // upstreamBillingRateSyncEnabled is the probe-side pre-filter deciding whether
 // a rate is even proposed for write-back. It is a necessary condition, not the
 // authority: the repository CAS re-checks both switches against the row it

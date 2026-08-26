@@ -78,6 +78,8 @@ type APIKeyUpdateFields struct {
 	RateLimitUsage bool
 	// IPRules 覆盖 ip_whitelist 与 ip_blacklist。
 	IPRules bool
+	// ModelWhitelist 覆盖 API Key 可请求的模型列表。
+	ModelWhitelist bool
 }
 
 // IsEmpty 报告该次 Update 是否不写任何列。
@@ -841,13 +843,6 @@ func (s *APIKeyService) Update(ctx context.Context, id int64, userID int64, req 
 	// 所以用原始值比对来决定是否写 status，而不是只看 req.Status。
 	originalStatus := apiKey.Status
 
-	// fields 只登记本次请求真正要改的列。quota_used 与 usage_5h/1d/7d 由计费热路径
-	// 原子递增，除非用户显式点了"重置"，否则这里不用快照把它们写回去。
-	var fields APIKeyUpdateFields
-	// 下面若干分支会顺带把 Status 改回 active（配额扩容、清除过期等），
-	// 所以用原始值比对来决定是否写 status，而不是只看 req.Status。
-	originalStatus := apiKey.Status
-
 	// 更新字段
 	if req.Name != nil {
 		apiKey.Name = html.EscapeString(*req.Name)
@@ -924,6 +919,10 @@ func (s *APIKeyService) Update(ctx context.Context, id int64, userID int64, req 
 	if req.IPBlacklist != nil {
 		apiKey.IPBlacklist = *req.IPBlacklist
 		fields.IPRules = true
+	}
+	if req.ModelWhitelist != nil {
+		apiKey.ModelWhitelist = normalizedModelWhitelist
+		fields.ModelWhitelist = true
 	}
 
 	// Update rate limit configuration

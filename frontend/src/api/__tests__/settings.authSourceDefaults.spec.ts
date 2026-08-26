@@ -24,6 +24,10 @@ const allNullQuotas: DefaultPlatformQuotasMap = {
   tokenrhythm: { daily: null, weekly: null, monthly: null },
   chatanywhere: { daily: null, weekly: null, monthly: null },
   glm: { daily: null, weekly: null, monthly: null },
+  modelscope: { daily: null, weekly: null, monthly: null },
+  dashscope: { daily: null, weekly: null, monthly: null },
+  minimax: { daily: null, weekly: null, monthly: null },
+  volcengine: { daily: null, weekly: null, monthly: null },
 }
 
 describe("admin settings auth source defaults helpers", () => {
@@ -259,7 +263,7 @@ describe("normalizePlatformQuotasMap", () => {
 
   it("无参数时返回全平台全 null", () => {
     const result = normalizePlatformQuotasMap();
-    expect(Object.keys(result)).toHaveLength(13);
+    expect(Object.keys(result)).toHaveLength(17);
     for (const v of Object.values(result)) {
       expect(v).toEqual({ daily: null, weekly: null, monthly: null });
     }
@@ -307,7 +311,7 @@ describe("sanitizePlatformQuotasMap", () => {
 
   it("缺失平台填充为全 null", () => {
     const result = sanitizePlatformQuotasMap({});
-    expect(Object.keys(result)).toHaveLength(13);
+    expect(Object.keys(result)).toHaveLength(17);
     for (const v of Object.values(result)) {
       expect(v).toEqual({ daily: null, weekly: null, monthly: null });
     }

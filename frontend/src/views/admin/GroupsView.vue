@@ -1564,8 +1564,23 @@
             <span><span class="block text-sm text-gray-700 dark:text-gray-300">{{ t("admin.groups.modelPricing.longContext") }}</span><span class="block text-xs text-gray-500">{{ t("admin.groups.modelPricing.longContextHint") }}</span></span>
           </label>
           <div class="mt-3 space-y-2">
-            <PricingEntryCard v-for="(entry, index) in createForm.model_pricing" :key="index" :entry="entry" :platform="createForm.platform" hide-token-intervals @update="createForm.model_pricing[index] = $event" @remove="createForm.model_pricing.splice(index, 1)" />
+             <PricingEntryCard v-for="(entry, index) in createForm.model_pricing" :key="index" :entry="entry" :platform="createForm.platform" hide-token-intervals hide-time-windows @update="createForm.model_pricing[index] = $event" @remove="createForm.model_pricing.splice(index, 1)" />
           </div>
+        </div>
+
+        <div class="border-t border-gray-200 pt-4 mt-4 dark:border-dark-400">
+          <div class="flex items-start justify-between gap-4">
+            <div>
+              <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t("admin.groups.globalPrompt.title") }}</h4>
+              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t("admin.groups.globalPrompt.hint") }}</p>
+            </div>
+            <label class="flex shrink-0 items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+              <input v-model="createForm.global_prompt_enabled" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
+              {{ createForm.global_prompt_enabled ? t("admin.groups.globalPrompt.enabled") : t("admin.groups.globalPrompt.disabled") }}
+            </label>
+          </div>
+          <textarea v-model="createForm.global_prompt" :disabled="!createForm.global_prompt_enabled" rows="5" class="input mt-3" :placeholder="t('admin.groups.globalPrompt.placeholder')"></textarea>
+          <p class="mt-1 text-right text-xs text-gray-500 dark:text-gray-400">{{ groupGlobalPromptByteLength(createForm.global_prompt) }} / {{ groupGlobalPromptMaxBytes }}</p>
         </div>
 
         <!-- Grok Voice 显式定价（仅 grok 平台） -->
@@ -3341,8 +3356,23 @@
             <span><span class="block text-sm text-gray-700 dark:text-gray-300">{{ t("admin.groups.modelPricing.longContext") }}</span><span class="block text-xs text-gray-500">{{ t("admin.groups.modelPricing.longContextHint") }}</span></span>
           </label>
           <div class="mt-3 space-y-2">
-            <PricingEntryCard v-for="(entry, index) in editForm.model_pricing" :key="index" :entry="entry" :platform="editForm.platform" hide-token-intervals @update="editForm.model_pricing[index] = $event" @remove="editForm.model_pricing.splice(index, 1)" />
+             <PricingEntryCard v-for="(entry, index) in editForm.model_pricing" :key="index" :entry="entry" :platform="editForm.platform" hide-token-intervals hide-time-windows @update="editForm.model_pricing[index] = $event" @remove="editForm.model_pricing.splice(index, 1)" />
           </div>
+        </div>
+
+        <div class="border-t border-gray-200 pt-4 mt-4 dark:border-dark-400">
+          <div class="flex items-start justify-between gap-4">
+            <div>
+              <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t("admin.groups.globalPrompt.title") }}</h4>
+              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t("admin.groups.globalPrompt.hint") }}</p>
+            </div>
+            <label class="flex shrink-0 items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+              <input v-model="editForm.global_prompt_enabled" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
+              {{ editForm.global_prompt_enabled ? t("admin.groups.globalPrompt.enabled") : t("admin.groups.globalPrompt.disabled") }}
+            </label>
+          </div>
+          <textarea v-model="editForm.global_prompt" :disabled="!editForm.global_prompt_enabled" rows="5" class="input mt-3" :placeholder="t('admin.groups.globalPrompt.placeholder')"></textarea>
+          <p class="mt-1 text-right text-xs text-gray-500 dark:text-gray-400">{{ groupGlobalPromptByteLength(editForm.global_prompt) }} / {{ groupGlobalPromptMaxBytes }}</p>
         </div>
 
         <!-- Grok Voice 显式定价（仅 grok 平台） -->
@@ -4631,6 +4661,7 @@ const emptyGroupPricing = (): PricingFormEntry => ({
   image_output_price: null,
   per_request_price: null,
   intervals: [],
+  time_windows: [],
   time_pricing: createDefaultTimePricingForm(),
 });
 
@@ -4651,6 +4682,7 @@ const groupPricingFromAPI = (
     image_output_price: perTokenToMTok(entry.image_output_price),
     per_request_price: entry.per_request_price,
     intervals: apiIntervalsToForm(entry.intervals || []),
+    time_windows: [],
     time_pricing: createDefaultTimePricingForm(),
   }));
 
@@ -4675,6 +4707,7 @@ const groupPricingToAPI = (
         entry.billing_mode === "token"
           ? []
           : formIntervalsToAPI(entry.intervals || []),
+      time_windows: [],
       time_pricing: null,
     }));
 
@@ -5152,6 +5185,8 @@ const createForm = reactive({
   monthly_limit_usd: null as number | null,
   long_context_pricing_enabled: true,
   model_pricing: [] as PricingFormEntry[],
+  global_prompt_enabled: false,
+  global_prompt: "",
   // 图片生成计费配置
   allow_image_generation: false,
   allow_batch_image_generation: false,
@@ -5515,6 +5550,8 @@ const editForm = reactive({
   monthly_limit_usd: null as number | null,
   long_context_pricing_enabled: true,
   model_pricing: [] as PricingFormEntry[],
+  global_prompt_enabled: false,
+  global_prompt: "",
   // 图片生成计费配置
   allow_image_generation: false,
   allow_batch_image_generation: false,
@@ -5989,6 +6026,8 @@ const closeCreateModal = () => {
   createForm.video_model_prices = createVideoModelPricesForm();
   createForm.long_context_pricing_enabled = true;
   createForm.model_pricing = [];
+  createForm.global_prompt_enabled = false;
+  createForm.global_prompt = "";
   createForm.web_search_price_per_call = null;
   createForm.search_price_per_1k = null;
   createForm.audio_realtime_price_per_min = null;
@@ -6074,6 +6113,10 @@ const handleCreateGroup = async () => {
     return;
   }
   if (!validateProfitControlForm(createForm)) {
+    return;
+  }
+  if (groupGlobalPromptByteLength(createForm.global_prompt) > groupGlobalPromptMaxBytes) {
+    appStore.showError(t("admin.groups.globalPrompt.tooLong", { max: groupGlobalPromptMaxBytes.toLocaleString() }));
     return;
   }
   submitting.value = true;
@@ -6217,6 +6260,8 @@ const handleEdit = async (group: AdminGroup) => {
   editForm.long_context_pricing_enabled =
     group.long_context_pricing_enabled ?? true;
   editForm.model_pricing = groupPricingFromAPI(group.model_pricing);
+  editForm.global_prompt_enabled = group.global_prompt_enabled ?? false;
+  editForm.global_prompt = group.global_prompt ?? "";
   editForm.allow_image_generation = group.allow_image_generation ?? false;
   editForm.allow_batch_image_generation =
     group.allow_batch_image_generation ?? false;
@@ -6323,6 +6368,8 @@ const closeEditModal = () => {
   editForm.video_model_prices = createVideoModelPricesForm();
   editForm.long_context_pricing_enabled = true;
   editForm.model_pricing = [];
+  editForm.global_prompt_enabled = false;
+  editForm.global_prompt = "";
   editForm.web_search_price_per_call = null;
   editForm.search_price_per_1k = null;
   editForm.audio_realtime_price_per_min = null;
@@ -6347,6 +6394,10 @@ const handleUpdateGroup = async () => {
     return;
   }
   if (!validateProfitControlForm(editForm)) {
+    return;
+  }
+  if (groupGlobalPromptByteLength(editForm.global_prompt) > groupGlobalPromptMaxBytes) {
+    appStore.showError(t("admin.groups.globalPrompt.tooLong", { max: groupGlobalPromptMaxBytes.toLocaleString() }));
     return;
   }
 

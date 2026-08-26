@@ -116,6 +116,7 @@ func (h *OpenAIGatewayHandler) AlphaSearch(c *gin.Context) {
 	sameAccountRetryCount := make(map[int64]int)
 	var lastFailoverErr *service.UpstreamFailoverError
 	switchCount := 0
+	var oauth429FailoverState service.OpenAIOAuth429FailoverState
 	routingStart := time.Now()
 
 	// 分组利润控制：alpha search 文本入口请求级装门并固定 pricingAt
@@ -243,7 +244,7 @@ func (h *OpenAIGatewayHandler) AlphaSearch(c *gin.Context) {
 			return
 		}
 		switchCount++
-		if h.gatewayService.ShouldStopOpenAIOAuth429Failover(account, failoverErr.StatusCode, switchCount) {
+		if h.gatewayService.ShouldStopOpenAIOAuth429Failover(account, failoverErr.StatusCode, switchCount, &oauth429FailoverState) {
 			h.handleFailoverExhausted(c, failoverErr, false)
 			return
 		}

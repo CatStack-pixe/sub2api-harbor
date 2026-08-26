@@ -15,6 +15,10 @@ import (
 // openAIResponsesSSEKeepaliveKey 存放 Responses 请求的下游 SSE 预输出心跳器。
 const openAIResponsesSSEKeepaliveKey = "openai_responses_sse_keepalive"
 
+// Keep the historical compact key available while both paths share the
+// Responses keepalive implementation.
+const openAICompactSSEKeepaliveKey = openAIResponsesSSEKeepaliveKey
+
 const (
 	openAINvidiaResponsesStreamKey         = "openai_nvidia_responses_stream"
 	openAINvidiaResponsesBusinessOutputKey = "openai_nvidia_responses_business_output"

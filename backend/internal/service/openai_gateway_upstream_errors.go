@@ -193,19 +193,6 @@ func isOpenAIRequestScopedCapacityShed(upstreamMsg string, upstreamBody []byte) 
 		(!gjson.ValidBytes(upstreamBody) && isOpenAICapacityShedMessage(string(upstreamBody)))
 }
 
-func isOpenAICapacityShedMessage(text string) bool {
-	lower := strings.ToLower(strings.TrimSpace(text))
-	return strings.Contains(lower, "server is overloaded") ||
-		strings.Contains(lower, "servers are overloaded") ||
-		strings.Contains(lower, "servers are currently overloaded")
-}
-
-func isOpenAIRequestScopedCapacityShed(upstreamMsg string, upstreamBody []byte) bool {
-	return isOpenAIUpstreamCapacityShedEvent(upstreamBody) ||
-		isOpenAICapacityShedMessage(upstreamMsg) ||
-		isOpenAICapacityShedMessage(string(upstreamBody))
-}
-
 func isOpenAIContextWindowError(upstreamMsg string, upstreamBody []byte) bool {
 	match := func(text string) bool {
 		lower := strings.ToLower(strings.TrimSpace(text))

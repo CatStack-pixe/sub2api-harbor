@@ -185,6 +185,7 @@ func (h *OpenAIGatewayHandler) handleGrokMedia(c *gin.Context, endpoint service.
 	failedAccountIDs := make(map[int64]struct{})
 	sameAccountRetryCount := make(map[int64]int)
 	var lastFailoverErr *service.UpstreamFailoverError
+	var oauth429FailoverState service.OpenAIOAuth429FailoverState
 	mediaEligibilityRejected := false
 	switchCount := 0
 	videoCreateStartedAt := ""
@@ -387,7 +388,7 @@ func (h *OpenAIGatewayHandler) handleGrokMedia(c *gin.Context, endpoint service.
 					return
 				}
 				switchCount++
-				if h.gatewayService.ShouldStopOpenAIOAuth429Failover(account, failoverErr.StatusCode, switchCount) {
+				if h.gatewayService.ShouldStopOpenAIOAuth429Failover(account, failoverErr.StatusCode, switchCount, &oauth429FailoverState) {
 					h.handleFailoverExhausted(c, failoverErr, false)
 					return
 				}

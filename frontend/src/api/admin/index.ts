@@ -36,6 +36,7 @@ import affiliatesAPI from './affiliates'
 import riskControlAPI from './riskControl'
 import adminComplianceAPI from './compliance'
 import auditAPI from './audit'
+import heartbeatAPI from './heartbeat'
 import pluginsAPI from './plugins'
 
 /**
@@ -75,6 +76,7 @@ export const adminAPI = {
   riskControl: riskControlAPI,
   compliance: adminComplianceAPI,
   audit: auditAPI,
+  heartbeat: heartbeatAPI,
   plugins: pluginsAPI
 }
 
@@ -112,6 +114,7 @@ export {
   riskControlAPI,
   adminComplianceAPI,
   auditAPI,
+  heartbeatAPI,
   pluginsAPI
 }
 
@@ -130,3 +133,12 @@ export type {
   PluginUISession,
   PluginTestResult
 } from './plugins'
+export type {
+  HeartbeatConfig,
+  HeartbeatConfigUpdate,
+  HeartbeatGroupOption,
+  HeartbeatOptions,
+  HeartbeatProxyGroupOption,
+  HeartbeatStatus,
+  HeartbeatTarget
+} from './heartbeat'

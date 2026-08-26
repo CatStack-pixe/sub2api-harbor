@@ -223,6 +223,25 @@ const moonshotModels = [
   'kimi-k2'
 ]
 
+// TokenRhythm's known channel models are DeepSeek V4. Keep them available
+// when the provider model-list endpoint is unavailable.
+const tokenRhythmModels = [
+  'deepseek-v4-pro', 'deepseek-v4-flash'
+]
+
+// ChatAnywhere exposes a mixed OpenAI/Anthropic catalog; these IDs provide a
+// useful initial whitelist while account model sync can add newer IDs.
+const chatAnywhereModels = [
+  'gpt-5.5', 'gpt-5.1', 'gpt-4.1', 'claude-sonnet-4-5', 'deepseek-v3-2'
+]
+
+// GLM official Z.AI models. Account sync can extend this list from /models.
+const glmModels = [
+  'glm-5.2', 'glm-5.1', 'glm-5', 'glm-5-turbo',
+  'glm-4.7', 'glm-4.7-flash', 'glm-4.6', 'glm-4.5', 'glm-4.5-air',
+  'glm-4.5-flash', 'glm-4.1v-thinking-flashx', 'glm-4.1v-thinking-flash'
+]
+
 // 字节跳动 豆包
 const doubaoModels = [
   'doubao-pro-256k', 'doubao-pro-128k', 'doubao-pro-32k', 'doubao-pro-4k',
@@ -489,6 +508,9 @@ export function getModelsByPlatform(platform: string): string[] {
     case 'xai':
     case 'grok': return xaiModels
     case 'agnes': return agnesModels
+    case 'tokenrhythm': return tokenRhythmModels
+    case 'chatanywhere': return chatAnywhereModels
+    case 'glm': return glmModels
     case 'cohere': return cohereModels
     case 'yi': return yiModels
     case 'moonshot':

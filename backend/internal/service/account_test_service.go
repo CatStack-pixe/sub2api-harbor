@@ -302,13 +302,30 @@ func (s *AccountTestService) TestAccountConnection(c *gin.Context, accountID int
 		case APIProtocolResponses:
 			return s.testOpenAIAccountConnection(c, account, modelID, prompt, normalizeAccountTestMode(mode))
 		case APIProtocolChatCompletions:
+			if account.IsDeepSeek() {
+				return s.testDeepSeekAccountConnection(c, account, modelID, prompt)
+			}
+			if account.IsKimi() {
+				return s.testKimiAccountConnection(c, account, modelID, prompt)
+			}
 			return s.testCNProviderChatCompletionsConnection(c, account, modelID, prompt)
 		case APIProtocolAnthropic:
 			return s.testCNProviderAnthropicConnection(c, account, modelID)
 		}
 	}
 
-	if account.IsOpenAI() {
+	if account.IsNvidia() {
+		return s.testNvidiaAccountConnection(c, account, modelID, prompt)
+	}
+	if account.IsTokenRhythm() {
+		return s.testTokenRhythmAccountConnection(c, account, modelID, prompt)
+	}
+	if account.IsChatAnywhere() {
+		return s.testChatAnywhereAccountConnection(c, account, modelID, prompt)
+	}
+
+	if account.IsOpenAI() || account.IsAgnes() || account.IsGLM() ||
+		(account.IsDeepSeek() && account.GetAPIProtocol() == APIProtocolResponses) {
 		return s.testOpenAIAccountConnection(c, account, modelID, prompt, normalizeAccountTestMode(mode))
 	}
 
@@ -346,6 +363,91 @@ func (s *AccountTestService) testCNProviderChatCompletionsConnection(c *gin.Cont
 	}
 
 	return s.testOpenAIChatCompletionsConnection(c, account, testModelID, prompt, normalizedBaseURL, authToken)
+}
+
+func (s *AccountTestService) testDeepSeekAccountConnection(c *gin.Context, account *Account, modelID string, prompt string) error {
+	testModelID := strings.TrimSpace(modelID)
+	if testModelID == "" {
+		testModelID = "deepseek-v4-flash"
+	}
+	testModelID = account.GetMappedModel(testModelID)
+	authToken := strings.TrimSpace(account.GetOpenAIApiKey())
+	if authToken == "" {
+		return s.sendErrorAndEnd(c, "No DeepSeek API key available")
+	}
+	baseURL, err := s.validateUpstreamBaseURL(account.GetOpenAIBaseURL())
+	if err != nil {
+		return s.sendErrorAndEnd(c, fmt.Sprintf("Invalid DeepSeek base URL: %s", err.Error()))
+	}
+	return s.testOpenAIChatCompletionsConnection(c, account, testModelID, prompt, baseURL, authToken)
+}
+
+func (s *AccountTestService) testNvidiaAccountConnection(c *gin.Context, account *Account, modelID string, prompt string) error {
+	testModelID := strings.TrimSpace(modelID)
+	if testModelID == "" {
+		testModelID = NvidiaDefaultModel
+	}
+	testModelID = account.GetMappedModel(testModelID)
+	authToken := strings.TrimSpace(account.GetOpenAIApiKey())
+	if authToken == "" {
+		return s.sendErrorAndEnd(c, "No NVIDIA API key available")
+	}
+	baseURL, err := s.validateUpstreamBaseURL(account.GetOpenAIBaseURL())
+	if err != nil {
+		return s.sendErrorAndEnd(c, fmt.Sprintf("Invalid NVIDIA base URL: %s", err.Error()))
+	}
+	return s.testOpenAIChatCompletionsConnection(c, account, testModelID, prompt, baseURL, authToken)
+}
+
+func (s *AccountTestService) testTokenRhythmAccountConnection(c *gin.Context, account *Account, modelID string, prompt string) error {
+	testModelID := strings.TrimSpace(modelID)
+	if testModelID == "" {
+		testModelID = "gpt-4o-mini"
+	}
+	testModelID = account.GetMappedModel(testModelID)
+	authToken := strings.TrimSpace(account.GetOpenAIApiKey())
+	if authToken == "" {
+		return s.sendErrorAndEnd(c, "No TokenRhythm API key available")
+	}
+	baseURL, err := s.validateUpstreamBaseURL(account.GetOpenAIBaseURL())
+	if err != nil {
+		return s.sendErrorAndEnd(c, fmt.Sprintf("Invalid TokenRhythm base URL: %s", err.Error()))
+	}
+	return s.testOpenAIChatCompletionsConnection(c, account, testModelID, prompt, baseURL, authToken)
+}
+
+func (s *AccountTestService) testKimiAccountConnection(c *gin.Context, account *Account, modelID string, prompt string) error {
+	testModelID := strings.TrimSpace(modelID)
+	if testModelID == "" {
+		testModelID = KimiDefaultModelIDs()[0]
+	}
+	testModelID = account.GetMappedModel(testModelID)
+	authToken := strings.TrimSpace(account.GetOpenAIApiKey())
+	if authToken == "" {
+		return s.sendErrorAndEnd(c, "No Kimi API key available")
+	}
+	baseURL, err := s.validateUpstreamBaseURL(account.GetOpenAIBaseURL())
+	if err != nil {
+		return s.sendErrorAndEnd(c, fmt.Sprintf("Invalid Kimi base URL: %s", err.Error()))
+	}
+	return s.testOpenAIChatCompletionsConnection(c, account, testModelID, prompt, baseURL, authToken)
+}
+
+func (s *AccountTestService) testChatAnywhereAccountConnection(c *gin.Context, account *Account, modelID string, prompt string) error {
+	testModelID := strings.TrimSpace(modelID)
+	if testModelID == "" {
+		testModelID = ChatAnywhereDefaultModelIDs()[0]
+	}
+	testModelID = account.GetMappedModel(testModelID)
+	authToken := strings.TrimSpace(account.GetOpenAIApiKey())
+	if authToken == "" {
+		return s.sendErrorAndEnd(c, "No ChatAnywhere API key available")
+	}
+	baseURL, err := s.validateUpstreamBaseURL(account.GetOpenAIBaseURL())
+	if err != nil {
+		return s.sendErrorAndEnd(c, fmt.Sprintf("Invalid ChatAnywhere base URL: %s", err.Error()))
+	}
+	return s.testOpenAIChatCompletionsConnection(c, account, testModelID, prompt, baseURL, authToken)
 }
 
 // testClaudeAccountConnection tests an Anthropic Claude account's connection
@@ -834,6 +936,13 @@ func (s *AccountTestService) testOpenAIAccountConnection(c *gin.Context, account
 
 	// Process SSE stream
 	return s.processOpenAIStream(c, resp.Body)
+}
+
+func defaultOpenAIAccountTestModel(account *Account) string {
+	if account != nil && account.IsGLM() {
+		return GLMDefaultModelIDs()[0]
+	}
+	return openai.DefaultTestModel
 }
 
 // testGrokAccountConnection routes Grok admin connectivity tests by explicit mode first,

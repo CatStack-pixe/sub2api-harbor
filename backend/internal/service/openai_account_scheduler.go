@@ -554,23 +554,6 @@ func (s *defaultOpenAIAccountScheduler) selectBySessionHash(
 		clearBinding()
 		return nil, false, nil
 	}
-	// Free-tier soft gate: sticky session must not pin an over-quota free OAuth account.
-	// Admin QueryQuota / import probes do not use this path.
-	if account != nil && len(s.filterGrokFreeQuotaAccounts(ctx, []Account{*account})) == 0 {
-		_ = s.service.deleteStickySessionAccountID(ctx, req.GroupID, sessionHash)
-		return nil, false, nil
-	}
-	// Team+model cool: sticky must not pin a sibling under the same team 429 window.
-	now := time.Now()
-	upstreamModel := canonicalOpenAIAccountSchedulingModel(account, req.RequestedModel)
-	if account != nil && isGrokTeamModelRateLimited(account, upstreamModel, now) {
-		_ = s.service.deleteStickySessionAccountID(ctx, req.GroupID, sessionHash)
-		return nil, false, nil
-	}
-	if account != nil && isGrokModelQuotaBlocked(account.ID, upstreamModel, now) {
-		_ = s.service.deleteStickySessionAccountID(ctx, req.GroupID, sessionHash)
-		return nil, false, nil
-	}
 	escapeCfg := s.service.openAIStickyEscapeConfig()
 	if reason, errorRate, ttft, shouldEscape := s.shouldEscapeStickyAccount(accountID, escapeCfg); shouldEscape {
 		slog.Info("sticky_escape_triggered",

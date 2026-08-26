@@ -947,7 +947,7 @@ func (s *GatewayService) calculateRecordUsageCost(
 		if resolved := s.resolveChannelPricing(ctx, billingModel, apiKey); resolved != nil && resolved.Mode == BillingModeToken {
 			return s.calculateTokenCost(ctx, result, apiKey, billingModel, multiplier, pricingAt, opts)
 		}
-		return s.calculateImageCost(ctx, result, apiKey, billingModel, imageMultiplier)
+		return s.calculateImageCost(ctx, result, apiKey, billingModel, imageMultiplier, pricingAt)
 	}
 
 	// Voice audio (TTS / STT / realtime) when present on the forward result.
@@ -1064,7 +1064,7 @@ func (s *GatewayService) resolveChannelPricingAt(ctx context.Context, billingMod
 		return nil
 	}
 	gid := apiKey.Group.ID
-	resolved := s.resolver.Resolve(ctx, PricingInput{Model: billingModel, GroupID: &gid, Group: apiKey.Group})
+	resolved := s.resolver.Resolve(ctx, PricingInput{Model: billingModel, GroupID: &gid, Group: apiKey.Group, PricingAt: pricingAt})
 	if resolved.Source == PricingSourceGroup || resolved.Source == PricingSourceChannel {
 		return resolved
 	}
@@ -1081,7 +1081,7 @@ func (s *GatewayService) calculateImageCost(
 	pricingAt time.Time,
 ) *CostBreakdown {
 	sizeTier := NormalizeImageBillingTierOrDefault(result.ImageSize)
-	resolved := s.resolveChannelPricing(ctx, billingModel, apiKey)
+	resolved := s.resolveChannelPricingAt(ctx, billingModel, apiKey, pricingAt)
 	if resolved != nil && resolved.Source == PricingSourceGroup {
 		gid := apiKey.Group.ID
 		cost, err := s.billingService.CalculateCostUnified(CostInput{

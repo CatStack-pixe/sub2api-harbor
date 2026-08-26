@@ -18,16 +18,45 @@ const (
 
 // Platform constants
 const (
-	PlatformAnthropic   = "anthropic"
-	PlatformOpenAI      = "openai"
-	PlatformGemini      = "gemini"
-	PlatformAntigravity = "antigravity"
-	PlatformGrok        = "grok"
-	// 国产 OpenAI 兼容供应商（经 OpenAI 网关转发，按 Chat Completions 协议）。
-	PlatformKimi      = "kimi"     // Kimi (月之暗面 / Moonshot)
-	PlatformZhipu     = "zhipu"    // 智谱 GLM (bigmodel)
-	PlatformDeepseek  = "deepseek" // DeepSeek
-	PlatformComposite = "composite"
+	PlatformAnthropic    = "anthropic"
+	PlatformOpenAI       = "openai"
+	PlatformGemini       = "gemini"
+	PlatformAntigravity  = "antigravity"
+	PlatformGrok         = "grok"
+	PlatformAgnes        = "agnes"
+	PlatformDeepSeek     = "deepseek"
+	PlatformNvidia       = "nvidia"
+	PlatformTokenRhythm  = "tokenrhythm"
+	PlatformKimi         = "kimi"
+	PlatformZhipu        = "zhipu"
+	PlatformChatAnywhere = "chatanywhere"
+	PlatformGLM          = "glm"
+	PlatformModelScope   = "modelscope"
+	PlatformDashScope    = "dashscope"
+	PlatformMiniMax      = "minimax"
+	PlatformVolcengine   = "volcengine"
+	PlatformComposite    = "composite"
+)
+
+// PlatformDeepseek keeps compatibility with the historical identifier spelling.
+const PlatformDeepseek = PlatformDeepSeek
+
+const (
+	AgnesDefaultBaseURL       = "https://apihub.agnes-ai.com/v1"
+	AgnesDefaultModel         = "agnes-2.0-flash"
+	DeepSeekDefaultBaseURL    = "https://api.deepseek.com"
+	NvidiaDefaultBaseURL      = "https://integrate.api.nvidia.com/v1"
+	NvidiaDefaultModel        = "nvidia/llama-3.1-nemotron-nano-8b-v1"
+	TokenRhythmDefaultBaseURL = "https://tokenrhythm.studio/v1"
+	KimiDefaultBaseURL        = "https://api.moonshot.cn/v1"
+	KimiInternationalBaseURL  = "https://api.moonshot.ai/v1"
+	ChatAnywhereChinaBaseURL  = "https://api.chatanywhere.tech/v1"
+	ChatAnywhereGlobalBaseURL = "https://api.chatanywhere.org/v1"
+	GLMDefaultBaseURL         = "https://open.bigmodel.cn/api/paas/v4"
+	ModelScopeDefaultBaseURL  = "https://api-inference.modelscope.cn/v1"
+	DashScopeDefaultBaseURL   = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+	MiniMaxDefaultBaseURL     = "https://api.minimaxi.com/v1"
+	VolcengineDefaultBaseURL  = "https://ark.cn-beijing.volces.com/api/v3"
 )
 
 // Account mode constants 区分国产供应商的「按量付费（余额）」与「Coding Plan」两种接入方式。

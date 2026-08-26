@@ -47,13 +47,33 @@ func RegisterGatewayRoutes(
 
 	isOpenAIResponsesCompatibleGatewayPlatform := func(c *gin.Context) bool {
 		switch getGroupPlatform(c) {
-		case service.PlatformOpenAI, service.PlatformGrok,
-			service.PlatformKimi, service.PlatformZhipu, service.PlatformDeepseek:
-			// 国产 OpenAI 兼容供应商（kimi/zhipu/deepseek）与 openai/grok 一样经 OpenAI 网关转发。
+		case service.PlatformOpenAI, service.PlatformGrok, service.PlatformAgnes,
+			service.PlatformDeepSeek, service.PlatformNvidia, service.PlatformTokenRhythm,
+			service.PlatformKimi, service.PlatformZhipu, service.PlatformChatAnywhere,
+			service.PlatformGLM, service.PlatformModelScope, service.PlatformDashScope,
+			service.PlatformMiniMax, service.PlatformVolcengine:
 			return true
 		default:
 			return false
 		}
+	}
+	isOpenAIMessagesCompatibleGatewayPlatform := func(c *gin.Context) bool {
+		switch getGroupPlatform(c) {
+		case service.PlatformOpenAI, service.PlatformGrok, service.PlatformAgnes,
+			service.PlatformDeepSeek, service.PlatformTokenRhythm, service.PlatformKimi,
+			service.PlatformZhipu, service.PlatformChatAnywhere, service.PlatformGLM,
+			service.PlatformModelScope, service.PlatformDashScope, service.PlatformMiniMax,
+			service.PlatformVolcengine:
+			return true
+		default:
+			return false
+		}
+	}
+	isOpenAIChatCompatibleGatewayPlatform := func(c *gin.Context) bool {
+		if isOpenAIResponsesCompatibleGatewayPlatform(c) {
+			return true
+		}
+		return getGroupPlatform(c) == service.PlatformNvidia
 	}
 	countTokensHandler := func(c *gin.Context) {
 		switch getGroupPlatform(c) {

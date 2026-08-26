@@ -90,9 +90,18 @@ const platformLabel = computed(() => {
   if (props.platform === 'openai') return 'OpenAI'
   if (props.platform === 'antigravity') return 'Antigravity'
   if (props.platform === 'grok') return 'Grok'
+  if (props.platform === 'agnes') return 'Agnes'
+  if (props.platform === 'nvidia') return 'NVIDIA'
+  if (props.platform === 'tokenrhythm') return 'TokenRhythm'
   if (props.platform === 'kimi') return 'Kimi'
   if (props.platform === 'zhipu') return 'Zhipu GLM'
   if (props.platform === 'deepseek') return 'DeepSeek'
+  if (props.platform === 'chatanywhere') return 'ChatAnywhere'
+  if (props.platform === 'glm') return 'GLM'
+  if (props.platform === 'modelscope') return 'ModelScope'
+  if (props.platform === 'dashscope') return 'DashScope'
+  if (props.platform === 'minimax') return 'MiniMax'
+  if (props.platform === 'volcengine') return 'Volcengine Ark'
   return 'Gemini'
 })
 
@@ -191,6 +200,9 @@ const platformClass = computed(() => {
   if (props.platform === 'grok') {
     return 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300'
   }
+  if (props.platform === 'agnes') return 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300'
+  if (props.platform === 'nvidia') return 'bg-lime-100 text-lime-700 dark:bg-lime-900/30 dark:text-lime-300'
+  if (props.platform === 'tokenrhythm') return 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300'
   if (props.platform === 'kimi') {
     return 'bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-400'
   }
@@ -200,6 +212,12 @@ const platformClass = computed(() => {
   if (props.platform === 'deepseek') {
     return 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400'
   }
+  if (props.platform === 'chatanywhere') return 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300'
+  if (props.platform === 'glm') return 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300'
+  if (props.platform === 'modelscope') return 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300'
+  if (props.platform === 'dashscope') return 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300'
+  if (props.platform === 'minimax') return 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
+  if (props.platform === 'volcengine') return 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
   return 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
 })
 
@@ -216,6 +234,9 @@ const typeClass = computed(() => {
   if (props.platform === 'grok') {
     return 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300'
   }
+  if (props.platform === 'agnes') return 'bg-cyan-100 text-cyan-600 dark:bg-cyan-900/30 dark:text-cyan-300'
+  if (props.platform === 'nvidia') return 'bg-lime-100 text-lime-600 dark:bg-lime-900/30 dark:text-lime-300'
+  if (props.platform === 'tokenrhythm') return 'bg-teal-100 text-teal-600 dark:bg-teal-900/30 dark:text-teal-300'
   if (props.platform === 'kimi') {
     return 'bg-pink-100 text-pink-600 dark:bg-pink-900/30 dark:text-pink-400'
   }
@@ -225,6 +246,12 @@ const typeClass = computed(() => {
   if (props.platform === 'deepseek') {
     return 'bg-teal-100 text-teal-600 dark:bg-teal-900/30 dark:text-teal-400'
   }
+  if (props.platform === 'chatanywhere') return 'bg-violet-100 text-violet-600 dark:bg-violet-900/30 dark:text-violet-300'
+  if (props.platform === 'glm') return 'bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-300'
+  if (props.platform === 'modelscope') return 'bg-sky-100 text-sky-600 dark:bg-sky-900/30 dark:text-sky-300'
+  if (props.platform === 'dashscope') return 'bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-300'
+  if (props.platform === 'minimax') return 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-300'
+  if (props.platform === 'volcengine') return 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-300'
   return 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400'
 })
 

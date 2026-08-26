@@ -1,4 +1,4 @@
-import type { BillingMode, ChannelTimePricing, PricingInterval } from '@/api/admin/channels'
+import type { BillingMode, ChannelTimePricing, PricingInterval, PricingTimeWindow } from '@/api/admin/channels'
 
 type TranslateFn = (key: string, params?: Record<string, unknown>) => string
 
@@ -31,7 +31,18 @@ export interface PricingFormEntry {
   image_output_price: number | string | null
   per_request_price: number | string | null
   intervals: IntervalFormEntry[]
+  time_windows: TimeWindowFormEntry[]
   time_pricing: TimePricingFormEntry
+}
+
+export interface TimeWindowFormEntry {
+  start_time: string
+  end_time: string
+  input_price: number | string | null
+  output_price: number | string | null
+  cache_write_price: number | string | null
+  cache_read_price: number | string | null
+  sort_order: number
 }
 
 export interface TimePricingPeriodFormEntry {

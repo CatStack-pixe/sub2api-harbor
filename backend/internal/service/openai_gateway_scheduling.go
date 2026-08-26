@@ -302,6 +302,10 @@ func NormalizeOpenAICompatiblePlatform(platform string) string {
 	}
 }
 
+func normalizeOpenAICompatiblePlatform(platform string) string {
+	return NormalizeOpenAICompatiblePlatform(platform)
+}
+
 // noAvailableOpenAISelectionError builds the standard "no account available" error
 // while preserving the legacy /responses/compact error when applicable.
 // details carries an optional machine-parseable exclusion summary (e.g.

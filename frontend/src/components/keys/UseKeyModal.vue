@@ -1222,9 +1222,18 @@ function generateRoutedCodexFiles(
     gemini: 'gemini-2.5-pro',
     antigravity: 'claude-sonnet-4-6',
     grok: 'grok-4.5',
+    agnes: 'agnes-2.0-flash',
+    nvidia: 'nvidia/llama-3.1-nemotron-nano-8b-v1',
+    tokenrhythm: 'deepseek-v4-pro',
     kimi: 'kimi-k2.5',
     zhipu: 'glm-4.7',
     deepseek: 'deepseek-v4-pro',
+    chatanywhere: 'gpt-5.5',
+    glm: 'glm-5.2',
+    modelscope: 'Qwen/Qwen3-235B-A22B',
+    dashscope: 'qwen-plus',
+    minimax: 'MiniMax-M2.5',
+    volcengine: 'doubao-seed-1-6-251015',
     composite: 'gpt-5.5'
   }
   const preferredModel = preferredModels[platform] || ''
@@ -1235,9 +1244,18 @@ function generateRoutedCodexFiles(
     gemini: 'Gemini',
     antigravity: 'Antigravity',
     grok: 'Grok',
+    agnes: 'Agnes',
+    nvidia: 'NVIDIA',
+    tokenrhythm: 'TokenRhythm',
     kimi: 'Kimi',
     zhipu: 'Zhipu',
     deepseek: 'DeepSeek',
+    chatanywhere: 'ChatAnywhere',
+    glm: 'GLM',
+    modelscope: 'ModelScope',
+    dashscope: 'DashScope',
+    minimax: 'MiniMax',
+    volcengine: 'Volcengine Ark',
     composite: 'Composite'
   }
   const label = labels[platform]
@@ -1802,6 +1820,41 @@ function generateOpenCodeConfig(platform: string, baseUrl: string, apiKey: strin
     'grok-composer-2.5-fast': {
       name: 'Grok Composer 2.5 Fast',
       limit: { context: 500000, output: 64000 }
+    }
+  }
+  const agnesModels = {
+    'agnes-2.0-flash': {
+      name: 'Agnes 2.0 Flash',
+      limit: { context: 524288, output: 65536 },
+      modalities: { input: ['text', 'image'], output: ['text'] }
+    }
+  }
+  const deepseekModels = {
+    'deepseek-v4-pro': {
+      name: 'DeepSeek V4 Pro',
+      limit: { context: 1000000, output: 384000 }
+    },
+    'deepseek-v4-flash': {
+      name: 'DeepSeek V4 Flash',
+      limit: { context: 1000000, output: 384000 }
+    }
+  }
+  const nvidiaModels = {
+    'nvidia/llama-3.1-nemotron-nano-8b-v1': {
+      name: 'NVIDIA Llama 3.1 Nemotron Nano',
+      limit: { context: 128000, output: 32768 }
+    },
+    'meta/llama-3.1-8b-instruct': {
+      name: 'Llama 3.1 8B Instruct',
+      limit: { context: 131072, output: 8192 }
+    },
+    'meta/llama-3.1-70b-instruct': {
+      name: 'Llama 3.1 70B Instruct',
+      limit: { context: 131072, output: 8192 }
+    },
+    'meta/llama-3.3-70b-instruct': {
+      name: 'Llama 3.3 70B Instruct',
+      limit: { context: 131072, output: 8192 }
     }
   }
   if (platform === 'gemini') {

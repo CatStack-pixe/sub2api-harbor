@@ -71,6 +71,17 @@ type channelModelPricingRequest struct {
 	PerRequestPrice  *float64                   `json:"per_request_price" binding:"omitempty,min=0"`
 	Intervals        []pricingIntervalRequest   `json:"intervals"`
 	TimePricing      *channelTimePricingRequest `json:"time_pricing"`
+	TimeWindows      []pricingTimeWindowRequest `json:"time_windows"`
+}
+
+type pricingTimeWindowRequest struct {
+	StartTime       string   `json:"start_time"`
+	EndTime         string   `json:"end_time"`
+	InputPrice      *float64 `json:"input_price" binding:"omitempty,min=0"`
+	OutputPrice     *float64 `json:"output_price" binding:"omitempty,min=0"`
+	CacheWritePrice *float64 `json:"cache_write_price" binding:"omitempty,min=0"`
+	CacheReadPrice  *float64 `json:"cache_read_price" binding:"omitempty,min=0"`
+	SortOrder       int      `json:"sort_order"`
 }
 
 type channelTimePricingRequest struct {
@@ -142,40 +153,24 @@ type channelModelPricingResponse struct {
 	PerRequestPrice  *float64                    `json:"per_request_price"`
 	Intervals        []pricingIntervalResponse   `json:"intervals"`
 	TimePricing      *channelTimePricingResponse `json:"time_pricing"`
+	TimeWindows      []pricingTimeWindowResponse `json:"time_windows"`
+}
+
+type pricingTimeWindowResponse struct {
+	ID              int64    `json:"id"`
+	StartTime       string   `json:"start_time"`
+	EndTime         string   `json:"end_time"`
+	InputPrice      *float64 `json:"input_price"`
+	OutputPrice     *float64 `json:"output_price"`
+	CacheWritePrice *float64 `json:"cache_write_price"`
+	CacheReadPrice  *float64 `json:"cache_read_price"`
+	SortOrder       int      `json:"sort_order"`
 }
 
 type channelTimePricingResponse struct {
 	Timezone     string                             `json:"timezone"`
 	WeekdaysOnly bool                               `json:"weekdays_only"`
 	Periods      []channelTimePricingPeriodResponse `json:"periods"`
-}
-
-type channelTimePricingPeriodResponse struct {
-	StartTime  string  `json:"start_time"`
-	EndTime    string  `json:"end_time"`
-	Multiplier float64 `json:"multiplier"`
-}
-
-type pricingIntervalResponse struct {
-	ID                   int64    `json:"id"`
-	MinTokens            int      `json:"min_tokens"`
-	MaxTokens            *int     `json:"max_tokens"`
-	TierLabel            string   `json:"tier_label,omitempty"`
-	InputPrice           *float64 `json:"input_price"`
-	OutputPrice          *float64 `json:"output_price"`
-	CacheWritePrice      *float64 `json:"cache_write_price"`
-	CacheReadPrice       *float64 `json:"cache_read_price"`
-	InputMultiplier      *float64 `json:"input_multiplier"`
-	OutputMultiplier     *float64 `json:"output_multiplier"`
-	CacheWriteMultiplier *float64 `json:"cache_write_multiplier"`
-	CacheReadMultiplier  *float64 `json:"cache_read_multiplier"`
-	PerRequestPrice      *float64 `json:"per_request_price"`
-	SortOrder            int      `json:"sort_order"`
-}
-
-type channelTimePricingResponse struct {
-	Timezone string                             `json:"timezone"`
-	Periods  []channelTimePricingPeriodResponse `json:"periods"`
 }
 
 type channelTimePricingPeriodResponse struct {
@@ -304,6 +299,7 @@ func pricingToResponse(p *service.ChannelModelPricing) channelModelPricingRespon
 		ImageOutputPrice: p.ImageOutputPrice,
 		PerRequestPrice:  p.PerRequestPrice,
 		Intervals:        intervals,
+		TimeWindows:      timeWindows,
 		TimePricing:      timePricingToResponse(p.TimePricing),
 	}
 }
@@ -325,21 +321,6 @@ func timePricingToResponse(value *service.ChannelTimePricing) *channelTimePricin
 		WeekdaysOnly: value.WeekdaysOnly,
 		Periods:      periods,
 	}
-}
-
-func timePricingToResponse(value *service.ChannelTimePricing) *channelTimePricingResponse {
-	if value == nil {
-		return nil
-	}
-	periods := make([]channelTimePricingPeriodResponse, 0, len(value.Periods))
-	for _, period := range value.Periods {
-		periods = append(periods, channelTimePricingPeriodResponse{
-			StartTime:  period.StartTime,
-			EndTime:    period.EndTime,
-			Multiplier: period.Multiplier,
-		})
-	}
-	return &channelTimePricingResponse{Timezone: value.Timezone, Periods: periods}
 }
 
 func intervalToResponse(iv service.PricingInterval) pricingIntervalResponse {
@@ -394,6 +375,21 @@ func pricingRequestToService(reqs []channelModelPricingRequest, allowChannelMult
 				SortOrder:            iv.SortOrder,
 			})
 		}
+		timeWindows := make([]service.PricingTimeWindow, 0, len(r.TimeWindows))
+		for _, window := range r.TimeWindows {
+			start, startOK := clockToMinute(window.StartTime)
+			end, endOK := clockToMinute(window.EndTime)
+			if !startOK {
+				start = -1
+			}
+			if !endOK {
+				end = -1
+			}
+			timeWindows = append(timeWindows, service.PricingTimeWindow{
+				StartMinute: start, EndMinute: end, InputPrice: window.InputPrice, OutputPrice: window.OutputPrice,
+				CacheWritePrice: window.CacheWritePrice, CacheReadPrice: window.CacheReadPrice, SortOrder: window.SortOrder,
+			})
+		}
 		var fastMultiplier, flexMultiplier *float64
 		if allowChannelMultipliers {
 			fastMultiplier = r.FastMultiplier
@@ -413,10 +409,28 @@ func pricingRequestToService(reqs []channelModelPricingRequest, allowChannelMult
 			ImageOutputPrice: r.ImageOutputPrice,
 			PerRequestPrice:  r.PerRequestPrice,
 			Intervals:        intervals,
+			TimeWindows:      timeWindows,
 			TimePricing:      timePricingRequestToService(r.TimePricing),
 		})
 	}
 	return result
+}
+
+func clockToMinute(value string) (int, bool) {
+	parts := strings.Split(value, ":")
+	if len(parts) != 2 {
+		return 0, false
+	}
+	hour, hourErr := strconv.Atoi(parts[0])
+	minute, minuteErr := strconv.Atoi(parts[1])
+	if hourErr != nil || minuteErr != nil || hour < 0 || hour > 24 || minute < 0 || minute > 59 || (hour == 24 && minute != 0) {
+		return 0, false
+	}
+	return hour*60 + minute, true
+}
+
+func minuteToClock(minute int) string {
+	return fmt.Sprintf("%02d:%02d", minute/60, minute%60)
 }
 
 func timePricingRequestToService(value *channelTimePricingRequest) *service.ChannelTimePricing {

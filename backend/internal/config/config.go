@@ -105,6 +105,7 @@ type Config struct {
 	BatchImage              BatchImageConfig              `mapstructure:"batch_image"`
 	ImageStorage            ImageStorageConfig            `mapstructure:"image_storage"`
 	Plugins                 PluginConfig                  `mapstructure:"plugins"`
+	HeartbeatProvisioning   HeartbeatProvisioningConfig   `mapstructure:"heartbeat_provisioning"`
 }
 
 // PluginConfig 控制管理员手动上传的本地进程插件。

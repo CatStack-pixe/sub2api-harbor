@@ -633,8 +633,10 @@ func (s *AccountTestService) buildUpstreamModelsRequest(ctx context.Context, acc
 		return s.buildAntigravityAPIKeyModelsRequest(ctx, account)
 	case account.IsGrok():
 		return s.buildGrokUpstreamModelsRequest(ctx, account)
-	case account.IsOpenAI() || account.IsCNProvider():
-		// 国产 OpenAI 兼容供应商（kimi/zhipu/deepseek）复用 OpenAI /v1/models 探测。
+	case account.IsOpenAI() || account.IsCNProvider() || account.IsAgnes() || account.IsNvidia() ||
+		account.IsTokenRhythm() || account.IsChatAnywhere() || account.IsGLM() || account.IsModelScope() ||
+		account.IsDashScope() || account.IsMiniMax() || account.IsVolcengine():
+		// OpenAI-compatible fork and CN providers reuse the OpenAI /v1/models probe.
 		return s.buildOpenAIUpstreamModelsRequest(ctx, account)
 	case account.IsGemini():
 		return s.buildGeminiUpstreamModelsRequest(ctx, account)

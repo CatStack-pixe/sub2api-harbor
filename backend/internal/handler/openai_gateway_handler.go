@@ -485,13 +485,11 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 	}
 
 	// 解析渠道级模型映射
-	channelMapping, _ := h.gatewayService.ResolveChannelMappingAndRestrict(c.Request.Context(), apiKey.GroupID, reqModel)
-	forwardBody := openAIModelMappedBody(body, channelMapping.Mapped, channelMapping.MappedModel, h.gatewayService.ReplaceModelInBody)
-	seedOpenAIForwardImageIntentHint(c, channelMapping.Mapped, imageIntent)
-	forwardModel := reqModel
-	if channelMapping.Mapped {
-		forwardModel = channelMapping.MappedModel
-	}
+	routingModel, groupModelMapped := resolveGroupRequestModel(apiKey, reqModel)
+	channelMapping, _ := h.gatewayService.ResolveChannelMappingAndRestrict(c.Request.Context(), apiKey.GroupID, routingModel)
+	forwardModel, requestModelMapped := effectiveOpenAIForwardModel(routingModel, groupModelMapped, channelMapping)
+	forwardBody := openAIModelMappedBody(body, requestModelMapped, forwardModel, h.gatewayService.ReplaceModelInBody)
+	seedOpenAIForwardImageIntentHint(c, requestModelMapped, imageIntent)
 	c.Request = c.Request.WithContext(service.WithOpenAIForwardModel(
 		c.Request.Context(),
 		forwardModel,
@@ -558,6 +556,7 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 	quotaAccountExhausted := false
 	sameAccountRetryCount := make(map[int64]int)
 	var lastFailoverErr *service.UpstreamFailoverError
+	var oauth429FailoverState service.OpenAIOAuth429FailoverState
 	var passthroughFailoverState openAIPassthroughFailoverState
 
 	// 生图意图的 /v1/responses 请求必须调度到确实支持 Responses API 的账号，否则
@@ -853,7 +852,7 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 						return
 					}
 					switchCount++
-					if h.gatewayService.ShouldStopOpenAIOAuth429Failover(account, failoverErr.StatusCode, switchCount) {
+					if h.gatewayService.ShouldStopOpenAIOAuth429Failover(account, failoverErr.StatusCode, switchCount, &oauth429FailoverState) {
 						h.handleFailoverExhausted(c, failoverErr, streamStarted)
 						return
 					}
@@ -1197,6 +1196,7 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 	quotaAccountExhausted := false
 	sameAccountRetryCount := make(map[int64]int)
 	var lastFailoverErr *service.UpstreamFailoverError
+	var oauth429FailoverState service.OpenAIOAuth429FailoverState
 	effectiveMappedModel := preferredMappedModel
 	if channelMappingMsg.Mapped {
 		effectiveMappedModel = channelMappingMsg.MappedModel
@@ -1205,10 +1205,6 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 	// 分组利润控制：Messages 文本入口同样请求级装门并固定 pricingAt。
 	msgPricingCtx, pricingAt := h.gatewayService.WithOpenAIRequestPricingContext(c.Request.Context(), apiKey.GroupID)
 	msgPricingCtx = service.WithOpenAICompatibleInputTokensForScheduling(msgPricingCtx, body, "messages")
-	c.Request = c.Request.WithContext(msgPricingCtx)
-
-	// 分组利润控制：Messages 文本入口同样请求级装门并固定 pricingAt。
-	msgPricingCtx, pricingAt := h.gatewayService.WithOpenAIRequestPricingContext(c.Request.Context(), apiKey.GroupID)
 	c.Request = c.Request.WithContext(msgPricingCtx)
 
 	for {
@@ -1430,7 +1426,7 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 						return
 					}
 					switchCount++
-					if h.gatewayService.ShouldStopOpenAIOAuth429Failover(account, failoverErr.StatusCode, switchCount) {
+					if h.gatewayService.ShouldStopOpenAIOAuth429Failover(account, failoverErr.StatusCode, switchCount, &oauth429FailoverState) {
 						h.handleAnthropicFailoverExhausted(c, failoverErr, streamStarted)
 						return
 					}
@@ -3083,8 +3079,8 @@ func (h *OpenAIGatewayHandler) ensureForwardErrorResponse(c *gin.Context, stream
 		return false
 	}
 	// 先停 compact 心跳再读 Writer 状态，避免与心跳 goroutine 竞争。
-	responsesKeepaliveCommitted := service.StopOpenAIResponsesSSEKeepaliveCommitted(c)
-	if responsesKeepaliveCommitted {
+	compactKeepaliveCommitted := service.StopOpenAICompactSSEKeepaliveCommitted(c)
+	if compactKeepaliveCommitted {
 		streamStarted = true
 	}
 	imageKeepalivePresent := service.OpenAIImagesJSONKeepalivePresent(c)

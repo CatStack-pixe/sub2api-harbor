@@ -322,6 +322,7 @@
               :batched-usage-error="usageBatchErrorByAccountId[String(row.id)] ?? null"
               :batched-usage-loading="usageBatchLoadingByAccountId[String(row.id)] === true"
               :request-batched-usage="isDesktopViewport ? queueBatchedUsage : null"
+              :page-visible="documentVisibility === 'visible'"
               @account-updated="handleAccountUpdated"
               @usage-loaded="handleAccountUsageLoaded(row.id, $event)"
             />
@@ -526,6 +527,9 @@ import ErrorPassthroughRulesModal from '@/components/admin/ErrorPassthroughRules
 import TLSFingerprintProfilesModal from '@/components/admin/TLSFingerprintProfilesModal.vue'
 import { fetchAllAccountIds } from '@/utils/accountSelection'
 import { buildGrokUsageRefreshKey, buildOpenAIUsageRefreshKey } from '@/utils/accountUsageRefresh'
+import { invalidateDeepSeekBalanceCache } from '@/utils/deepSeekBalanceQuery'
+import { invalidateTokenRhythmBalanceCache } from '@/utils/tokenRhythmBalanceQuery'
+import { invalidateKimiBalanceCache } from '@/utils/kimiBalanceQuery'
 import { formatDateTime, formatRelativeTime } from '@/utils/format'
 import { proxyExpiryBadgeClass, proxyExpiryLabelKey } from '@/utils/proxyExpiry'
 import { extractApiErrorMessage } from '@/utils/apiError'
@@ -700,24 +704,6 @@ const documentVisibility = useDocumentVisibility()
 invalidateDeepSeekBalanceCache()
 invalidateTokenRhythmBalanceCache()
 invalidateKimiBalanceCache()
-
-const desktopViewportQuery = '(min-width: 768px)'
-const isDesktopViewport = ref(
-  typeof window === 'undefined' ? true : window.matchMedia(desktopViewportQuery).matches
-)
-let desktopViewportMediaQuery: MediaQueryList | null = null
-let desktopViewportListener: ((event: MediaQueryListEvent) => void) | null = null
-
-const usageBatchByAccountId = ref<Record<string, AccountUsageInfo | null>>({})
-const usageBatchErrorByAccountId = ref<Record<string, string | null>>({})
-const usageBatchLoadingByAccountId = ref<Record<string, boolean>>({})
-const usageBatchRequestTokenByAccountId = ref<Record<string, number>>({})
-const usageBatchCache = new Map<number, { data: AccountUsageInfo; ts: number }>()
-const USAGE_BATCH_CACHE_TTL = 5 * 60 * 1000
-const pendingUsageBatchIds = new Set<number>()
-let usageBatchFlushTimer: ReturnType<typeof setTimeout> | null = null
-let queuedUsageBatchForce = false
-let usageBatchRequestToken = 0
 
 const desktopViewportQuery = '(min-width: 768px)'
 const isDesktopViewport = ref(

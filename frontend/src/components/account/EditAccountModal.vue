@@ -3050,6 +3050,7 @@ interface TempUnschedRuleForm {
 const submitting = ref(false)
 const editBaseUrl = ref('https://api.anthropic.com')
 const editApiKey = ref('')
+const tokenRhythmCookie = ref('')
 
 // ── 国产供应商（Kimi / Zhipu / DeepSeek）account_mode / api_protocol 编辑 ──
 // account_mode 决定额度/余额监控路径，api_protocol 决定转发端点与格式；
@@ -3609,6 +3610,15 @@ const defaultBaseUrl = computed(() => {
   if (props.account?.platform === 'openai') return 'https://api.openai.com'
   if (props.account?.platform === 'gemini') return 'https://generativelanguage.googleapis.com'
   if (props.account?.platform === 'grok') return 'https://api.x.ai/v1'
+  if (props.account?.platform === 'agnes') return 'https://apihub.agnes-ai.com/v1'
+  if (props.account?.platform === 'nvidia') return 'https://integrate.api.nvidia.com/v1'
+  if (props.account?.platform === 'tokenrhythm') return 'https://tokenrhythm.studio/v1'
+  if (props.account?.platform === 'chatanywhere') return 'https://api.chatanywhere.tech/v1'
+  if (props.account?.platform === 'glm') return 'https://open.bigmodel.cn/api/paas/v4'
+  if (props.account?.platform === 'modelscope') return 'https://api-inference.modelscope.cn/v1'
+  if (props.account?.platform === 'dashscope') return 'https://dashscope.aliyuncs.com/compatible-mode/v1'
+  if (props.account?.platform === 'minimax') return 'https://api.minimaxi.com/v1'
+  if (props.account?.platform === 'volcengine') return 'https://ark.cn-beijing.volces.com/api/v3'
   // CN 供应商：按当前模式/协议回落到官方预设（清空输入框提交时使用），
   // 不能落到 anthropic 默认值（会被当 CC base 拼出错误端点）。
   if (
@@ -4025,18 +4035,27 @@ const syncFormFromAccount = (newAccount: Account | null) => {
       }
       editAdaptiveBaseUrls.value = nextAdaptiveBaseUrls
     }
-    const platformDefaultUrl =
-      newAccount.platform === 'openai'
-        ? 'https://api.openai.com'
-        : newAccount.platform === 'gemini'
-          ? 'https://generativelanguage.googleapis.com'
-          : newAccount.platform === 'grok'
-            ? 'https://api.x.ai/v1'
-            : newAccount.platform === 'kimi' ||
-                newAccount.platform === 'zhipu' ||
-                newAccount.platform === 'deepseek'
-              ? defaultCNBaseUrl(newAccount.platform, editAccountMode.value, editApiProtocol.value)
-              : 'https://api.anthropic.com'
+    const cnPlatform =
+      newAccount.platform === 'kimi' || newAccount.platform === 'zhipu' || newAccount.platform === 'deepseek'
+        ? newAccount.platform
+        : null
+    const platformDefaultUrls: Record<string, string> = {
+      openai: 'https://api.openai.com',
+      gemini: 'https://generativelanguage.googleapis.com',
+      grok: 'https://api.x.ai/v1',
+      agnes: 'https://apihub.agnes-ai.com/v1',
+      tokenrhythm: 'https://tokenrhythm.studio/v1',
+      chatanywhere: 'https://api.chatanywhere.tech/v1',
+      glm: 'https://open.bigmodel.cn/api/paas/v4',
+      nvidia: 'https://integrate.api.nvidia.com/v1',
+      modelscope: 'https://api-inference.modelscope.cn/v1',
+      dashscope: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+      minimax: 'https://api.minimaxi.com/v1',
+      volcengine: 'https://ark.cn-beijing.volces.com/api/v3'
+    }
+    const platformDefaultUrl = cnPlatform
+      ? defaultCNBaseUrl(cnPlatform, editAccountMode.value, editApiProtocol.value)
+      : platformDefaultUrls[newAccount.platform] || 'https://api.anthropic.com'
     editBaseUrl.value = isCNApiKeyAccount.value && editApiProtocol.value === 'adaptive'
       ? editAdaptiveBaseUrls.value.chat_completions
       : (credentials.base_url as string) || platformDefaultUrl

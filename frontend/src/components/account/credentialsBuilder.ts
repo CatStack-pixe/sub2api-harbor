@@ -40,9 +40,18 @@ export function isHeaderOverrideCapable(platform: string, type: string): boolean
   if (
     platform === 'anthropic' ||
     platform === 'openai' ||
+    platform === 'agnes' ||
     platform === 'kimi' ||
     platform === 'zhipu' ||
-    platform === 'deepseek'
+    platform === 'deepseek' ||
+    platform === 'nvidia' ||
+    platform === 'tokenrhythm' ||
+    platform === 'chatanywhere' ||
+    platform === 'glm' ||
+    platform === 'modelscope' ||
+    platform === 'dashscope' ||
+    platform === 'minimax' ||
+    platform === 'volcengine'
   ) {
     return type === 'apikey'
   }

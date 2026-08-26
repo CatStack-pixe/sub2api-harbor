@@ -350,6 +350,16 @@ func createIntervalExec(ctx context.Context, exec dbExec, iv *service.PricingInt
 	).Scan(&iv.ID, &iv.CreatedAt, &iv.UpdatedAt)
 }
 
+func createTimeWindowExec(ctx context.Context, exec dbExec, window *service.PricingTimeWindow) error {
+	return exec.QueryRowContext(ctx,
+		`INSERT INTO channel_pricing_time_windows
+			 (pricing_id, start_minute, end_minute, input_price, output_price, cache_write_price, cache_read_price, sort_order)
+			 VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id, created_at, updated_at`,
+		window.PricingID, window.StartMinute, window.EndMinute, window.InputPrice, window.OutputPrice,
+		window.CacheWritePrice, window.CacheReadPrice, window.SortOrder,
+	).Scan(&window.ID, &window.CreatedAt, &window.UpdatedAt)
+}
+
 func replaceModelPricingTx(ctx context.Context, exec dbExec, channelID int64, pricingList []service.ChannelModelPricing) error {
 	if _, err := exec.ExecContext(ctx, `DELETE FROM channel_model_pricing WHERE channel_id = $1`, channelID); err != nil {
 		return fmt.Errorf("delete old model pricing: %w", err)

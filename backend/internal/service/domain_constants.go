@@ -38,19 +38,41 @@ const (
 
 // Platform constants
 const (
-	PlatformAnthropic   = domain.PlatformAnthropic
-	PlatformOpenAI      = domain.PlatformOpenAI
-	PlatformGemini      = domain.PlatformGemini
-	PlatformAntigravity = domain.PlatformAntigravity
-	PlatformGrok        = domain.PlatformGrok
-	// 国产 OpenAI 兼容供应商（与 grok 一样经 OpenAI 网关转发）。
-	PlatformKimi      = domain.PlatformKimi
-	PlatformZhipu     = domain.PlatformZhipu
-	PlatformDeepseek  = domain.PlatformDeepseek
-	PlatformComposite = domain.PlatformComposite
-	// PlatformKiro is retained for unsupported-platform threshold tests and legacy
-	// account rows. Scheduling-threshold evaluation never pauses kiro accounts.
-	PlatformKiro = "kiro"
+	PlatformAnthropic         = domain.PlatformAnthropic
+	PlatformOpenAI            = domain.PlatformOpenAI
+	PlatformGemini            = domain.PlatformGemini
+	PlatformAntigravity       = domain.PlatformAntigravity
+	PlatformGrok              = domain.PlatformGrok
+	PlatformAgnes             = domain.PlatformAgnes
+	PlatformDeepSeek          = domain.PlatformDeepSeek
+	PlatformNvidia            = domain.PlatformNvidia
+	PlatformTokenRhythm       = domain.PlatformTokenRhythm
+	PlatformKimi              = domain.PlatformKimi
+	PlatformZhipu             = domain.PlatformZhipu
+	PlatformDeepseek          = domain.PlatformDeepseek
+	PlatformChatAnywhere      = domain.PlatformChatAnywhere
+	PlatformGLM               = domain.PlatformGLM
+	PlatformModelScope        = domain.PlatformModelScope
+	PlatformDashScope         = domain.PlatformDashScope
+	PlatformMiniMax           = domain.PlatformMiniMax
+	PlatformVolcengine        = domain.PlatformVolcengine
+	PlatformComposite         = domain.PlatformComposite
+	PlatformKiro              = "kiro"
+	AgnesDefaultBaseURL       = domain.AgnesDefaultBaseURL
+	AgnesDefaultModel         = domain.AgnesDefaultModel
+	DeepSeekDefaultBaseURL    = domain.DeepSeekDefaultBaseURL
+	NvidiaDefaultBaseURL      = domain.NvidiaDefaultBaseURL
+	NvidiaDefaultModel        = domain.NvidiaDefaultModel
+	TokenRhythmDefaultBaseURL = domain.TokenRhythmDefaultBaseURL
+	KimiDefaultBaseURL        = domain.KimiDefaultBaseURL
+	KimiInternationalBaseURL  = domain.KimiInternationalBaseURL
+	ChatAnywhereChinaBaseURL  = domain.ChatAnywhereChinaBaseURL
+	ChatAnywhereGlobalBaseURL = domain.ChatAnywhereGlobalBaseURL
+	GLMDefaultBaseURL         = domain.GLMDefaultBaseURL
+	ModelScopeDefaultBaseURL  = domain.ModelScopeDefaultBaseURL
+	DashScopeDefaultBaseURL   = domain.DashScopeDefaultBaseURL
+	MiniMaxDefaultBaseURL     = domain.MiniMaxDefaultBaseURL
+	VolcengineDefaultBaseURL  = domain.VolcengineDefaultBaseURL
 )
 
 // 账号接入模式（国产供应商）：按量付费 vs Coding Plan。
@@ -105,9 +127,64 @@ var AllowedQuotaPlatforms = []string{
 	PlatformGemini,
 	PlatformAntigravity,
 	PlatformGrok,
+	PlatformAgnes,
+	PlatformDeepSeek,
+	PlatformNvidia,
+	PlatformTokenRhythm,
 	PlatformKimi,
 	PlatformZhipu,
-	PlatformDeepseek,
+	PlatformChatAnywhere,
+	PlatformGLM,
+	PlatformModelScope,
+	PlatformDashScope,
+	PlatformMiniMax,
+	PlatformVolcengine,
+}
+
+// Default model IDs keep provider-specific account creation and model sync
+// usable before a live provider catalog has been fetched.
+func DeepSeekDefaultModelIDs() []string {
+	return []string{"deepseek-v4-pro", "deepseek-v4-flash"}
+}
+
+func KimiDefaultModelIDs() []string {
+	return []string{"kimi-k2.6", "kimi-k2.5"}
+}
+
+func ChatAnywhereDefaultModelIDs() []string {
+	return []string{"gpt-5.5", "gpt-5.1", "gpt-4.1", "claude-sonnet-4-5", "deepseek-v3-2"}
+}
+
+func GLMDefaultModelIDs() []string {
+	return []string{"glm-5.2", "glm-5.1", "glm-5", "glm-5-turbo", "glm-4.7", "glm-4.5-air", "glm-4.7-flashx", "glm-4.7-flash"}
+}
+
+func ModelScopeDefaultModelIDs() []string {
+	return []string{
+		"Qwen/Qwen3.5-397B-A17B",
+		"Qwen/Qwen3.5-122B-A10B",
+		"Qwen/Qwen3-235B-A22B-Instruct-2507",
+		"Qwen/Qwen3-Coder-30B-A3B-Instruct",
+		"deepseek-ai/DeepSeek-V4-Pro",
+		"deepseek-ai/DeepSeek-V4-Flash-0731",
+		"ZhipuAI/GLM-5.2",
+	}
+}
+
+func DashScopeDefaultModelIDs() []string {
+	return []string{"qwen-plus", "qwen-max", "qwen3.5-plus", "qwen3.5-flash", "qwen3-max", "qwen3-coder-plus", "deepseek-v3.2", "deepseek-r1", "glm-5.2", "kimi-k2.6"}
+}
+
+func MiniMaxDefaultModelIDs() []string {
+	return []string{"MiniMax-M2", "MiniMax-M2.1", "MiniMax-M2.1-highspeed", "MiniMax-M2.5", "MiniMax-M2.5-highspeed", "MiniMax-M2.7", "MiniMax-M2.7-highspeed", "MiniMax-M3"}
+}
+
+func VolcengineDefaultModelIDs() []string {
+	return []string{"doubao-seed-2-0-code-preview-260215", "doubao-seed-2-0-pro-260215", "doubao-seed-2-1-pro-260628", "doubao-seed-2-1-turbo-260628", "deepseek-v3-2-251201", "deepseek-v4-pro-ga-260813", "glm-5-2-260617", "kimi-k2-thinking-251104"}
+}
+
+func TokenRhythmDefaultModelIDs() []string {
+	return []string{"deepseek-v4-pro", "deepseek-v4-flash"}
 }
 
 // AllowedSchedulingThresholdPlatforms 是允许设置账号自动停调阈值的平台列表。
@@ -119,6 +196,15 @@ var AllowedSchedulingThresholdPlatforms = []string{
 	PlatformGrok,
 	PlatformKimi,
 	PlatformZhipu,
+}
+
+func NvidiaDefaultModelIDs() []string {
+	return []string{
+		NvidiaDefaultModel,
+		"meta/llama-3.1-8b-instruct",
+		"meta/llama-3.1-70b-instruct",
+		"meta/llama-3.3-70b-instruct",
+	}
 }
 
 // IsAllowedQuotaPlatform 报告 s 是否为合法的 quota platform 标识。

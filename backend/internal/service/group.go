@@ -83,6 +83,8 @@ type Group struct {
 	// Token intervals are selected only when LongContextPricingEnabled is true.
 	LongContextPricingEnabled bool
 	ModelPricing              []ChannelModelPricing
+	GlobalPromptEnabled       bool
+	GlobalPrompt              string
 
 	// Claude Code 客户端限制
 	ClaudeCodeOnly  bool

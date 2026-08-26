@@ -886,11 +886,15 @@ func (s *OpenAIGatewayService) filterCNProviderBillingModelCandidates(ctx contex
 }
 
 func (s *OpenAIGatewayService) resolveOpenAIChannelPricing(ctx context.Context, billingModel string, apiKey *APIKey) *ResolvedPricing {
+	return s.resolveOpenAIChannelPricingAt(ctx, billingModel, apiKey, time.Time{})
+}
+
+func (s *OpenAIGatewayService) resolveOpenAIChannelPricingAt(ctx context.Context, billingModel string, apiKey *APIKey, pricingAt time.Time) *ResolvedPricing {
 	if s.resolver == nil || apiKey == nil || apiKey.Group == nil {
 		return nil
 	}
 	gid := apiKey.Group.ID
-	resolved := s.resolver.Resolve(ctx, PricingInput{Model: billingModel, GroupID: &gid, Group: apiKey.Group})
+	resolved := s.resolver.Resolve(ctx, PricingInput{Model: billingModel, GroupID: &gid, Group: apiKey.Group, PricingAt: pricingAt})
 	if resolved.Source == PricingSourceGroup || resolved.Source == PricingSourceChannel {
 		return resolved
 	}
