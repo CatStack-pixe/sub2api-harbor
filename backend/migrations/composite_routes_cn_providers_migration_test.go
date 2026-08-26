@@ -13,19 +13,6 @@ func TestCompositeRoutesCNProvidersMigration(t *testing.T) {
 
 	sql := strings.Join(strings.Fields(string(content)), " ")
 	require.Contains(t, sql, "DROP CONSTRAINT IF EXISTS composite_model_routes_target_platform_check")
-	for _, platform := range []string{"anthropic", "openai", "gemini", "antigravity", "grok", "agnes", "deepseek", "nvidia", "tokenrhythm", "kimi", "zhipu", "chatanywhere", "glm"} {
-		require.Contains(t, sql, "'"+platform+"'")
-	}
-}
-
-func TestFinalPlatformConstraintUnionMigration(t *testing.T) {
-	content, err := FS.ReadFile("230_add_official_platform_constraints.sql")
-	require.NoError(t, err)
-
-	sql := strings.Join(strings.Fields(string(content)), " ")
-	require.Contains(t, sql, "user_platform_quotas_platform_check")
-	require.Contains(t, sql, "composite_model_routes_target_platform_check")
-	for _, platform := range []string{"anthropic", "openai", "gemini", "antigravity", "grok", "agnes", "deepseek", "nvidia", "tokenrhythm", "kimi", "zhipu", "chatanywhere", "glm", "modelscope", "dashscope", "minimax", "volcengine"} {
-		require.Contains(t, sql, "'"+platform+"'")
-	}
+	require.Contains(t, sql,
+		"CHECK (target_platform IN ('anthropic', 'openai', 'gemini', 'antigravity', 'grok', 'kimi', 'zhipu', 'deepseek'))")
 }

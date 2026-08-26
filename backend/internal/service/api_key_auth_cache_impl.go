@@ -14,9 +14,7 @@ import (
 	"github.com/dgraph-io/ristretto"
 )
 
-// v24 preserves the fork's global prompt policy and adds upstream group
-// long-context/model-pricing fields, invalidating all older L2 snapshots.
-const apiKeyAuthSnapshotVersion = 24
+const apiKeyAuthSnapshotVersion = 20 // v20: group long-context and model pricing fields (force refresh of pre-fix snapshots)
 
 type apiKeyAuthCacheConfig struct {
 	l1Size        int

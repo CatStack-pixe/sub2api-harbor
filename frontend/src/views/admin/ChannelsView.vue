@@ -1091,7 +1091,7 @@ function accountStatsRulesToAPI(): AccountStatsPricingRule[] {
             image_output_price: mTokToPerToken(p.image_output_price),
             per_request_price: p.per_request_price != null && p.per_request_price !== '' ? Number(p.per_request_price) : null,
             intervals: formIntervalsToAPI(p.intervals || []),
-            time_windows: [],
+            time_windows: formTimeWindowsToAPI(p.time_windows || []),
             time_pricing: null
           }))
       })
@@ -1429,7 +1429,7 @@ function distributeRulesToPlatforms(apiRules: AccountStatsPricingRule[]) {
         image_output_price: perTokenToMTok(p.image_output_price),
         per_request_price: p.per_request_price,
         intervals: apiIntervalsToForm(p.intervals || []),
-        time_windows: [],
+        time_windows: apiTimeWindowsToForm(p.time_windows || []),
         time_pricing: createDefaultTimePricingForm()
       } as PricingFormEntry))
     }

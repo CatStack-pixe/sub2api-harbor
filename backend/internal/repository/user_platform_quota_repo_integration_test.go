@@ -98,31 +98,10 @@ func TestUserPlatformQuotaRepository_BulkInsertInitial_GrokAllowed(t *testing.T)
 	require.InDelta(t, 9.0, *rec.DailyLimitUSD, 1e-9)
 }
 
-func TestUserPlatformQuotaRepository_BulkInsertInitial_ChatAnywhereAllowed(t *testing.T) {
-	ctx := context.Background()
-	tx := testEntTx(t)
-	txCtx := dbent.NewTxContext(ctx, tx)
-	client := tx.Client()
-
-	userID := mustCreateUserForQuota(t, client)
-	repo := NewUserPlatformQuotaRepository(client)
-
-	daily := 9.0
-	records := []UserPlatformQuotaRecord{
-		{UserID: userID, Platform: service.PlatformChatAnywhere, DailyLimitUSD: &daily},
-	}
-	require.NoError(t, repo.BulkInsertInitial(txCtx, records),
-		"ChatAnywhere quota rows must satisfy the database platform constraint")
-
-	rec, err := repo.GetByUserPlatform(txCtx, userID, service.PlatformChatAnywhere)
-	require.NoError(t, err)
-	require.NotNil(t, rec, "ChatAnywhere quota row should be persisted")
-	require.NotNil(t, rec.DailyLimitUSD)
-	require.InDelta(t, 9.0, *rec.DailyLimitUSD, 1e-9)
-}
-
 // TestUserPlatformQuotaRepository_BulkInsertInitial_CNProvidersAllowed 回归迁移 224：
 // kimi/zhipu/deepseek 平台必须能写入 user_platform_quotas（CHECK 约束已含国产供应商）。
+// 历史 bug：三个平台不在约束内 → 注册预填充 8 平台默认配额时整条多行 INSERT 中止 →
+// fail-open 吞错 → 新用户拿到零条配额记录（缺失配额行 = 无限额）。
 func TestUserPlatformQuotaRepository_BulkInsertInitial_CNProvidersAllowed(t *testing.T) {
 	ctx := context.Background()
 	tx := testEntTx(t)
@@ -131,38 +110,21 @@ func TestUserPlatformQuotaRepository_BulkInsertInitial_CNProvidersAllowed(t *tes
 
 	userID := mustCreateUserForQuota(t, client)
 	repo := NewUserPlatformQuotaRepository(client)
+
 	daily := 12.0
 	records := []UserPlatformQuotaRecord{
-		{UserID: userID, Platform: service.PlatformKimi, DailyLimitUSD: &daily},
-		{UserID: userID, Platform: service.PlatformZhipu},
-		{UserID: userID, Platform: service.PlatformDeepSeek},
+		{UserID: userID, Platform: "kimi", DailyLimitUSD: &daily},
+		{UserID: userID, Platform: "zhipu"},
+		{UserID: userID, Platform: "deepseek"},
 	}
 	require.NoError(t, repo.BulkInsertInitial(txCtx, records),
-		"kimi/zhipu/deepseek quota rows must satisfy the database platform constraint")
+		"kimi/zhipu/deepseek 平台应可写入（迁移 224 后 CHECK 约束已含国产供应商）")
 
-	for _, platform := range []string{service.PlatformKimi, service.PlatformZhipu, service.PlatformDeepSeek} {
+	for _, platform := range []string{"kimi", "zhipu", "deepseek"} {
 		rec, err := repo.GetByUserPlatform(txCtx, userID, platform)
 		require.NoError(t, err)
-		require.NotNil(t, rec, "%s quota row should be persisted", platform)
+		require.NotNil(t, rec, "%s 配额行应已写入", platform)
 	}
-}
-
-func TestCompositeModelRoute_ChatAnywhereTargetAllowed(t *testing.T) {
-	ctx := context.Background()
-	tx := testEntTx(t)
-	txCtx := dbent.NewTxContext(ctx, tx)
-	client := tx.Client()
-
-	group := mustCreateGroup(t, client, &service.Group{
-		Name:     fmt.Sprintf("chatanywhere-composite-%d", time.Now().UnixNano()),
-		Platform: service.PlatformComposite,
-	})
-	_, err := client.CompositeModelRoute.Create().
-		SetGroupID(group.ID).
-		SetPublicModel("chatanywhere-audit-model").
-		SetTargetPlatform(service.PlatformChatAnywhere).
-		Save(txCtx)
-	require.NoError(t, err, "ChatAnywhere must satisfy the composite route target constraint")
 }
 
 func TestUserPlatformQuotaRepository_GetByUserPlatform(t *testing.T) {

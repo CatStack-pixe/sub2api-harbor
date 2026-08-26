@@ -73,27 +73,3 @@ func TestGroupFromServiceAdminIncludesProfitControl(t *testing.T) {
 		}
 	}
 }
-
-func TestGroupGlobalPromptIsAdminOnly(t *testing.T) {
-	group := profitControlServiceGroup()
-	group.GlobalPromptEnabled = true
-	group.GlobalPrompt = "Internal policy"
-
-	for name, got := range map[string]any{
-		"GroupFromService":        GroupFromService(group),
-		"GroupFromServiceShallow": GroupFromServiceShallow(group),
-	} {
-		fields := marshalToMap(t, got)
-		if _, ok := fields["global_prompt"]; ok {
-			t.Errorf("%s: public DTO must not include global_prompt", name)
-		}
-		if _, ok := fields["global_prompt_enabled"]; ok {
-			t.Errorf("%s: public DTO must not include global_prompt_enabled", name)
-		}
-	}
-
-	admin := GroupFromServiceAdmin(group)
-	if !admin.GlobalPromptEnabled || admin.GlobalPrompt != group.GlobalPrompt {
-		t.Fatalf("admin DTO did not preserve global prompt: %+v", admin)
-	}
-}

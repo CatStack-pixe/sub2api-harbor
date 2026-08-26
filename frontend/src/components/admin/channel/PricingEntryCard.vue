@@ -139,6 +139,19 @@
             </div>
           </div>
 
+          <div v-if="enableTierMultipliers" class="mt-3 grid max-w-md grid-cols-2 gap-2">
+            <div>
+              <label class="text-xs text-gray-400">{{ t('admin.channels.form.fastMultiplier') }}</label>
+              <input :value="entry.fast_multiplier" @input="emitField('fast_multiplier', ($event.target as HTMLInputElement).value)"
+                type="number" step="any" min="0.000001" class="input mt-0.5 text-sm" :placeholder="t('admin.channels.form.multiplierPlaceholder')" />
+            </div>
+            <div>
+              <label class="text-xs text-gray-400">{{ t('admin.channels.form.flexMultiplier') }}</label>
+              <input :value="entry.flex_multiplier" @input="emitField('flex_multiplier', ($event.target as HTMLInputElement).value)"
+                type="number" step="any" min="0.000001" class="input mt-0.5 text-sm" :placeholder="t('admin.channels.form.multiplierPlaceholder')" />
+            </div>
+          </div>
+
           <div v-if="!hideTimeWindows" class="mt-3">
             <div class="flex items-center justify-between">
               <div>
@@ -161,20 +174,6 @@
                 <div><label class="text-xs text-gray-400">{{ t('admin.channels.form.cacheReadPrice') }}</label><input :value="window.cache_read_price" type="number" step="any" min="0" class="input mt-0.5 text-sm" @input="updateTimeWindowField(idx, 'cache_read_price', ($event.target as HTMLInputElement).value)" /></div>
                 <button type="button" class="mb-0.5 h-9 w-9 justify-self-end rounded p-1 text-gray-400 hover:text-red-500" @click="removeTimeWindow(idx)"><Icon name="trash" size="sm" /></button>
               </div>
-            </div>
-          </div>
-
-          <!-- Token intervals (channel-only; group long-context uses official presets) -->
-          <div v-if="enableTierMultipliers" class="mt-3 grid max-w-md grid-cols-2 gap-2">
-            <div>
-              <label class="text-xs text-gray-400">{{ t('admin.channels.form.fastMultiplier') }}</label>
-              <input :value="entry.fast_multiplier" @input="emitField('fast_multiplier', ($event.target as HTMLInputElement).value)"
-                type="number" step="any" min="0.000001" class="input mt-0.5 text-sm" :placeholder="t('admin.channels.form.multiplierPlaceholder')" />
-            </div>
-            <div>
-              <label class="text-xs text-gray-400">{{ t('admin.channels.form.flexMultiplier') }}</label>
-              <input :value="entry.flex_multiplier" @input="emitField('flex_multiplier', ($event.target as HTMLInputElement).value)"
-                type="number" step="any" min="0.000001" class="input mt-0.5 text-sm" :placeholder="t('admin.channels.form.multiplierPlaceholder')" />
             </div>
           </div>
 

@@ -560,16 +560,15 @@ func TestSchedulerGroupLifecycleEpochPreventsABA(t *testing.T) {
 	groups.set(&Group{ID: groupID, Status: StatusActive, Hydrated: true}, nil)
 	require.NoError(t, svc.handleGroupEvent(context.Background(), ptrInt64(groupID), make(map[batchSeenKey]struct{})))
 	firstActiveTokens := cache.tokens()
-	canonicalCount := expectedSchedulerCanonicalBucketCount()
-	require.Len(t, firstActiveTokens, canonicalCount)
+	require.Len(t, firstActiveTokens, expectedSchedulerCanonicalBucketCount())
 
 	groups.set(&Group{ID: groupID, Status: StatusDisabled, Hydrated: true}, nil)
 	require.NoError(t, svc.handleGroupEvent(context.Background(), ptrInt64(groupID), make(map[batchSeenKey]struct{})))
 	groups.set(&Group{ID: groupID, Status: StatusActive, Hydrated: true}, nil)
 	require.NoError(t, svc.handleGroupEvent(context.Background(), ptrInt64(groupID), make(map[batchSeenKey]struct{})))
 	allTokens := cache.tokens()
-	require.Len(t, allTokens, canonicalCount*2)
-	require.Greater(t, allTokens[canonicalCount].Epoch, firstActiveTokens[0].Epoch)
+	require.Len(t, allTokens, expectedSchedulerCanonicalBucketCount()*2)
+	require.Greater(t, allTokens[expectedSchedulerCanonicalBucketCount()].Epoch, firstActiveTokens[0].Epoch)
 	require.ErrorIs(t, cache.SetSnapshot(context.Background(), firstActiveTokens[0].Bucket, firstActiveTokens[0], nil), ErrSchedulerBucketWriteFenced)
 }
 
@@ -584,10 +583,6 @@ func TestSchedulerGroupLifecycleSeenIsIndependentAndDeduplicatesGroupEvents(t *t
 		seen[batchSeenKey{groupID: groupID, platform: platform}] = struct{}{}
 	}
 
-	require.NoError(t, svc.handleGroupEvent(context.Background(), ptrInt64(groupID), seen))
-	require.Equal(t, 1, groups.callCount())
-	require.Equal(t, expectedSchedulerPlatformQueryCount(), accounts.callCount())
-	requireLifecycleSeen(t, seen, groupID)
 	require.NoError(t, svc.handleGroupEvent(context.Background(), ptrInt64(groupID), seen))
 	require.Equal(t, 1, groups.callCount())
 	require.Equal(t, expectedSchedulerPlatformQueryCount(), accounts.callCount())

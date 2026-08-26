@@ -2043,7 +2043,7 @@ func TestIsPlatformPricingMatch(t *testing.T) {
 		{"composite matches gemini pricing", PlatformComposite, PlatformGemini, true},
 		{"composite matches kimi pricing", PlatformComposite, PlatformKimi, true},
 		{"composite matches zhipu pricing", PlatformComposite, PlatformZhipu, true},
-		{"composite matches deepseek pricing", PlatformComposite, PlatformDeepSeek, true},
+		{"composite matches deepseek pricing", PlatformComposite, PlatformDeepseek, true},
 		{"empty string matches nothing", "", PlatformAnthropic, false},
 		{"empty string matches empty", "", "", true},
 	}

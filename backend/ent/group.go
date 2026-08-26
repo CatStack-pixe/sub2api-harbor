@@ -4,6 +4,7 @@ package ent
 
 import (
 	"encoding/json"
+	"encoding/json/jsontext"
 	"fmt"
 	"strings"
 	"time"
@@ -100,7 +101,7 @@ type Group struct {
 	// 是否按上下文长度应用模型阶梯价格；默认开启以保持官方/渠道长上下文价
 	LongContextPricingEnabled bool `json:"long_context_pricing_enabled,omitempty"`
 	// 分组逐模型定价；优先级高于渠道和内置定价
-	ModelPricing json.RawMessage `json:"model_pricing,omitempty"`
+	ModelPricing jsontext.Value `json:"model_pricing,omitempty"`
 	// Whether the group global prompt is injected into supported text requests
 	GlobalPromptEnabled bool `json:"global_prompt_enabled,omitempty"`
 	// Static group-wide prompt injected before supported text requests

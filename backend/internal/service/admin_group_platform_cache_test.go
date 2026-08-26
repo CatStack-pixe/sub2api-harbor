@@ -26,17 +26,6 @@ func (r *groupPlatformRepoStub) Update(_ context.Context, group *Group) error {
 	return nil
 }
 
-type groupPlatformAccountRepoStub struct {
-	AccountRepository
-	accounts         []Account
-	listByGroupCalls int
-}
-
-func (r *groupPlatformAccountRepoStub) ListByGroup(_ context.Context, _ int64) ([]Account, error) {
-	r.listByGroupCalls++
-	return append([]Account(nil), r.accounts...), nil
-}
-
 type channelCacheInvalidatorSpy struct {
 	calls int
 }
@@ -95,56 +84,4 @@ func TestUpdateGroupWithoutChannelCacheInvalidator(t *testing.T) {
 	got, err := svc.UpdateGroup(context.Background(), 7, &UpdateGroupInput{Platform: PlatformOpenAI})
 	require.NoError(t, err)
 	require.Equal(t, PlatformOpenAI, got.Platform)
-}
-
-func TestUpdateGroupAllowsCrossPlatformBoundAccounts(t *testing.T) {
-	tests := []struct {
-		name            string
-		fromPlatform    string
-		toPlatform      string
-		accountPlatform string
-	}{
-		{
-			name:            "switching to NVIDIA keeps an OpenAI account bound",
-			fromPlatform:    PlatformOpenAI,
-			toPlatform:      PlatformNvidia,
-			accountPlatform: PlatformOpenAI,
-		},
-		{
-			name:            "switching from NVIDIA keeps an NVIDIA account bound",
-			fromPlatform:    PlatformNvidia,
-			toPlatform:      PlatformOpenAI,
-			accountPlatform: PlatformNvidia,
-		},
-		{
-			name:            "switching to NVIDIA accepts an NVIDIA account",
-			fromPlatform:    PlatformOpenAI,
-			toPlatform:      PlatformNvidia,
-			accountPlatform: PlatformNvidia,
-		},
-		{
-			name:            "switching from NVIDIA to composite accepts an NVIDIA account",
-			fromPlatform:    PlatformNvidia,
-			toPlatform:      PlatformComposite,
-			accountPlatform: PlatformNvidia,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			repo := &groupPlatformRepoStub{group: &Group{ID: 7, Name: "g", Platform: tt.fromPlatform}}
-			accountRepo := &groupPlatformAccountRepoStub{
-				accounts: []Account{{ID: 11, Platform: tt.accountPlatform}},
-			}
-			svc := &adminServiceImpl{groupRepo: repo, accountRepo: accountRepo}
-
-			got, err := svc.UpdateGroup(context.Background(), 7, &UpdateGroupInput{Platform: tt.toPlatform})
-
-			require.Zero(t, accountRepo.listByGroupCalls)
-			require.NoError(t, err)
-			require.NotNil(t, got)
-			require.Equal(t, tt.toPlatform, got.Platform)
-			require.NotNil(t, repo.updated)
-		})
-	}
 }

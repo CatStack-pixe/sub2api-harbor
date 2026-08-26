@@ -189,6 +189,7 @@ const xaiModels = [
   'grok-imagine',
   'grok-imagine-image-quality',
   'grok-imagine-image',
+  'grok-imagine-image-2.0',
   'grok-imagine-video',
   'grok-imagine-video-1.5-preview',
   'grok-imagine-video-1.5'
@@ -217,7 +218,9 @@ const yiModels = [
 const moonshotModels = [
   'kimi-k3', 'kimi-k2.6', 'kimi-k2.5', 'kimi-k2-thinking',
   'moonshot-v1-8k', 'moonshot-v1-32k', 'moonshot-v1-128k',
-  'kimi-latest', 'kimi-for-coding', 'kimi-k2'
+  'kimi-latest',
+  'kimi-for-coding',
+  'kimi-k2'
 ]
 
 // TokenRhythm's known channel models are DeepSeek V4. Keep them available
@@ -505,13 +508,13 @@ export function getModelsByPlatform(platform: string): string[] {
     case 'xai':
     case 'grok': return xaiModels
     case 'agnes': return agnesModels
-    case 'cohere': return cohereModels
-    case 'yi': return yiModels
-    case 'moonshot': return moonshotModels
-    case 'kimi': return moonshotModels
     case 'tokenrhythm': return tokenRhythmModels
     case 'chatanywhere': return chatAnywhereModels
     case 'glm': return glmModels
+    case 'cohere': return cohereModels
+    case 'yi': return yiModels
+    case 'moonshot':
+    case 'kimi': return moonshotModels
     case 'doubao': return doubaoModels
     case 'volcengine': return volcengineModels
     case 'minimax': return minimaxModels

@@ -124,7 +124,7 @@ func (s *CNProviderBalanceService) QueryBalanceForAccount(ctx context.Context, a
 
 func (s *CNProviderBalanceService) queryBalanceForAccount(ctx context.Context, account *Account) (*CNProviderBalanceResult, error) {
 	provider := account.Platform
-	if provider != PlatformKimi && provider != PlatformDeepSeek {
+	if provider != PlatformKimi && provider != PlatformDeepseek {
 		return nil, infraerrors.New(http.StatusBadRequest, "CN_BALANCE_NO_ENDPOINT", "account provider has no balance endpoint")
 	}
 
@@ -183,16 +183,25 @@ func (s *CNProviderBalanceService) queryBalanceForAccount(ctx context.Context, a
 		// Moonshot：code==0 成功；data.available_balance（number），单币种 CNY。
 		balance, _ := cnParseF64(gjson.GetBytes(bodyBytes, "data.available_balance").Value())
 		entries = append(entries, CNProviderBalanceEntry{Currency: "CNY", Balance: balance})
-	case PlatformDeepSeek:
+	case PlatformDeepseek:
 		// is_available 缺省视为 true（健康）；显式存在时取其值。
 		if v := gjson.GetBytes(bodyBytes, "is_available"); v.Exists() {
 			available = v.Bool()
 		}
 		// balance_infos 逐条解析：双币种账号同时返回 CNY + USD（数组顺序即
 		// 主次序，首条为主币种）。
-		gjson.GetBytes(bodyBytes, "balance_infos").ForEach(func(_, info gjson.Result) bool {
+		balanceInfos := gjson.GetBytes(bodyBytes, "balance_infos")
+		if !balanceInfos.Exists() || !balanceInfos.IsArray() {
+			result.Error = "Invalid balance response: missing balance_infos"
+			return result, nil
+		}
+		balanceInfos.ForEach(func(_, info gjson.Result) bool {
 			currency := strings.ToUpper(strings.TrimSpace(info.Get("currency").String()))
-			balance, _ := cnParseF64(info.Get("total_balance").Value())
+			totalBalance := info.Get("total_balance")
+			balance, ok := cnParseF64(totalBalance.Value())
+			if !totalBalance.Exists() || !ok {
+				return true
+			}
 			if currency == "" {
 				currency = "CNY"
 			}
@@ -200,7 +209,8 @@ func (s *CNProviderBalanceService) queryBalanceForAccount(ctx context.Context, a
 			return true
 		})
 		if len(entries) == 0 {
-			entries = append(entries, CNProviderBalanceEntry{Currency: "CNY"})
+			result.Error = "Invalid balance response: no valid balance entries"
+			return result, nil
 		}
 	}
 	result.Balances = entries
@@ -285,7 +295,7 @@ func cnBalanceURL(account *Account) string {
 	switch account.Platform {
 	case PlatformKimi:
 		return "https://api.moonshot.cn/v1/users/me/balance"
-	case PlatformDeepSeek:
+	case PlatformDeepseek:
 		// Anthropic 协议账号的凭证 base_url 指向 /anthropic 端点，余额探测需回退
 		// 到 OpenAI 格式 base（协议感知）再拼接 /user/balance。
 		return strings.TrimRight(account.GetOpenAIFormatBaseURL(), "/") + "/user/balance"

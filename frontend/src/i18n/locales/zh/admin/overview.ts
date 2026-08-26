@@ -578,6 +578,8 @@ export default {
         statusLabel: '状态',
         selectStatus: '选择状态',
         rpmLimit: '每分钟请求数 (RPM)',
+        concurrencyPlaceholder: '0 表示不限制',
+        concurrencyHint: '该用户的最大并发请求数，0 = 不限制',
         rpmLimitPlaceholder: '0 表示不限制',
         rpmLimitHint: '该用户每分钟最大请求数，0 = 不限制；仅在所用分组未设置 rpm_limit 时作为兜底生效'
       },
@@ -598,7 +600,7 @@ export default {
       failedToSave: '保存用户失败',
       failedToAdjust: '调整失败',
       emailRequired: '请输入邮箱',
-      concurrencyMin: '并发数不能小于1',
+      concurrencyNonNegative: '并发数不能为负数，0 表示不限制',
       amountRequired: '请输入有效金额',
       insufficientBalance: '余额不足',
       setAllowedGroups: '设置允许分组',
@@ -1019,14 +1021,6 @@ export default {
         longContext: '启用长上下文阶梯定价',
         longContextHint: '勾选后按渠道区间或官方预设阶梯计费；关闭后默认按第一档，账号显式开启时除外。',
         add: '添加模型价格'
-      },
-      globalPrompt: {
-        title: '分组全局提示词',
-        hint: '会在支持的文本请求中前置于客户端指令，并发送给上游；它不是安全边界。',
-        enabled: '已启用',
-        disabled: '未启用',
-        placeholder: '输入分组统一要求',
-        tooLong: '全局提示词不能超过 {max} 字节。'
       },
       voicePricing: {
         title: 'Grok Voice 定价',

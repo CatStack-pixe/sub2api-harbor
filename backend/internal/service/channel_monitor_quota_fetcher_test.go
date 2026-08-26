@@ -177,7 +177,7 @@ func TestQuotaFetcher_PayGAccountUsesCNBalance(t *testing.T) {
 	fetcher, _, _, cnBalance, accounts := newQuotaFetcherTestSetup(t)
 	accounts.accounts[11] = &Account{
 		ID:          11,
-		Platform:    domain.PlatformDeepSeek,
+		Platform:    domain.PlatformDeepseek,
 		Credentials: map[string]any{"account_mode": AccountModePayG},
 	}
 	cnBalance.result = &CNProviderBalanceResult{
@@ -235,7 +235,7 @@ func TestQuotaFetcher_LoadsAccountOnceAndPassesItThrough(t *testing.T) {
 
 	t.Run("cn payg", func(t *testing.T) {
 		fetcher, _, _, cnBalance, accounts := newQuotaFetcherTestSetup(t)
-		acc := &Account{ID: 23, Platform: domain.PlatformDeepSeek, Credentials: map[string]any{"account_mode": AccountModePayG}}
+		acc := &Account{ID: 23, Platform: domain.PlatformDeepseek, Credentials: map[string]any{"account_mode": AccountModePayG}}
 		accounts.accounts[23] = acc
 		cnBalance.result = &CNProviderBalanceResult{Success: true, Available: true, Balance: 1, Currency: "CNY"}
 

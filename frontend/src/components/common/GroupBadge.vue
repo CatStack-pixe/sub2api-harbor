@@ -165,27 +165,23 @@ const labelClass = computed(() => {
   if (props.platform === 'agnes') {
     return `${base} bg-cyan-200/70 text-cyan-900 dark:bg-cyan-900/50 dark:text-cyan-300`
   }
-  if (props.platform === 'deepseek') {
-    return `${base} bg-indigo-200/70 text-indigo-900 dark:bg-indigo-900/50 dark:text-indigo-300`
-  }
-  if (props.platform === 'kimi') {
-    return `${base} bg-sky-200/70 text-sky-900 dark:bg-sky-900/50 dark:text-sky-300`
-  }
   if (props.platform === 'nvidia') {
     return `${base} bg-lime-200/70 text-lime-900 dark:bg-lime-900/50 dark:text-lime-300`
   }
   if (props.platform === 'tokenrhythm') {
     return `${base} bg-teal-200/70 text-teal-900 dark:bg-teal-900/50 dark:text-teal-300`
   }
-  if (props.platform === 'chatanywhere') {
-    return `${base} bg-violet-200/70 text-violet-900 dark:bg-violet-900/50 dark:text-violet-300`
-  }
-  if (props.platform === 'glm') {
-    return `${base} bg-rose-200/70 text-rose-900 dark:bg-rose-900/50 dark:text-rose-300`
+  if (props.platform === 'kimi') {
+    return `${base} bg-pink-200/60 text-pink-800 dark:bg-pink-800/40 dark:text-pink-300`
   }
   if (props.platform === 'zhipu') {
     return `${base} bg-indigo-200/60 text-indigo-800 dark:bg-indigo-800/40 dark:text-indigo-300`
   }
+  if (props.platform === 'deepseek') {
+    return `${base} bg-teal-200/60 text-teal-800 dark:bg-teal-800/40 dark:text-teal-300`
+  }
+  if (props.platform === 'chatanywhere') return `${base} bg-violet-200/70 text-violet-900 dark:bg-violet-900/50 dark:text-violet-300`
+  if (props.platform === 'glm') return `${base} bg-rose-200/70 text-rose-900 dark:bg-rose-900/50 dark:text-rose-300`
   if (props.platform === 'modelscope') return `${base} bg-sky-200/70 text-sky-900 dark:bg-sky-900/50 dark:text-sky-300`
   if (props.platform === 'dashscope') return `${base} bg-orange-200/70 text-orange-900 dark:bg-orange-900/50 dark:text-orange-300`
   if (props.platform === 'minimax') return `${base} bg-blue-200/70 text-blue-900 dark:bg-blue-900/50 dark:text-blue-300`
@@ -233,16 +229,6 @@ const badgeClass = computed(() => {
       ? 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-300'
       : 'bg-cyan-50 text-cyan-800 dark:bg-cyan-900/20 dark:text-cyan-300'
   }
-  if (props.platform === 'deepseek') {
-    return isSubscription.value
-      ? 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300'
-      : 'bg-indigo-50 text-indigo-800 dark:bg-indigo-900/20 dark:text-indigo-300'
-  }
-  if (props.platform === 'kimi') {
-    return isSubscription.value
-      ? 'bg-sky-100 text-sky-800 dark:bg-sky-900/30 dark:text-sky-300'
-      : 'bg-sky-50 text-sky-800 dark:bg-sky-900/20 dark:text-sky-300'
-  }
   if (props.platform === 'nvidia') {
     return isSubscription.value
       ? 'bg-lime-100 text-lime-800 dark:bg-lime-900/30 dark:text-lime-300'
@@ -253,6 +239,21 @@ const badgeClass = computed(() => {
       ? 'bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-300'
       : 'bg-teal-50 text-teal-800 dark:bg-teal-900/20 dark:text-teal-300'
   }
+  if (props.platform === 'kimi') {
+    return isSubscription.value
+      ? 'bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-400'
+      : 'bg-pink-50 text-pink-700 dark:bg-pink-900/20 dark:text-pink-400'
+  }
+  if (props.platform === 'zhipu') {
+    return isSubscription.value
+      ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400'
+      : 'bg-indigo-50 text-indigo-700 dark:bg-indigo-900/20 dark:text-indigo-400'
+  }
+  if (props.platform === 'deepseek') {
+    return isSubscription.value
+      ? 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400'
+      : 'bg-teal-50 text-teal-700 dark:bg-teal-900/20 dark:text-teal-400'
+  }
   if (props.platform === 'chatanywhere') {
     return isSubscription.value
       ? 'bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-300'
@@ -262,11 +263,6 @@ const badgeClass = computed(() => {
     return isSubscription.value
       ? 'bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-300'
       : 'bg-rose-50 text-rose-800 dark:bg-rose-900/20 dark:text-rose-300'
-  }
-  if (props.platform === 'zhipu') {
-    return isSubscription.value
-      ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400'
-      : 'bg-indigo-50 text-indigo-700 dark:bg-indigo-900/20 dark:text-indigo-400'
   }
   if (props.platform === 'modelscope') {
     return isSubscription.value

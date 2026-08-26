@@ -53,6 +53,7 @@ export interface TimePricingPeriodFormEntry {
 
 export interface TimePricingFormEntry {
   timezone: string
+  weekdays_only: boolean
   periods: TimePricingPeriodFormEntry[]
 }
 
@@ -77,13 +78,14 @@ export const COMMON_TIMEZONES = [
 ]
 
 export function createDefaultTimePricingForm(): TimePricingFormEntry {
-  return { timezone: DEFAULT_TIME_PRICING_TIMEZONE, periods: [] }
+  return { timezone: DEFAULT_TIME_PRICING_TIMEZONE, weekdays_only: false, periods: [] }
 }
 
 export function apiTimePricingToForm(value: ChannelTimePricing | null | undefined): TimePricingFormEntry {
   if (!value) return createDefaultTimePricingForm()
   return {
     timezone: value.timezone || DEFAULT_TIME_PRICING_TIMEZONE,
+    weekdays_only: value.weekdays_only === true,
     periods: (value.periods || []).map(period => ({
       start_time: LEGACY_CLOCK_TIME.test(period.start_time) ? `${period.start_time}:00` : period.start_time,
       end_time: LEGACY_CLOCK_TIME.test(period.end_time) ? `${period.end_time}:00` : period.end_time,
@@ -97,6 +99,7 @@ export function formTimePricingToAPI(value: TimePricingFormEntry | null | undefi
   const timezone = typeof value.timezone === 'string' ? value.timezone.trim() : ''
   return {
     timezone,
+    weekdays_only: value.weekdays_only === true,
     periods: value.periods.map(period => ({
       start_time: period.start_time,
       end_time: period.end_time,
@@ -437,10 +440,10 @@ export function getPlatformTagClass(platform: string): string {
     case 'gemini': return 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
     case 'antigravity': return 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400'
     case 'grok': return 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
-    case 'deepseek': return 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400'
-    case 'nvidia': return 'bg-lime-100 text-lime-700 dark:bg-lime-900/30 dark:text-lime-400'
     case 'kimi': return 'bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-400'
     case 'zhipu': return 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400'
+    case 'deepseek': return 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400'
+    case 'nvidia': return 'bg-lime-100 text-lime-700 dark:bg-lime-900/30 dark:text-lime-400'
     default: return 'bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400'
   }
 }
@@ -453,10 +456,10 @@ export function getPlatformTextClass(platform: string): string {
     case 'gemini': return 'text-blue-700 dark:text-blue-400'
     case 'antigravity': return 'text-purple-700 dark:text-purple-400'
     case 'grok': return 'text-slate-700 dark:text-slate-300'
-    case 'deepseek': return 'text-indigo-700 dark:text-indigo-400'
-    case 'nvidia': return 'text-lime-700 dark:text-lime-400'
     case 'kimi': return 'text-pink-700 dark:text-pink-400'
     case 'zhipu': return 'text-indigo-700 dark:text-indigo-400'
+    case 'deepseek': return 'text-indigo-700 dark:text-indigo-400'
+    case 'nvidia': return 'text-lime-700 dark:text-lime-400'
     default: return ''
   }
 }

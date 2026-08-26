@@ -12,11 +12,11 @@ import (
 )
 
 // 探测资格：/v1/sub2api/billing 是 key 级端点，全部
-// 受支持平台（含 fork 与国产供应商）的 API-key 账号都可开启探测；OAuth/Bedrock 无静态 Key 仍不合格。
+// 受支持平台（含国产供应商）的 API-key 账号都可开启探测；OAuth/Bedrock 无静态 Key 仍不合格。
 func TestUpstreamBillingProbeIdentityCoversAllAPIKeyPlatforms(t *testing.T) {
 	for _, platform := range []string{
 		PlatformOpenAI, PlatformGrok, PlatformAnthropic, PlatformGemini, PlatformAntigravity,
-		PlatformNvidia, PlatformTokenRhythm, PlatformKimi, PlatformZhipu, PlatformDeepSeek,
+		PlatformKimi, PlatformZhipu, PlatformDeepseek,
 	} {
 		require.True(t, IsUpstreamBillingProbeIdentity(platform, AccountTypeAPIKey), platform)
 		require.True(t, isUpstreamBillingProbeAccount(&Account{Platform: platform, Type: AccountTypeAPIKey}), platform)
@@ -131,8 +131,8 @@ func TestUpstreamBillingProbeOfficialAPIBaseURLIsUnsupportedWithoutRequest(t *te
 		{PlatformKimi, "https://api.kimi.com/coding"},
 		{PlatformZhipu, "https://open.bigmodel.cn/api/paas/v4"},
 		{PlatformZhipu, "https://open.bigmodel.cn/api/anthropic"},
-		{PlatformDeepSeek, "https://api.deepseek.com"},
-		{PlatformDeepSeek, "https://api.deepseek.com/anthropic"},
+		{PlatformDeepseek, "https://api.deepseek.com"},
+		{PlatformDeepseek, "https://api.deepseek.com/anthropic"},
 	}
 	for i, tc := range cases {
 		account := &Account{

@@ -27,12 +27,12 @@ type stubAdminService struct {
 	createdProxies                      []*service.CreateProxyInput
 	updatedProxyIDs                     []int64
 	updatedProxies                      []*service.UpdateProxyInput
+	updateProxyErr                      error
 	testedProxyIDs                      []int64
 	getUserErr                          error
 	createAccountErr                    error
 	createSparkShadowErr                error
 	updateAccountErr                    error
-	updateProxyErr                      error
 	lastUpdateAccountInput              *service.UpdateAccountInput
 	bulkUpdateAccountErr                error
 	lastBulkUpdateAccountInput          *service.BulkUpdateAccountsInput

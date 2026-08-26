@@ -1698,7 +1698,7 @@ func TestAPIKeyAuthModelRestrictionCoversStandaloneSearchDefaults(t *testing.T) 
 		},
 		"blocked-key": {
 			ID: 104, UserID: user.ID, Key: "blocked-key", Status: service.StatusActive, GroupID: &groupID,
-			ModelWhitelist: []string{"grok-4.6"}, User: user, Group: group,
+			ModelWhitelist: []string{"grok-4.5"}, User: user, Group: group,
 		},
 	}
 	repo := &stubApiKeyRepo{getByKey: func(_ context.Context, key string) (*service.APIKey, error) {

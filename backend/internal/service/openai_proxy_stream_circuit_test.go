@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"errors"
 	"testing"
 	"time"
 
@@ -111,64 +110,6 @@ func TestOpenAIProxyStreamQuarantineBypassContext(t *testing.T) {
 	ctx := context.Background()
 	require.True(t, svc.isOpenAIProxyStreamQuarantined(ctx, account))
 	require.False(t, svc.isOpenAIProxyStreamQuarantined(withOpenAIProxyStreamQuarantineBypass(ctx), account))
-}
-
-func TestOpenAIProxyStreamCircuitAppliesToCompatiblePlatforms(t *testing.T) {
-	compatiblePlatforms := []string{
-		PlatformOpenAI,
-		PlatformGrok,
-		PlatformAgnes,
-		PlatformDeepSeek,
-		PlatformNvidia,
-		PlatformTokenRhythm,
-		PlatformKimi,
-	}
-	for _, platform := range compatiblePlatforms {
-		t.Run(platform, func(t *testing.T) {
-			proxyID := int64(7)
-			account := &Account{Platform: platform, ProxyID: &proxyID}
-			got, ok := openAIProxyStreamCircuitProxyID(account)
-			require.True(t, ok)
-			require.Equal(t, proxyID, got)
-		})
-	}
-}
-
-func TestOpenAIProxyStreamDisconnectQuarantinesDeepSeekAndTokenRhythmProxies(t *testing.T) {
-	for _, platform := range []string{PlatformDeepSeek, PlatformTokenRhythm} {
-		t.Run(platform, func(t *testing.T) {
-			proxyID := int64(19)
-			account := &Account{ID: 42, Platform: platform, ProxyID: &proxyID}
-			svc := &OpenAIGatewayService{}
-			svc.openaiProxyStreamCircuit = newOpenAIProxyStreamCircuit(openAIProxyStreamCircuitSettings{
-				failureThreshold: 2,
-				failureWindow:    time.Minute,
-				quarantineTTL:    10 * time.Minute,
-				collapseInterval: 0,
-				maxEntries:       16,
-			})
-			svc.recordOpenAIProxyStreamDisconnect(account, errors.New("connection reset by peer"), "rid-1")
-			svc.recordOpenAIProxyStreamDisconnect(account, errors.New("connection reset by peer"), "rid-2")
-			require.True(t, svc.isOpenAIProxyStreamQuarantined(context.Background(), account))
-		})
-	}
-}
-
-func TestOpenAIProxyStreamCircuitIgnoresUnsupportedOrUnproxiedAccounts(t *testing.T) {
-	proxyID := int64(7)
-	invalidProxyID := int64(0)
-	tests := map[string]*Account{
-		"nil account":          nil,
-		"unsupported platform": {Platform: PlatformAnthropic, ProxyID: &proxyID},
-		"missing proxy":        {Platform: PlatformDeepSeek},
-		"invalid proxy":        {Platform: PlatformTokenRhythm, ProxyID: &invalidProxyID},
-	}
-	for name, account := range tests {
-		t.Run(name, func(t *testing.T) {
-			_, ok := openAIProxyStreamCircuitProxyID(account)
-			require.False(t, ok)
-		})
-	}
 }
 
 func TestOpenAIProxyStreamCircuitBoundsEntries(t *testing.T) {

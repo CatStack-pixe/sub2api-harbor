@@ -9,8 +9,6 @@ import (
 	"golang.org/x/net/http/httpguts"
 )
 
-// 请求头覆写（header override）：对 Anthropic / OpenAI / Agnes / DeepSeek 平台
-// 的 api_key 账号以及 Grok 平台的 api_key / oauth 账号生效。
 // 请求头覆写（header override）：对 Anthropic / OpenAI / Kimi / Zhipu / DeepSeek
 // 平台的 api_key 账号，以及 Grok 平台的 api_key / oauth 账号生效。
 // 管理员在账号上配置一组 header name -> value，转发到上游前用配置值覆盖同名请求头
@@ -72,7 +70,7 @@ func isHeaderOverrideBlockedName(lowerName string) bool {
 }
 
 // IsHeaderOverrideEligible 报告账号类型是否支持请求头覆写。
-// Supported API-compatible providers only allow api_key accounts.
+// Anthropic / OpenAI / Kimi / Zhipu / DeepSeek 仅开放 api_key 账号；
 // Grok 额外开放 oauth 账号——
 // 订阅流量改发自定义转发地址时，通常需要补充中间层要求的准入头。
 func (a *Account) IsHeaderOverrideEligible() bool {
@@ -81,7 +79,8 @@ func (a *Account) IsHeaderOverrideEligible() bool {
 	}
 	switch a.Platform {
 	case PlatformAnthropic, PlatformOpenAI, PlatformAgnes, PlatformDeepSeek, PlatformNvidia,
-		PlatformTokenRhythm, PlatformKimi, PlatformZhipu, PlatformChatAnywhere, PlatformGLM, PlatformModelScope, PlatformDashScope, PlatformMiniMax, PlatformVolcengine:
+		PlatformTokenRhythm, PlatformKimi, PlatformZhipu, PlatformChatAnywhere, PlatformGLM,
+		PlatformModelScope, PlatformDashScope, PlatformMiniMax, PlatformVolcengine:
 		return a.Type == AccountTypeAPIKey
 	case PlatformGrok:
 		return a.Type == AccountTypeAPIKey || a.Type == AccountTypeOAuth

@@ -249,6 +249,15 @@ func (s *EmailService) sendEmailWithConfigAt(ctx context.Context, config *SMTPCo
 // smtpTestRootCAs 仅供单元测试注入自签 CA，生产环境始终为 nil（走系统信任链）。
 var smtpTestRootCAs *x509.CertPool
 
+func smtpTLSConfig(host string) *tls.Config {
+	return &tls.Config{
+		ServerName: host,
+		// 强制 TLS 1.2+，避免协议降级导致的弱加密风险。
+		MinVersion: tls.VersionTLS12,
+		RootCAs:    smtpTestRootCAs,
+	}
+}
+
 type smtpClient struct {
 	*smtp.Client
 	stopContextWatch func() bool
@@ -262,15 +271,6 @@ func (c *smtpClient) close() {
 		c.stopContextWatch()
 	}
 	_ = c.Close()
-}
-
-func smtpTLSConfig(host string) *tls.Config {
-	return &tls.Config{
-		ServerName: host,
-		// 强制 TLS 1.2+，避免协议降级导致的弱加密风险。
-		MinVersion: tls.VersionTLS12,
-		RootCAs:    smtpTestRootCAs,
-	}
 }
 
 // Port 465 uses implicit TLS. Other TLS-enabled ports use one connection and

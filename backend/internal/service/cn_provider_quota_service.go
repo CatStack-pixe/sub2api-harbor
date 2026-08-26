@@ -139,6 +139,11 @@ func (s *CNProviderQuotaService) queryUsageForAccount(ctx context.Context, accou
 	}
 
 	baseURL := account.GetOpenAIBaseURL()
+	if provider == PlatformKimi {
+		if configured := strings.TrimRight(strings.TrimSpace(account.GetCredential("base_url")), "/"); configured != "" {
+			baseURL = configured
+		}
+	}
 	var (
 		targetURL  string
 		authHeader string

@@ -61,10 +61,9 @@ func NewModelPricingResolver(channelService *ChannelService, billingService *Bil
 
 // PricingInput 定价解析输入
 type PricingInput struct {
-	Model   string
-	GroupID *int64 // nil 表示不检查渠道
-	Group   *Group
-
+	Model     string
+	GroupID   *int64 // nil 表示不检查渠道
+	Group     *Group
 	PricingAt time.Time
 }
 

@@ -71,11 +71,11 @@ func (r *channelRepository) UpdateModelPricing(ctx context.Context, pricing *ser
 		}
 		result, err := tx.ExecContext(ctx,
 			`UPDATE channel_model_pricing
-		 SET models = $1, billing_mode = $2, input_price = $3, output_price = $4, cache_write_price = $5, cache_read_price = $6, fast_multiplier = $7, flex_multiplier = $8, image_input_price = $9, image_output_price = $10, per_request_price = $11, time_pricing = $12, platform = $13, updated_at = NOW()
-		 WHERE id = $14`,
+			 SET models = $1, billing_mode = $2, input_price = $3, output_price = $4, cache_write_price = $5, cache_read_price = $6, fast_multiplier = $7, flex_multiplier = $8, image_input_price = $9, image_output_price = $10, per_request_price = $11, time_pricing = $12, platform = $13, updated_at = NOW()
+			 WHERE id = $14`,
 			modelsJSON, billingMode, pricing.InputPrice, pricing.OutputPrice, pricing.CacheWritePrice, pricing.CacheReadPrice,
-			pricing.FastMultiplier, pricing.FlexMultiplier, pricing.ImageInputPrice, pricing.ImageOutputPrice,
-			pricing.PerRequestPrice, timePricingJSON, pricing.Platform, pricing.ID,
+			pricing.FastMultiplier, pricing.FlexMultiplier, pricing.ImageInputPrice, pricing.ImageOutputPrice, pricing.PerRequestPrice,
+			timePricingJSON, pricing.Platform, pricing.ID,
 		)
 		if err != nil {
 			return fmt.Errorf("update model pricing: %w", err)
@@ -327,15 +327,6 @@ func createModelPricingExec(ctx context.Context, exec dbExec, pricing *service.C
 	return nil
 }
 
-func createTimeWindowExec(ctx context.Context, exec dbExec, window *service.PricingTimeWindow) error {
-	return exec.QueryRowContext(ctx,
-		`INSERT INTO channel_pricing_time_windows
-		 (pricing_id, start_minute, end_minute, input_price, output_price, cache_write_price, cache_read_price, sort_order)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id, created_at, updated_at`,
-		window.PricingID, window.StartMinute, window.EndMinute, window.InputPrice, window.OutputPrice, window.CacheWritePrice, window.CacheReadPrice, window.SortOrder,
-	).Scan(&window.ID, &window.CreatedAt, &window.UpdatedAt)
-}
-
 func marshalChannelTimePricing(config *service.ChannelTimePricing) (any, error) {
 	if config == nil || len(config.Periods) == 0 {
 		return nil, nil
@@ -368,6 +359,16 @@ func createIntervalExec(ctx context.Context, exec dbExec, iv *service.PricingInt
 		iv.InputMultiplier, iv.OutputMultiplier, iv.CacheWriteMultiplier, iv.CacheReadMultiplier,
 		iv.PerRequestPrice, iv.SortOrder,
 	).Scan(&iv.ID, &iv.CreatedAt, &iv.UpdatedAt)
+}
+
+func createTimeWindowExec(ctx context.Context, exec dbExec, window *service.PricingTimeWindow) error {
+	return exec.QueryRowContext(ctx,
+		`INSERT INTO channel_pricing_time_windows
+			 (pricing_id, start_minute, end_minute, input_price, output_price, cache_write_price, cache_read_price, sort_order)
+			 VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id, created_at, updated_at`,
+		window.PricingID, window.StartMinute, window.EndMinute, window.InputPrice, window.OutputPrice,
+		window.CacheWritePrice, window.CacheReadPrice, window.SortOrder,
+	).Scan(&window.ID, &window.CreatedAt, &window.UpdatedAt)
 }
 
 func replaceModelPricingTx(ctx context.Context, exec dbExec, channelID int64, pricingList []service.ChannelModelPricing) error {

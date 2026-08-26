@@ -279,7 +279,6 @@ func (r *groupRepository) Update(ctx context.Context, groupIn *service.Group) er
 	if err != nil && !errors.Is(err, dbent.ErrTxStarted) {
 		return err
 	}
-
 	txClient := r.client
 	if err == nil {
 		defer func() { _ = tx.Rollback() }()

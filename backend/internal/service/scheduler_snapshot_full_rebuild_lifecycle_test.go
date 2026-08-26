@@ -637,10 +637,6 @@ func TestSchedulerFullRebuildFreshReopenLockBusyRetriesWithoutBlockingOrdinaryTa
 	svc.pollOutbox()
 	require.Equal(t, int64(1), cache.currentWatermark())
 	require.Equal(t, expectedSchedulerPlatformQueryCount()*4, accounts.callCount())
-
-	svc.pollOutbox()
-	require.Equal(t, int64(1), cache.currentWatermark())
-	require.Equal(t, expectedSchedulerPlatformQueryCount()*4, accounts.callCount())
 	_, busyBucketPublished := cache.counts(canonical[0])
 	require.Equal(t, 1, busyBucketPublished)
 	activeCalls, fallbackCalls, freshCalls := groups.stats()

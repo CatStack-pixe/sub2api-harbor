@@ -161,15 +161,21 @@ func DetectModelPlatform(model string) (string, bool) {
 		return PlatformGemini, true
 	case normalized == "grok" || strings.HasPrefix(normalized, "grok-"):
 		return PlatformGrok, true
+	case normalized == "k3",
+		normalized == "k3-256k",
+		strings.HasPrefix(normalized, "kimi-"),
+		strings.HasPrefix(normalized, "moonshot-"):
+		return PlatformKimi, true
 	case strings.HasPrefix(normalized, "agnes-"):
 		return PlatformAgnes, true
 	case strings.HasPrefix(normalized, "deepseek-"):
 		return PlatformDeepSeek, true
 	case strings.HasPrefix(normalized, "nvidia-"):
 		return PlatformNvidia, true
-	case strings.HasPrefix(normalized, "kimi-"),
-		strings.HasPrefix(normalized, "moonshot-"):
-		return PlatformKimi, true
+	case strings.HasPrefix(normalized, "tokenrhythm-"):
+		return PlatformTokenRhythm, true
+	case strings.HasPrefix(normalized, "chatanywhere-"):
+		return PlatformChatAnywhere, true
 	case strings.HasPrefix(normalized, "glm-"):
 		return PlatformGLM, true
 	case strings.HasPrefix(normalized, "qwen-"):

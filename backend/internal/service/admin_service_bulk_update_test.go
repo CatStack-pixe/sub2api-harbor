@@ -18,7 +18,6 @@ type accountRepoStubForBulkUpdate struct {
 	accountRepoStub
 	bulkUpdateErr       error
 	bulkUpdateIDs       []int64
-	bulkUpdate          AccountBulkUpdate
 	bulkUpdateCalls     int
 	lastBulkUpdate      AccountBulkUpdate
 	bindGroupErrByID    map[int64]error
@@ -53,11 +52,10 @@ type accountRepoStubForBulkUpdate struct {
 	}
 }
 
-func (s *accountRepoStubForBulkUpdate) BulkUpdate(_ context.Context, ids []int64, update AccountBulkUpdate) (int64, error) {
+func (s *accountRepoStubForBulkUpdate) BulkUpdate(_ context.Context, ids []int64, updates AccountBulkUpdate) (int64, error) {
 	s.bulkUpdateCalls++
 	s.bulkUpdateIDs = append([]int64{}, ids...)
-	s.bulkUpdate = update
-	s.lastBulkUpdate = update
+	s.lastBulkUpdate = updates
 	if s.bulkUpdateErr != nil {
 		return 0, s.bulkUpdateErr
 	}
@@ -300,9 +298,9 @@ func TestAdminService_BulkUpdateAccountsStripsGrokProviderManagedCredentials(t *
 
 	require.NoError(t, err)
 	require.NotNil(t, result)
-	require.Equal(t, "https://api.x.ai/v1", repo.bulkUpdate.Credentials["base_url"])
-	require.NotContains(t, repo.bulkUpdate.Credentials, "subscription_tier")
-	require.NotContains(t, repo.bulkUpdate.Credentials, "entitlement_status")
+	require.Equal(t, "https://api.x.ai/v1", repo.lastBulkUpdate.Credentials["base_url"])
+	require.NotContains(t, repo.lastBulkUpdate.Credentials, "subscription_tier")
+	require.NotContains(t, repo.lastBulkUpdate.Credentials, "entitlement_status")
 }
 
 func TestAdminService_BulkUpdateAccounts_NilGroupRepoReturnsError(t *testing.T) {

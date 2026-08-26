@@ -37,6 +37,7 @@ import riskControlAPI from './riskControl'
 import adminComplianceAPI from './compliance'
 import auditAPI from './audit'
 import heartbeatAPI from './heartbeat'
+import pluginsAPI from './plugins'
 
 /**
  * Unified admin API object for convenient access
@@ -76,6 +77,7 @@ export const adminAPI = {
   compliance: adminComplianceAPI,
   audit: auditAPI,
   heartbeat: heartbeatAPI,
+  plugins: pluginsAPI
 }
 
 export {
@@ -113,6 +115,7 @@ export {
   adminComplianceAPI,
   auditAPI,
   heartbeatAPI,
+  pluginsAPI
 }
 
 export default adminAPI
@@ -125,11 +128,17 @@ export type { BackupAgentHealth, DataManagementConfig } from './dataManagement'
 export type { TLSFingerprintProfile, CreateProfileRequest, UpdateProfileRequest } from './tlsFingerprintProfile'
 export type { ContentModerationConfig, ContentModerationLog, ModerationMode } from './riskControl'
 export type {
+  PluginInstallation,
+  PluginCompatibility,
+  PluginUISession,
+  PluginTestResult
+} from './plugins'
+export type {
   HeartbeatConfig,
   HeartbeatConfigUpdate,
   HeartbeatGroupOption,
   HeartbeatOptions,
   HeartbeatProxyGroupOption,
   HeartbeatStatus,
-  HeartbeatTarget,
+  HeartbeatTarget
 } from './heartbeat'

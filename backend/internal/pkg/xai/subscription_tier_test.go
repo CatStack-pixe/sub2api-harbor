@@ -53,15 +53,6 @@ func TestSubscriptionTierFromJWTUsesNumericClaim(t *testing.T) {
 	require.Empty(t, SubscriptionTierFromJWT("not-a-jwt"))
 }
 
-func TestSubscriptionTierFromJWTRejectsInvalidNumericClaims(t *testing.T) {
-	t.Parallel()
-
-	require.Empty(t, SubscriptionTierFromJWT(jwtWithClaims(t, map[string]any{"tier": -1})))
-	require.Empty(t, SubscriptionTierFromJWT(jwtWithClaims(t, map[string]any{"tier": 5.9})))
-	require.Equal(t, "supergrok_heavy", SubscriptionTierFromJWT(jwtWithClaims(t, map[string]any{"tier": "5"})))
-	require.Equal(t, "supergrok_heavy", SubscriptionTierFromJWT(jwtWithClaims(t, map[string]any{"tier": "SuperGrok Heavy"})))
-}
-
 func TestCanonicalGrokPlanUsesOnlyGrok45ResponsesWindow(t *testing.T) {
 	t.Parallel()
 

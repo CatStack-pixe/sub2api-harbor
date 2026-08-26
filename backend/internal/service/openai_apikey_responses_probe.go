@@ -128,7 +128,7 @@ func (s *AccountTestService) ProbeOpenAIAPIKeyResponsesSupport(ctx context.Conte
 		// 例外：deepseek 的固定 responses 和 adaptive 账号使用官方原生 /responses
 		// 端点，落标 force_responses；其余协议显式重置为 auto，避免切换后残留强制模式。
 		if account.GetAPIProtocol() == APIProtocolResponses ||
-			(account.Platform == PlatformDeepSeek && account.IsAdaptiveAPIProtocol()) {
+			(account.Platform == PlatformDeepseek && account.IsAdaptiveAPIProtocol()) {
 			_ = s.accountRepo.UpdateExtra(ctx, account.ID, map[string]any{
 				openai_compat.ExtraKeyResponsesMode:      string(openai_compat.ResponsesSupportModeForceResponses),
 				openai_compat.ExtraKeyResponsesSupported: true,
