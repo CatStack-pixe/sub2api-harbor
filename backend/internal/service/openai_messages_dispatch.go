@@ -78,6 +78,12 @@ func (g *Group) ResolveMessagesDispatchModel(requestedModel string) string {
 		}
 		return xai.ModelMappingWithOptions(opts)["claude-*"]
 	}
+	if g.Platform == PlatformAgnes {
+		if claudeMessagesDispatchFamily(requestedModel) != "" {
+			return AgnesDefaultModel
+		}
+		return ""
+	}
 
 	// 国产供应商分组:调度级模型映射不适用(其配置被 sanitize 置空,且下方的
 	// gpt-5.x 默认值是 openai 专属,发给 CN 上游必错)。模型改写完全交给账号级

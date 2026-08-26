@@ -207,9 +207,18 @@ const upstreamSyncPlatforms = new Set([
   'gemini',
   'antigravity',
   'grok',
+  'agnes',
+  'deepseek',
   'kimi',
+  'nvidia',
+  'tokenrhythm',
   'zhipu',
-  'deepseek'
+  'chatanywhere',
+  'glm',
+  'modelscope',
+  'dashscope',
+  'minimax',
+  'volcengine'
 ])
 const canSyncUpstream = computed(() => {
   if (props.accountId) {

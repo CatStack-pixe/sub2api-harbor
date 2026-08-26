@@ -1632,7 +1632,7 @@
             }}
           </p>
           <div
-            v-if="account?.type === 'apikey'"
+            v-if="supportsGenericUpstreamBillingProbe"
             class="mt-3 flex items-center justify-between gap-3"
           >
             <div class="min-w-0">
@@ -1857,7 +1857,7 @@
       </div>
 
       <div
-        v-if="account?.type === 'apikey'"
+        v-if="supportsGenericUpstreamBillingProbe"
         class="flex items-center justify-between gap-4 border-t border-gray-200 pt-4 dark:border-dark-600"
       >
         <div>
@@ -3249,6 +3249,22 @@ const autoResetCredit5hThreshold = ref(100)
 const autoResetCredit7dThreshold = ref(100)
 const upstreamBillingAutoProbeEnabled = ref(false)
 const upstreamBillingRateSyncEnabled = ref(false)
+const genericUpstreamBillingProbeExcludedPlatforms = new Set([
+  'deepseek',
+  'kimi',
+  'tokenrhythm',
+  'chatanywhere',
+  'glm',
+  'modelscope',
+  'dashscope',
+  'minimax',
+  'volcengine'
+])
+const supportsGenericUpstreamBillingProbe = computed(() => {
+  const platform = props.account?.platform
+  return props.account?.type === 'apikey' &&
+    !genericUpstreamBillingProbeExcludedPlatforms.has(platform || '')
+})
 const mixedScheduling = ref(false) // For antigravity accounts: enable mixed scheduling
 const allowOverages = ref(false) // For antigravity accounts: enable AI Credits overages
 const antigravityProjectId = ref('')
@@ -3789,7 +3805,8 @@ const syncFormFromAccount = (newAccount: Account | null) => {
 		typeof extra?.auto_reset_credit_5h_threshold === 'number' ? extra.auto_reset_credit_5h_threshold * 100 : 100
 	autoResetCredit7dThreshold.value =
 		typeof extra?.auto_reset_credit_7d_threshold === 'number' ? extra.auto_reset_credit_7d_threshold * 100 : 100
-	upstreamBillingAutoProbeEnabled.value = extra?.upstream_billing_probe_enabled === true
+	upstreamBillingAutoProbeEnabled.value =
+    supportsGenericUpstreamBillingProbe.value && extra?.upstream_billing_probe_enabled === true
   upstreamBillingRateSyncEnabled.value =
     upstreamBillingAutoProbeEnabled.value && extra?.upstream_billing_rate_sync_enabled === true
 
@@ -4740,7 +4757,7 @@ const handleSubmit = async () => {
       updatePayload.load_factor = 0
     }
     updatePayload.auto_pause_on_expired = autoPauseOnExpired.value
-    if (props.account.type === 'apikey') {
+    if (supportsGenericUpstreamBillingProbe.value) {
       updatePayload.upstream_billing_probe_enabled = upstreamBillingAutoProbeEnabled.value
       updatePayload.upstream_billing_rate_sync_enabled = upstreamBillingRateSyncEnabled.value
       if (upstreamBillingRateSyncEnabled.value) {

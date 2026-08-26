@@ -1596,6 +1596,16 @@
             v-model="apiKeyBaseUrl"
             type="text"
             class="input"
+            readonly
+            data-testid="glm-base-url"
+            placeholder="https://open.bigmodel.cn/api/paas/v4"
+          />
+          <input
+            v-else
+            v-model="apiKeyBaseUrl"
+            type="text"
+            class="input"
+            :readonly="form.platform === 'tokenrhythm'"
             :placeholder="apiKeyBaseUrlPlaceholder"
           />
           <p v-if="baseUrlHint" class="input-hint">{{ baseUrlHint }}</p>
@@ -1643,6 +1653,28 @@
             :placeholder="apiKeyValuePlaceholder"
           />
           <p v-if="apiKeyHint" class="input-hint">{{ apiKeyHint }}</p>
+        </div>
+
+        <div v-if="form.platform === 'tokenrhythm'">
+          <TokenRhythmSessionResolver
+            v-model:api-key="apiKeyValue"
+            :proxy-id="form.proxy_id"
+            :account-name="form.name"
+            :credential-cookie="tokenRhythmCookie"
+            @resolved="tokenRhythmCookie = $event"
+            @api-key-created="tokenRhythmCookie = $event.tokenrhythm_cookie || tokenRhythmCookie"
+          />
+          <label class="input-label">{{ t('admin.accounts.tokenrhythm.cookie') }}</label>
+          <textarea
+            v-model="tokenRhythmCookie"
+            required
+            rows="3"
+            class="input font-mono"
+            autocomplete="off"
+            spellcheck="false"
+            :placeholder="t('admin.accounts.tokenrhythm.cookiePlaceholder')"
+          ></textarea>
+          <p class="input-hint">{{ t('admin.accounts.tokenrhythm.cookieHint') }}</p>
         </div>
 
         <!-- 上游倍率自动探测：全部 API-key 平台可用（所在区块已限定 apikey 类型） -->
@@ -4116,6 +4148,7 @@ import Toggle from '@/components/common/Toggle.vue'
 import GrokBaseUrlPresets from '@/components/account/GrokBaseUrlPresets.vue'
 import CnBaseUrlPresets from '@/components/account/CnBaseUrlPresets.vue'
 import HeaderOverrideEditor from '@/components/account/HeaderOverrideEditor.vue'
+import TokenRhythmSessionResolver from '@/components/account/TokenRhythmSessionResolver.vue'
 import { allSelectedGroupsEnableLongContextPricing } from '@/components/account/longContextBilling'
 import {
   applyAntigravityProjectID,
@@ -4220,6 +4253,24 @@ const apiKeyBaseUrlPlaceholder = computed(() => {
       return 'https://generativelanguage.googleapis.com'
     case 'grok':
       return 'https://api.x.ai/v1'
+    case 'agnes':
+      return 'https://apihub.agnes-ai.com/v1'
+    case 'nvidia':
+      return 'https://integrate.api.nvidia.com/v1'
+    case 'tokenrhythm':
+      return 'https://tokenrhythm.studio/v1'
+    case 'chatanywhere':
+      return 'https://api.chatanywhere.tech/v1'
+    case 'glm':
+      return 'https://open.bigmodel.cn/api/paas/v4'
+    case 'modelscope':
+      return 'https://api-inference.modelscope.cn/v1'
+    case 'dashscope':
+      return 'https://dashscope.aliyuncs.com/compatible-mode/v1'
+    case 'minimax':
+      return 'https://api.minimaxi.com/v1'
+    case 'volcengine':
+      return 'https://ark.cn-beijing.volces.com/api/v3'
     default:
       return 'https://api.anthropic.com'
   }
@@ -4239,6 +4290,21 @@ const apiKeyValuePlaceholder = computed(() => {
       return '<api-key>.<secret>'
     case 'deepseek':
       return 'sk-...'
+    case 'nvidia':
+      return 'nvapi-...'
+    case 'agnes':
+    case 'tokenrhythm':
+    case 'chatanywhere':
+      return 'sk-...'
+    case 'glm':
+      return '<api-key>.<secret>'
+    case 'modelscope':
+      return 'ms-...'
+    case 'dashscope':
+    case 'minimax':
+      return 'sk-...'
+    case 'volcengine':
+      return 'ark-...'
     default:
       return 'sk-ant-...'
   }
@@ -4954,14 +5020,21 @@ watch(
     if (newPlatform === 'kimi' || newPlatform === 'zhipu' || newPlatform === 'deepseek') {
       apiKeyBaseUrl.value = defaultCNBaseUrl(newPlatform, accountMode.value, apiProtocol.value)
     } else {
-      apiKeyBaseUrl.value =
-        (newPlatform === 'openai')
-          ? 'https://api.openai.com'
-          : newPlatform === 'gemini'
-            ? 'https://generativelanguage.googleapis.com'
-            : newPlatform === 'grok'
-              ? 'https://api.x.ai/v1'
-              : 'https://api.anthropic.com'
+      const platformDefaults: Record<string, string> = {
+        openai: 'https://api.openai.com',
+        gemini: 'https://generativelanguage.googleapis.com',
+        grok: 'https://api.x.ai/v1',
+        agnes: 'https://apihub.agnes-ai.com/v1',
+        nvidia: 'https://integrate.api.nvidia.com/v1',
+        tokenrhythm: 'https://tokenrhythm.studio/v1',
+        chatanywhere: 'https://api.chatanywhere.tech/v1',
+        glm: 'https://open.bigmodel.cn/api/paas/v4',
+        modelscope: 'https://api-inference.modelscope.cn/v1',
+        dashscope: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+        minimax: 'https://api.minimaxi.com/v1',
+        volcengine: 'https://ark.cn-beijing.volces.com/api/v3'
+      }
+      apiKeyBaseUrl.value = platformDefaults[newPlatform] || 'https://api.anthropic.com'
     }
     // Clear model-related settings
     allowedModels.value = []

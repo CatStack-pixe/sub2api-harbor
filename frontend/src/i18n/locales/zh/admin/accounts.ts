@@ -307,9 +307,18 @@ export default {
         gemini: 'Gemini',
         antigravity: 'Antigravity',
         grok: 'Grok',
+        agnes: 'Agnes',
         kimi: 'Kimi',
         zhipu: 'Zhipu GLM',
         deepseek: 'DeepSeek',
+        nvidia: 'NVIDIA',
+        tokenrhythm: 'TokenRhythm',
+        chatanywhere: 'ChatAnywhere',
+        glm: 'GLM',
+        modelscope: 'ModelScope',
+        dashscope: 'DashScope',
+        minimax: 'MiniMax',
+        volcengine: 'Volcengine Ark',
       },
       cnProviders: {
         accountMode: {

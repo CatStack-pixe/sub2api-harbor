@@ -148,6 +148,9 @@ export default {
         note: 'Make sure the config directory exists. macOS/Linux users can run mkdir -p ~/.codex to create it.',
         noteWindows: 'Press Win+R and enter %userprofile%\\.codex to open the config directory. Create it manually if it does not exist.',
       },
+      nvidia: {
+        description: 'Configure OpenCode to send NVIDIA NIM Chat Completions traffic through your Sub2API NVIDIA group.',
+      },
       cliTabs: {
         claudeCode: 'Claude Code',
         geminiCli: 'Gemini CLI',
@@ -471,7 +474,16 @@ export default {
       antigravity: 'Antigravity',
       kimi: 'Kimi',
       zhipu: 'Zhipu GLM',
-      deepseek: 'DeepSeek'
+      deepseek: 'DeepSeek',
+      agnes: 'Agnes',
+      nvidia: 'NVIDIA',
+      tokenrhythm: 'TokenRhythm',
+      chatanywhere: 'ChatAnywhere',
+      glm: 'GLM',
+      modelscope: 'ModelScope',
+      dashscope: 'DashScope',
+      minimax: 'MiniMax',
+      volcengine: 'Volcengine Ark'
     },
     // Check modes (how a monitor performs its checks)
     checkMode: {

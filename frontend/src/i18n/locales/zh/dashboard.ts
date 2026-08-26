@@ -149,6 +149,9 @@ export default {
         noteWindows:
           '按 Win+R，输入 %userprofile%\\.codex 打开配置目录。如目录不存在，请先手动创建。'
       },
+      nvidia: {
+        description: '配置 OpenCode，让 NVIDIA NIM Chat Completions 请求通过当前 Sub2API NVIDIA 分组发送。',
+      },
       cliTabs: {
         claudeCode: 'Claude Code',
         geminiCli: 'Gemini CLI',
@@ -476,7 +479,16 @@ export default {
       antigravity: 'Antigravity',
       kimi: 'Kimi',
       zhipu: '智谱 GLM',
-      deepseek: 'DeepSeek'
+      deepseek: 'DeepSeek',
+      agnes: 'Agnes',
+      nvidia: 'NVIDIA',
+      tokenrhythm: 'TokenRhythm',
+      chatanywhere: 'ChatAnywhere',
+      glm: 'GLM',
+      modelscope: 'ModelScope',
+      dashscope: 'DashScope',
+      minimax: 'MiniMax',
+      volcengine: 'Volcengine Ark'
     },
     // 检查模式（监控条目的工作方式）
     checkMode: {

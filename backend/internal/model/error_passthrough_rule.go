@@ -36,14 +36,23 @@ const MatchModeAll = "all"
 
 // 支持的平台常量
 const (
-	PlatformAnthropic   = domain.PlatformAnthropic
-	PlatformOpenAI      = domain.PlatformOpenAI
-	PlatformGemini      = domain.PlatformGemini
-	PlatformAntigravity = domain.PlatformAntigravity
-	PlatformGrok        = domain.PlatformGrok
-	PlatformKimi        = domain.PlatformKimi
-	PlatformZhipu       = domain.PlatformZhipu
-	PlatformDeepseek    = domain.PlatformDeepseek
+	PlatformAnthropic    = domain.PlatformAnthropic
+	PlatformOpenAI       = domain.PlatformOpenAI
+	PlatformGemini       = domain.PlatformGemini
+	PlatformAntigravity  = domain.PlatformAntigravity
+	PlatformGrok         = domain.PlatformGrok
+	PlatformAgnes        = domain.PlatformAgnes
+	PlatformDeepSeek     = domain.PlatformDeepSeek
+	PlatformNvidia       = domain.PlatformNvidia
+	PlatformTokenRhythm  = domain.PlatformTokenRhythm
+	PlatformKimi         = domain.PlatformKimi
+	PlatformZhipu        = domain.PlatformZhipu
+	PlatformChatAnywhere = domain.PlatformChatAnywhere
+	PlatformGLM          = domain.PlatformGLM
+	PlatformModelScope   = domain.PlatformModelScope
+	PlatformDashScope    = domain.PlatformDashScope
+	PlatformMiniMax      = domain.PlatformMiniMax
+	PlatformVolcengine   = domain.PlatformVolcengine
 )
 
 // AllPlatforms 返回所有支持的平台列表
@@ -54,9 +63,18 @@ func AllPlatforms() []string {
 		PlatformGemini,
 		PlatformAntigravity,
 		PlatformGrok,
+		PlatformAgnes,
+		PlatformDeepSeek,
+		PlatformNvidia,
+		PlatformTokenRhythm,
 		PlatformKimi,
 		PlatformZhipu,
-		PlatformDeepseek,
+		PlatformChatAnywhere,
+		PlatformGLM,
+		PlatformModelScope,
+		PlatformDashScope,
+		PlatformMiniMax,
+		PlatformVolcengine,
 	}
 }
 

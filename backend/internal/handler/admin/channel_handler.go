@@ -682,10 +682,18 @@ var platformToLiteLLMProvider = map[string]string{
 	service.PlatformGemini:      "gemini",
 	service.PlatformAntigravity: "anthropic",
 	service.PlatformGrok:        "xai",
+	service.PlatformAgnes:       "agnes",
+	service.PlatformDeepSeek:    "deepseek",
+	service.PlatformNvidia:      "nvidia_nim",
+	service.PlatformTokenRhythm: "tokenrhythm",
 	service.PlatformKimi:        "moonshot",
 	service.PlatformZhipu:       "zhipu",
-	service.PlatformDeepseek:    "deepseek",
+	service.PlatformChatAnywhere: "chatanywhere",
 	service.PlatformGLM:         "zai",
+	service.PlatformModelScope:  "modelscope",
+	service.PlatformDashScope:   "dashscope",
+	service.PlatformMiniMax:     "minimax",
+	service.PlatformVolcengine:  "volcengine",
 }
 
 // SyncPricingModels 返回 LiteLLM 定价目录中指定平台的最新模型列表

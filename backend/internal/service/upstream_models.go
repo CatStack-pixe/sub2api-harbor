@@ -633,6 +633,8 @@ func (s *AccountTestService) buildUpstreamModelsRequest(ctx context.Context, acc
 		return s.buildAntigravityAPIKeyModelsRequest(ctx, account)
 	case account.IsGrok():
 		return s.buildGrokUpstreamModelsRequest(ctx, account)
+	case account.IsDeepSeek():
+		return s.buildDeepSeekUpstreamModelsRequest(ctx, account)
 	case account.IsOpenAI() || account.IsCNProvider() || account.IsAgnes() || account.IsNvidia() ||
 		account.IsTokenRhythm() || account.IsChatAnywhere() || account.IsGLM() || account.IsModelScope() ||
 		account.IsDashScope() || account.IsMiniMax() || account.IsVolcengine():
@@ -727,6 +729,33 @@ func (s *AccountTestService) buildGrokUpstreamModelsRequest(ctx context.Context,
 			}
 		}
 	}
+	account.ApplyHeaderOverrides(req.Header)
+	return req, nil
+}
+
+func (s *AccountTestService) buildDeepSeekUpstreamModelsRequest(ctx context.Context, account *Account) (*http.Request, error) {
+	if account.Type != AccountTypeAPIKey {
+		return nil, newUpstreamModelSyncUnsupportedError(
+			fmt.Sprintf("Unsupported DeepSeek account type for upstream model sync: %s", account.Type), nil,
+		)
+	}
+	apiKey := strings.TrimSpace(account.GetOpenAIApiKey())
+	if apiKey == "" {
+		return nil, newUpstreamModelSyncConfigError("No DeepSeek API key is available", nil)
+	}
+
+	baseURL := account.GetOpenAIBaseURL()
+	normalizedBaseURL, err := s.validateUpstreamBaseURL(baseURL)
+	if err != nil {
+		return nil, newUpstreamModelSyncConfigError("Invalid DeepSeek base URL", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, buildDeepSeekModelsURL(normalizedBaseURL), nil)
+	if err != nil {
+		return nil, newUpstreamModelSyncConfigError("Invalid DeepSeek model list URL", err)
+	}
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Authorization", "Bearer "+apiKey)
 	account.ApplyHeaderOverrides(req.Header)
 	return req, nil
 }
@@ -1054,6 +1083,14 @@ func buildOpenAIModelsURL(base string) string {
 		return strings.TrimRight(strings.TrimSpace(base), "/") + "/models"
 	}
 	return buildOpenAIEndpointURL(base, "/v1/models")
+}
+
+func buildDeepSeekModelsURL(base string) string {
+	normalized := strings.TrimRight(strings.TrimSpace(base), "/")
+	if strings.HasSuffix(normalized, "/models") {
+		return normalized
+	}
+	return normalized + "/models"
 }
 
 func buildGeminiModelsURL(base string) string {

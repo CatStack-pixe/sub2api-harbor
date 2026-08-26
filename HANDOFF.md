@@ -9,12 +9,15 @@
 - Fork behavior retained: Agnes, NVIDIA, TokenRhythm, ChatAnywhere, Heartbeat, API-key management, deployment configuration, and provider-specific routing/account behavior.
 - Upstream behavior integrated: plugins, Codex model catalogs, context/tier/time pricing, service-tier billing, OAuth automatic quota reset, Responses/WS fixes, security dependency updates, and Go `1.27.0`.
 - Plugin migrations use `231_plugins.sql` and `232_plugin_artifacts.sql`; existing fork migrations `229_restore_fork_platform_constraints.sql` and `230_add_official_platform_constraints.sql` remain unchanged. The plugin SQL uses idempotent DDL.
+- Post-merge compatibility audit restored the complete fork provider set across routing, model synchronization, account URL/auth defaults, header overrides, failover/error passthrough, quota validation, billing probes, admin channel mapping, and frontend account/key controls. DeepSeek retains its dedicated `/models` sync endpoint; TokenRhythm session fields remain redacted; Anthropic API-key passthrough normalization and provider-managed credential sanitation run during account creation.
+- The audit also preserved upstream Codex catalog, auto-reset credit, adaptive CN protocol, and service-tier behavior. Duplicate plaza test declarations were renamed without removing either the upstream Model Plaza coverage or the fork Channel Plaza coverage.
 
 ### Build and Verification Policy
 
 - Do not install or execute Go locally on Windows for this sync. Backend generation, compilation, unit tests, integration tests, golangci-lint, security scan, and release image builds must run in GitHub Actions.
 - The local Go toolchain removal request targeted `E:\tools\go1.27.0`; it was removed and verified absent. Its presence must not be treated as a local validation source.
 - Frontend checks completed locally before this policy change: frozen-lockfile install, typecheck, lint (two existing unused-test-helper warnings), and full Vitest (`261` files, `1838` tests). Frontend build and all backend checks require GitHub Actions confirmation.
+- After the compatibility audit, frontend `pnpm typecheck`, changed-file ESLint, and the profit-control regression test passed (`13` tests). The backend remains unbuilt locally by design; GitHub Actions is the only authority for Go generation, compilation, tests, lint, security, and release image construction.
 - A local backend full test run was stopped after it exposed the stale group-platform validator; the validator has since been updated to include all fork platforms. GitHub Actions is authoritative for the corrected result.
 - Run `git diff --check` before push. Do not deploy from a dirty local worktree; deploy the immutable GHCR image produced by GitHub Actions.
 

@@ -136,6 +136,17 @@ func (s *OpenAIGatewayService) handleOpenAIAccountUpstreamError(ctx context.Cont
 	if s == nil || account == nil {
 		return false
 	}
+	if s.rateLimitService != nil && account.Platform == PlatformChatAnywhere &&
+		isChatAnywhereContextQuotaExceededError(statusCode, "", responseBody) {
+		return s.rateLimitService.HandleUpstreamError(stateCtx, account, statusCode, headers, responseBody, canonicalModel...)
+	}
+	// Agnes reports daily free-credit exhaustion as 403. It is neither an
+	// authentication failure nor a permanent account fault; the forwarding
+	// path falls back to agnes-2.0-flash and probes the primary model again
+	// after the daily reset.
+	if isAgnesInsufficientQuotaResponse(account, statusCode, responseBody) {
+		return false
+	}
 	// Team 联动熔断必须先于 model-not-found 与账户级临时不可调度规则的早退。
 	if s.rateLimitService != nil {
 		s.rateLimitService.maybeHandleOpenAITeamLinkedError(stateCtx, account, statusCode, responseBody)

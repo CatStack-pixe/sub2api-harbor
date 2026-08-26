@@ -542,6 +542,8 @@ const platformDescription = computed(() => {
         return t('keys.useKeyModal.grok.codexDescription')
       }
       return t('keys.useKeyModal.grok.description')
+    case 'nvidia':
+      return t('keys.useKeyModal.nvidia.description')
     case 'deepseek':
       return activeClientTab.value === 'codex'
         ? t('keys.useKeyModal.deepseek.codexDescription')
@@ -594,6 +596,8 @@ const platformNote = computed(() => {
         return t('keys.useKeyModal.grok.noteWindows')
       }
       return t('keys.useKeyModal.grok.note')
+    case 'nvidia':
+      return t('keys.useKeyModal.note')
     case 'deepseek':
       return activeClientTab.value === 'codex'
         ? t('keys.useKeyModal.deepseek.codexNote')

@@ -404,6 +404,35 @@ func normalizeOpenAILongContextBillingUpdateExtra(account *Account, input *Updat
 
 // Grok media eligibility helpers live in account_grok_media_eligibility.go.
 
+const anthropicAPIKeyPassthroughExtraKey = "anthropic_passthrough"
+
+// normalizeAnthropicAPIKeyPassthroughExtra enables the native Anthropic
+// Messages forwarding path for newly-created API Key accounts by default.
+// An explicit false remains an opt-out for upstreams that need the legacy
+// compatibility pipeline.
+func normalizeAnthropicAPIKeyPassthroughExtra(platform, accountType string, extra map[string]any) (map[string]any, error) {
+	if platform != PlatformAnthropic || accountType != AccountTypeAPIKey {
+		return extra, nil
+	}
+
+	normalized := maps.Clone(extra)
+	if normalized == nil {
+		normalized = make(map[string]any, 1)
+	}
+	raw, exists := normalized[anthropicAPIKeyPassthroughExtraKey]
+	if !exists {
+		normalized[anthropicAPIKeyPassthroughExtraKey] = true
+		return normalized, nil
+	}
+	if _, ok := raw.(bool); !ok {
+		return nil, infraerrors.BadRequest(
+			"ANTHROPIC_API_KEY_PASSTHROUGH_INVALID",
+			"anthropic_passthrough must be a boolean",
+		)
+	}
+	return normalized, nil
+}
+
 func buildAccountForCreate(input *CreateAccountInput, accountExtra map[string]any) (*Account, error) {
 	// Probe/session state is system-managed. New accounts always start with automatic refresh disabled.
 	delete(accountExtra, UpstreamBillingProbeEnabledExtraKey)
@@ -496,6 +525,10 @@ func (s *adminServiceImpl) CreateAccount(ctx context.Context, input *CreateAccou
 	if err != nil {
 		return nil, err
 	}
+	accountExtra, err = normalizeAnthropicAPIKeyPassthroughExtra(input.Platform, input.Type, accountExtra)
+	if err != nil {
+		return nil, err
+	}
 	accountExtra, err = normalizeOpenAIAutoResetCreditExtra(input.Platform, input.Type, false, accountExtra)
 	if err != nil {
 		return nil, err
@@ -531,6 +564,11 @@ func (s *adminServiceImpl) CreateAccount(ctx context.Context, input *CreateAccou
 	if err := NormalizeHeaderOverrideCredentials(input.Credentials); err != nil {
 		return nil, err
 	}
+	input.Credentials = sanitizeProviderManagedCredentials(
+		input.Platform,
+		input.Credentials,
+		input.ProviderManagedCredentials,
+	)
 	// Never persist ephemeral SSO/password secrets after OAuth conversion.
 	input.Credentials = SanitizeStoredCredentials(input.Platform, input.Credentials)
 

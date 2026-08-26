@@ -20,7 +20,7 @@ func newPlazaChannelService(channels []Channel, groups []Group, pricing *Pricing
 	return svc
 }
 
-func plazaPricedChannel(id int64, name string, groupIDs []int64, platform string, models ...string) Channel {
+func channelPlazaPricedChannel(id int64, name string, groupIDs []int64, platform string, models ...string) Channel {
 	return Channel{
 		ID:       id,
 		Name:     name,
@@ -36,11 +36,11 @@ func plazaPricedChannel(id int64, name string, groupIDs []int64, platform string
 	}
 }
 
-func TestListPlazaGroups_GroupCentricAggregation(t *testing.T) {
+func TestChannelListPlazaGroups_GroupCentricAggregation(t *testing.T) {
 	// 两个渠道挂同一分组:模型并入同一 PlazaGroup;无模型的分组不返回。
 	channels := []Channel{
-		plazaPricedChannel(1, "chA", []int64{10}, "anthropic", "claude-sonnet"),
-		plazaPricedChannel(2, "chB", []int64{10}, "anthropic", "claude-opus"),
+		channelPlazaPricedChannel(1, "chA", []int64{10}, "anthropic", "claude-sonnet"),
+		channelPlazaPricedChannel(2, "chB", []int64{10}, "anthropic", "claude-opus"),
 	}
 	groups := []Group{
 		{ID: 10, Name: "g-main", Description: "desc", Platform: "anthropic", RateMultiplier: 1},
@@ -58,7 +58,7 @@ func TestListPlazaGroups_GroupCentricAggregation(t *testing.T) {
 	require.Equal(t, "claude-sonnet", out[0].Models[1].Name)
 }
 
-func TestListPlazaGroups_DedupFirstWinsWithPricingUpgrade(t *testing.T) {
+func TestChannelListPlazaGroups_DedupFirstWinsWithPricingUpgrade(t *testing.T) {
 	// 同名模型:先见者胜;仅当已存条目无定价而新条目有定价时升级替换。
 	unpriced := Channel{
 		ID: 1, Name: "alpha", Status: StatusActive, GroupIDs: []int64{10},
@@ -67,7 +67,7 @@ func TestListPlazaGroups_DedupFirstWinsWithPricingUpgrade(t *testing.T) {
 			"anthropic": {"claude-sonnet": "claude-sonnet"},
 		},
 	}
-	priced := plazaPricedChannel(2, "beta", []int64{10}, "anthropic", "claude-sonnet")
+	priced := channelPlazaPricedChannel(2, "beta", []int64{10}, "anthropic", "claude-sonnet")
 	groups := []Group{{ID: 10, Name: "g", Platform: "anthropic", RateMultiplier: 1}}
 
 	// alpha(无价)按名称序先于 beta(有价):先见者无价,应被有价条目升级。
@@ -80,7 +80,7 @@ func TestListPlazaGroups_DedupFirstWinsWithPricingUpgrade(t *testing.T) {
 	require.NotNil(t, out[0].Models[0].Pricing.InputPrice)
 }
 
-func TestListPlazaGroups_PlatformIsolation(t *testing.T) {
+func TestChannelListPlazaGroups_PlatformIsolation(t *testing.T) {
 	// 渠道同时有 anthropic/openai 定价,anthropic 分组只应看到 anthropic 模型。
 	ch := Channel{
 		ID: 1, Name: "multi", Status: StatusActive, GroupIDs: []int64{10, 20},
@@ -107,7 +107,7 @@ func TestListPlazaGroups_PlatformIsolation(t *testing.T) {
 	require.Equal(t, "gpt-5", byName["g-gpt"][0].Name)
 }
 
-func TestListPlazaGroups_CompositeIncludesConfiguredConcretePlatforms(t *testing.T) {
+func TestChannelListPlazaGroups_CompositeIncludesConfiguredConcretePlatforms(t *testing.T) {
 	anthropicPrice := 3e-6
 	openAIPrice := 2e-6
 	ch := Channel{
@@ -133,7 +133,7 @@ func TestListPlazaGroups_CompositeIncludesConfiguredConcretePlatforms(t *testing
 	require.InDelta(t, openAIPrice, *out[0].Models[1].Pricing.InputPrice, 1e-12)
 }
 
-func TestListPlazaGroups_CompositeAndOrdinaryGroupsDoNotLeakPlatforms(t *testing.T) {
+func TestChannelListPlazaGroups_CompositeAndOrdinaryGroupsDoNotLeakPlatforms(t *testing.T) {
 	ch := Channel{
 		ID: 1, Name: "multi", Status: StatusActive, GroupIDs: []int64{10, 20},
 		ModelPricing: []ChannelModelPricing{
@@ -169,8 +169,8 @@ func TestListPlazaGroups_CompositeAndOrdinaryGroupsDoNotLeakPlatforms(t *testing
 	})
 }
 
-func TestListPlazaGroups_InactiveChannelSkipped(t *testing.T) {
-	inactive := plazaPricedChannel(1, "off", []int64{10}, "anthropic", "claude-sonnet")
+func TestChannelListPlazaGroups_InactiveChannelSkipped(t *testing.T) {
+	inactive := channelPlazaPricedChannel(1, "off", []int64{10}, "anthropic", "claude-sonnet")
 	inactive.Status = "inactive"
 	groups := []Group{{ID: 10, Name: "g", Platform: "anthropic", RateMultiplier: 1}}
 	svc := newPlazaChannelService([]Channel{inactive}, groups, nil)
@@ -179,9 +179,9 @@ func TestListPlazaGroups_InactiveChannelSkipped(t *testing.T) {
 	require.Empty(t, out)
 }
 
-func TestListPlazaGroups_SortedByRateMultiplierAsc(t *testing.T) {
+func TestChannelListPlazaGroups_SortedByRateMultiplierAsc(t *testing.T) {
 	channels := []Channel{
-		plazaPricedChannel(1, "ch", []int64{10, 20, 30}, "anthropic", "claude-sonnet"),
+		channelPlazaPricedChannel(1, "ch", []int64{10, 20, 30}, "anthropic", "claude-sonnet"),
 	}
 	groups := []Group{
 		{ID: 10, Name: "b-standard", Platform: "anthropic", RateMultiplier: 1},
@@ -197,7 +197,7 @@ func TestListPlazaGroups_SortedByRateMultiplierAsc(t *testing.T) {
 	require.Equal(t, "b-standard", out[2].Name)
 }
 
-func TestListPlazaGroups_OfficialPricingFill(t *testing.T) {
+func TestChannelListPlazaGroups_OfficialPricingFill(t *testing.T) {
 	pricingSvc := newStubPricingServiceFromMap(map[string]*LiteLLMModelPricing{
 		"claude-sonnet": {
 			Mode:                                "chat",
@@ -210,7 +210,7 @@ func TestListPlazaGroups_OfficialPricingFill(t *testing.T) {
 		"token-absent": {Mode: "image_generation", TokenPricingAbsent: true, OutputCostPerImage: 0.04},
 	})
 	channels := []Channel{
-		plazaPricedChannel(1, "ch", []int64{10}, "anthropic", "claude-sonnet", "unknown-model", "token-absent"),
+		channelPlazaPricedChannel(1, "ch", []int64{10}, "anthropic", "claude-sonnet", "unknown-model", "token-absent"),
 	}
 	groups := []Group{{ID: 10, Name: "g", Platform: "anthropic", RateMultiplier: 1}}
 	svc := newPlazaChannelService(channels, groups, pricingSvc)
@@ -235,7 +235,7 @@ func TestListPlazaGroups_OfficialPricingFill(t *testing.T) {
 	require.Nil(t, byName["token-absent"].OfficialPricing)
 }
 
-func TestListPlazaGroups_GroupImagePriceOverridesChannelPricing(t *testing.T) {
+func TestChannelListPlazaGroups_GroupImagePriceOverridesChannelPricing(t *testing.T) {
 	// 图片计费模型:档位价按实收口径合成(分组图片价 > 渠道档位价 > 渠道默认按次价),
 	// 分组独立倍率字段透传;未配图片价的分组保持渠道定价原样。
 	perReq := 0.2
@@ -293,10 +293,10 @@ func TestListPlazaGroups_GroupImagePriceOverridesChannelPricing(t *testing.T) {
 	require.Len(t, channels[0].ModelPricing[0].Intervals, 1)
 }
 
-func TestListPlazaGroups_GroupImagePriceIgnoredForNonImageModes(t *testing.T) {
+func TestChannelListPlazaGroups_GroupImagePriceIgnoredForNonImageModes(t *testing.T) {
 	// token 模式定价不受分组图片价影响。
 	imgPrice := 0.02
-	channels := []Channel{plazaPricedChannel(1, "ch", []int64{10}, "openai", "gpt-5")}
+	channels := []Channel{channelPlazaPricedChannel(1, "ch", []int64{10}, "openai", "gpt-5")}
 	groups := []Group{{ID: 10, Name: "g", Platform: "openai", RateMultiplier: 1, ImagePrice1K: &imgPrice}}
 	svc := newPlazaChannelService(channels, groups, nil)
 	out, err := svc.ListPlazaGroups(context.Background())
@@ -309,7 +309,7 @@ func TestListPlazaGroups_GroupImagePriceIgnoredForNonImageModes(t *testing.T) {
 	require.Nil(t, p.PerRequestPrice)
 }
 
-func TestListPlazaGroups_RepoErrorsPropagate(t *testing.T) {
+func TestChannelListPlazaGroups_RepoErrorsPropagate(t *testing.T) {
 	sentinel := errors.New("boom")
 	repo := &mockChannelRepository{
 		listAllFn: func(ctx context.Context) ([]Channel, error) { return nil, sentinel },

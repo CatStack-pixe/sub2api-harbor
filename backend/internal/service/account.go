@@ -317,11 +317,11 @@ func (a *Account) IsGrokOAuth() bool {
 }
 
 func (a *Account) IsZhipu() bool {
-	return a.Platform == PlatformZhipu
+	return a != nil && a.Platform == PlatformZhipu
 }
 
 func (a *Account) IsDeepseek() bool {
-	return a.Platform == PlatformDeepseek
+	return a != nil && a.Platform == PlatformDeepseek
 }
 
 // IsCNProvider 报告是否为国产 OpenAI 兼容供应商（kimi/zhipu/deepseek）。
@@ -1410,35 +1410,82 @@ func (a *Account) IsOpenAIApiKey() bool {
 // 适用 openai 与国产 OpenAI 兼容供应商（kimi/zhipu/deepseek）；grok 走 GetGrokBaseURL，
 // 此处对 grok 返回 "" 以保持原有行为。
 func (a *Account) GetOpenAIBaseURL() string {
-	if !a.IsOpenAI() && !a.IsCNProvider() {
+	if a == nil || (!a.IsOpenAI() && !a.IsAgnes() && !a.IsDeepSeek() && !a.IsNvidia() &&
+		!a.IsTokenRhythm() && !a.IsKimi() && !a.IsZhipu() && !a.IsChatAnywhere() &&
+		!a.IsGLM() && !a.IsModelScope() && !a.IsDashScope() && !a.IsMiniMax() && !a.IsVolcengine()) {
 		return ""
+	}
+	if a.IsChatAnywhere() {
+		baseURL := strings.TrimRight(strings.TrimSpace(a.GetCredential("base_url")), "/")
+		if baseURL == ChatAnywhereGlobalBaseURL || baseURL == ChatAnywhereChinaBaseURL {
+			return baseURL
+		}
+		return ChatAnywhereChinaBaseURL
+	}
+	if a.IsGLM() {
+		baseURL := strings.TrimRight(strings.TrimSpace(a.GetCredential("base_url")), "/")
+		if baseURL == GLMDefaultBaseURL {
+			return baseURL
+		}
+		return GLMDefaultBaseURL
 	}
 	if a.IsCNProvider() && a.IsAdaptiveAPIProtocol() {
 		if baseURLs, ok := a.Credentials["api_base_urls"].(map[string]any); ok {
 			if baseURL, ok := baseURLs[APIProtocolChatCompletions].(string); ok && strings.TrimSpace(baseURL) != "" {
-				return strings.TrimSpace(baseURL)
+				return strings.TrimRight(strings.TrimSpace(baseURL), "/")
 			}
 		}
 	}
+	if a.IsCNProvider() {
+		if a.IsKimi() {
+			_, hasMode := a.Credentials["account_mode"]
+			_, hasProtocol := a.Credentials["api_protocol"]
+			_, hasProtocolURLs := a.Credentials["api_base_urls"]
+			if !hasMode && !hasProtocol && !hasProtocolURLs {
+				if baseURL := strings.TrimRight(strings.TrimSpace(a.GetCredential("base_url")), "/"); isKimiBaseURL(baseURL) {
+					return baseURL
+				}
+				return KimiDefaultBaseURL
+			}
+		}
+		// 平台默认 base_url：CN 供应商按 account_mode 选择 payg / coding 默认值。
+		switch a.Platform {
+		case PlatformKimi:
+			if a.GetAccountMode() == AccountModeCoding {
+				return DefaultKimiCodingBaseURL
+			}
+			return DefaultKimiPayGBaseURL
+		case PlatformZhipu:
+			if a.GetAccountMode() == AccountModeCoding {
+				return DefaultZhipuCodingBaseURL
+			}
+			return DefaultZhipuPayGBaseURL
+		case PlatformDeepSeek:
+			return DefaultDeepseekBaseURL
+		}
+	}
 	if a.Type == AccountTypeAPIKey || a.Type == AccountTypeUpstream {
-		if baseURL := strings.TrimSpace(a.GetCredential("base_url")); baseURL != "" {
+		if baseURL := strings.TrimRight(strings.TrimSpace(a.GetCredential("base_url")), "/"); baseURL != "" {
 			return baseURL
 		}
 	}
-	// 平台默认 base_url：CN 供应商按 account_mode 选择 payg / coding 默认值。
 	switch a.Platform {
-	case PlatformKimi:
-		if a.GetAccountMode() == AccountModeCoding {
-			return DefaultKimiCodingBaseURL
-		}
-		return DefaultKimiPayGBaseURL
-	case PlatformZhipu:
-		if a.GetAccountMode() == AccountModeCoding {
-			return DefaultZhipuCodingBaseURL
-		}
-		return DefaultZhipuPayGBaseURL
-	case PlatformDeepseek:
-		return DefaultDeepseekBaseURL
+	case PlatformAgnes:
+		return AgnesDefaultBaseURL
+	case PlatformDeepSeek:
+		return DeepSeekDefaultBaseURL
+	case PlatformNvidia:
+		return NvidiaDefaultBaseURL
+	case PlatformTokenRhythm:
+		return TokenRhythmDefaultBaseURL
+	case PlatformModelScope:
+		return ModelScopeDefaultBaseURL
+	case PlatformDashScope:
+		return DashScopeDefaultBaseURL
+	case PlatformMiniMax:
+		return MiniMaxDefaultBaseURL
+	case PlatformVolcengine:
+		return VolcengineDefaultBaseURL
 	default:
 		return "https://api.openai.com"
 	}
@@ -1753,7 +1800,7 @@ func (a *Account) GetOpenAIProtocolAPIKey() string {
 	if a == nil {
 		return ""
 	}
-	if a.IsCNProvider() {
+	if a.IsCNProvider() || a.IsModelScope() || a.IsDashScope() || a.IsMiniMax() || a.IsVolcengine() {
 		if a.Type != AccountTypeAPIKey {
 			return ""
 		}
