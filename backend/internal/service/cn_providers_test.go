@@ -452,7 +452,9 @@ func TestBuildUpstreamModelsRequest_CNProviders(t *testing.T) {
 		{"kimi coding", PlatformKimi, AccountModeCoding, "https://api.kimi.com/coding/v1/models"},
 		{"zhipu default", PlatformZhipu, "", "https://open.bigmodel.cn/api/paas/v4/models"},
 		{"zhipu coding", PlatformZhipu, AccountModeCoding, "https://open.bigmodel.cn/api/coding/paas/v4/models"},
-		{"deepseek", PlatformDeepseek, "", "https://api.deepseek.com/v1/models"},
+		// DeepSeek keeps the fork's provider-native model endpoint instead of
+		// being folded into the generic OpenAI-compatible /v1/models builder.
+		{"deepseek", PlatformDeepseek, "", "https://api.deepseek.com/models"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

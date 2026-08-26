@@ -1033,6 +1033,33 @@ func (s *adminServiceImpl) BulkUpdateAccounts(ctx context.Context, input *BulkUp
 		}
 		cachedTargets = loaded
 	}
+	if hasGroupBindingUpdate {
+		for _, account := range cachedTargets {
+			if account == nil {
+				continue
+			}
+			if err := validateAccountGroupPlatforms(ctx, s.groupRepo, account.Platform, *input.GroupIDs); err != nil {
+				return nil, err
+			}
+		}
+	}
+	if len(input.Credentials) > 0 {
+		for _, account := range cachedTargets {
+			if account == nil || !account.IsDeepSeek() {
+				continue
+			}
+			mergedCredentials := make(map[string]any, len(account.Credentials)+len(input.Credentials))
+			for key, value := range account.Credentials {
+				mergedCredentials[key] = value
+			}
+			for key, value := range input.Credentials {
+				mergedCredentials[key] = value
+			}
+			if err := validateAccountCredentials(account.Platform, account.Type, mergedCredentials); err != nil {
+				return nil, err
+			}
+		}
+	}
 	targetsByID := make(map[int64]*Account, len(cachedTargets))
 	for _, account := range cachedTargets {
 		if account != nil {
@@ -1132,6 +1159,13 @@ func (s *adminServiceImpl) BulkUpdateAccounts(ctx context.Context, input *BulkUp
 	// only when platform is known Grok — empty platform still strips password/*).
 	if input.Credentials != nil {
 		input.Credentials = SanitizeStoredCredentials("", input.Credentials)
+		for _, account := range cachedTargets {
+			if account != nil && account.Platform == PlatformGrok {
+				delete(input.Credentials, "subscription_tier")
+				delete(input.Credentials, "entitlement_status")
+				break
+			}
+		}
 	}
 
 	// Prepare bulk updates for columns and JSONB fields.

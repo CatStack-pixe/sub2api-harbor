@@ -516,14 +516,7 @@ func TestGetFallbackPricing_FamilyMatching(t *testing.T) {
 			expectedCacheRead: floatPtr(2.8e-9),
 		},
 
-		// ---- 智谱 GLM（中国大陆开放平台 CNY 口径换算为 USD）----
-		{
-			name:              "glm 5.2 flagship",
-			model:             "glm-5.2",
-			expectedInput:     1.120448e-6,
-			expectedOutput:    floatPtr(3.921569e-6),
-			expectedCacheRead: floatPtr(0.280112e-6),
-		},
+		// ---- 智谱 GLM（z.ai USD 口径）----
 		{
 			name:              "glm 5.2 flagship",
 			model:             "glm-5.2",
@@ -619,13 +612,6 @@ func TestGetFallbackPricing_FamilyMatching(t *testing.T) {
 			name:              "glm 5.1 vs glm 5 ordering (verbatim 5.1)",
 			model:             "glm-5.1",
 			expectedInput:     1.120448e-6, // = glm-5.1 价格
-			expectedOutput:    floatPtr(3.921569e-6),
-			expectedCacheRead: floatPtr(0.280112e-6),
-		},
-		{
-			name:              "glm 5.2 vs glm 5 ordering (verbatim 5.2)",
-			model:             "glm-5.2",
-			expectedInput:     1.120448e-6, // = glm-5.2 价格（不是 glm-5 的 1e-6）
 			expectedOutput:    floatPtr(3.921569e-6),
 			expectedCacheRead: floatPtr(0.280112e-6),
 		},

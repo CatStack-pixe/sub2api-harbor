@@ -1682,6 +1682,15 @@ func (a *Account) GetCodingPlanProvider() string {
 		return ""
 	}
 	baseURL := strings.ToLower(a.GetOpenAIBaseURL())
+	// Kimi's general OpenAI base resolver intentionally falls back to the
+	// official endpoint for unsupported custom domains. Quota routing must
+	// inspect an explicit base_url before that fallback so those domains are
+	// rejected by the outbound URL policy instead of probing the official host.
+	if a.Platform == PlatformKimi {
+		if configured := strings.TrimRight(strings.TrimSpace(a.GetCredential("base_url")), "/"); configured != "" {
+			baseURL = strings.ToLower(configured)
+		}
+	}
 	switch {
 	case strings.Contains(baseURL, "api.kimi.com/coding"):
 		return PlatformKimi

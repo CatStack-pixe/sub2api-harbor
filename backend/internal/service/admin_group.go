@@ -258,14 +258,8 @@ func defaultModelsListCandidateIDs(platform string) []string {
 		return xai.DefaultModelIDs()
 	case PlatformAgnes:
 		return []string{AgnesDefaultModel}
-	case PlatformDeepSeek:
-		return DeepSeekDefaultModelIDs()
 	case PlatformNvidia:
 		return NvidiaDefaultModelIDs()
-	case PlatformKimi:
-		return KimiDefaultModelIDs()
-	case PlatformZhipu:
-		return nil
 	case PlatformChatAnywhere:
 		return ChatAnywhereDefaultModelIDs()
 	case PlatformGLM:
@@ -713,6 +707,12 @@ func (s *adminServiceImpl) UpdateGroup(ctx context.Context, id int64, input *Upd
 			return nil, normalizeErr
 		}
 		group.ModelPricing = modelPricing
+	} else if group.Platform != previousPlatform && len(group.ModelPricing) > 0 {
+		modelPricing, normalizeErr := normalizeGroupModelPricing(group.Platform, group.ModelPricing)
+		if normalizeErr != nil {
+			return nil, normalizeErr
+		}
+		group.ModelPricing = modelPricing
 	}
 
 	// 订阅相关字段
@@ -1026,14 +1026,12 @@ func normalizeGroupModelPricing(platform string, pricing []ChannelModelPricing) 
 		out[i] = pricing[i].Clone()
 		out[i].ID = 0
 		out[i].ChannelID = 0
+		out[i].Platform = platform
 		if out[i].TimePricing != nil && len(out[i].TimePricing.Periods) > 0 {
 			return nil, infraerrors.BadRequest(
 				"GROUP_MODEL_TIME_PRICING_UNSUPPORTED",
 				"group model pricing does not support time pricing",
 			)
-		}
-		if strings.TrimSpace(out[i].Platform) == "" {
-			out[i].Platform = platform
 		}
 		for j := range out[i].Models {
 			out[i].Models[j] = strings.TrimSpace(out[i].Models[j])
