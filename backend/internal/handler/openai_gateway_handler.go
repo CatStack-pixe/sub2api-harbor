@@ -507,6 +507,9 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 	// Get subscription info (may be nil)
 	subscription, _ := middleware2.GetSubscriptionFromContext(c)
 	requestPlatform := openAICompatibleRequestPlatform(c.Request.Context(), apiKey)
+	if reqStream && requestPlatform == service.PlatformNvidia && isBareOpenAIResponsesPath(c) {
+		service.MarkOpenAINvidiaResponsesStream(c)
+	}
 	stopResponsesFallbackKeepalive := func() {}
 	if reqStream && isResponsesChatFallbackPlatform(requestPlatform) && isBareOpenAIResponsesPath(c) {
 		stopResponsesFallbackKeepalive = service.StartOpenAIResponsesSSEKeepalive(c, h.openAIResponsesKeepaliveInterval())
