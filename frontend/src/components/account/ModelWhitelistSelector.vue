@@ -173,6 +173,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   'update:modelValue': [value: string[]]
+  'upstream-synced': []
 }>()
 
 const appStore = useAppStore()
@@ -206,18 +207,9 @@ const upstreamSyncPlatforms = new Set([
   'gemini',
   'antigravity',
   'grok',
-  'agnes',
-  'deepseek',
   'kimi',
-  'nvidia',
-  'tokenrhythm',
   'zhipu',
-  'chatanywhere',
-  'glm',
-  'modelscope',
-  'dashscope',
-  'minimax',
-  'volcengine'
+  'deepseek'
 ])
 const canSyncUpstream = computed(() => {
   if (props.accountId) {
@@ -341,6 +333,10 @@ const syncUpstreamModels = async () => {
       return
     }
 
+    if (!props.accountId) {
+      emit('upstream-synced')
+    }
+
     const newModels = [...props.modelValue]
     let addedCount = 0
     for (const model of upstreamModels) {
@@ -351,6 +347,10 @@ const syncUpstreamModels = async () => {
     }
 
     emit('update:modelValue', newModels)
+    if (result.warnings?.some(warning => warning.code === 'upstream_model_metadata_incomplete')) {
+      appStore.showWarning(t('admin.accounts.syncUpstreamModelsMetadataIncomplete'))
+      return
+    }
     if (addedCount > 0) {
       appStore.showSuccess(t('admin.accounts.syncUpstreamModelsSuccess', { count: addedCount, total: upstreamModels.length }))
     } else {

@@ -56,45 +56,34 @@ func (r *channelRepository) CreateModelPricing(ctx context.Context, pricing *ser
 }
 
 func (r *channelRepository) UpdateModelPricing(ctx context.Context, pricing *service.ChannelModelPricing) error {
-	return r.runInTx(ctx, func(tx *sql.Tx) error {
-		modelsJSON, err := json.Marshal(pricing.Models)
-		if err != nil {
-			return fmt.Errorf("marshal models: %w", err)
-		}
-		timePricingJSON, err := marshalChannelTimePricing(pricing.TimePricing)
-		if err != nil {
-			return err
-		}
-		billingMode := pricing.BillingMode
-		if billingMode == "" {
-			billingMode = service.BillingModeToken
-		}
-		result, err := tx.ExecContext(ctx,
-			`UPDATE channel_model_pricing
+	modelsJSON, err := json.Marshal(pricing.Models)
+	if err != nil {
+		return fmt.Errorf("marshal models: %w", err)
+	}
+	timePricingJSON, err := marshalChannelTimePricing(pricing.TimePricing)
+	if err != nil {
+		return err
+	}
+	billingMode := pricing.BillingMode
+	if billingMode == "" {
+		billingMode = service.BillingModeToken
+	}
+	result, err := r.db.ExecContext(ctx,
+		`UPDATE channel_model_pricing
 		 SET models = $1, billing_mode = $2, input_price = $3, output_price = $4, cache_write_price = $5, cache_read_price = $6, fast_multiplier = $7, flex_multiplier = $8, image_input_price = $9, image_output_price = $10, per_request_price = $11, time_pricing = $12, platform = $13, updated_at = NOW()
 		 WHERE id = $14`,
-			modelsJSON, billingMode, pricing.InputPrice, pricing.OutputPrice, pricing.CacheWritePrice, pricing.CacheReadPrice,
-			pricing.FastMultiplier, pricing.FlexMultiplier, pricing.ImageInputPrice, pricing.ImageOutputPrice,
-			pricing.PerRequestPrice, timePricingJSON, pricing.Platform, pricing.ID,
-		)
-		if err != nil {
-			return fmt.Errorf("update model pricing: %w", err)
-		}
-		rows, _ := result.RowsAffected()
-		if rows == 0 {
-			return fmt.Errorf("pricing entry not found: %d", pricing.ID)
-		}
-		if _, err := tx.ExecContext(ctx, `DELETE FROM channel_pricing_time_windows WHERE pricing_id = $1`, pricing.ID); err != nil {
-			return fmt.Errorf("delete pricing time windows: %w", err)
-		}
-		for i := range pricing.TimeWindows {
-			pricing.TimeWindows[i].PricingID = pricing.ID
-			if err := createTimeWindowExec(ctx, tx, &pricing.TimeWindows[i]); err != nil {
-				return fmt.Errorf("insert pricing time window: %w", err)
-			}
-		}
-		return nil
-	})
+		modelsJSON, billingMode, pricing.InputPrice, pricing.OutputPrice, pricing.CacheWritePrice, pricing.CacheReadPrice,
+		pricing.FastMultiplier, pricing.FlexMultiplier, pricing.ImageInputPrice, pricing.ImageOutputPrice, pricing.PerRequestPrice,
+		timePricingJSON, pricing.Platform, pricing.ID,
+	)
+	if err != nil {
+		return fmt.Errorf("update model pricing: %w", err)
+	}
+	rows, _ := result.RowsAffected()
+	if rows == 0 {
+		return fmt.Errorf("pricing entry not found: %d", pricing.ID)
+	}
+	return nil
 }
 
 func (r *channelRepository) DeleteModelPricing(ctx context.Context, id int64) error {
@@ -325,15 +314,6 @@ func createModelPricingExec(ctx context.Context, exec dbExec, pricing *service.C
 	}
 
 	return nil
-}
-
-func createTimeWindowExec(ctx context.Context, exec dbExec, window *service.PricingTimeWindow) error {
-	return exec.QueryRowContext(ctx,
-		`INSERT INTO channel_pricing_time_windows
-		 (pricing_id, start_minute, end_minute, input_price, output_price, cache_write_price, cache_read_price, sort_order)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id, created_at, updated_at`,
-		window.PricingID, window.StartMinute, window.EndMinute, window.InputPrice, window.OutputPrice, window.CacheWritePrice, window.CacheReadPrice, window.SortOrder,
-	).Scan(&window.ID, &window.CreatedAt, &window.UpdatedAt)
 }
 
 func marshalChannelTimePricing(config *service.ChannelTimePricing) (any, error) {

@@ -590,44 +590,6 @@ func (s *UpstreamBillingProbeService) probeLoadedAccount(ctx context.Context, ac
 	if s.accountTestService == nil || s.accountTestService.httpUpstream == nil {
 		return s.persistProbeFailure(ctx, account, intervalMinutes, now, 0, "transport_unavailable", 0)
 	}
-	if account.IsTokenRhythm() {
-		result, err := s.accountTestService.FetchTokenRhythmBalance(ctx, account.ID)
-		if err != nil {
-			return s.persistProbeFailure(ctx, account, intervalMinutes, now, 0, "tokenrhythm_balance_failed", 0)
-		}
-		data := map[string]any{
-			"provider":              PlatformTokenRhythm,
-			"balance_cny":           result.BalanceCNY,
-			"available_balance_cny": result.AvailableBalanceCNY,
-			"frozen_balance_cny":    result.FrozenBalanceCNY,
-			"expiring_balance_cny":  result.ExpiringBalanceCNY,
-			"cost_cny":              result.CostCNY,
-			"currency":              result.Currency,
-			"calls":                 result.Calls,
-			"success_calls":         result.SuccessCalls,
-			"error_calls":           result.ErrorCalls,
-			"aborted_calls":         result.AbortedCalls,
-			"input_tokens":          result.InputTokens,
-			"output_tokens":         result.OutputTokens,
-			"fetched_at":            result.FetchedAt,
-		}
-		if result.NextExpiryAt != "" {
-			data["next_expiry_at"] = result.NextExpiryAt
-		}
-		snapshot := &UpstreamBillingProbeSnapshot{
-			Status:        UpstreamBillingProbeStatusOK,
-			Data:          data,
-			ReceivedAt:    probeTimePtr(now),
-			FreshUntil:    probeTimePtr(now.Add(2 * time.Duration(intervalMinutes) * time.Minute)),
-			LastAttemptAt: now,
-			NextProbeAt:   now.Add(nextProbeDelay(intervalMinutes, 0)),
-			HTTPStatus:    result.StatusCode,
-		}
-		if err := s.updateSnapshot(ctx, account, snapshot, nil); err != nil {
-			return nil, err
-		}
-		return snapshot, nil
-	}
 	// 平台放宽后取数直读 credentials：所有 API-key 平台的密钥与自定义上游
 	// 统一存放在 credentials.api_key / credentials.base_url。
 	apiKey := account.GetCredential("api_key")
@@ -1006,8 +968,6 @@ func decodeUpstreamBillingProbeSnapshot(extra map[string]any) *UpstreamBillingPr
 
 // IsUpstreamBillingProbeIdentity reports whether an account identity may opt
 // in to the upstream billing probe. `/v1/sub2api/billing` is a key-scoped
-// sub2api convention shared by the supported API-key platforms. DeepSeek is
-// intentionally excluded because it has a separate official balance endpoint.
 // sub2api convention shared by the supported API-key platforms (including the
 // CN providers, whose official-domain accounts are short-circuited to
 // "unsupported" by upstreamBillingProbeTargetIsOfficialAPI).
@@ -1024,7 +984,7 @@ func IsUpstreamBillingProbeIdentity(platform, accountType string) bool {
 	}
 	switch platform {
 	case PlatformOpenAI, PlatformAnthropic, PlatformGemini, PlatformAntigravity, PlatformGrok,
-		PlatformNvidia, PlatformTokenRhythm, PlatformKimi, PlatformZhipu, PlatformDeepSeek:
+		PlatformKimi, PlatformZhipu, PlatformDeepseek:
 		return true
 	default:
 		return false
@@ -1058,7 +1018,6 @@ var upstreamBillingProbeOfficialAPIDomains = []string{
 	"grok.com",
 	"openai.com",
 	"ollama.com",
-	"nvidia.com",
 	"moonshot.cn",
 	"kimi.com",
 	"bigmodel.cn",
@@ -1092,23 +1051,6 @@ func upstreamBillingProbeEnabled(account *Account) bool {
 	}
 	enabled, ok := account.Extra[UpstreamBillingProbeEnabledExtraKey].(bool)
 	return ok && enabled
-}
-
-// tokenRhythmBalanceProbeAllowsScheduling is deliberately opt-in. Existing
-// TokenRhythm accounts keep their current behavior until the administrator
-// enables the upstream billing probe for them. Once enabled, a missing,
-// failed, stale, or zero-available-balance snapshot removes the account from
-// request scheduling until the next successful probe.
-func tokenRhythmBalanceProbeAllowsScheduling(account *Account, now time.Time) bool {
-	if account == nil || !account.IsTokenRhythm() || !upstreamBillingProbeEnabled(account) {
-		return true
-	}
-	snapshot := decodeUpstreamBillingProbeSnapshot(account.Extra)
-	if snapshot == nil || snapshot.Status != UpstreamBillingProbeStatusOK || snapshot.FreshUntil == nil || !snapshot.FreshUntil.After(now) {
-		return false
-	}
-	available, ok := resolveAccountExtraNumber(snapshot.Data, "available_balance_cny")
-	return ok && available > 0
 }
 
 // upstreamBillingRateSyncEnabled is the probe-side pre-filter deciding whether

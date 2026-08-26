@@ -4,7 +4,7 @@ package ent
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/json/jsontext"
 	"errors"
 	"fmt"
 	"time"
@@ -803,13 +803,13 @@ func (_u *GroupUpdate) SetNillableLongContextPricingEnabled(v *bool) *GroupUpdat
 }
 
 // SetModelPricing sets the "model_pricing" field.
-func (_u *GroupUpdate) SetModelPricing(v json.RawMessage) *GroupUpdate {
+func (_u *GroupUpdate) SetModelPricing(v jsontext.Value) *GroupUpdate {
 	_u.mutation.SetModelPricing(v)
 	return _u
 }
 
 // AppendModelPricing appends value to the "model_pricing" field.
-func (_u *GroupUpdate) AppendModelPricing(v json.RawMessage) *GroupUpdate {
+func (_u *GroupUpdate) AppendModelPricing(v jsontext.Value) *GroupUpdate {
 	_u.mutation.AppendModelPricing(v)
 	return _u
 }
@@ -817,34 +817,6 @@ func (_u *GroupUpdate) AppendModelPricing(v json.RawMessage) *GroupUpdate {
 // ClearModelPricing clears the value of the "model_pricing" field.
 func (_u *GroupUpdate) ClearModelPricing() *GroupUpdate {
 	_u.mutation.ClearModelPricing()
-	return _u
-}
-
-// SetGlobalPromptEnabled sets the "global_prompt_enabled" field.
-func (_u *GroupUpdate) SetGlobalPromptEnabled(v bool) *GroupUpdate {
-	_u.mutation.SetGlobalPromptEnabled(v)
-	return _u
-}
-
-// SetNillableGlobalPromptEnabled sets the "global_prompt_enabled" field if the given value is not nil.
-func (_u *GroupUpdate) SetNillableGlobalPromptEnabled(v *bool) *GroupUpdate {
-	if v != nil {
-		_u.SetGlobalPromptEnabled(*v)
-	}
-	return _u
-}
-
-// SetGlobalPrompt sets the "global_prompt" field.
-func (_u *GroupUpdate) SetGlobalPrompt(v string) *GroupUpdate {
-	_u.mutation.SetGlobalPrompt(v)
-	return _u
-}
-
-// SetNillableGlobalPrompt sets the "global_prompt" field if the given value is not nil.
-func (_u *GroupUpdate) SetNillableGlobalPrompt(v *string) *GroupUpdate {
-	if v != nil {
-		_u.SetGlobalPrompt(*v)
-	}
 	return _u
 }
 
@@ -1505,11 +1477,6 @@ func (_u *GroupUpdate) check() error {
 			return &ValidationError{Name: "audio_stt_price_per_hour", err: fmt.Errorf(`ent: validator failed for field "Group.audio_stt_price_per_hour": %w`, err)}
 		}
 	}
-	if v, ok := _u.mutation.GlobalPrompt(); ok {
-		if err := group.GlobalPromptValidator(v); err != nil {
-			return &ValidationError{Name: "global_prompt", err: fmt.Errorf(`ent: validator failed for field "Group.global_prompt": %w`, err)}
-		}
-	}
 	if v, ok := _u.mutation.DefaultMappedModel(); ok {
 		if err := group.DefaultMappedModelValidator(v); err != nil {
 			return &ValidationError{Name: "default_mapped_model", err: fmt.Errorf(`ent: validator failed for field "Group.default_mapped_model": %w`, err)}
@@ -1776,12 +1743,6 @@ func (_u *GroupUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if _u.mutation.ModelPricingCleared() {
 		_spec.ClearField(group.FieldModelPricing, field.TypeJSON)
-	}
-	if value, ok := _u.mutation.GlobalPromptEnabled(); ok {
-		_spec.SetField(group.FieldGlobalPromptEnabled, field.TypeBool, value)
-	}
-	if value, ok := _u.mutation.GlobalPrompt(); ok {
-		_spec.SetField(group.FieldGlobalPrompt, field.TypeString, value)
 	}
 	if value, ok := _u.mutation.ClaudeCodeOnly(); ok {
 		_spec.SetField(group.FieldClaudeCodeOnly, field.TypeBool, value)
@@ -2963,13 +2924,13 @@ func (_u *GroupUpdateOne) SetNillableLongContextPricingEnabled(v *bool) *GroupUp
 }
 
 // SetModelPricing sets the "model_pricing" field.
-func (_u *GroupUpdateOne) SetModelPricing(v json.RawMessage) *GroupUpdateOne {
+func (_u *GroupUpdateOne) SetModelPricing(v jsontext.Value) *GroupUpdateOne {
 	_u.mutation.SetModelPricing(v)
 	return _u
 }
 
 // AppendModelPricing appends value to the "model_pricing" field.
-func (_u *GroupUpdateOne) AppendModelPricing(v json.RawMessage) *GroupUpdateOne {
+func (_u *GroupUpdateOne) AppendModelPricing(v jsontext.Value) *GroupUpdateOne {
 	_u.mutation.AppendModelPricing(v)
 	return _u
 }
@@ -2977,34 +2938,6 @@ func (_u *GroupUpdateOne) AppendModelPricing(v json.RawMessage) *GroupUpdateOne 
 // ClearModelPricing clears the value of the "model_pricing" field.
 func (_u *GroupUpdateOne) ClearModelPricing() *GroupUpdateOne {
 	_u.mutation.ClearModelPricing()
-	return _u
-}
-
-// SetGlobalPromptEnabled sets the "global_prompt_enabled" field.
-func (_u *GroupUpdateOne) SetGlobalPromptEnabled(v bool) *GroupUpdateOne {
-	_u.mutation.SetGlobalPromptEnabled(v)
-	return _u
-}
-
-// SetNillableGlobalPromptEnabled sets the "global_prompt_enabled" field if the given value is not nil.
-func (_u *GroupUpdateOne) SetNillableGlobalPromptEnabled(v *bool) *GroupUpdateOne {
-	if v != nil {
-		_u.SetGlobalPromptEnabled(*v)
-	}
-	return _u
-}
-
-// SetGlobalPrompt sets the "global_prompt" field.
-func (_u *GroupUpdateOne) SetGlobalPrompt(v string) *GroupUpdateOne {
-	_u.mutation.SetGlobalPrompt(v)
-	return _u
-}
-
-// SetNillableGlobalPrompt sets the "global_prompt" field if the given value is not nil.
-func (_u *GroupUpdateOne) SetNillableGlobalPrompt(v *string) *GroupUpdateOne {
-	if v != nil {
-		_u.SetGlobalPrompt(*v)
-	}
 	return _u
 }
 
@@ -3678,11 +3611,6 @@ func (_u *GroupUpdateOne) check() error {
 			return &ValidationError{Name: "audio_stt_price_per_hour", err: fmt.Errorf(`ent: validator failed for field "Group.audio_stt_price_per_hour": %w`, err)}
 		}
 	}
-	if v, ok := _u.mutation.GlobalPrompt(); ok {
-		if err := group.GlobalPromptValidator(v); err != nil {
-			return &ValidationError{Name: "global_prompt", err: fmt.Errorf(`ent: validator failed for field "Group.global_prompt": %w`, err)}
-		}
-	}
 	if v, ok := _u.mutation.DefaultMappedModel(); ok {
 		if err := group.DefaultMappedModelValidator(v); err != nil {
 			return &ValidationError{Name: "default_mapped_model", err: fmt.Errorf(`ent: validator failed for field "Group.default_mapped_model": %w`, err)}
@@ -3966,12 +3894,6 @@ func (_u *GroupUpdateOne) sqlSave(ctx context.Context) (_node *Group, err error)
 	}
 	if _u.mutation.ModelPricingCleared() {
 		_spec.ClearField(group.FieldModelPricing, field.TypeJSON)
-	}
-	if value, ok := _u.mutation.GlobalPromptEnabled(); ok {
-		_spec.SetField(group.FieldGlobalPromptEnabled, field.TypeBool, value)
-	}
-	if value, ok := _u.mutation.GlobalPrompt(); ok {
-		_spec.SetField(group.FieldGlobalPrompt, field.TypeString, value)
 	}
 	if value, ok := _u.mutation.ClaudeCodeOnly(); ok {
 		_spec.SetField(group.FieldClaudeCodeOnly, field.TypeBool, value)

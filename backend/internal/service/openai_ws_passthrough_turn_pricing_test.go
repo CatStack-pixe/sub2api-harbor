@@ -76,8 +76,6 @@ func TestPassthroughIngressReportsTurnStartedBeforeAfterTurnWithoutBeforeTurn(t 
 
 	var hooksMu sync.Mutex
 	beforeTurnCalls := 0
-	beforeTurnAdmissionCalls := 0
-	afterTurnCalls := 0
 	expectedTurnStartedAt := time.Date(2026, time.August, 17, 9, 59, 59, 0, time.UTC)
 	type hookEvent struct {
 		name      string
@@ -98,15 +96,8 @@ func TestPassthroughIngressReportsTurnStartedBeforeAfterTurnWithoutBeforeTurn(t 
 			hooksMu.Unlock()
 			return nil
 		},
-		BeforeTurnAdmission: func(int) error {
-			hooksMu.Lock()
-			beforeTurnAdmissionCalls++
-			hooksMu.Unlock()
-			return nil
-		},
 		AfterTurn: func(turn int, _ *OpenAIForwardResult, _ error) {
 			hooksMu.Lock()
-			afterTurnCalls++
 			hookEvents = append(hookEvents, hookEvent{name: "AfterTurn", turn: turn})
 			hooksMu.Unlock()
 		},
@@ -136,16 +127,11 @@ func TestPassthroughIngressReportsTurnStartedBeforeAfterTurnWithoutBeforeTurn(t 
 	}
 
 	hooksMu.Lock()
-	gotBefore, gotAdmission, gotAfter := beforeTurnCalls, beforeTurnAdmissionCalls, afterTurnCalls
-	hooksMu.Unlock()
-
-	require.Zero(t, gotBefore, "透传 ingress 没有 turn 起始回调，BeforeTurn 不应被调用")
-	require.Zero(t, gotAdmission, "首轮透传请求已在 handler 准入，不应重复触发 turn 配额回调")
-	require.Positive(t, gotAfter, "透传 ingress 仍应回调 AfterTurn 提交用量")
-	hooksMu.Lock()
+	gotBefore := beforeTurnCalls
 	gotEvents := append([]hookEvent(nil), hookEvents...)
 	hooksMu.Unlock()
 
+	require.Zero(t, gotBefore, "透传 ingress 不应调用 BeforeTurn")
 	require.GreaterOrEqual(t, len(gotEvents), 2, "透传 ingress 应报告 TurnStarted 和 AfterTurn")
 	require.Equal(t, "TurnStarted", gotEvents[0].name)
 	require.Equal(t, expectedTurnStartedAt, gotEvents[0].startedAt, "TurnStarted 必须携带入口冻结的首轮开始时刻")

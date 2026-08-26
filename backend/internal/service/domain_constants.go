@@ -38,41 +38,19 @@ const (
 
 // Platform constants
 const (
-	PlatformAnthropic         = domain.PlatformAnthropic
-	PlatformOpenAI            = domain.PlatformOpenAI
-	PlatformGemini            = domain.PlatformGemini
-	PlatformAntigravity       = domain.PlatformAntigravity
-	PlatformGrok              = domain.PlatformGrok
-	PlatformAgnes             = domain.PlatformAgnes
-	PlatformDeepSeek          = domain.PlatformDeepSeek
-	PlatformNvidia            = domain.PlatformNvidia
-	PlatformTokenRhythm       = domain.PlatformTokenRhythm
-	PlatformKimi              = domain.PlatformKimi
-	PlatformZhipu             = domain.PlatformZhipu
-	PlatformDeepseek          = domain.PlatformDeepseek
-	PlatformChatAnywhere      = domain.PlatformChatAnywhere
-	PlatformGLM               = domain.PlatformGLM
-	PlatformModelScope        = domain.PlatformModelScope
-	PlatformDashScope         = domain.PlatformDashScope
-	PlatformMiniMax           = domain.PlatformMiniMax
-	PlatformVolcengine        = domain.PlatformVolcengine
-	PlatformComposite         = domain.PlatformComposite
-	PlatformKiro              = "kiro"
-	AgnesDefaultBaseURL       = domain.AgnesDefaultBaseURL
-	AgnesDefaultModel         = domain.AgnesDefaultModel
-	DeepSeekDefaultBaseURL    = domain.DeepSeekDefaultBaseURL
-	NvidiaDefaultBaseURL      = domain.NvidiaDefaultBaseURL
-	NvidiaDefaultModel        = domain.NvidiaDefaultModel
-	TokenRhythmDefaultBaseURL = domain.TokenRhythmDefaultBaseURL
-	KimiDefaultBaseURL        = domain.KimiDefaultBaseURL
-	KimiInternationalBaseURL  = domain.KimiInternationalBaseURL
-	ChatAnywhereChinaBaseURL  = domain.ChatAnywhereChinaBaseURL
-	ChatAnywhereGlobalBaseURL = domain.ChatAnywhereGlobalBaseURL
-	GLMDefaultBaseURL         = domain.GLMDefaultBaseURL
-	ModelScopeDefaultBaseURL  = domain.ModelScopeDefaultBaseURL
-	DashScopeDefaultBaseURL   = domain.DashScopeDefaultBaseURL
-	MiniMaxDefaultBaseURL     = domain.MiniMaxDefaultBaseURL
-	VolcengineDefaultBaseURL  = domain.VolcengineDefaultBaseURL
+	PlatformAnthropic   = domain.PlatformAnthropic
+	PlatformOpenAI      = domain.PlatformOpenAI
+	PlatformGemini      = domain.PlatformGemini
+	PlatformAntigravity = domain.PlatformAntigravity
+	PlatformGrok        = domain.PlatformGrok
+	// 国产 OpenAI 兼容供应商（与 grok 一样经 OpenAI 网关转发）。
+	PlatformKimi      = domain.PlatformKimi
+	PlatformZhipu     = domain.PlatformZhipu
+	PlatformDeepseek  = domain.PlatformDeepseek
+	PlatformComposite = domain.PlatformComposite
+	// PlatformKiro is retained for unsupported-platform threshold tests and legacy
+	// account rows. Scheduling-threshold evaluation never pauses kiro accounts.
+	PlatformKiro = "kiro"
 )
 
 // 账号接入模式（国产供应商）：按量付费 vs Coding Plan。
@@ -127,107 +105,9 @@ var AllowedQuotaPlatforms = []string{
 	PlatformGemini,
 	PlatformAntigravity,
 	PlatformGrok,
-	PlatformAgnes,
-	PlatformDeepSeek,
-	PlatformNvidia,
-	PlatformTokenRhythm,
 	PlatformKimi,
 	PlatformZhipu,
-	PlatformChatAnywhere,
-	PlatformGLM,
-	PlatformModelScope,
-	PlatformDashScope,
-	PlatformMiniMax,
-	PlatformVolcengine,
-}
-
-// DeepSeekDefaultModelIDs are the public DeepSeek V4 model IDs shown in default selections.
-func DeepSeekDefaultModelIDs() []string {
-	return []string{"deepseek-v4-pro", "deepseek-v4-flash"}
-}
-
-// KimiDefaultModelIDs are the general-purpose Kimi API model IDs shown when
-// an account or group has no explicit model list.
-func KimiDefaultModelIDs() []string {
-	return []string{"kimi-k2.6", "kimi-k2.5"}
-}
-
-// ChatAnywhereDefaultModelIDs are conservative fallbacks used before live model sync.
-func ChatAnywhereDefaultModelIDs() []string {
-	return []string{"gpt-5.5", "gpt-5.1", "gpt-4.1", "claude-sonnet-4-5", "deepseek-v3-2"}
-}
-
-// GLMDefaultModelIDs are conservative fallbacks used before a live model sync.
-func GLMDefaultModelIDs() []string {
-	return []string{"glm-5.2", "glm-5.1", "glm-5", "glm-5-turbo", "glm-4.7", "glm-4.5-air", "glm-4.7-flashx", "glm-4.7-flash"}
-}
-
-// ModelScopeDefaultModelIDs are representative model IDs observed from the
-// ModelScope OpenAI-compatible catalog. A live account sync remains the source
-// of truth for the complete and changing catalog.
-func ModelScopeDefaultModelIDs() []string {
-	return []string{
-		"Qwen/Qwen3.5-397B-A17B",
-		"Qwen/Qwen3.5-122B-A10B",
-		"Qwen/Qwen3-235B-A22B-Instruct-2507",
-		"Qwen/Qwen3-Coder-30B-A3B-Instruct",
-		"deepseek-ai/DeepSeek-V4-Pro",
-		"deepseek-ai/DeepSeek-V4-Flash-0731",
-		"ZhipuAI/GLM-5.2",
-	}
-}
-
-// DashScopeDefaultModelIDs are representative Qwen and third-party model IDs
-// observed from the DashScope catalog before an account-specific sync.
-func DashScopeDefaultModelIDs() []string {
-	return []string{
-		"qwen-plus",
-		"qwen-max",
-		"qwen3.5-plus",
-		"qwen3.5-flash",
-		"qwen3-max",
-		"qwen3-coder-plus",
-		"deepseek-v3.2",
-		"deepseek-r1",
-		"glm-5.2",
-		"kimi-k2.6",
-	}
-}
-
-// MiniMaxDefaultModelIDs are the current MiniMax model IDs returned by the
-// upstream account catalog.
-func MiniMaxDefaultModelIDs() []string {
-	return []string{
-		"MiniMax-M2",
-		"MiniMax-M2.1",
-		"MiniMax-M2.1-highspeed",
-		"MiniMax-M2.5",
-		"MiniMax-M2.5-highspeed",
-		"MiniMax-M2.7",
-		"MiniMax-M2.7-highspeed",
-		"MiniMax-M3",
-	}
-}
-
-// VolcengineDefaultModelIDs are representative current Doubao, DeepSeek,
-// GLM, and Kimi IDs observed from Volcengine's OpenAI-compatible catalog.
-func VolcengineDefaultModelIDs() []string {
-	return []string{
-		"doubao-seed-2-0-code-preview-260215",
-		"doubao-seed-2-0-pro-260215",
-		"doubao-seed-2-1-pro-260628",
-		"doubao-seed-2-1-turbo-260628",
-		"deepseek-v3-2-251201",
-		"deepseek-v4-pro-ga-260813",
-		"glm-5-2-260617",
-		"kimi-k2-thinking-251104",
-	}
-}
-
-// TokenRhythmDefaultModelIDs are the DeepSeek V4 models exposed by the
-// TokenRhythm channel when its live model list is unavailable.
-func TokenRhythmDefaultModelIDs() []string {
-	return []string{"deepseek-v4-pro", "deepseek-v4-flash"}
+	PlatformDeepseek,
 }
 
 // AllowedSchedulingThresholdPlatforms 是允许设置账号自动停调阈值的平台列表。
@@ -239,18 +119,6 @@ var AllowedSchedulingThresholdPlatforms = []string{
 	PlatformGrok,
 	PlatformKimi,
 	PlatformZhipu,
-}
-
-// NvidiaDefaultModelIDs are the current NVIDIA NIM model IDs used when an
-// account or group has no explicit model list yet. The account model sync
-// endpoint remains the source of truth for the full catalog.
-func NvidiaDefaultModelIDs() []string {
-	return []string{
-		NvidiaDefaultModel,
-		"meta/llama-3.1-8b-instruct",
-		"meta/llama-3.1-70b-instruct",
-		"meta/llama-3.3-70b-instruct",
-	}
 }
 
 // IsAllowedQuotaPlatform 报告 s 是否为合法的 quota platform 标识。
@@ -655,6 +523,10 @@ const (
 	// the Model Plaza page (global pricing notes, exchange rate, promotions, ...).
 	SettingKeyModelPlazaDescription = "model_plaza_description"
 
+	// SettingKeyPluginManagementEnabled controls sidebar visibility only; it does
+	// not stop or otherwise change already loaded plugin runtimes.
+	SettingKeyPluginManagementEnabled = "plugin_management_enabled"
+
 	// SettingKeyUpstreamBillingProbeSettings stores the global enable switch and interval
 	// for probing remote Sub2API API-key billing metadata.
 	SettingKeyUpstreamBillingProbeSettings = "upstream_billing_probe_settings"
@@ -671,6 +543,8 @@ const (
 
 	// SettingKeyRateLimit429CooldownSettings stores JSON config for 429 fallback cooldown handling.
 	SettingKeyRateLimit429CooldownSettings = "rate_limit_429_cooldown_settings"
+	// SettingKeyOpenAIAPIKeyHealthBreakerSettings stores the opt-in OpenAI pool API-key breaker config.
+	SettingKeyOpenAIAPIKeyHealthBreakerSettings = "openai_apikey_health_breaker_settings"
 
 	// =========================
 	// Stream Timeout Handling

@@ -138,7 +138,21 @@
             <span
               :class="[
                 'inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium',
-                platformBadgeLightClass(value),
+                value === 'anthropic'
+                  ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'
+                  : value === 'openai'
+                    ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
+                    : value === 'antigravity'
+                      ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400'
+                      : value === 'grok'
+                        ? 'bg-zinc-200 text-zinc-800 dark:bg-zinc-700 dark:text-zinc-100'
+                        : value === 'kimi'
+                          ? 'bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-400'
+                          : value === 'zhipu'
+                            ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400'
+                            : value === 'deepseek'
+                              ? 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400'
+                              : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
               ]"
             >
               <PlatformIcon :platform="value" size="xs" />
@@ -1242,7 +1256,7 @@
           </div>
         </div>
 
-        <!-- 分组利润控制（支持的平台 token 请求） -->
+        <!-- 分组利润控制（五个平台 token 请求） -->
         <div v-if="isProfitControlPlatform(createForm.platform)" class="border-t pt-4">
           <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
             <input
@@ -1550,26 +1564,11 @@
             <span><span class="block text-sm text-gray-700 dark:text-gray-300">{{ t("admin.groups.modelPricing.longContext") }}</span><span class="block text-xs text-gray-500">{{ t("admin.groups.modelPricing.longContextHint") }}</span></span>
           </label>
           <div class="mt-3 space-y-2">
-<PricingEntryCard v-for="(entry, index) in createForm.model_pricing" :key="index" :entry="entry" :platform="createForm.platform" hide-token-intervals hide-time-windows @update="createForm.model_pricing[index] = $event" @remove="createForm.model_pricing.splice(index, 1)" />
+            <PricingEntryCard v-for="(entry, index) in createForm.model_pricing" :key="index" :entry="entry" :platform="createForm.platform" hide-token-intervals @update="createForm.model_pricing[index] = $event" @remove="createForm.model_pricing.splice(index, 1)" />
           </div>
         </div>
 
         <!-- Grok Voice 显式定价（仅 grok 平台） -->
-        <div class="border-t border-gray-200 pt-4 mt-4 dark:border-dark-400">
-          <div class="flex items-center justify-between gap-4">
-            <div>
-              <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t("admin.groups.globalPrompt.title") }}</h4>
-              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t("admin.groups.globalPrompt.hint") }}</p>
-            </div>
-            <label class="flex shrink-0 items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-              <input v-model="createForm.global_prompt_enabled" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
-              {{ createForm.global_prompt_enabled ? t("admin.groups.globalPrompt.enabled") : t("admin.groups.globalPrompt.disabled") }}
-            </label>
-          </div>
-          <textarea v-model="createForm.global_prompt" :disabled="!createForm.global_prompt_enabled" rows="5" class="input mt-3" :placeholder="t('admin.groups.globalPrompt.placeholder')"></textarea>
-          <p class="mt-1 text-right text-xs text-gray-500 dark:text-gray-400">{{ groupGlobalPromptByteLength(createForm.global_prompt) }} / {{ groupGlobalPromptMaxBytes }}</p>
-        </div>
-
         <div
           v-if="createForm.platform === 'grok'"
           class="border-t border-gray-200 dark:border-dark-400 pt-4 mt-4"
@@ -1664,9 +1663,9 @@
           </p>
         </div>
 
-        <!-- OpenAI Messages 调度配置（仅 openai 平台） -->
+        <!-- OpenAI Messages 调度配置（OpenAI 与 Composite 平台） -->
         <div
-          v-if="createForm.platform === 'openai'"
+          v-if="supportsMessagesDispatchPlatform(createForm.platform)"
           class="border-t border-gray-200 dark:border-dark-400 pt-4 mt-4"
         >
           <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
@@ -1705,7 +1704,13 @@
             {{ t("admin.groups.openaiMessages.allowDispatchHint") }}
           </p>
 
-          <div v-if="createForm.allow_messages_dispatch" class="mt-3">
+          <div
+            v-if="
+              createForm.platform === 'openai' &&
+              createForm.allow_messages_dispatch
+            "
+            class="mt-3"
+          >
             <div
               class="relative overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-dark-600 dark:bg-dark-800"
             >
@@ -3032,7 +3037,7 @@
           </div>
         </div>
 
-        <!-- 分组利润控制（支持的平台 token 请求） -->
+        <!-- 分组利润控制（五个平台 token 请求） -->
         <div v-if="isProfitControlPlatform(editForm.platform)" class="border-t pt-4">
           <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
             <input
@@ -3336,26 +3341,11 @@
             <span><span class="block text-sm text-gray-700 dark:text-gray-300">{{ t("admin.groups.modelPricing.longContext") }}</span><span class="block text-xs text-gray-500">{{ t("admin.groups.modelPricing.longContextHint") }}</span></span>
           </label>
           <div class="mt-3 space-y-2">
-<PricingEntryCard v-for="(entry, index) in editForm.model_pricing" :key="index" :entry="entry" :platform="editForm.platform" hide-token-intervals hide-time-windows @update="editForm.model_pricing[index] = $event" @remove="editForm.model_pricing.splice(index, 1)" />
+            <PricingEntryCard v-for="(entry, index) in editForm.model_pricing" :key="index" :entry="entry" :platform="editForm.platform" hide-token-intervals @update="editForm.model_pricing[index] = $event" @remove="editForm.model_pricing.splice(index, 1)" />
           </div>
         </div>
 
         <!-- Grok Voice 显式定价（仅 grok 平台） -->
-        <div class="border-t border-gray-200 pt-4 mt-4 dark:border-dark-400">
-          <div class="flex items-center justify-between gap-4">
-            <div>
-              <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t("admin.groups.globalPrompt.title") }}</h4>
-              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t("admin.groups.globalPrompt.hint") }}</p>
-            </div>
-            <label class="flex shrink-0 items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-              <input v-model="editForm.global_prompt_enabled" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
-              {{ editForm.global_prompt_enabled ? t("admin.groups.globalPrompt.enabled") : t("admin.groups.globalPrompt.disabled") }}
-            </label>
-          </div>
-          <textarea v-model="editForm.global_prompt" :disabled="!editForm.global_prompt_enabled" rows="5" class="input mt-3" :placeholder="t('admin.groups.globalPrompt.placeholder')"></textarea>
-          <p class="mt-1 text-right text-xs text-gray-500 dark:text-gray-400">{{ groupGlobalPromptByteLength(editForm.global_prompt) }} / {{ groupGlobalPromptMaxBytes }}</p>
-        </div>
-
         <div
           v-if="editForm.platform === 'grok'"
           class="border-t border-gray-200 dark:border-dark-400 pt-4 mt-4"
@@ -3450,9 +3440,9 @@
           </p>
         </div>
 
-        <!-- OpenAI Messages 调度配置（仅 openai 平台） -->
+        <!-- OpenAI Messages 调度配置（OpenAI 与 Composite 平台） -->
         <div
-          v-if="editForm.platform === 'openai'"
+          v-if="supportsMessagesDispatchPlatform(editForm.platform)"
           class="border-t border-gray-200 dark:border-dark-400 pt-4 mt-4"
         >
           <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
@@ -3491,7 +3481,12 @@
             {{ t("admin.groups.openaiMessages.allowDispatchHint") }}
           </p>
 
-          <div v-if="editForm.allow_messages_dispatch" class="mt-3">
+          <div
+            v-if="
+              editForm.platform === 'openai' && editForm.allow_messages_dispatch
+            "
+            class="mt-3"
+          >
             <div
               class="relative overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-dark-600 dark:bg-dark-800"
             >
@@ -4075,9 +4070,23 @@
               </div>
               <div class="text-xs text-gray-500 dark:text-gray-400">
                 <span
-                    :class="[
-                      'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium',
-                      platformBadgeLightClass(group.platform),
+                  :class="[
+                    'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium',
+                    group.platform === 'anthropic'
+                      ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'
+                      : group.platform === 'openai'
+                        ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
+                        : group.platform === 'antigravity'
+                          ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400'
+                          : group.platform === 'grok'
+                            ? 'bg-zinc-200 text-zinc-800 dark:bg-zinc-700 dark:text-zinc-100'
+                            : group.platform === 'kimi'
+                              ? 'bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-400'
+                              : group.platform === 'zhipu'
+                                ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400'
+                                : group.platform === 'deepseek'
+                                  ? 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400'
+                                  : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
                   ]"
                 >
                   {{ t("admin.groups.platforms." + group.platform) }}
@@ -4526,7 +4535,6 @@ import {
   CONCRETE_PLATFORM_OPTIONS,
   GROUP_PLATFORM_OPTIONS,
 } from "@/constants/platforms";
-import { platformBadgeLightClass } from "@/utils/platformColors";
 import type { Column } from "@/components/common/types";
 import AppLayout from "@/components/layout/AppLayout.vue";
 import TablePageLayout from "@/components/layout/TablePageLayout.vue";
@@ -4563,6 +4571,7 @@ import {
   messagesDispatchConfigToFormState,
   messagesDispatchFormStateToConfig,
   resetMessagesDispatchFormState,
+  supportsMessagesDispatchPlatform,
   type MessagesDispatchMappingRow,
 } from "./groupsMessagesDispatch";
 import {
@@ -4622,7 +4631,6 @@ const emptyGroupPricing = (): PricingFormEntry => ({
   image_output_price: null,
   per_request_price: null,
   intervals: [],
-	 time_windows: [],
   time_pricing: createDefaultTimePricingForm(),
 });
 
@@ -4643,7 +4651,6 @@ const groupPricingFromAPI = (
     image_output_price: perTokenToMTok(entry.image_output_price),
     per_request_price: entry.per_request_price,
     intervals: apiIntervalsToForm(entry.intervals || []),
-	 time_windows: [],
     time_pricing: createDefaultTimePricingForm(),
   }));
 
@@ -4668,7 +4675,6 @@ const groupPricingToAPI = (
         entry.billing_mode === "token"
           ? []
           : formIntervalsToAPI(entry.intervals || []),
-	 time_windows: [],
       time_pricing: null,
     }));
 
@@ -5146,8 +5152,6 @@ const createForm = reactive({
   monthly_limit_usd: null as number | null,
   long_context_pricing_enabled: true,
   model_pricing: [] as PricingFormEntry[],
-  global_prompt_enabled: false,
-  global_prompt: "",
   // 图片生成计费配置
   allow_image_generation: false,
   allow_batch_image_generation: false,
@@ -5176,7 +5180,7 @@ const createForm = reactive({
   peak_start: "",
   peak_end: "",
   peak_rate_multiplier: 1.0,
-  // 分组利润控制（支持的 token 平台）；界面按百分比输入，提交时转小数
+  // 分组利润控制（五个 token 平台）；界面按百分比输入，提交时转小数
   profit_control_enabled: false,
   profit_min_margin_percent: 0,
   profit_safety_buffer_percent: 0,
@@ -5511,8 +5515,6 @@ const editForm = reactive({
   monthly_limit_usd: null as number | null,
   long_context_pricing_enabled: true,
   model_pricing: [] as PricingFormEntry[],
-  global_prompt_enabled: false,
-  global_prompt: "",
   // 图片生成计费配置
   allow_image_generation: false,
   allow_batch_image_generation: false,
@@ -5541,7 +5543,7 @@ const editForm = reactive({
   peak_start: "",
   peak_end: "",
   peak_rate_multiplier: 1.0,
-  // 分组利润控制（支持的 token 平台）；界面按百分比输入，提交时转小数
+  // 分组利润控制（五个 token 平台）；界面按百分比输入，提交时转小数
   profit_control_enabled: false,
   profit_min_margin_percent: 0,
   profit_safety_buffer_percent: 0,
@@ -5987,8 +5989,6 @@ const closeCreateModal = () => {
   createForm.video_model_prices = createVideoModelPricesForm();
   createForm.long_context_pricing_enabled = true;
   createForm.model_pricing = [];
-  createForm.global_prompt_enabled = false;
-  createForm.global_prompt = "";
   createForm.web_search_price_per_call = null;
   createForm.search_price_per_1k = null;
   createForm.audio_realtime_price_per_min = null;
@@ -6067,17 +6067,6 @@ const handleCreateGroup = async () => {
     return;
   }
   if (
-    groupGlobalPromptByteLength(createForm.global_prompt) >
-    groupGlobalPromptMaxBytes
-  ) {
-    appStore.showError(
-      t("admin.groups.globalPrompt.tooLong", {
-        max: groupGlobalPromptMaxBytes.toLocaleString(),
-      }),
-    );
-    return;
-  }
-  if (
     supportsReasoningEffortPolicyPlatform(createForm.platform) &&
     createReasoningEffortPolicyRef.value &&
     !createReasoningEffortPolicyRef.value.validate()
@@ -6136,7 +6125,7 @@ const handleCreateGroup = async () => {
       reasoning_effort_mappings: reasoningEffortMappingsToAPI(
         createForm.reasoning_effort_mappings,
       ),
-      // 利润控制：界面百分比转小数提交；仅支持的平台可启用
+      // 利润控制：界面百分比转小数提交；仅五个 token 平台可启用
       profit_control_enabled:
         isProfitControlPlatform(createForm.platform) &&
         createForm.profit_control_enabled,
@@ -6228,8 +6217,6 @@ const handleEdit = async (group: AdminGroup) => {
   editForm.long_context_pricing_enabled =
     group.long_context_pricing_enabled ?? true;
   editForm.model_pricing = groupPricingFromAPI(group.model_pricing);
-  editForm.global_prompt_enabled = group.global_prompt_enabled ?? false;
-  editForm.global_prompt = group.global_prompt ?? "";
   editForm.allow_image_generation = group.allow_image_generation ?? false;
   editForm.allow_batch_image_generation =
     group.allow_batch_image_generation ?? false;
@@ -6336,8 +6323,6 @@ const closeEditModal = () => {
   editForm.video_model_prices = createVideoModelPricesForm();
   editForm.long_context_pricing_enabled = true;
   editForm.model_pricing = [];
-  editForm.global_prompt_enabled = false;
-  editForm.global_prompt = "";
   editForm.web_search_price_per_call = null;
   editForm.search_price_per_1k = null;
   editForm.audio_realtime_price_per_min = null;
@@ -6352,17 +6337,6 @@ const handleUpdateGroup = async () => {
   if (!editingGroup.value) return;
   if (!editForm.name.trim()) {
     appStore.showError(t("admin.groups.nameRequired"));
-    return;
-  }
-  if (
-    groupGlobalPromptByteLength(editForm.global_prompt) >
-    groupGlobalPromptMaxBytes
-  ) {
-    appStore.showError(
-      t("admin.groups.globalPrompt.tooLong", {
-        max: groupGlobalPromptMaxBytes.toLocaleString(),
-      }),
-    );
     return;
   }
   if (
@@ -6424,7 +6398,7 @@ const handleUpdateGroup = async () => {
       reasoning_effort_mappings: reasoningEffortMappingsToAPI(
         editForm.reasoning_effort_mappings,
       ),
-      // 利润控制：界面百分比转小数提交；仅支持的平台可启用
+      // 利润控制：界面百分比转小数提交；仅五个 token 平台可启用
       profit_control_enabled:
         isProfitControlPlatform(editForm.platform) &&
         editForm.profit_control_enabled,
@@ -6790,7 +6764,7 @@ watch(
     if (!["anthropic", "antigravity"].includes(newVal)) {
       createForm.fallback_group_id_on_invalid_request = null;
     }
-    if (newVal !== "openai") {
+    if (!supportsMessagesDispatchPlatform(newVal)) {
       resetMessagesDispatchFormState(createForm);
     }
     if (!supportsLivePlatform(newVal)) {
@@ -6840,7 +6814,7 @@ watch(
     if (!["anthropic", "antigravity"].includes(newVal)) {
       editForm.fallback_group_id_on_invalid_request = null;
     }
-    if (newVal !== "openai") {
+    if (!supportsMessagesDispatchPlatform(newVal)) {
       resetMessagesDispatchFormState(editForm);
     }
     if (!supportsLivePlatform(newVal)) {
@@ -6892,7 +6866,7 @@ watch(
     if (!['anthropic', 'antigravity'].includes(newVal)) {
       editForm.fallback_group_id_on_invalid_request = null
     }
-    if (newVal !== 'openai') {
+    if (!supportsMessagesDispatchPlatform(newVal)) {
       editForm.allow_messages_dispatch = false
       editForm.default_mapped_model = ''
     }

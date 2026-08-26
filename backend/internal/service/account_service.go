@@ -534,24 +534,9 @@ func (s *AccountService) TestCredentials(ctx context.Context, id int64) error {
 	case PlatformGrok:
 		// Grok OAuth credentials are validated via token exchange/refresh and request-path probes.
 		return nil
-	case PlatformAgnes:
+	case PlatformKimi, PlatformZhipu, PlatformDeepseek:
+		// 国产 OpenAI 兼容供应商：凭证为 API Key，实际可用性经余额/额度探测与转发路径验证。
 		return nil
-	case PlatformDeepSeek:
-		return validateAccountCredentials(account.Platform, account.Type, account.Credentials)
-	case PlatformNvidia:
-		return validateAccountCredentials(account.Platform, account.Type, account.Credentials)
-	case PlatformTokenRhythm:
-		return validateAccountCredentials(account.Platform, account.Type, account.Credentials)
-	case PlatformKimi:
-		return validateAccountCredentials(account.Platform, account.Type, account.Credentials)
-	case PlatformChatAnywhere:
-		return validateAccountCredentials(account.Platform, account.Type, account.Credentials)
-	case PlatformGLM:
-		return validateAccountCredentials(account.Platform, account.Type, account.Credentials)
-	case PlatformZhipu:
-		return validateAccountCredentials(account.Platform, account.Type, account.Credentials)
-	case PlatformModelScope, PlatformDashScope, PlatformMiniMax, PlatformVolcengine:
-		return validateAccountCredentials(account.Platform, account.Type, account.Credentials)
 	default:
 		return fmt.Errorf("unsupported platform: %s", account.Platform)
 	}

@@ -95,7 +95,7 @@ func TestCNProviderQuotaService_RejectsURLBlockedByPolicy(t *testing.T) {
 // deepseek payg 账号自定义 base_url → 余额端点落在中转主机上，必须先过策略。
 func TestCNProviderBalanceService_RejectsURLBlockedByPolicy(t *testing.T) {
 	repo := &fakeCNProbeAccountRepo{account: &Account{
-		ID: 2, Platform: PlatformDeepSeek, Type: AccountTypeAPIKey, Status: StatusActive,
+		ID: 2, Platform: PlatformDeepseek, Type: AccountTypeAPIKey, Status: StatusActive,
 		Credentials: map[string]any{
 			"account_mode": "payg",
 			"api_key":      "sk-test",
@@ -115,7 +115,7 @@ func TestCNProviderBalanceService_RejectsURLBlockedByPolicy(t *testing.T) {
 // httpUpstream 层即视为通过校验，不发真实网络）。
 func TestCNProviderBalanceService_OfficialHostPassesValidation(t *testing.T) {
 	repo := &fakeCNProbeAccountRepo{account: &Account{
-		ID: 3, Platform: PlatformDeepSeek, Type: AccountTypeAPIKey, Status: StatusActive,
+		ID: 3, Platform: PlatformDeepseek, Type: AccountTypeAPIKey, Status: StatusActive,
 		Credentials: map[string]any{
 			"account_mode": "payg",
 			"api_key":      "sk-test",

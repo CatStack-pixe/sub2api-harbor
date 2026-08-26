@@ -101,7 +101,7 @@ func TestAdaptiveProtocolRoutesResponsesShapedChatToNativeResponses(t *testing.T
 	body := []byte(`{"model":"deepseek-v4","input":"hello","max_output_tokens":32,"stream":false}`)
 	upstream := &httpUpstreamRecorder{err: errors.New("stop after capture")}
 	svc := &OpenAIGatewayService{cfg: rawChatCompletionsTestConfig(), httpUpstream: upstream}
-	account := adaptiveProtocolTestAccount(PlatformDeepSeek, map[string]any{
+	account := adaptiveProtocolTestAccount(PlatformDeepseek, map[string]any{
 		APIProtocolChatCompletions: "http://chat.example",
 		APIProtocolAnthropic:       "http://anthropic.example",
 		APIProtocolResponses:       "http://responses.example",
@@ -169,7 +169,7 @@ func TestAdaptiveProtocolRoutesDeepSeekResponsesToNativeResponses(t *testing.T) 
 	body := []byte(`{"model":"deepseek-v4","input":"hello","max_output_tokens":32,"store":true,"previous_response_id":"resp_old","stream":false}`)
 	upstream := &httpUpstreamRecorder{err: errors.New("stop after capture")}
 	svc := &OpenAIGatewayService{cfg: rawChatCompletionsTestConfig(), httpUpstream: upstream}
-	account := adaptiveProtocolTestAccount(PlatformDeepSeek, map[string]any{
+	account := adaptiveProtocolTestAccount(PlatformDeepseek, map[string]any{
 		APIProtocolChatCompletions: "http://chat.example",
 		APIProtocolAnthropic:       "http://anthropic.example",
 		APIProtocolResponses:       "http://responses.example",
@@ -190,7 +190,7 @@ func TestFixedCNChatProtocolOverridesStaleResponsesMode(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			upstream := &httpUpstreamRecorder{err: errors.New("stop after capture")}
 			svc := &OpenAIGatewayService{cfg: rawChatCompletionsTestConfig(), httpUpstream: upstream}
-			account := adaptiveProtocolTestAccount(PlatformDeepSeek, nil)
+			account := adaptiveProtocolTestAccount(PlatformDeepseek, nil)
 			account.Credentials["api_protocol"] = APIProtocolChatCompletions
 			account.Credentials["base_url"] = "http://chat.example"
 			account.Extra = map[string]any{
@@ -211,7 +211,7 @@ func TestFixedCNResponsesProtocolOverridesStaleChatMode(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			upstream := &httpUpstreamRecorder{err: errors.New("stop after capture")}
 			svc := &OpenAIGatewayService{cfg: rawChatCompletionsTestConfig(), httpUpstream: upstream}
-			account := adaptiveProtocolTestAccount(PlatformDeepSeek, nil)
+			account := adaptiveProtocolTestAccount(PlatformDeepseek, nil)
 			account.Credentials["api_protocol"] = APIProtocolResponses
 			account.Credentials["base_url"] = "http://responses.example"
 			account.Extra = map[string]any{

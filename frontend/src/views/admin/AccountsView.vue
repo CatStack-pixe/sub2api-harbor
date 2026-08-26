@@ -322,7 +322,6 @@
               :batched-usage-error="usageBatchErrorByAccountId[String(row.id)] ?? null"
               :batched-usage-loading="usageBatchLoadingByAccountId[String(row.id)] === true"
               :request-batched-usage="isDesktopViewport ? queueBatchedUsage : null"
-              :page-visible="documentVisibility === 'visible'"
               @account-updated="handleAccountUpdated"
               @usage-loaded="handleAccountUsageLoaded(row.id, $event)"
             />
@@ -527,9 +526,6 @@ import ErrorPassthroughRulesModal from '@/components/admin/ErrorPassthroughRules
 import TLSFingerprintProfilesModal from '@/components/admin/TLSFingerprintProfilesModal.vue'
 import { fetchAllAccountIds } from '@/utils/accountSelection'
 import { buildGrokUsageRefreshKey, buildOpenAIUsageRefreshKey } from '@/utils/accountUsageRefresh'
-import { invalidateDeepSeekBalanceCache } from '@/utils/deepSeekBalanceQuery'
-import { invalidateTokenRhythmBalanceCache } from '@/utils/tokenRhythmBalanceQuery'
-import { invalidateKimiBalanceCache } from '@/utils/kimiBalanceQuery'
 import { formatDateTime, formatRelativeTime } from '@/utils/format'
 import { proxyExpiryBadgeClass, proxyExpiryLabelKey } from '@/utils/proxyExpiry'
 import { extractApiErrorMessage } from '@/utils/apiError'
@@ -638,7 +634,7 @@ const accountToolsDropdownStyle = computed(() => ({
   width: `${accountToolsDropdownPosition.width}px`
 }))
 const hiddenColumns = reactive<Set<string>>(new Set())
-const DEFAULT_HIDDEN_COLUMNS = ['today_stats', 'proxy', 'notes', 'priority', 'scheduler_score', 'rate_multiplier']
+const DEFAULT_HIDDEN_COLUMNS = ['today_stats', 'proxy', 'notes', 'scheduler_score', 'rate_multiplier']
 const HIDDEN_COLUMNS_KEY = 'account-hidden-columns'
 // One-time migration: hide scheduler score for existing admins too, because showing it opt-ins to heavy backend scoring.
 const HIDDEN_COLUMNS_VERSION_KEY = 'account-hidden-columns-version'
@@ -704,6 +700,24 @@ const documentVisibility = useDocumentVisibility()
 invalidateDeepSeekBalanceCache()
 invalidateTokenRhythmBalanceCache()
 invalidateKimiBalanceCache()
+
+const desktopViewportQuery = '(min-width: 768px)'
+const isDesktopViewport = ref(
+  typeof window === 'undefined' ? true : window.matchMedia(desktopViewportQuery).matches
+)
+let desktopViewportMediaQuery: MediaQueryList | null = null
+let desktopViewportListener: ((event: MediaQueryListEvent) => void) | null = null
+
+const usageBatchByAccountId = ref<Record<string, AccountUsageInfo | null>>({})
+const usageBatchErrorByAccountId = ref<Record<string, string | null>>({})
+const usageBatchLoadingByAccountId = ref<Record<string, boolean>>({})
+const usageBatchRequestTokenByAccountId = ref<Record<string, number>>({})
+const usageBatchCache = new Map<number, { data: AccountUsageInfo; ts: number }>()
+const USAGE_BATCH_CACHE_TTL = 5 * 60 * 1000
+const pendingUsageBatchIds = new Set<number>()
+let usageBatchFlushTimer: ReturnType<typeof setTimeout> | null = null
+let queuedUsageBatchForce = false
+let usageBatchRequestToken = 0
 
 const desktopViewportQuery = '(min-width: 768px)'
 const isDesktopViewport = ref(
@@ -1808,7 +1822,6 @@ const handleBulkDelete = async () => {
       appStore.showSuccess(t('admin.accounts.bulkActions.deleteSuccess', { count: result.success }))
       clearSelection()
     }
-    invalidateKimiBalanceCache()
     await reload()
   } catch (error) {
     console.error('Failed to bulk delete accounts:', error)

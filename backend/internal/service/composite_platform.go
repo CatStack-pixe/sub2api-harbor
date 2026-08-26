@@ -106,34 +106,12 @@ func DetectModelPlatform(model string) (string, bool) {
 			return PlatformGemini, true
 		case "xai", "x-ai", "grok":
 			return PlatformGrok, true
-		case "agnes":
-			return PlatformAgnes, true
-		case "deepseek":
-			return PlatformDeepSeek, true
-		case "nvidia":
-			return PlatformNvidia, true
-		case "tokenrhythm":
-			return PlatformTokenRhythm, true
 		case "kimi", "moonshot":
 			return PlatformKimi, true
-		case "chatanywhere":
-			return PlatformChatAnywhere, true
-		case "glm":
-			return PlatformGLM, true
-		case "zhipu", "bigmodel":
+		case "zhipu", "glm", "bigmodel":
 			return PlatformZhipu, true
-		case "modelscope":
-			return PlatformModelScope, true
-		case "dashscope", "aliyun", "qwen":
-			return PlatformDashScope, true
-		case "minimax":
-			return PlatformMiniMax, true
-		case "volcengine", "ark", "doubao":
-			return PlatformVolcengine, true
-		case "z-ai", "zai":
-			// NVIDIA NIM also publishes models under these namespaces. Leave
-			// ambiguous names unresolved unless a composite route is explicit.
-			return "", false
+		case "deepseek":
+			return PlatformDeepseek, true
 		}
 		if rest != "" {
 			normalized = strings.TrimPrefix(rest, "models/")
@@ -161,23 +139,15 @@ func DetectModelPlatform(model string) (string, bool) {
 		return PlatformGemini, true
 	case normalized == "grok" || strings.HasPrefix(normalized, "grok-"):
 		return PlatformGrok, true
-	case strings.HasPrefix(normalized, "agnes-"):
-		return PlatformAgnes, true
-	case strings.HasPrefix(normalized, "deepseek-"):
-		return PlatformDeepSeek, true
-	case strings.HasPrefix(normalized, "nvidia-"):
-		return PlatformNvidia, true
-	case strings.HasPrefix(normalized, "kimi-"),
+	case normalized == "k3",
+		normalized == "k3-256k",
+		strings.HasPrefix(normalized, "kimi-"),
 		strings.HasPrefix(normalized, "moonshot-"):
 		return PlatformKimi, true
 	case strings.HasPrefix(normalized, "glm-"):
-		return PlatformGLM, true
-	case strings.HasPrefix(normalized, "qwen-"):
-		return PlatformDashScope, true
-	case strings.HasPrefix(normalized, "minimax-"):
-		return PlatformMiniMax, true
-	case strings.HasPrefix(normalized, "doubao-"):
-		return PlatformVolcengine, true
+		return PlatformZhipu, true
+	case strings.HasPrefix(normalized, "deepseek-"):
+		return PlatformDeepseek, true
 	default:
 		return "", false
 	}
@@ -225,9 +195,7 @@ func (s *GatewayService) resolveCompositeRouteDecision(ctx context.Context, grou
 func isConcreteRequestPlatform(platform string) bool {
 	switch platform {
 	case PlatformAnthropic, PlatformOpenAI, PlatformGemini, PlatformAntigravity, PlatformGrok,
-		PlatformAgnes, PlatformDeepSeek, PlatformNvidia, PlatformTokenRhythm, PlatformKimi,
-		PlatformZhipu, PlatformChatAnywhere, PlatformGLM, PlatformModelScope, PlatformDashScope,
-		PlatformMiniMax, PlatformVolcengine:
+		PlatformKimi, PlatformZhipu, PlatformDeepseek:
 		return true
 	default:
 		return false

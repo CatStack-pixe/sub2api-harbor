@@ -292,9 +292,7 @@ func defaultAllowImageGenerationForPlatform(platform string) bool {
 func compositeDefaultModelsListCandidateIDs() []string {
 	seen := make(map[string]struct{})
 	ids := make([]string, 0)
-	for _, platform := range []string{PlatformAnthropic, PlatformGemini, PlatformOpenAI, PlatformAntigravity,
-		PlatformGrok, PlatformAgnes, PlatformDeepSeek, PlatformNvidia, PlatformTokenRhythm,
-		PlatformKimi, PlatformZhipu, PlatformChatAnywhere, PlatformGLM, PlatformModelScope, PlatformDashScope, PlatformMiniMax, PlatformVolcengine} {
+	for _, platform := range []string{PlatformAnthropic, PlatformGemini, PlatformOpenAI, PlatformAntigravity, PlatformGrok, PlatformKimi, PlatformZhipu, PlatformDeepseek} {
 		for _, id := range defaultModelsListCandidateIDs(platform) {
 			if _, ok := seen[id]; ok {
 				continue
@@ -331,16 +329,9 @@ func (s *adminServiceImpl) CreateGroup(ctx context.Context, input *CreateGroupIn
 	}
 
 	platform := NormalizeGroupPlatform(input.Platform)
-	if err := ValidateGroupPlatform(platform); err != nil {
-		return nil, err
-	}
 	modelPricing, err := normalizeGroupModelPricing(platform, input.ModelPricing)
 	if err != nil {
 		return nil, err
-	}
-	longContextPricingEnabled := true
-	if input.LongContextPricingEnabled != nil {
-		longContextPricingEnabled = *input.LongContextPricingEnabled
 	}
 	maxReasoningEffort, err := normalizeMaxReasoningEffortForPlatform(platform, input.MaxReasoningEffort)
 	if err != nil {
@@ -500,10 +491,8 @@ func (s *adminServiceImpl) CreateGroup(ctx context.Context, input *CreateGroupIn
 		DailyLimitUSD:                   dailyLimit,
 		WeeklyLimitUSD:                  weeklyLimit,
 		MonthlyLimitUSD:                 monthlyLimit,
-		LongContextPricingEnabled:       longContextPricingEnabled,
+		LongContextPricingEnabled:       input.LongContextPricingEnabled,
 		ModelPricing:                    modelPricing,
-		GlobalPromptEnabled:             input.GlobalPromptEnabled && strings.TrimSpace(input.GlobalPrompt) != "",
-		GlobalPrompt:                    strings.TrimSpace(input.GlobalPrompt),
 		AllowImageGeneration:            allowImageGeneration,
 		AllowBatchImageGeneration:       allowBatchImageGeneration,
 		ImageRateIndependent:            input.ImageRateIndependent,
@@ -717,24 +706,6 @@ func (s *adminServiceImpl) UpdateGroup(ctx context.Context, id int64, input *Upd
 			return nil, normalizeErr
 		}
 		group.ModelPricing = modelPricing
-	} else if group.Platform != previousPlatform && len(group.ModelPricing) > 0 {
-		modelPricing, normalizeErr := normalizeGroupModelPricing(group.Platform, group.ModelPricing)
-		if normalizeErr != nil {
-			return nil, normalizeErr
-		}
-		group.ModelPricing = modelPricing
-	}
-	if input.GlobalPrompt != nil {
-		if err := ValidateGroupGlobalPrompt(*input.GlobalPrompt); err != nil {
-			return nil, err
-		}
-		group.GlobalPrompt = strings.TrimSpace(*input.GlobalPrompt)
-	}
-	if input.GlobalPromptEnabled != nil {
-		group.GlobalPromptEnabled = *input.GlobalPromptEnabled
-	}
-	if strings.TrimSpace(group.GlobalPrompt) == "" {
-		group.GlobalPromptEnabled = false
 	}
 
 	// 订阅相关字段
@@ -1048,7 +1019,6 @@ func normalizeGroupModelPricing(platform string, pricing []ChannelModelPricing) 
 		out[i] = pricing[i].Clone()
 		out[i].ID = 0
 		out[i].ChannelID = 0
-		out[i].Platform = platform
 		if out[i].TimePricing != nil && len(out[i].TimePricing.Periods) > 0 {
 			return nil, infraerrors.BadRequest(
 				"GROUP_MODEL_TIME_PRICING_UNSUPPORTED",

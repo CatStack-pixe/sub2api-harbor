@@ -32,7 +32,6 @@ type stubAdminService struct {
 	createAccountErr                    error
 	createSparkShadowErr                error
 	updateAccountErr                    error
-	updateProxyErr                      error
 	lastUpdateAccountInput              *service.UpdateAccountInput
 	bulkUpdateAccountErr                error
 	lastBulkUpdateAccountInput          *service.BulkUpdateAccountsInput

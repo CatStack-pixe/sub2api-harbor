@@ -105,29 +105,13 @@ type ChannelModelPricing struct {
 	TimePricing      *ChannelTimePricing `json:"time_pricing,omitempty"`
 	CreatedAt        time.Time           `json:"created_at,omitempty"`
 	UpdatedAt        time.Time           `json:"updated_at,omitempty"`
-	TimeWindows      []PricingTimeWindow `json:"time_windows"`
-}
-
-// PricingTimeWindow overrides selected model prices during a daily Beijing-time window.
-// The interval is [StartMinute, EndMinute); gaps fall back to the parent pricing.
-type PricingTimeWindow struct {
-	ID              int64     `json:"id,omitempty"`
-	PricingID       int64     `json:"pricing_id,omitempty"`
-	StartMinute     int       `json:"start_minute"`
-	EndMinute       int       `json:"end_minute"`
-	InputPrice      *float64  `json:"input_price"`
-	OutputPrice     *float64  `json:"output_price"`
-	CacheWritePrice *float64  `json:"cache_write_price"`
-	CacheReadPrice  *float64  `json:"cache_read_price"`
-	SortOrder       int       `json:"sort_order"`
-	CreatedAt       time.Time `json:"created_at,omitempty"`
-	UpdatedAt       time.Time `json:"updated_at,omitempty"`
 }
 
 // ChannelTimePricing 渠道模型定价的分时倍率配置。
 type ChannelTimePricing struct {
-	Timezone string                     `json:"timezone"`
-	Periods  []ChannelTimePricingPeriod `json:"periods"`
+	Timezone     string                     `json:"timezone"`
+	WeekdaysOnly bool                       `json:"weekdays_only,omitempty"`
+	Periods      []ChannelTimePricingPeriod `json:"periods"`
 }
 
 // ChannelTimePricingPeriod 是秒级的左闭右开分时倍率区间，并兼容历史 HH:mm 数据。
@@ -232,12 +216,11 @@ func (p ChannelModelPricing) Clone() ChannelModelPricing {
 		cp.Intervals = make([]PricingInterval, len(p.Intervals))
 		copy(cp.Intervals, p.Intervals)
 	}
-	if p.TimeWindows != nil {
-		cp.TimeWindows = make([]PricingTimeWindow, len(p.TimeWindows))
-		copy(cp.TimeWindows, p.TimeWindows)
-	}
 	if p.TimePricing != nil {
-		cp.TimePricing = &ChannelTimePricing{Timezone: p.TimePricing.Timezone}
+		cp.TimePricing = &ChannelTimePricing{
+			Timezone:     p.TimePricing.Timezone,
+			WeekdaysOnly: p.TimePricing.WeekdaysOnly,
+		}
 		if p.TimePricing.Periods != nil {
 			cp.TimePricing.Periods = append([]ChannelTimePricingPeriod(nil), p.TimePricing.Periods...)
 		}

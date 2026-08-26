@@ -69,7 +69,7 @@ func TestValidatePayGAccount_Matrix(t *testing.T) {
 		{name: "non cn provider", account: &Account{ID: 3, Platform: PlatformAnthropic}, wantReason: "CN_BALANCE_INVALID_PLATFORM"},
 		{name: "coding has no balance endpoint", account: codingAccount(PlatformKimi), wantReason: "CN_BALANCE_CODING_PLAN"},
 		{name: "kimi payg ok", account: paygAccount(PlatformKimi)},
-		{name: "deepseek payg ok", account: paygAccount(PlatformDeepSeek)},
+		{name: "deepseek payg ok", account: paygAccount(PlatformDeepseek)},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

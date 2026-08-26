@@ -1857,7 +1857,7 @@
       </div>
 
       <div
-        v-if="account?.type === 'apikey' && account?.platform !== 'deepseek'"
+        v-if="account?.type === 'apikey'"
         class="flex items-center justify-between gap-4 border-t border-gray-200 pt-4 dark:border-dark-600"
       >
         <div>
@@ -2337,6 +2337,66 @@
           />
           <p class="input-hint">{{ t('admin.accounts.autoPauseThresholdHint') }}</p>
         </div>
+      </div>
+
+      <div
+        v-if="account?.platform === 'openai' && account?.type === 'oauth' && !isSparkShadow"
+        class="space-y-4 border-t border-gray-200 pt-4 dark:border-dark-600"
+        data-testid="auto-reset-credit-settings"
+      >
+        <div class="flex items-center justify-between gap-4">
+          <div class="min-w-0">
+            <label class="input-label mb-0">{{ t('admin.accounts.autoResetCredit.title') }}</label>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              {{ t('admin.accounts.autoResetCredit.hint') }}
+            </p>
+          </div>
+          <button
+            type="button"
+            data-testid="auto-reset-credit-enabled"
+            @click="autoResetCreditEnabled = !autoResetCreditEnabled"
+            :class="[
+              'relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2',
+              autoResetCreditEnabled ? 'bg-primary-600' : 'bg-gray-200 dark:bg-dark-600'
+            ]"
+          >
+            <span
+              :class="[
+                'pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out',
+                autoResetCreditEnabled ? 'translate-x-5' : 'translate-x-0'
+              ]"
+            />
+          </button>
+        </div>
+        <div class="grid gap-4 sm:grid-cols-2">
+          <div>
+            <label class="input-label">{{ t('admin.accounts.autoResetCredit.threshold5h') }}</label>
+            <input
+              v-model.number="autoResetCredit5hThreshold"
+              type="number"
+              min="0.1"
+              max="100"
+              step="0.1"
+              class="input"
+              :disabled="!autoResetCreditEnabled"
+              data-testid="auto-reset-credit-5h-threshold"
+            />
+          </div>
+          <div>
+            <label class="input-label">{{ t('admin.accounts.autoResetCredit.threshold7d') }}</label>
+            <input
+              v-model.number="autoResetCredit7dThreshold"
+              type="number"
+              min="0.1"
+              max="100"
+              step="0.1"
+              class="input"
+              :disabled="!autoResetCreditEnabled"
+              data-testid="auto-reset-credit-7d-threshold"
+            />
+          </div>
+        </div>
+        <p class="input-hint">{{ t('admin.accounts.autoResetCredit.thresholdHint') }}</p>
       </div>
 
       <!-- 配额控制 (Anthropic OAuth/SetupToken: 亲和 + 窗口费用 + 会话 + RPM 等) -->
@@ -2990,7 +3050,6 @@ interface TempUnschedRuleForm {
 const submitting = ref(false)
 const editBaseUrl = ref('https://api.anthropic.com')
 const editApiKey = ref('')
-const tokenRhythmCookie = ref('')
 
 // ── 国产供应商（Kimi / Zhipu / DeepSeek）account_mode / api_protocol 编辑 ──
 // account_mode 决定额度/余额监控路径，api_protocol 决定转发端点与格式；
@@ -3184,6 +3243,9 @@ const autoPause5hThreshold = ref<number | null>(null)
 const autoPause7dThreshold = ref<number | null>(null)
 const autoPause5hDisabled = ref(false)
 const autoPause7dDisabled = ref(false)
+const autoResetCreditEnabled = ref(false)
+const autoResetCredit5hThreshold = ref(100)
+const autoResetCredit7dThreshold = ref(100)
 const upstreamBillingAutoProbeEnabled = ref(false)
 const upstreamBillingRateSyncEnabled = ref(false)
 const mixedScheduling = ref(false) // For antigravity accounts: enable mixed scheduling
@@ -3547,15 +3609,6 @@ const defaultBaseUrl = computed(() => {
   if (props.account?.platform === 'openai') return 'https://api.openai.com'
   if (props.account?.platform === 'gemini') return 'https://generativelanguage.googleapis.com'
   if (props.account?.platform === 'grok') return 'https://api.x.ai/v1'
-  if (props.account?.platform === 'agnes') return 'https://apihub.agnes-ai.com/v1'
-  if (props.account?.platform === 'nvidia') return 'https://integrate.api.nvidia.com/v1'
-  if (props.account?.platform === 'tokenrhythm') return 'https://tokenrhythm.studio/v1'
-  if (props.account?.platform === 'chatanywhere') return 'https://api.chatanywhere.tech/v1'
-  if (props.account?.platform === 'glm') return 'https://open.bigmodel.cn/api/paas/v4'
-  if (props.account?.platform === 'modelscope') return 'https://api-inference.modelscope.cn/v1'
-  if (props.account?.platform === 'dashscope') return 'https://dashscope.aliyuncs.com/compatible-mode/v1'
-  if (props.account?.platform === 'minimax') return 'https://api.minimaxi.com/v1'
-  if (props.account?.platform === 'volcengine') return 'https://ark.cn-beijing.volces.com/api/v3'
   // CN 供应商：按当前模式/协议回落到官方预设（清空输入框提交时使用），
   // 不能落到 anthropic 默认值（会被当 CC base 拼出错误端点）。
   if (
@@ -3721,7 +3774,12 @@ const syncFormFromAccount = (newAccount: Account | null) => {
 	autoPause7dThreshold.value = typeof extra?.auto_pause_7d_threshold === 'number' ? extra.auto_pause_7d_threshold * 100 : null
 	autoPause5hDisabled.value = extra?.auto_pause_5h_disabled === true
 	autoPause7dDisabled.value = extra?.auto_pause_7d_disabled === true
-	upstreamBillingAutoProbeEnabled.value = newAccount.platform !== 'deepseek' && newAccount.platform !== 'kimi' && newAccount.platform !== 'tokenrhythm' && newAccount.platform !== 'chatanywhere' && newAccount.platform !== 'glm' && newAccount.platform !== 'modelscope' && newAccount.platform !== 'dashscope' && newAccount.platform !== 'minimax' && newAccount.platform !== 'volcengine' && extra?.upstream_billing_probe_enabled === true
+	autoResetCreditEnabled.value = extra?.auto_reset_credit_enabled === true
+	autoResetCredit5hThreshold.value =
+		typeof extra?.auto_reset_credit_5h_threshold === 'number' ? extra.auto_reset_credit_5h_threshold * 100 : 100
+	autoResetCredit7dThreshold.value =
+		typeof extra?.auto_reset_credit_7d_threshold === 'number' ? extra.auto_reset_credit_7d_threshold * 100 : 100
+	upstreamBillingAutoProbeEnabled.value = extra?.upstream_billing_probe_enabled === true
   upstreamBillingRateSyncEnabled.value =
     upstreamBillingAutoProbeEnabled.value && extra?.upstream_billing_rate_sync_enabled === true
 
@@ -3967,31 +4025,21 @@ const syncFormFromAccount = (newAccount: Account | null) => {
       }
       editAdaptiveBaseUrls.value = nextAdaptiveBaseUrls
     }
-    const cnPlatform =
-      newAccount.platform === 'kimi' || newAccount.platform === 'zhipu' || newAccount.platform === 'deepseek'
-        ? newAccount.platform
-        : null
-    const platformDefaultUrls: Record<string, string> = {
-          openai: 'https://api.openai.com',
-          gemini: 'https://generativelanguage.googleapis.com',
-          grok: 'https://api.x.ai/v1',
-          agnes: 'https://apihub.agnes-ai.com/v1',
-          tokenrhythm: 'https://tokenrhythm.studio/v1',
-          chatanywhere: 'https://api.chatanywhere.tech/v1',
-          glm: 'https://open.bigmodel.cn/api/paas/v4',
-          nvidia: 'https://integrate.api.nvidia.com/v1',
-          modelscope: 'https://api-inference.modelscope.cn/v1',
-          dashscope: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
-          minimax: 'https://api.minimaxi.com/v1',
-          volcengine: 'https://ark.cn-beijing.volces.com/api/v3'
-        }
-    const platformDefaultUrl = cnPlatform
-      ? defaultCNBaseUrl(cnPlatform, editAccountMode.value, editApiProtocol.value)
-      : platformDefaultUrls[newAccount.platform] || 'https://api.anthropic.com'
+    const platformDefaultUrl =
+      newAccount.platform === 'openai'
+        ? 'https://api.openai.com'
+        : newAccount.platform === 'gemini'
+          ? 'https://generativelanguage.googleapis.com'
+          : newAccount.platform === 'grok'
+            ? 'https://api.x.ai/v1'
+            : newAccount.platform === 'kimi' ||
+                newAccount.platform === 'zhipu' ||
+                newAccount.platform === 'deepseek'
+              ? defaultCNBaseUrl(newAccount.platform, editAccountMode.value, editApiProtocol.value)
+              : 'https://api.anthropic.com'
     editBaseUrl.value = isCNApiKeyAccount.value && editApiProtocol.value === 'adaptive'
       ? editAdaptiveBaseUrls.value.chat_completions
       : (credentials.base_url as string) || platformDefaultUrl
-    tokenRhythmCookie.value = ''
 
     // Load model mappings and detect mode
     loadModelRestrictionFromMapping(credentials.model_mapping as Record<string, unknown> | undefined)
@@ -4192,6 +4240,10 @@ const syncAntigravityUpstreamModels = async () => {
       }
     }
 
+    if (result.warnings?.some((warning) => warning.code === 'upstream_model_metadata_incomplete')) {
+      appStore.showWarning(t('admin.accounts.syncUpstreamModelsMetadataIncomplete'))
+      return
+    }
     if (addedCount > 0) {
       appStore.showSuccess(t('admin.accounts.syncUpstreamModelsSuccess', { count: addedCount, total: upstreamModels.length }))
     } else {
@@ -4646,6 +4698,13 @@ const handleSubmit = async () => {
     appStore.showError(t('admin.accounts.pleaseSelectStatus'))
     return
   }
+	if (autoResetCreditEnabled.value) {
+		const thresholds = [autoResetCredit5hThreshold.value, autoResetCredit7dThreshold.value]
+		if (thresholds.some((value) => !Number.isFinite(value) || value < 0.1 || value > 100)) {
+			appStore.showError(t('admin.accounts.autoResetCredit.thresholdInvalid'))
+			return
+		}
+	}
 
   const updatePayload: Record<string, unknown> = { ...form }
   try {
@@ -4662,7 +4721,7 @@ const handleSubmit = async () => {
       updatePayload.load_factor = 0
     }
     updatePayload.auto_pause_on_expired = autoPauseOnExpired.value
-    if (props.account.type === 'apikey' && props.account.platform !== 'deepseek' && props.account.platform !== 'kimi' && props.account.platform !== 'tokenrhythm' && props.account.platform !== 'chatanywhere' && props.account.platform !== 'glm' && props.account.platform !== 'modelscope' && props.account.platform !== 'dashscope' && props.account.platform !== 'minimax' && props.account.platform !== 'volcengine') {
+    if (props.account.type === 'apikey') {
       updatePayload.upstream_billing_probe_enabled = upstreamBillingAutoProbeEnabled.value
       updatePayload.upstream_billing_rate_sync_enabled = upstreamBillingRateSyncEnabled.value
       if (upstreamBillingRateSyncEnabled.value) {
@@ -5214,6 +5273,13 @@ const handleSubmit = async () => {
 		} else {
 			delete newExtra.auto_pause_7d_disabled
 		}
+		if (props.account.type === 'oauth' && !isSparkShadow.value) {
+			newExtra.auto_reset_credit_enabled = autoResetCreditEnabled.value
+			newExtra.auto_reset_credit_5h_threshold = autoResetCredit5hThreshold.value / 100
+			newExtra.auto_reset_credit_7d_threshold = autoResetCredit7dThreshold.value / 100
+		}
+		// 运行态只允许后端服务更新，账号编辑不得回写旧状态。
+		delete newExtra.codex_auto_reset_credit_state
 
 		delete newExtra.codex_image_generation_bridge_enabled
       switch (codexImageToolMode.value) {
@@ -5267,7 +5333,7 @@ const handleSubmit = async () => {
       const currentExtra = (updatePayload.extra as Record<string, unknown>) ||
         (props.account.extra as Record<string, unknown>) || {}
       const newExtra: Record<string, unknown> = { ...currentExtra }
-      // 上游倍率自动探测对支持的 API-key 平台开放（DeepSeek 使用独立余额探测），
+      // 上游倍率自动探测对全部 API-key 平台开放（sub2api 上游即可应答），
       // Bedrock 凭证无静态 Key 不参与。
       if (props.account.type === 'apikey') {
         delete newExtra.upstream_billing_probe_enabled

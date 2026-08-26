@@ -420,7 +420,7 @@ func TestRevalidateLinkedAccount_QuotaErrorsProbeUnbinds(t *testing.T) {
 func TestRevalidateLinkedAccount_PlatformMismatch(t *testing.T) {
 	svc := NewChannelMonitorService(nil, nil)
 	svc.SetQuotaFetcher(newQuotaModeFetcher(map[int64]*Account{
-		2: {ID: 2, Platform: domain.PlatformDeepSeek},
+		2: {ID: 2, Platform: domain.PlatformDeepseek},
 	}, nil))
 
 	quota := &ChannelMonitor{Provider: MonitorProviderKimi, CheckMode: MonitorCheckModeQuota, AccountID: int64Ptr(2)}
@@ -440,7 +440,7 @@ func TestMonitorAccountQuotaCapability_Matrix(t *testing.T) {
 	}{
 		{
 			name:    "deepseek coding has no quota endpoint",
-			account: &Account{ID: 1, Platform: domain.PlatformDeepSeek, Credentials: map[string]any{"account_mode": AccountModeCoding}},
+			account: &Account{ID: 1, Platform: domain.PlatformDeepseek, Credentials: map[string]any{"account_mode": AccountModeCoding}},
 			wantErr: ErrChannelMonitorAccountNotSupportable,
 		},
 		{
@@ -469,7 +469,7 @@ func TestMonitorAccountQuotaCapability_Matrix(t *testing.T) {
 		},
 		{
 			name:    "deepseek payg ok",
-			account: &Account{ID: 7, Platform: domain.PlatformDeepSeek},
+			account: &Account{ID: 7, Platform: domain.PlatformDeepseek},
 		},
 		{
 			name:    "anthropic api key cannot query usage",
@@ -522,7 +522,7 @@ func TestMonitorAccountQuotaCapability_Matrix(t *testing.T) {
 func TestValidateLinkedAccount_CapabilityRejected(t *testing.T) {
 	svc := NewChannelMonitorService(nil, nil)
 	svc.SetQuotaFetcher(newQuotaModeFetcher(map[int64]*Account{
-		1: {ID: 1, Platform: domain.PlatformDeepSeek, Credentials: map[string]any{"account_mode": AccountModeCoding}},
+		1: {ID: 1, Platform: domain.PlatformDeepseek, Credentials: map[string]any{"account_mode": AccountModeCoding}},
 	}, nil))
 
 	err := svc.validateLinkedAccount(context.Background(), MonitorProviderDeepseek, int64Ptr(1))
@@ -532,7 +532,7 @@ func TestValidateLinkedAccount_CapabilityRejected(t *testing.T) {
 func TestRevalidateLinkedAccount_Capability(t *testing.T) {
 	svc := NewChannelMonitorService(nil, nil)
 	svc.SetQuotaFetcher(newQuotaModeFetcher(map[int64]*Account{
-		2: {ID: 2, Platform: domain.PlatformDeepSeek, Credentials: map[string]any{"account_mode": AccountModeCoding}},
+		2: {ID: 2, Platform: domain.PlatformDeepseek, Credentials: map[string]any{"account_mode": AccountModeCoding}},
 	}, nil))
 
 	quota := &ChannelMonitor{Provider: MonitorProviderDeepseek, CheckMode: MonitorCheckModeQuota, AccountID: int64Ptr(2)}

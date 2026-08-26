@@ -440,20 +440,7 @@
           :title="t('admin.accounts.cnProviders.noBalanceEndpoint')"
         >-</div>
         <CNProviderQuotaCell :account="account" />
-        <DeepSeekBalanceCell
-          v-if="account.platform === 'deepseek' && cnBalanceCellVisible"
-          :account="account"
-          :auto-load="shouldAutoLoadDeepSeekBalance"
-          :refresh-token="manualRefreshToken"
-        />
-        <KimiBalanceCell
-          v-else-if="account.platform === 'kimi' && cnBalanceCellVisible"
-          :key="account.updated_at"
-          :account="account"
-          :auto-load="shouldAutoLoadKimiBalance"
-          :refresh-token="manualRefreshToken"
-        />
-        <CNProviderBalanceCell v-else :account="account" />
+        <CNProviderBalanceCell :account="account" />
       </div>
     </template>
 
@@ -680,9 +667,6 @@ import UsageProgressBar from './UsageProgressBar.vue'
 import AccountQuotaInfo from './AccountQuotaInfo.vue'
 import OpenAIQuotaResetCell from './OpenAIQuotaResetCell.vue'
 import GrokQuotaProbeCell from './GrokQuotaProbeCell.vue'
-import DeepSeekBalanceCell from './DeepSeekBalanceCell.vue'
-import TokenRhythmBalanceCell from './TokenRhythmBalanceCell.vue'
-import KimiBalanceCell from './KimiBalanceCell.vue'
 import CNProviderQuotaCell from './CNProviderQuotaCell.vue'
 import CNProviderBalanceCell from './CNProviderBalanceCell.vue'
 import OllamaCloudUsageCell from './OllamaCloudUsageCell.vue'
@@ -704,7 +688,6 @@ const props = withDefaults(
     batchedUsageError?: string | null
     batchedUsageLoading?: boolean
     requestBatchedUsage?: ((account: Account, options?: { force?: boolean }) => void) | null
-    pageVisible?: boolean
   }>(),
   {
     todayStats: null,
@@ -713,8 +696,7 @@ const props = withDefaults(
     batchedUsage: null,
     batchedUsageError: null,
     batchedUsageLoading: false,
-    requestBatchedUsage: null,
-    pageVisible: true
+    requestBatchedUsage: null
   }
 )
 

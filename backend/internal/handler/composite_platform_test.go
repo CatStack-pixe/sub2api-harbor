@@ -31,8 +31,9 @@ func TestOpenAICompatibleTextTargetAllowsCompositeProviders(t *testing.T) {
 	}{
 		{model: "grok-4.3", platform: service.PlatformGrok},
 		{model: "kimi-k2-thinking", platform: service.PlatformKimi},
-		{model: "zhipu/glm-5.2", platform: service.PlatformZhipu},
-		{model: "deepseek-v3.2", platform: service.PlatformDeepSeek},
+		{model: "k3", platform: service.PlatformKimi},
+		{model: "glm-5.2", platform: service.PlatformZhipu},
+		{model: "deepseek-v3.2", platform: service.PlatformDeepseek},
 	}
 	for _, path := range []string{"/v1/messages", "/v1/chat/completions", "/v1/responses", "/v1/responses/input_tokens", "/v1/messages/count_tokens"} {
 		for _, provider := range providers {
@@ -54,7 +55,7 @@ func TestResponsesWebSocketCompositePlatformGuardKeepsOpenAIAndGrokOnly(t *testi
 	require.True(t, isResponsesWebSocketCompositePlatform(service.PlatformOpenAI))
 	require.True(t, isResponsesWebSocketCompositePlatform(service.PlatformGrok))
 	for _, platform := range []string{
-		service.PlatformKimi, service.PlatformZhipu, service.PlatformDeepSeek,
+		service.PlatformKimi, service.PlatformZhipu, service.PlatformDeepseek,
 		service.PlatformAnthropic, service.PlatformGemini,
 	} {
 		require.False(t, isResponsesWebSocketCompositePlatform(platform), "platform=%s", platform)

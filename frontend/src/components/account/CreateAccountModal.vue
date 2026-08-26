@@ -329,6 +329,48 @@
             Volcengine Ark
           </button>
         </div>
+        <!-- CN providers row: Kimi / Zhipu GLM / DeepSeek -->
+        <div class="mt-2 flex flex-wrap rounded-lg bg-gray-100 p-1 dark:bg-dark-700">
+          <button
+            type="button"
+            @click="selectCNPlatform('kimi')"
+            :class="[
+              'flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium transition-all',
+              form.platform === 'kimi'
+                ? 'bg-white text-pink-600 shadow-sm dark:bg-dark-600 dark:text-pink-400'
+                : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200'
+            ]"
+          >
+            <PlatformIcon platform="kimi" size="sm" />
+            Kimi
+          </button>
+          <button
+            type="button"
+            @click="selectCNPlatform('zhipu')"
+            :class="[
+              'flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium transition-all',
+              form.platform === 'zhipu'
+                ? 'bg-white text-indigo-600 shadow-sm dark:bg-dark-600 dark:text-indigo-400'
+                : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200'
+            ]"
+          >
+            <PlatformIcon platform="zhipu" size="sm" />
+            Zhipu GLM
+          </button>
+          <button
+            type="button"
+            @click="selectCNPlatform('deepseek')"
+            :class="[
+              'flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium transition-all',
+              form.platform === 'deepseek'
+                ? 'bg-white text-teal-600 shadow-sm dark:bg-dark-600 dark:text-teal-400'
+                : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200'
+            ]"
+          >
+            <PlatformIcon platform="deepseek" size="sm" />
+            DeepSeek
+          </button>
+        </div>
       </div>
 
       <!-- Account Type Selection (Anthropic) -->
@@ -1554,16 +1596,6 @@
             v-model="apiKeyBaseUrl"
             type="text"
             class="input"
-            readonly
-            data-testid="glm-base-url"
-            placeholder="https://open.bigmodel.cn/api/paas/v4"
-          />
-          <input
-            v-else
-            v-model="apiKeyBaseUrl"
-            type="text"
-            class="input"
-            :readonly="form.platform === 'tokenrhythm'"
             :placeholder="apiKeyBaseUrlPlaceholder"
           />
           <p v-if="baseUrlHint" class="input-hint">{{ baseUrlHint }}</p>
@@ -1613,31 +1645,8 @@
           <p v-if="apiKeyHint" class="input-hint">{{ apiKeyHint }}</p>
         </div>
 
-        <div v-if="form.platform === 'tokenrhythm'">
-          <TokenRhythmSessionResolver
-            v-model:api-key="apiKeyValue"
-            :proxy-id="form.proxy_id"
-            :account-name="form.name"
-            :credential-cookie="tokenRhythmCookie"
-            @resolved="tokenRhythmCookie = $event"
-            @api-key-created="tokenRhythmCookie = $event.tokenrhythm_cookie || tokenRhythmCookie"
-          />
-          <label class="input-label">{{ t('admin.accounts.tokenrhythm.cookie') }}</label>
-          <textarea
-            v-model="tokenRhythmCookie"
-            required
-            rows="3"
-            class="input font-mono"
-            autocomplete="off"
-            spellcheck="false"
-            :placeholder="t('admin.accounts.tokenrhythm.cookiePlaceholder')"
-          ></textarea>
-          <p class="input-hint">{{ t('admin.accounts.tokenrhythm.cookieHint') }}</p>
-        </div>
-
-        <!-- 上游倍率自动探测：支持的 API-key 平台可用，DeepSeek 使用独立余额探测。 -->
+        <!-- 上游倍率自动探测：全部 API-key 平台可用（所在区块已限定 apikey 类型） -->
         <div
-          v-if="form.platform !== 'deepseek' && form.platform !== 'kimi' && form.platform !== 'tokenrhythm' && form.platform !== 'chatanywhere' && form.platform !== 'glm' && form.platform !== 'modelscope' && form.platform !== 'dashscope' && form.platform !== 'minimax' && form.platform !== 'volcengine'"
           class="flex items-center justify-between gap-4 border-t border-gray-200 pt-4 dark:border-dark-600"
         >
           <div>
@@ -1733,7 +1742,12 @@
 
             <!-- Whitelist Mode -->
             <div v-if="modelRestrictionMode === 'whitelist'">
-              <ModelWhitelistSelector v-model="allowedModels" :platform="form.platform" :sync-credentials="syncPreviewCredentials" />
+              <ModelWhitelistSelector
+                v-model="allowedModels"
+                :platform="form.platform"
+                :sync-credentials="syncPreviewCredentials"
+                @upstream-synced="upstreamModelsPreviewed = true"
+              />
               <p class="text-xs text-gray-500 dark:text-gray-400">
                 {{ t('admin.accounts.selectedModels', { count: allowedModels.length }) }}
                 <span v-if="allowedModels.length === 0">{{
@@ -2215,7 +2229,12 @@
 
           <!-- Whitelist Mode -->
           <div v-if="modelRestrictionMode === 'whitelist'">
-            <ModelWhitelistSelector v-model="allowedModels" platform="anthropic" :sync-credentials="syncPreviewCredentials" />
+            <ModelWhitelistSelector
+              v-model="allowedModels"
+              platform="anthropic"
+              :sync-credentials="syncPreviewCredentials"
+              @upstream-synced="upstreamModelsPreviewed = true"
+            />
             <p class="text-xs text-gray-500 dark:text-gray-400">
               {{ t('admin.accounts.selectedModels', { count: allowedModels.length }) }}
               <span v-if="allowedModels.length === 0">{{ t('admin.accounts.supportsAllModels') }}</span>
@@ -2551,7 +2570,12 @@
 
           <!-- Whitelist Mode -->
           <div v-if="modelRestrictionMode === 'whitelist'">
-            <ModelWhitelistSelector v-model="allowedModels" :platform="form.platform" :sync-credentials="syncPreviewCredentials" />
+            <ModelWhitelistSelector
+              v-model="allowedModels"
+              :platform="form.platform"
+              :sync-credentials="syncPreviewCredentials"
+              @upstream-synced="upstreamModelsPreviewed = true"
+            />
             <p class="text-xs text-gray-500 dark:text-gray-400">
               {{ t('admin.accounts.selectedModels', { count: allowedModels.length }) }}
               <span v-if="allowedModels.length === 0">{{
@@ -4091,7 +4115,6 @@ import Toggle from '@/components/common/Toggle.vue'
 import GrokBaseUrlPresets from '@/components/account/GrokBaseUrlPresets.vue'
 import CnBaseUrlPresets from '@/components/account/CnBaseUrlPresets.vue'
 import HeaderOverrideEditor from '@/components/account/HeaderOverrideEditor.vue'
-import TokenRhythmSessionResolver from '@/components/account/TokenRhythmSessionResolver.vue'
 import { allSelectedGroupsEnableLongContextPricing } from '@/components/account/longContextBilling'
 import {
   applyAntigravityProjectID,
@@ -4196,24 +4219,6 @@ const apiKeyBaseUrlPlaceholder = computed(() => {
       return 'https://generativelanguage.googleapis.com'
     case 'grok':
       return 'https://api.x.ai/v1'
-    case 'agnes':
-      return 'https://apihub.agnes-ai.com/v1'
-    case 'nvidia':
-      return 'https://integrate.api.nvidia.com/v1'
-    case 'tokenrhythm':
-      return 'https://tokenrhythm.studio/v1'
-    case 'chatanywhere':
-      return 'https://api.chatanywhere.tech/v1'
-    case 'glm':
-      return 'https://open.bigmodel.cn/api/paas/v4'
-    case 'modelscope':
-      return 'https://api-inference.modelscope.cn/v1'
-    case 'dashscope':
-      return 'https://dashscope.aliyuncs.com/compatible-mode/v1'
-    case 'minimax':
-      return 'https://api.minimaxi.com/v1'
-    case 'volcengine':
-      return 'https://ark.cn-beijing.volces.com/api/v3'
     default:
       return 'https://api.anthropic.com'
   }
@@ -4233,21 +4238,6 @@ const apiKeyValuePlaceholder = computed(() => {
       return '<api-key>.<secret>'
     case 'deepseek':
       return 'sk-...'
-    case 'nvidia':
-      return 'nvapi-...'
-    case 'agnes':
-    case 'tokenrhythm':
-    case 'chatanywhere':
-      return 'sk-...'
-    case 'glm':
-      return '<api-key>.<secret>'
-    case 'modelscope':
-      return 'ms-...'
-    case 'dashscope':
-    case 'minimax':
-      return 'sk-...'
-    case 'volcengine':
-      return 'ark-...'
     default:
       return 'sk-ant-...'
   }
@@ -4460,11 +4450,17 @@ const syncPreviewCredentials = computed(() => {
   const baseUrl = isCNPlatform.value && apiProtocol.value === 'adaptive'
     ? adaptiveBaseUrls.value.chat_completions.trim() || apiKeyBaseUrl.value.trim()
     : apiKeyBaseUrl.value.trim()
+  const modelMapping = buildModelMappingObject(
+    modelRestrictionMode.value,
+    allowedModels.value,
+    modelMappings.value
+  )
   return {
     platform: form.platform,
     type: form.type,
     base_url: baseUrl || undefined,
-    api_key: apiKeyValue.value
+    api_key: apiKeyValue.value,
+    ...(modelMapping ? { model_mapping: modelMapping } : {})
   }
 })
 
@@ -4481,6 +4477,7 @@ const modelMappings = ref<ModelMapping[]>([])
 const openAICompactModelMappings = ref<ModelMapping[]>([])
 const modelRestrictionMode = ref<'whitelist' | 'mapping'>('whitelist')
 const allowedModels = ref<string[]>([])
+const upstreamModelsPreviewed = ref(false)
 const DEFAULT_POOL_MODE_RETRY_COUNT = 3
 const MAX_POOL_MODE_RETRY_COUNT = 10
 const DEFAULT_POOL_MODE_RETRY_STATUS_CODES = [401, 403, 429]
@@ -4953,41 +4950,21 @@ watch(
   () => form.platform,
   (newPlatform) => {
     // Reset base URL based on platform
-    apiKeyBaseUrl.value =
-      (newPlatform === 'openai')
-        ? 'https://api.openai.com'
-        : newPlatform === 'gemini'
-          ? 'https://generativelanguage.googleapis.com'
-          : newPlatform === 'grok'
-            ? 'https://api.x.ai/v1'
-              : newPlatform === 'agnes'
-                ? 'https://apihub.agnes-ai.com/v1'
-                : newPlatform === 'tokenrhythm'
-                  ? 'https://tokenrhythm.studio/v1'
-                : newPlatform === 'chatanywhere'
-                  ? 'https://api.chatanywhere.tech/v1'
-                : newPlatform === 'glm'
-                  ? 'https://open.bigmodel.cn/api/paas/v4'
-                : newPlatform === 'kimi'
-                  ? 'https://api.moonshot.cn/v1'
-                : newPlatform === 'nvidia'
-                ? 'https://integrate.api.nvidia.com/v1'
-                : newPlatform === 'deepseek'
-                ? 'https://api.deepseek.com'
-                : newPlatform === 'modelscope'
-                ? 'https://api-inference.modelscope.cn/v1'
-                : newPlatform === 'dashscope'
-                ? 'https://dashscope.aliyuncs.com/compatible-mode/v1'
-                : newPlatform === 'minimax'
-                ? 'https://api.minimaxi.com/v1'
-                : newPlatform === 'volcengine'
-                ? 'https://ark.cn-beijing.volces.com/api/v3'
-                : 'https://api.anthropic.com'
     if (newPlatform === 'kimi' || newPlatform === 'zhipu' || newPlatform === 'deepseek') {
       apiKeyBaseUrl.value = defaultCNBaseUrl(newPlatform, accountMode.value, apiProtocol.value)
+    } else {
+      apiKeyBaseUrl.value =
+        (newPlatform === 'openai')
+          ? 'https://api.openai.com'
+          : newPlatform === 'gemini'
+            ? 'https://generativelanguage.googleapis.com'
+            : newPlatform === 'grok'
+              ? 'https://api.x.ai/v1'
+              : 'https://api.anthropic.com'
     }
     // Clear model-related settings
     allowedModels.value = []
+    upstreamModelsPreviewed.value = false
     modelMappings.value = []
     // Antigravity: 默认使用映射模式并填充默认映射
     if (newPlatform === 'antigravity') {
@@ -5432,6 +5409,23 @@ const submitCreateAccount = async (payload: CreateAccountRequest) => {
   submitting.value = true
   try {
     const account = await adminAPI.accounts.create(withAntigravityConfirmFlag(payload))
+    const modelMapping = payload.credentials.model_mapping
+    const hasConcreteMappedTarget = payload.type === 'apikey' &&
+      typeof modelMapping === 'object' &&
+      modelMapping !== null &&
+      Object.values(modelMapping).some((target) =>
+        typeof target === 'string' && target.trim() !== '' && !target.includes('*')
+      )
+    if (upstreamModelsPreviewed.value || hasConcreteMappedTarget) {
+      try {
+        const result = await adminAPI.accounts.syncUpstreamModels(account.id)
+        if (result.warnings?.some(warning => warning.code === 'upstream_model_metadata_incomplete')) {
+          appStore.showWarning(t('admin.accounts.syncUpstreamModelsMetadataIncomplete'))
+        }
+      } catch {
+        appStore.showWarning(t('admin.accounts.syncUpstreamModelsFailed'))
+      }
+    }
     if (
       payload.type === 'apikey' &&
       payload.upstream_billing_probe_enabled === true
@@ -5528,8 +5522,6 @@ const resetForm = () => {
   openaiAPIKeyResponsesWebSocketV2Mode.value = OPENAI_WS_MODE_OFF
   codexCLIOnlyEnabled.value = false
   codexCLIOnlyAppServerEnabled.value = false
-  codexFingerprintMode.value = 'session'
-  anthropicPassthroughEnabled.value = true
   codexFingerprintMode.value = 'off'
   anthropicPassthroughEnabled.value = false
   anthropicAPIKeyAuthScheme.value = 'x_api_key'
@@ -5575,6 +5567,7 @@ const resetForm = () => {
   grokOAuth.resetState()
   oauthFlowRef.value?.reset()
   antigravityMixedChannelConfirmed.value = false
+  upstreamModelsPreviewed.value = false
   clearMixedChannelDialog()
 }
 
@@ -6054,12 +6047,7 @@ const handleSubmit = async () => {
     ...form,
     group_ids: form.group_ids,
     extra,
-    upstream_billing_probe_enabled:
-      form.platform === 'deepseek' || form.platform === 'kimi' || form.platform === 'chatanywhere' || form.platform === 'glm' || form.platform === 'modelscope' || form.platform === 'dashscope' || form.platform === 'minimax' || form.platform === 'volcengine'
-        ? undefined
-        : form.platform === 'tokenrhythm'
-          ? true
-          : upstreamBillingAutoProbeEnabled.value,
+    upstream_billing_probe_enabled: upstreamBillingAutoProbeEnabled.value,
     auto_pause_on_expired: autoPauseOnExpired.value
   })
 }
@@ -6188,16 +6176,9 @@ const createAccountAndFinish = async (
     rate_multiplier: form.rate_multiplier,
     group_ids: form.group_ids,
     expires_at: form.expires_at,
-    // 上游倍率探测对支持的 API-key 平台开放（antigravity upstream 走本 helper）；
-    // DeepSeek 使用独立余额探测，非 apikey 类型（bedrock/oauth）不传。
-    upstream_billing_probe_enabled:
-      type === 'apikey'
-        ? form.platform === 'tokenrhythm'
-          ? true
-          : form.platform !== 'deepseek' && form.platform !== 'kimi' && form.platform !== 'chatanywhere' && form.platform !== 'glm' && form.platform !== 'modelscope' && form.platform !== 'dashscope' && form.platform !== 'minimax' && form.platform !== 'volcengine'
-            ? upstreamBillingAutoProbeEnabled.value
-            : undefined
-        : undefined,
+    // 上游倍率探测对全部 API-key 平台开放（antigravity upstream 走本 helper）；
+    // 非 apikey 类型（bedrock/oauth）不传，后端不动作。
+    upstream_billing_probe_enabled: type === 'apikey' ? upstreamBillingAutoProbeEnabled.value : undefined,
     auto_pause_on_expired: autoPauseOnExpired.value
   })
 }

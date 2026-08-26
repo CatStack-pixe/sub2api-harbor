@@ -635,7 +635,7 @@ import { extractApiErrorMessage } from '@/utils/apiError'
 import { adminAPI } from '@/api/admin'
 import type { Channel, ChannelModelPricing, CreateChannelRequest, UpdateChannelRequest, AccountStatsPricingRule } from '@/api/admin/channels'
 import type { PricingFormEntry } from '@/components/admin/channel/types'
-import { apiIntervalsToForm, apiTimePricingToForm, apiTimeWindowsToForm, createDefaultTimePricingForm, findModelConflict, formIntervalsToAPI, formTimePricingToAPI, formTimeWindowsToAPI, isValidPositiveMultiplier, mTokToPerToken, perTokenToMTok, validateIntervals, validateTimePricing } from '@/components/admin/channel/types'
+import { apiIntervalsToForm, apiTimePricingToForm, createDefaultTimePricingForm, findModelConflict, formIntervalsToAPI, formTimePricingToAPI, isValidPositiveMultiplier, mTokToPerToken, perTokenToMTok, validateIntervals, validateTimePricing } from '@/components/admin/channel/types'
 import type { AdminGroup, GroupPlatform } from '@/types'
 import type { Column } from '@/components/common/types'
 import { platformTextClass, platformBadgeLightClass } from '@/utils/platformColors'
@@ -764,9 +764,9 @@ const form = reactive({
 let abortController: AbortController | null = null
 
 // ── Platform config ──
-const platformOrder: GroupPlatform[] = ['anthropic', 'openai', 'gemini', 'antigravity', 'grok', 'agnes', 'deepseek', 'nvidia', 'tokenrhythm', 'kimi', 'zhipu', 'chatanywhere', 'glm', 'modelscope', 'dashscope', 'minimax', 'volcengine']
+const platformOrder: GroupPlatform[] = ['anthropic', 'openai', 'gemini', 'antigravity', 'grok', 'kimi', 'zhipu', 'deepseek']
 // Composite pricing/mapping may target every concrete schedulable provider.
-const compositePlatforms: GroupPlatform[] = ['anthropic', 'openai', 'gemini', 'antigravity', 'grok', 'agnes', 'deepseek', 'nvidia', 'tokenrhythm', 'kimi', 'zhipu', 'chatanywhere', 'glm', 'modelscope', 'dashscope', 'minimax', 'volcengine']
+const compositePlatforms: GroupPlatform[] = ['anthropic', 'openai', 'gemini', 'antigravity', 'grok', 'kimi', 'zhipu', 'deepseek']
 
 // ── Helpers ──
 function formatDate(value: string): string {
@@ -869,7 +869,6 @@ function addPricingEntry(sectionIdx: number) {
     image_output_price: null,
     per_request_price: null,
     intervals: [],
-    time_windows: [],
     time_pricing: createDefaultTimePricingForm()
   })
 }
@@ -906,7 +905,6 @@ async function syncLatestModels(sectionIdx: number) {
       image_output_price: null,
       per_request_price: null,
       intervals: [],
-      time_windows: [],
       time_pricing: createDefaultTimePricingForm()
     })
     appStore.showSuccess(t('admin.channels.form.syncModelsSuccess', { count: newModels.length }))
@@ -973,7 +971,6 @@ function addRulePricingEntry(sectionIdx: number, ruleIndex: number) {
     image_output_price: null,
     per_request_price: null,
     intervals: [],
-    time_windows: [],
     time_pricing: createDefaultTimePricingForm()
   })
 }
@@ -1091,7 +1088,6 @@ function accountStatsRulesToAPI(): AccountStatsPricingRule[] {
             image_output_price: mTokToPerToken(p.image_output_price),
             per_request_price: p.per_request_price != null && p.per_request_price !== '' ? Number(p.per_request_price) : null,
             intervals: formIntervalsToAPI(p.intervals || []),
-            time_windows: [],
             time_pricing: null
           }))
       })
@@ -1136,7 +1132,6 @@ function formToAPI(): { group_ids: number[], model_pricing: ChannelModelPricing[
         image_output_price: mTokToPerToken(entry.image_output_price),
         per_request_price: entry.per_request_price != null && entry.per_request_price !== '' ? Number(entry.per_request_price) : null,
         intervals: formIntervalsToAPI(entry.intervals || []),
-        time_windows: formTimeWindowsToAPI(entry.time_windows || []),
         time_pricing: formTimePricingToAPI(entry.time_pricing)
       })
     }
@@ -1238,7 +1233,6 @@ function apiToForm(channel: Channel): PlatformSection[] {
         image_output_price: perTokenToMTok(p.image_output_price),
         per_request_price: p.per_request_price,
         intervals: apiIntervalsToForm(p.intervals || []),
-        time_windows: apiTimeWindowsToForm(p.time_windows || []),
         time_pricing: apiTimePricingToForm(p.time_pricing)
       } as PricingFormEntry))
 
@@ -1429,7 +1423,6 @@ function distributeRulesToPlatforms(apiRules: AccountStatsPricingRule[]) {
         image_output_price: perTokenToMTok(p.image_output_price),
         per_request_price: p.per_request_price,
         intervals: apiIntervalsToForm(p.intervals || []),
-        time_windows: [],
         time_pricing: createDefaultTimePricingForm()
       } as PricingFormEntry))
     }

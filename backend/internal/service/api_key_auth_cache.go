@@ -67,10 +67,6 @@ type APIKeyAuthGroupSnapshot struct {
 	DailyLimitUSD                   *float64                      `json:"daily_limit_usd,omitempty"`
 	WeeklyLimitUSD                  *float64                      `json:"weekly_limit_usd,omitempty"`
 	MonthlyLimitUSD                 *float64                      `json:"monthly_limit_usd,omitempty"`
-	LongContextPricingEnabled       bool                          `json:"long_context_pricing_enabled"`
-	ModelPricing                    []ChannelModelPricing         `json:"model_pricing,omitempty"`
-	GlobalPromptEnabled             bool                          `json:"global_prompt_enabled"`
-	GlobalPrompt                    string                        `json:"global_prompt,omitempty"`
 	AllowImageGeneration            bool                          `json:"allow_image_generation"`
 	AllowBatchImageGeneration       bool                          `json:"allow_batch_image_generation"`
 	ImageRateIndependent            bool                          `json:"image_rate_independent"`
@@ -89,6 +85,8 @@ type APIKeyAuthGroupSnapshot struct {
 	AudioRealtimePricePerMin        *float64                      `json:"audio_realtime_price_per_min,omitempty"`
 	AudioTTSPricePerMillionChars    *float64                      `json:"audio_tts_price_per_million_chars,omitempty"`
 	AudioSTTPricePerHour            *float64                      `json:"audio_stt_price_per_hour,omitempty"`
+	LongContextPricingEnabled       bool                          `json:"long_context_pricing_enabled"`
+	ModelPricing                    []ChannelModelPricing         `json:"model_pricing,omitempty"`
 	ClaudeCodeOnly                  bool                          `json:"claude_code_only"`
 	FallbackGroupID                 *int64                        `json:"fallback_group_id,omitempty"`
 	FallbackGroupIDOnInvalidRequest *int64                        `json:"fallback_group_id_on_invalid_request,omitempty"`

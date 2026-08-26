@@ -16,18 +16,9 @@ export const CONCRETE_PLATFORM_OPTIONS = [
   { value: 'gemini', label: 'Gemini' },
   { value: 'antigravity', label: 'Antigravity' },
   { value: 'grok', label: 'Grok' },
-  { value: 'agnes', label: 'Agnes' },
-  { value: 'deepseek', label: 'DeepSeek' },
-  { value: 'nvidia', label: 'NVIDIA' },
-  { value: 'tokenrhythm', label: 'TokenRhythm' },
   { value: 'kimi', label: 'Kimi' },
   { value: 'zhipu', label: 'Zhipu GLM' },
-  { value: 'chatanywhere', label: 'ChatAnywhere' },
-  { value: 'glm', label: 'GLM' },
-  { value: 'modelscope', label: 'ModelScope' },
-  { value: 'dashscope', label: 'DashScope' },
-  { value: 'minimax', label: 'MiniMax' },
-  { value: 'volcengine', label: 'Volcengine Ark' }
+  { value: 'deepseek', label: 'DeepSeek' }
 ] as const satisfies readonly PlatformOption<AccountPlatform>[]
 
 /** Platforms that can own a group. */

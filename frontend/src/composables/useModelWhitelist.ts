@@ -189,6 +189,7 @@ const xaiModels = [
   'grok-imagine',
   'grok-imagine-image-quality',
   'grok-imagine-image',
+  'grok-imagine-image-2.0',
   'grok-imagine-video',
   'grok-imagine-video-1.5-preview',
   'grok-imagine-video-1.5'
@@ -217,26 +218,9 @@ const yiModels = [
 const moonshotModels = [
   'kimi-k3', 'kimi-k2.6', 'kimi-k2.5', 'kimi-k2-thinking',
   'moonshot-v1-8k', 'moonshot-v1-32k', 'moonshot-v1-128k',
-  'kimi-latest', 'kimi-for-coding', 'kimi-k2'
-]
-
-// TokenRhythm's known channel models are DeepSeek V4. Keep them available
-// when the provider model-list endpoint is unavailable.
-const tokenRhythmModels = [
-  'deepseek-v4-pro', 'deepseek-v4-flash'
-]
-
-// ChatAnywhere exposes a mixed OpenAI/Anthropic catalog; these IDs provide a
-// useful initial whitelist while account model sync can add newer IDs.
-const chatAnywhereModels = [
-  'gpt-5.5', 'gpt-5.1', 'gpt-4.1', 'claude-sonnet-4-5', 'deepseek-v3-2'
-]
-
-// GLM official Z.AI models. Account sync can extend this list from /models.
-const glmModels = [
-  'glm-5.2', 'glm-5.1', 'glm-5', 'glm-5-turbo',
-  'glm-4.7', 'glm-4.7-flash', 'glm-4.6', 'glm-4.5', 'glm-4.5-air',
-  'glm-4.5-flash', 'glm-4.1v-thinking-flashx', 'glm-4.1v-thinking-flash'
+  'kimi-latest',
+  'kimi-for-coding',
+  'kimi-k2'
 ]
 
 // 字节跳动 豆包
@@ -507,11 +491,8 @@ export function getModelsByPlatform(platform: string): string[] {
     case 'agnes': return agnesModels
     case 'cohere': return cohereModels
     case 'yi': return yiModels
-    case 'moonshot': return moonshotModels
+    case 'moonshot':
     case 'kimi': return moonshotModels
-    case 'tokenrhythm': return tokenRhythmModels
-    case 'chatanywhere': return chatAnywhereModels
-    case 'glm': return glmModels
     case 'doubao': return doubaoModels
     case 'volcengine': return volcengineModels
     case 'minimax': return minimaxModels

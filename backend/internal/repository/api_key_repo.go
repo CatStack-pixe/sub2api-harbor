@@ -346,13 +346,6 @@ func (r *apiKeyRepository) Update(ctx context.Context, key *service.APIKey, fiel
 			builder.ClearIPBlacklist()
 		}
 	}
-	if fields.ModelWhitelist {
-		if len(key.ModelWhitelist) > 0 {
-			builder.SetModelWhitelist(key.ModelWhitelist)
-		} else {
-			builder.ClearModelWhitelist()
-		}
-	}
 
 	affected, err := builder.Save(ctx)
 	if err != nil {

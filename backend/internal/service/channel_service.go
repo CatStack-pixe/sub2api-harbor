@@ -357,9 +357,7 @@ func isPlatformPricingMatch(groupPlatform, pricingPlatform string) bool {
 // fallback used before a request target has been resolved.
 func matchingPlatforms(groupPlatform string) []string {
 	if groupPlatform == PlatformComposite {
-		return []string{PlatformAnthropic, PlatformGemini, PlatformOpenAI, PlatformAntigravity,
-			PlatformGrok, PlatformAgnes, PlatformDeepSeek, PlatformNvidia, PlatformTokenRhythm,
-			PlatformKimi, PlatformZhipu, PlatformChatAnywhere, PlatformGLM, PlatformModelScope, PlatformDashScope, PlatformMiniMax, PlatformVolcengine}
+		return []string{PlatformAnthropic, PlatformGemini, PlatformOpenAI, PlatformAntigravity, PlatformGrok, PlatformKimi, PlatformZhipu, PlatformDeepseek}
 	}
 	return []string{groupPlatform}
 }
@@ -647,11 +645,6 @@ func validatePricingEntries(pricing []ChannelModelPricing) error {
 	}
 	if err := validatePricingIntervals(pricing); err != nil {
 		return err
-	}
-	for _, entry := range pricing {
-		if err := ValidatePricingTimeWindows(entry.TimeWindows); err != nil {
-			return infraerrors.BadRequest("INVALID_PRICING_TIME_WINDOWS", fmt.Sprintf("invalid pricing time windows for platform '%s' models %v: %v", entry.Platform, entry.Models, err))
-		}
 	}
 	if err := validatePricingBillingMode(pricing); err != nil {
 		return err

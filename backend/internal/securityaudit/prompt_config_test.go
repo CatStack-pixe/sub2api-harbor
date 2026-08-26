@@ -1,9 +1,11 @@
 package securityaudit
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"strings"
 	"testing"
 
@@ -500,25 +502,50 @@ func TestUpdateConfigStrictBoundsAndKnownValues(t *testing.T) {
 	}
 }
 
-func TestCaptureOnlyConfigRequiresPassEventsAndAllowsNoEndpoint(t *testing.T) {
-	cfg := DefaultStorageConfig()
-	cfg.Enabled = true
-	cfg.CaptureOnly = true
-	cfg.StorePassEvents = true
-	require.NoError(t, validateStorageConfig(cfg))
+// Regression coverage for issue #5732: refreshLoop reloads every 5s, so
+// config_loaded must stay a change signal instead of ~17k identical lines a
+// day, while still reporting the first load, real config changes and a
+// recovery from a failed reload.
+func TestConfigLoadedIsLoggedOnlyWhenSomethingChanged(t *testing.T) {
+	storage := DefaultStorageConfig()
+	storage.ConfigVersion = 4
+	raw, err := json.Marshal(storage)
+	require.NoError(t, err)
+	repository := &switchableSettingRepository{staticSettingRepository: staticSettingRepository{values: map[string]string{
+		SettingKeyPromptAuditConfig: string(raw),
+		SettingKeyRiskControl:       "false",
+	}}}
+	manager := NewConfigManager(nil, repository, nil, prefixEncryptor{}, testTotpKeyConfig())
 
-	req := promptAuditUpdateRequest(1, 1, "")
-	req.CaptureOnly = true
-	req.StorePassEvents = true
-	req.Endpoints = nil
-	require.NoError(t, validateUpdateConfigRequest(req))
+	var output bytes.Buffer
+	previous := slog.Default()
+	slog.SetDefault(slog.New(slog.NewJSONHandler(&output, nil)))
+	t.Cleanup(func() { slog.SetDefault(previous) })
+	loadedCount := func() int { return strings.Count(output.String(), EventConfigLoaded) }
 
-	req.StorePassEvents = false
-	err := validateUpdateConfigRequest(req)
-	require.Equal(t, "prompt_audit_capture_only_requires_pass_events", infraerrors.Reason(err))
+	require.NoError(t, manager.Reload(context.Background()))
+	require.Equal(t, 1, loadedCount(), "the first successful load must be logged")
 
-	req.StorePassEvents = true
-	req.BlockingEnabled = true
-	err = validateUpdateConfigRequest(req)
-	require.Equal(t, "prompt_audit_capture_only_blocking", infraerrors.Reason(err))
+	require.NoError(t, manager.Reload(context.Background()))
+	require.NoError(t, manager.Reload(context.Background()))
+	require.Equal(t, 1, loadedCount(), "TTL refreshes of an unchanged config must stay silent")
+
+	repository.values[SettingKeyRiskControl] = "true"
+	require.NoError(t, manager.Reload(context.Background()))
+	require.Equal(t, 2, loadedCount(), "flipping the global risk control gate must be logged")
+
+	storage.ConfigVersion = 5
+	raw, err = json.Marshal(storage)
+	require.NoError(t, err)
+	repository.values[SettingKeyPromptAuditConfig] = string(raw)
+	require.NoError(t, manager.Reload(context.Background()))
+	require.Equal(t, 3, loadedCount(), "a new config version must be logged")
+
+	repository.loadErr = errors.New("settings unavailable")
+	require.Error(t, manager.Reload(context.Background()))
+	require.Equal(t, 3, loadedCount(), "a failed reload must not claim a load")
+
+	repository.loadErr = nil
+	require.NoError(t, manager.Reload(context.Background()))
+	require.Equal(t, 4, loadedCount(), "recovering from a failed reload must be visible")
 }

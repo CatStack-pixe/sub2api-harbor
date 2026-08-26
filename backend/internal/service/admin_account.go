@@ -404,35 +404,6 @@ func normalizeOpenAILongContextBillingUpdateExtra(account *Account, input *Updat
 
 // Grok media eligibility helpers live in account_grok_media_eligibility.go.
 
-const anthropicAPIKeyPassthroughExtraKey = "anthropic_passthrough"
-
-// normalizeAnthropicAPIKeyPassthroughExtra enables the native Anthropic
-// Messages forwarding path for newly-created API Key accounts by default.
-// An explicit false remains an opt-out for upstreams that need the legacy
-// compatibility pipeline.
-func normalizeAnthropicAPIKeyPassthroughExtra(platform, accountType string, extra map[string]any) (map[string]any, error) {
-	if platform != PlatformAnthropic || accountType != AccountTypeAPIKey {
-		return extra, nil
-	}
-
-	normalized := maps.Clone(extra)
-	if normalized == nil {
-		normalized = make(map[string]any, 1)
-	}
-	raw, exists := normalized[anthropicAPIKeyPassthroughExtraKey]
-	if !exists {
-		normalized[anthropicAPIKeyPassthroughExtraKey] = true
-		return normalized, nil
-	}
-	if _, ok := raw.(bool); !ok {
-		return nil, infraerrors.BadRequest(
-			"ANTHROPIC_API_KEY_PASSTHROUGH_INVALID",
-			"anthropic_passthrough must be a boolean",
-		)
-	}
-	return normalized, nil
-}
-
 func buildAccountForCreate(input *CreateAccountInput, accountExtra map[string]any) (*Account, error) {
 	// Probe/session state is system-managed. New accounts always start with automatic refresh disabled.
 	delete(accountExtra, UpstreamBillingProbeEnabledExtraKey)
@@ -525,7 +496,7 @@ func (s *adminServiceImpl) CreateAccount(ctx context.Context, input *CreateAccou
 	if err != nil {
 		return nil, err
 	}
-	accountExtra, err = normalizeAnthropicAPIKeyPassthroughExtra(input.Platform, input.Type, accountExtra)
+	accountExtra, err = normalizeOpenAIAutoResetCreditExtra(input.Platform, input.Type, false, accountExtra)
 	if err != nil {
 		return nil, err
 	}
@@ -560,11 +531,6 @@ func (s *adminServiceImpl) CreateAccount(ctx context.Context, input *CreateAccou
 	if err := NormalizeHeaderOverrideCredentials(input.Credentials); err != nil {
 		return nil, err
 	}
-	input.Credentials = sanitizeProviderManagedCredentials(
-		input.Platform,
-		input.Credentials,
-		input.ProviderManagedCredentials,
-	)
 	// Never persist ephemeral SSO/password secrets after OAuth conversion.
 	input.Credentials = SanitizeStoredCredentials(input.Platform, input.Credentials)
 
@@ -626,6 +592,14 @@ func (s *adminServiceImpl) UpdateAccount(ctx context.Context, id int64, input *U
 			return nil, err
 		}
 		normalizedExtra, err = normalizeGrokMediaEligibilityUpdateExtra(account, input, normalizedExtra)
+		if err != nil {
+			return nil, err
+		}
+		effectiveType := account.Type
+		if input.Type != "" {
+			effectiveType = input.Type
+		}
+		normalizedExtra, err = normalizeOpenAIAutoResetCreditExtra(account.Platform, effectiveType, account.IsShadow(), normalizedExtra)
 		if err != nil {
 			return nil, err
 		}
@@ -698,9 +672,6 @@ func (s *adminServiceImpl) UpdateAccount(ctx context.Context, id int64, input *U
 	}
 	// Extra 使用 map：需要区分“未提供(nil)”与“显式清空({})”。
 	// 关闭配额限制时前端会删除 quota_* 键并提交 extra:{}，此时也必须落库。
-	if err := validateAccountCredentials(account.Platform, account.Type, account.Credentials); err != nil {
-		return nil, err
-	}
 	requestedProbeEnabledUpdate := input.ProbeEnabled
 	requestedRateSyncEnabledUpdate := input.RateSyncEnabled
 	if input.Extra != nil {
@@ -735,6 +706,7 @@ func (s *adminServiceImpl) UpdateAccount(ctx context.Context, id int64, input *U
 			OllamaCloudUsageSessionExtraKey,
 			OllamaCloudUsageAutoRefreshExtraKey,
 			OllamaCloudUsageSnapshotExtraKey,
+			OpenAIAutoResetCreditStateExtraKey,
 		} {
 			if v, ok := account.Extra[key]; ok {
 				normalizedExtra[key] = v
@@ -949,6 +921,7 @@ func (s *adminServiceImpl) UpdateAccount(ctx context.Context, id int64, input *U
 // （如 model_rate_limits / passive_usage_* 等）。
 func (s *adminServiceImpl) UpdateAccountExtra(ctx context.Context, id int64, updates map[string]any) error {
 	updates = sanitizedCodexFingerprintExtraUpdates(updates)
+	updates = stripOpenAIAutoResetCreditManagedExtra(updates, true)
 	delete(updates, UpstreamBillingProbeEnabledExtraKey)
 	delete(updates, UpstreamBillingRateSyncEnabledExtraKey)
 	delete(updates, UpstreamBillingProbeExtraKey)
@@ -975,6 +948,7 @@ func (s *adminServiceImpl) UpdateAccountExtra(ctx context.Context, id int64, upd
 func (s *adminServiceImpl) BulkUpdateAccounts(ctx context.Context, input *BulkUpdateAccountsInput) (*BulkUpdateAccountsResult, error) {
 	// Managed probe/session state may only enter through dedicated typed endpoints.
 	input.Extra = sanitizedCodexFingerprintExtraUpdates(input.Extra)
+	input.Extra = stripOpenAIAutoResetCreditManagedExtra(input.Extra, true)
 	delete(input.Extra, UpstreamBillingProbeEnabledExtraKey)
 	delete(input.Extra, UpstreamBillingRateSyncEnabledExtraKey)
 	delete(input.Extra, UpstreamBillingProbeExtraKey)
@@ -1014,39 +988,12 @@ func (s *adminServiceImpl) BulkUpdateAccounts(ctx context.Context, input *BulkUp
 
 	// 预取所有目标账号，供凭据守卫/代理守卫/混合渠道检查共用，避免多次 DB 查询。
 	var cachedTargets []*Account
-	if len(input.Credentials) > 0 || input.ProxyID != nil || needMixedChannelCheck || hasGroupBindingUpdate || openAISettings.any() || input.ProbeEnabled != nil || input.RateMultiplier != nil {
+	if len(input.Credentials) > 0 || input.ProxyID != nil || needMixedChannelCheck || openAISettings.any() || input.ProbeEnabled != nil || input.RateMultiplier != nil {
 		loaded, err := s.accountRepo.GetByIDs(ctx, input.AccountIDs)
 		if err != nil {
 			return nil, err
 		}
 		cachedTargets = loaded
-	}
-	if hasGroupBindingUpdate {
-		for _, account := range cachedTargets {
-			if account == nil {
-				continue
-			}
-			if err := validateAccountGroupPlatforms(ctx, s.groupRepo, account.Platform, *input.GroupIDs); err != nil {
-				return nil, err
-			}
-		}
-	}
-	if len(input.Credentials) > 0 {
-		for _, account := range cachedTargets {
-			if account == nil || !account.IsDeepSeek() {
-				continue
-			}
-			mergedCredentials := make(map[string]any, len(account.Credentials)+len(input.Credentials))
-			for key, value := range account.Credentials {
-				mergedCredentials[key] = value
-			}
-			for key, value := range input.Credentials {
-				mergedCredentials[key] = value
-			}
-			if err := validateAccountCredentials(account.Platform, account.Type, mergedCredentials); err != nil {
-				return nil, err
-			}
-		}
 	}
 	targetsByID := make(map[int64]*Account, len(cachedTargets))
 	for _, account := range cachedTargets {
@@ -1147,13 +1094,6 @@ func (s *adminServiceImpl) BulkUpdateAccounts(ctx context.Context, input *BulkUp
 	// only when platform is known Grok — empty platform still strips password/*).
 	if input.Credentials != nil {
 		input.Credentials = SanitizeStoredCredentials("", input.Credentials)
-		for _, account := range cachedTargets {
-			if account != nil && account.Platform == PlatformGrok {
-				delete(input.Credentials, "subscription_tier")
-				delete(input.Credentials, "entitlement_status")
-				break
-			}
-		}
 	}
 
 	// Prepare bulk updates for columns and JSONB fields.

@@ -18,7 +18,6 @@ type accountRepoStubForBulkUpdate struct {
 	accountRepoStub
 	bulkUpdateErr       error
 	bulkUpdateIDs       []int64
-	bulkUpdate          AccountBulkUpdate
 	bulkUpdateCalls     int
 	lastBulkUpdate      AccountBulkUpdate
 	bindGroupErrByID    map[int64]error
@@ -53,11 +52,10 @@ type accountRepoStubForBulkUpdate struct {
 	}
 }
 
-func (s *accountRepoStubForBulkUpdate) BulkUpdate(_ context.Context, ids []int64, update AccountBulkUpdate) (int64, error) {
+func (s *accountRepoStubForBulkUpdate) BulkUpdate(_ context.Context, ids []int64, updates AccountBulkUpdate) (int64, error) {
 	s.bulkUpdateCalls++
 	s.bulkUpdateIDs = append([]int64{}, ids...)
-	s.bulkUpdate = update
-	s.lastBulkUpdate = update
+	s.lastBulkUpdate = updates
 	if s.bulkUpdateErr != nil {
 		return 0, s.bulkUpdateErr
 	}

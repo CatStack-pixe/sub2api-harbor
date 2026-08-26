@@ -250,16 +250,6 @@ func LongContextPricingEnabled(v bool) predicate.Group {
 	return predicate.Group(sql.FieldEQ(FieldLongContextPricingEnabled, v))
 }
 
-// GlobalPromptEnabled applies equality check predicate on the "global_prompt_enabled" field. It's identical to GlobalPromptEnabledEQ.
-func GlobalPromptEnabled(v bool) predicate.Group {
-	return predicate.Group(sql.FieldEQ(FieldGlobalPromptEnabled, v))
-}
-
-// GlobalPrompt applies equality check predicate on the "global_prompt" field. It's identical to GlobalPromptEQ.
-func GlobalPrompt(v string) predicate.Group {
-	return predicate.Group(sql.FieldEQ(FieldGlobalPrompt, v))
-}
-
 // ClaudeCodeOnly applies equality check predicate on the "claude_code_only" field. It's identical to ClaudeCodeOnlyEQ.
 func ClaudeCodeOnly(v bool) predicate.Group {
 	return predicate.Group(sql.FieldEQ(FieldClaudeCodeOnly, v))
@@ -2078,81 +2068,6 @@ func ModelPricingIsNil() predicate.Group {
 // ModelPricingNotNil applies the NotNil predicate on the "model_pricing" field.
 func ModelPricingNotNil() predicate.Group {
 	return predicate.Group(sql.FieldNotNull(FieldModelPricing))
-}
-
-// GlobalPromptEnabledEQ applies the EQ predicate on the "global_prompt_enabled" field.
-func GlobalPromptEnabledEQ(v bool) predicate.Group {
-	return predicate.Group(sql.FieldEQ(FieldGlobalPromptEnabled, v))
-}
-
-// GlobalPromptEnabledNEQ applies the NEQ predicate on the "global_prompt_enabled" field.
-func GlobalPromptEnabledNEQ(v bool) predicate.Group {
-	return predicate.Group(sql.FieldNEQ(FieldGlobalPromptEnabled, v))
-}
-
-// GlobalPromptEQ applies the EQ predicate on the "global_prompt" field.
-func GlobalPromptEQ(v string) predicate.Group {
-	return predicate.Group(sql.FieldEQ(FieldGlobalPrompt, v))
-}
-
-// GlobalPromptNEQ applies the NEQ predicate on the "global_prompt" field.
-func GlobalPromptNEQ(v string) predicate.Group {
-	return predicate.Group(sql.FieldNEQ(FieldGlobalPrompt, v))
-}
-
-// GlobalPromptIn applies the In predicate on the "global_prompt" field.
-func GlobalPromptIn(vs ...string) predicate.Group {
-	return predicate.Group(sql.FieldIn(FieldGlobalPrompt, vs...))
-}
-
-// GlobalPromptNotIn applies the NotIn predicate on the "global_prompt" field.
-func GlobalPromptNotIn(vs ...string) predicate.Group {
-	return predicate.Group(sql.FieldNotIn(FieldGlobalPrompt, vs...))
-}
-
-// GlobalPromptGT applies the GT predicate on the "global_prompt" field.
-func GlobalPromptGT(v string) predicate.Group {
-	return predicate.Group(sql.FieldGT(FieldGlobalPrompt, v))
-}
-
-// GlobalPromptGTE applies the GTE predicate on the "global_prompt" field.
-func GlobalPromptGTE(v string) predicate.Group {
-	return predicate.Group(sql.FieldGTE(FieldGlobalPrompt, v))
-}
-
-// GlobalPromptLT applies the LT predicate on the "global_prompt" field.
-func GlobalPromptLT(v string) predicate.Group {
-	return predicate.Group(sql.FieldLT(FieldGlobalPrompt, v))
-}
-
-// GlobalPromptLTE applies the LTE predicate on the "global_prompt" field.
-func GlobalPromptLTE(v string) predicate.Group {
-	return predicate.Group(sql.FieldLTE(FieldGlobalPrompt, v))
-}
-
-// GlobalPromptContains applies the Contains predicate on the "global_prompt" field.
-func GlobalPromptContains(v string) predicate.Group {
-	return predicate.Group(sql.FieldContains(FieldGlobalPrompt, v))
-}
-
-// GlobalPromptHasPrefix applies the HasPrefix predicate on the "global_prompt" field.
-func GlobalPromptHasPrefix(v string) predicate.Group {
-	return predicate.Group(sql.FieldHasPrefix(FieldGlobalPrompt, v))
-}
-
-// GlobalPromptHasSuffix applies the HasSuffix predicate on the "global_prompt" field.
-func GlobalPromptHasSuffix(v string) predicate.Group {
-	return predicate.Group(sql.FieldHasSuffix(FieldGlobalPrompt, v))
-}
-
-// GlobalPromptEqualFold applies the EqualFold predicate on the "global_prompt" field.
-func GlobalPromptEqualFold(v string) predicate.Group {
-	return predicate.Group(sql.FieldEqualFold(FieldGlobalPrompt, v))
-}
-
-// GlobalPromptContainsFold applies the ContainsFold predicate on the "global_prompt" field.
-func GlobalPromptContainsFold(v string) predicate.Group {
-	return predicate.Group(sql.FieldContainsFold(FieldGlobalPrompt, v))
 }
 
 // ClaudeCodeOnlyEQ applies the EQ predicate on the "claude_code_only" field.

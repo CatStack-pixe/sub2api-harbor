@@ -513,6 +513,8 @@ export default {
         statusLabel: 'Status',
         selectStatus: 'Select status',
         rpmLimit: 'Requests Per Minute (RPM)',
+        concurrencyPlaceholder: '0 = unlimited',
+        concurrencyHint: 'Max concurrent requests for this user; 0 = unlimited.',
         rpmLimitPlaceholder: '0 = unlimited',
         rpmLimitHint: 'Max requests per minute for this user; 0 = unlimited. Acts as a fallback only when the group has no rpm_limit set.'
       },
@@ -577,7 +579,7 @@ export default {
       failedToToggle: 'Failed to update user status',
       failedToLoadApiKeys: 'Failed to load user API keys',
       emailRequired: 'Please enter email',
-      concurrencyMin: 'Concurrency must be at least 1',
+      concurrencyNonNegative: 'Concurrency cannot be negative; 0 = unlimited',
       amountRequired: 'Please enter a valid amount',
       insufficientBalance: 'Insufficient balance',
       adjustBalance: 'Adjust Balance',
@@ -948,18 +950,9 @@ export default {
         gemini: 'Gemini',
         antigravity: 'Antigravity',
         grok: 'Grok',
-        agnes: 'Agnes',
-        deepseek: 'DeepSeek',
         kimi: 'Kimi',
-        nvidia: 'NVIDIA',
-        tokenrhythm: 'TokenRhythm',
-        chatanywhere: 'ChatAnywhere',
-        glm: 'GLM',
         zhipu: 'Zhipu GLM',
-        modelscope: 'ModelScope',
-        dashscope: 'DashScope',
-        minimax: 'MiniMax',
-        volcengine: 'Volcengine Ark',
+        deepseek: 'DeepSeek',
         composite: 'Composite',
       },
       deleteConfirm:
@@ -1022,14 +1015,6 @@ export default {
         longContext: 'Enable long-context tier pricing',
         longContextHint: 'When checked, channel intervals or official preset tiers apply. Otherwise the first tier is used unless the account explicitly enables long-context billing.',
         add: 'Add model price'
-      },
-      globalPrompt: {
-        title: 'Group Global Prompt',
-        hint: 'Prepended to supported text requests before client instructions. It is sent upstream and is not a security boundary.',
-        enabled: 'Enabled',
-        disabled: 'Disabled',
-        placeholder: 'Enter group-wide instructions',
-        tooLong: 'Global prompt must be at most {max} bytes.'
       },
       voicePricing: {
         title: 'Grok Voice Pricing',

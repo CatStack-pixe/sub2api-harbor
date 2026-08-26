@@ -2,7 +2,6 @@ package xai
 
 import (
 	"encoding/json"
-	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -86,7 +85,7 @@ func SubscriptionTierFromJWT(jwt string) string {
 	}
 	switch v := raw.(type) {
 	case float64:
-		if v < 0 || math.IsNaN(v) || math.IsInf(v, 0) || math.Trunc(v) != v || v > math.MaxUint64 {
+		if v < 0 {
 			return ""
 		}
 		return MapJWTSubscriptionTier(uint64(v))
