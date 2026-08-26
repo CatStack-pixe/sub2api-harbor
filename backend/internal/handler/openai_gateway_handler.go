@@ -45,8 +45,6 @@ type OpenAIGatewayHandler struct {
 	cfg                        *config.Config
 }
 
-const openAIRequestQuotaReservedContextKey = "openai_request_quota_reserved_accounts"
-
 type openAIWSTurnChannelMappingSnapshot struct {
 	turn    int
 	mapping service.ChannelMappingResult

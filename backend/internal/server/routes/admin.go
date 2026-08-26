@@ -63,6 +63,10 @@ func RegisterAdminRoutes(
 
 		// 国产供应商（kimi/zhipu/deepseek）额度与余额
 		registerCNProviderRoutes(admin, h)
+		registerDeepSeekRoutes(admin, h)
+		registerHeartbeatRoutes(admin, h)
+		registerTokenRhythmRoutes(admin, h)
+		registerKimiRoutes(admin, h)
 
 		// 代理管理
 		registerProxyRoutes(admin, h, stepUpAuth)
