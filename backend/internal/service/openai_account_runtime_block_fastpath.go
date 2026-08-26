@@ -26,7 +26,6 @@ const (
 // owned by the gateway handler so provider-specific pools keep their existing
 // configured account-switch budget.
 type OpenAIOAuth429FailoverState struct {
-	grokOAuth429FollowupPending bool
 }
 
 type openAIOAuth429Disposition uint8

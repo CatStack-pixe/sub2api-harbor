@@ -389,16 +389,18 @@ func TestCNProviderQuotaSnapshotReset(t *testing.T) {
 	require.Nil(t, cnProviderQuotaSnapshotReset(payg, now))
 }
 
-// TestNormalizeOpenAICompatiblePlatform_SchedulerExactMatch 回归保护：
-// grok 与国产供应商原样保留，其余归一为 openai —— 保证 kimi/zhipu/deepseek 分组请求
-// 精确匹配同名账号（与 openai/grok 当前行为一致），不会错误并入 openai 池。
+// TestNormalizeOpenAICompatiblePlatform_SchedulerExactMatch protects exact
+// platform matching for every OpenAI-compatible provider.
 func TestNormalizeOpenAICompatiblePlatform_SchedulerExactMatch(t *testing.T) {
 	t.Parallel()
-	require.Equal(t, PlatformGrok, NormalizeOpenAICompatiblePlatform(PlatformGrok))
-	require.Equal(t, PlatformKimi, NormalizeOpenAICompatiblePlatform(PlatformKimi))
-	require.Equal(t, PlatformZhipu, NormalizeOpenAICompatiblePlatform(PlatformZhipu))
-	require.Equal(t, PlatformDeepseek, NormalizeOpenAICompatiblePlatform(PlatformDeepseek))
-	// 其他平台（含空、anthropic、未知）一律归一为 openai。
+	for _, platform := range []string{
+		PlatformGrok, PlatformAgnes, PlatformDeepSeek, PlatformNvidia,
+		PlatformTokenRhythm, PlatformKimi, PlatformZhipu, PlatformChatAnywhere,
+		PlatformGLM, PlatformModelScope, PlatformDashScope, PlatformMiniMax, PlatformVolcengine,
+	} {
+		require.Equal(t, platform, NormalizeOpenAICompatiblePlatform(platform))
+	}
+	// Non-OpenAI-compatible platforms and unknown values use the OpenAI default.
 	require.Equal(t, PlatformOpenAI, NormalizeOpenAICompatiblePlatform(""))
 	require.Equal(t, PlatformOpenAI, NormalizeOpenAICompatiblePlatform(PlatformAnthropic))
 	require.Equal(t, PlatformOpenAI, NormalizeOpenAICompatiblePlatform("something-else"))
