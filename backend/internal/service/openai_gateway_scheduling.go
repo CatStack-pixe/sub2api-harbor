@@ -386,7 +386,13 @@ func isOpenAICompatibleAccountEligibleForRequestInGroup(ctx context.Context, acc
 // the reason only for server-side no-account diagnostics; the admission behavior
 // remains unchanged.
 func openAICompatibleAccountEligibilityFailureReason(ctx context.Context, account *Account, platform string, requestedModel string, requireCompact bool, requiredCapability OpenAIEndpointCapability) string {
-	return openAICompatibleAccountEligibilityFailureReasonInGroup(ctx, account, nil, platform, requestedModel, requireCompact, requiredCapability)
+	if reason := openAICompatibleAccountEligibilityFailureReasonBeforeProfit(ctx, account, platform, requestedModel, requireCompact, requiredCapability); reason != "" {
+		return reason
+	}
+	if vetoed, reason := openAIProfitControlVetoReason(ctx, account); vetoed {
+		return reason
+	}
+	return ""
 }
 
 func openAICompatibleAccountEligibilityFailureReasonInGroup(ctx context.Context, account *Account, groupID *int64, platform string, requestedModel string, requireCompact bool, requiredCapability OpenAIEndpointCapability) string {
