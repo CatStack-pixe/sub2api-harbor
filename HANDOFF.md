@@ -1,5 +1,15 @@
 # Handoff
 
+## 2026-08-27 TokenRhythm Responses fallback and v0.1.183-nvidia.31 deployment
+
+- Root cause: after the platform/group matching fix, TokenRhythm accounts could be selected by the DeepSeek group, but the Responses dispatcher did not use the account-level capability decision for TokenRhythm. Compatible accounts were therefore sent to the upstream `/v1/responses` endpoint, which returned `RESPONSES_MODEL_NOT_SUPPORTED` for `deepseek-v4-flash`.
+- PR [#98](https://github.com/CatStack-pixe/sub2api-harbor/pull/98) changed the dispatcher to use `Account.ShouldUseOpenAIResponsesAPI()`. TokenRhythm and other excluded compatible providers now use the existing Responses-to-Chat Completions bridge; native Responses routing remains unchanged for supported OpenAI and DeepSeek accounts. The regression test covers the converted `messages` request, upstream `/v1/chat/completions` path, and Responses-formatted output.
+- PR #98 was labeled `bug`, received the required post-label code-audit comment, passed all required checks (`12` successful, `4` skipped), and was squash-merged as `f37ddbd9f9c5f342b61e9f7204bdd4cc2acea600`. Local `git diff --check` passed; backend validation and image construction ran in GitHub Actions.
+- Release [v0.1.183-nvidia.31](https://github.com/CatStack-pixe/sub2api-harbor/releases/tag/v0.1.183-nvidia.31) completed successfully in GitHub Actions run `33055037240`. The immutable image is `ghcr.io/catstack-pixe/sub2api:0.1.183-nvidia.31-amd64@sha256:1e91dbff41b98fddd869ef130b6a6ee1bfb13eee07406f7b1f3a6e88c344378c`.
+- Production target is `root@154.37.212.18` (`instance-0GDSx0Ws`), deployment directory `/opt/sub2api`. The pre-deployment Compose backup is `/opt/sub2api/docker-compose.yml.before-0.1.183-nvidia.31` with SHA-256 `33ff970300e2daf6d6c4b155a6ef9cf056d63617f8ba714e3e207c99be57e745`.
+- Only `sub2api` was pulled and recreated. Compose pins the image digest above; the container is `running/healthy`, and Docker health probes passed. PostgreSQL, Redis, and Mihomo were not restarted. A local probe with the supplied connectivity-test key returned `401 INVALID_API_KEY` before routing; the user subsequently verified the fixed Responses request successfully against production.
+- Status: production is live on `v0.1.183-nvidia.31` with the TokenRhythm Responses fallback fix.
+
 ## 2026-08-27 Platform/group routing fix and v0.1.183-nvidia.30 deployment
 
 - PR [#96](https://github.com/CatStack-pixe/sub2api-harbor/pull/96) restored the pre-`836d4e9` `accountPlatformMatchesGroup` behavior in gateway sticky selection, OpenAI-compatible eligibility, and OpenAI scheduler load balancing. The final change is limited to the historical OpenAI/ChatAnywhere and DeepSeek/TokenRhythm group mappings; broad cross-provider matching was removed. Existing routing tests cover both compatible mappings and reverse-direction rejection.
