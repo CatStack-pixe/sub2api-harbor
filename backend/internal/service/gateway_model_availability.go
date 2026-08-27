@@ -73,8 +73,6 @@ func (s *GatewayService) DiagnoseModelAvailabilityForPlatform(
 	platforms := []string{platform}
 	if useMixed {
 		platforms = append(platforms, PlatformAntigravity)
-	} else if groupID != nil && isOpenAICompatibleRoutingPlatform(platform) {
-		platforms = openAICompatibleRoutingPlatforms()
 	}
 
 	queryGroupID := groupID

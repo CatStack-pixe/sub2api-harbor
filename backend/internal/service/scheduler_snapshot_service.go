@@ -609,15 +609,13 @@ func (s *SchedulerSnapshotService) handleBulkAccountEvent(ctx context.Context, p
 		}
 		accountGroupIDs := s.normalizeGroupIDs(account.GroupIDs)
 		switch account.Platform {
-		case PlatformAnthropic, PlatformGemini, PlatformZhipu, PlatformGLM, PlatformModelScope,
-			PlatformDashScope, PlatformMiniMax, PlatformVolcengine:
+		case PlatformAnthropic, PlatformGemini, PlatformOpenAI, PlatformGrok, PlatformAgnes,
+			PlatformDeepSeek, PlatformNvidia, PlatformTokenRhythm, PlatformKimi, PlatformZhipu,
+			PlatformChatAnywhere, PlatformGLM, PlatformModelScope, PlatformDashScope, PlatformMiniMax,
+			PlatformVolcengine:
 			addPlatformGroups(account.Platform, accountGroupIDs)
-		case PlatformOpenAI, PlatformGrok, PlatformAgnes, PlatformDeepSeek, PlatformNvidia,
-			PlatformTokenRhythm, PlatformKimi, PlatformChatAnywhere:
-			// Explicit OpenAI-compatible groups use membership as the pool boundary,
-			// so every compatible platform bucket must be refreshed together.
-			for _, platform := range openAICompatibleRoutingPlatforms() {
-				addPlatformGroups(platform, accountGroupIDs)
+			if account.Platform == PlatformTokenRhythm {
+				addPlatformGroups(PlatformDeepSeek, accountGroupIDs)
 			}
 		case PlatformAntigravity:
 			// 批量更新可能刚关闭 mixed_scheduling，仍需清理两个兼容平台的旧快照。
@@ -825,13 +823,8 @@ func (s *SchedulerSnapshotService) rebuildByAccount(ctx context.Context, account
 	}
 
 	buckets := s.bucketsForPlatform(account.Platform, groupIDs, seen)
-	if isOpenAICompatibleRoutingPlatform(account.Platform) {
-		for _, platform := range openAICompatibleRoutingPlatforms() {
-			if platform == account.Platform {
-				continue
-			}
-			buckets = append(buckets, s.bucketsForPlatform(platform, groupIDs, seen)...)
-		}
+	if account.Platform == PlatformTokenRhythm {
+		buckets = append(buckets, s.bucketsForPlatform(PlatformDeepSeek, groupIDs, seen)...)
 	}
 	if account.Platform == PlatformAntigravity && account.IsMixedSchedulingEnabled() {
 		buckets = append(buckets, s.bucketsForPlatform(PlatformAnthropic, groupIDs, seen)...)
@@ -1507,9 +1500,6 @@ func (s *SchedulerSnapshotService) loadAccountsFromDB(ctx context.Context, bucke
 	}
 
 	if groupID > 0 {
-		if isOpenAICompatibleRoutingPlatform(bucket.Platform) {
-			return s.accountRepo.ListSchedulableByGroupIDAndPlatforms(ctx, groupID, openAICompatibleRoutingPlatforms())
-		}
 		platforms := accountPlatformsForGroupPlatform(bucket.Platform)
 		if len(platforms) > 1 {
 			return s.accountRepo.ListSchedulableByGroupIDAndPlatforms(ctx, groupID, platforms)

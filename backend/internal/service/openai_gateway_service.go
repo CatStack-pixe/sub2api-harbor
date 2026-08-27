@@ -646,8 +646,7 @@ func (s *OpenAIGatewayService) isUpstreamModelRestrictedByChannel(ctx context.Co
 	if upstreamModel == "" {
 		return false
 	}
-	lookupCtx := withAccountPlatformForChannelLookup(ctx, s.channelService, groupID, account)
-	return s.channelService.IsModelRestricted(lookupCtx, groupID, upstreamModel)
+	return s.channelService.IsModelRestricted(ctx, groupID, upstreamModel)
 }
 
 func (s *OpenAIGatewayService) needsUpstreamChannelRestrictionCheck(ctx context.Context, groupID *int64) bool {

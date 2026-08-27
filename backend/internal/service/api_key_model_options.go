@@ -61,7 +61,7 @@ func mappedGroupModelOptions(accounts []Account, platform string) []string {
 	seen := make(map[string]struct{})
 	models := make([]string, 0)
 	for _, account := range accounts {
-		if !accountPlatformMatchesExplicitGroup(platform, account.Platform) {
+		if !accountPlatformMatchesGroup(platform, account.Platform) {
 			continue
 		}
 		for model := range account.GetModelMapping() {
