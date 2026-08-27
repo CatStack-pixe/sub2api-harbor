@@ -2526,10 +2526,25 @@ func (s *GatewayService) diagnoseSelectionFailureInGroup(
 }
 
 func isPlatformFilteredForSelection(acc *Account, platform string, allowMixedScheduling bool) bool {
-	return isPlatformFilteredForSchedulingScope(acc, nil, platform, allowMixedScheduling)
+	if acc == nil {
+		return true
+	}
+	if allowMixedScheduling {
+		if acc.Platform == PlatformAntigravity {
+			return !acc.IsMixedSchedulingEnabled()
+		}
+		return !accountPlatformMatchesGroup(platform, acc.Platform)
+	}
+	if strings.TrimSpace(platform) == "" {
+		return false
+	}
+	return !accountPlatformMatchesGroup(platform, acc.Platform)
 }
 
 func isPlatformFilteredForSchedulingScope(acc *Account, groupID *int64, platform string, allowMixedScheduling bool) bool {
+	if groupID == nil {
+		return isPlatformFilteredForSelection(acc, platform, allowMixedScheduling)
+	}
 	if acc == nil {
 		return true
 	}

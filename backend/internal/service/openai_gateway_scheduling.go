@@ -367,10 +367,17 @@ func openAICompactSupportTier(account *Account) int {
 // 注意：对 spark 影子账号，调用方还须额外调用 parentHealthyForShadow(account, lookup)
 // 检查母账号凭据可用性；该检查未内置于本函数，以避免注入 DB 依赖。
 func isOpenAICompatibleAccountEligibleForRequest(ctx context.Context, account *Account, platform string, requestedModel string, requireCompact bool, requiredCapability OpenAIEndpointCapability) bool {
-	return isOpenAICompatibleAccountEligibleForRequestInGroup(ctx, account, nil, platform, requestedModel, requireCompact, requiredCapability)
+	if !isOpenAICompatibleAccountEligibleForRequestBeforeProfit(ctx, account, platform, requestedModel, requireCompact, requiredCapability) {
+		return false
+	}
+	vetoed, _ := openAIProfitControlVetoReason(ctx, account)
+	return !vetoed
 }
 
 func isOpenAICompatibleAccountEligibleForRequestInGroup(ctx context.Context, account *Account, groupID *int64, platform string, requestedModel string, requireCompact bool, requiredCapability OpenAIEndpointCapability) bool {
+	if groupID == nil {
+		return isOpenAICompatibleAccountEligibleForRequest(ctx, account, platform, requestedModel, requireCompact, requiredCapability)
+	}
 	return openAICompatibleAccountEligibilityFailureReasonInGroup(ctx, account, groupID, platform, requestedModel, requireCompact, requiredCapability) == ""
 }
 
@@ -383,6 +390,9 @@ func openAICompatibleAccountEligibilityFailureReason(ctx context.Context, accoun
 }
 
 func openAICompatibleAccountEligibilityFailureReasonInGroup(ctx context.Context, account *Account, groupID *int64, platform string, requestedModel string, requireCompact bool, requiredCapability OpenAIEndpointCapability) string {
+	if groupID == nil {
+		return openAICompatibleAccountEligibilityFailureReason(ctx, account, platform, requestedModel, requireCompact, requiredCapability)
+	}
 	if reason := openAICompatibleAccountEligibilityFailureReasonBeforeProfitInGroup(ctx, account, groupID, platform, requestedModel, requireCompact, requiredCapability); reason != "" {
 		return reason
 	}
@@ -1538,10 +1548,20 @@ func (s *OpenAIGatewayService) tryAcquireAccountSlot(ctx context.Context, accoun
 }
 
 func (s *OpenAIGatewayService) resolveFreshSchedulableOpenAIAccount(ctx context.Context, account *Account, platform string, requestedModel string, requireCompact bool, requiredCapability OpenAIEndpointCapability) *Account {
-	return s.resolveFreshSchedulableOpenAIAccountInGroup(ctx, account, nil, platform, requestedModel, requireCompact, requiredCapability)
+	fresh := s.resolveFreshSchedulableOpenAIAccountBeforeProfit(ctx, account, platform, requestedModel, requireCompact, requiredCapability)
+	if fresh == nil {
+		return nil
+	}
+	if vetoed, _ := openAIProfitControlVetoReason(ctx, fresh); vetoed {
+		return nil
+	}
+	return fresh
 }
 
 func (s *OpenAIGatewayService) resolveFreshSchedulableOpenAIAccountInGroup(ctx context.Context, account *Account, groupID *int64, platform string, requestedModel string, requireCompact bool, requiredCapability OpenAIEndpointCapability) *Account {
+	if groupID == nil {
+		return s.resolveFreshSchedulableOpenAIAccount(ctx, account, platform, requestedModel, requireCompact, requiredCapability)
+	}
 	fresh := s.resolveFreshSchedulableOpenAIAccountBeforeProfitInGroup(ctx, account, groupID, platform, requestedModel, requireCompact, requiredCapability)
 	if fresh == nil {
 		return nil
