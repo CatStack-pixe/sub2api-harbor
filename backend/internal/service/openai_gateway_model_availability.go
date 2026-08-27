@@ -43,7 +43,11 @@ func (s *OpenAIGatewayService) DiagnoseModelAvailabilityForPlatform(
 	}
 	platforms := []string{platform}
 	if queryGroupID != nil {
-		platforms = accountPlatformsForGroupPlatform(platform)
+		if isOpenAICompatibleRoutingPlatform(platform) {
+			platforms = openAICompatibleRoutingPlatforms()
+		} else {
+			platforms = accountPlatformsForGroupPlatform(platform)
+		}
 	}
 	accounts, err := s.accountRepo.ListModelAvailabilityCandidates(
 		ctx,

@@ -82,7 +82,7 @@ func (s *adminServiceImpl) GetGroupModelsListCandidates(ctx context.Context, id 
 			if !isConcreteRequestPlatform(acc.Platform) {
 				continue
 			}
-		} else if !accountPlatformMatchesGroup(platform, acc.Platform) {
+		} else if !accountPlatformMatchesExplicitGroup(platform, acc.Platform) {
 			continue
 		}
 		for model := range acc.GetModelMapping() {

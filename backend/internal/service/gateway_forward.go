@@ -1015,7 +1015,8 @@ func (s *GatewayService) isUpstreamModelRestrictedByChannel(ctx context.Context,
 	if upstreamModel == "" {
 		return false
 	}
-	return s.channelService.IsModelRestricted(ctx, groupID, upstreamModel)
+	lookupCtx := withAccountPlatformForChannelLookup(ctx, s.channelService, groupID, account)
+	return s.channelService.IsModelRestricted(lookupCtx, groupID, upstreamModel)
 }
 
 // resolveAccountUpstreamModel 确定账号将请求模型映射为什么上游模型。

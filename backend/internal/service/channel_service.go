@@ -243,7 +243,7 @@ func expandPricingToCache(cache *channelCache, ch *Channel, gid int64, platform 
 // expandMappingToCache 将渠道的模型映射展开到缓存（按分组+平台维度）。
 // 各平台严格独立：antigravity 分组只匹配 antigravity 映射。
 func expandMappingToCache(cache *channelCache, ch *Channel, gid int64, platform string) {
-	for _, mappingPlatform := range matchingPlatforms(platform) {
+	for _, mappingPlatform := range channelConfigPlatforms(platform) {
 		platformMapping, ok := ch.ModelMapping[mappingPlatform]
 		if !ok {
 			continue
@@ -343,13 +343,26 @@ func populateChannelCache(channels []Channel, groupPlatforms map[int64]string) *
 // invalidateCache 使缓存失效，让下次读取时自然重建
 
 // isPlatformPricingMatch 判断定价条目的平台是否匹配分组平台。
-// Concrete platforms stay isolated; composite groups may carry concrete-provider
-// pricing rows that are selected by the request's resolved target platform.
+// Native concrete platforms stay isolated; explicit OpenAI-compatible groups may
+// carry provider-specific pricing rows selected by the account platform.
 func isPlatformPricingMatch(groupPlatform, pricingPlatform string) bool {
 	if groupPlatform == PlatformComposite {
 		return isConcreteRequestPlatform(pricingPlatform)
 	}
+	if isOpenAICompatibleRoutingPlatform(groupPlatform) {
+		return isOpenAICompatibleRoutingPlatform(pricingPlatform)
+	}
 	return groupPlatform == pricingPlatform
+}
+
+func channelConfigPlatforms(groupPlatform string) []string {
+	if groupPlatform == PlatformComposite {
+		return matchingPlatforms(groupPlatform)
+	}
+	if isOpenAICompatibleRoutingPlatform(groupPlatform) {
+		return openAICompatibleRoutingPlatforms()
+	}
+	return []string{groupPlatform}
 }
 
 // matchingPlatforms 返回分组平台对应的可匹配平台列表。
