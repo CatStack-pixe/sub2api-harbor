@@ -68,21 +68,6 @@ function mountSelector(props: Record<string, unknown> = {}) {
   })
 }
 
-function mountTokenRhythmSelector() {
-  return mount(ModelWhitelistSelector, {
-    props: {
-      modelValue: [],
-      platform: 'tokenrhythm',
-      accountId: 42
-    },
-    global: {
-      stubs: {
-        ModelIcon: true
-      }
-    }
-  })
-}
-
 function findModelRow(wrapper: ReturnType<typeof mountSelector>, modelId: string) {
   const row = wrapper
     .findAll('[data-testid="model-option"]')
