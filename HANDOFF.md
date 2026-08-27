@@ -1,5 +1,14 @@
 # Handoff
 
+## 2026-08-27 Platform/group routing fix and v0.1.183-nvidia.30 deployment
+
+- PR [#96](https://github.com/CatStack-pixe/sub2api-harbor/pull/96) restored the pre-`836d4e9` `accountPlatformMatchesGroup` behavior in gateway sticky selection, OpenAI-compatible eligibility, and OpenAI scheduler load balancing. The final change is limited to the historical OpenAI/ChatAnywhere and DeepSeek/TokenRhythm group mappings; broad cross-provider matching was removed. Existing routing tests cover both compatible mappings and reverse-direction rejection.
+- PR #96 was labeled `bug`, received the required post-label code-audit comment, passed CI/Security Scan, and was squash-merged as `d8accb64c1303238878b8f17564783a9e7da7e62`. Backend CI run `33050140287` and Security Scan run `33050140286` passed. Local frontend lint and the two affected test files passed (`37` tests).
+- Release [v0.1.183-nvidia.30](https://github.com/CatStack-pixe/sub2api-harbor/releases/tag/v0.1.183-nvidia.30) completed successfully in GitHub Actions run `33050919962` with the repository's simple amd64 release profile. The immutable image is `ghcr.io/catstack-pixe/sub2api:0.1.183-nvidia.30-amd64@sha256:18ce35aeb398a18a6f538e8df57564ff14bc3bc701441c09c62cfd67b3accbbf`.
+- Production target is `root@154.37.212.18` (`instance-0GDSx0Ws`), deployment directory `/opt/sub2api`. The pre-deployment Compose backup is `/opt/sub2api/docker-compose.yml.before-0.1.183-nvidia.30` with SHA-256 `0b31e455546b13f78f915a69b7eb9efa18e40eb4de3ee2c94373baeeb573e188`.
+- Only `sub2api` was pulled and recreated. Compose now pins the image digest above; the container is `running/healthy` with image ID `sha256:18ce35aeb398a18a6f538e8df57564ff14bc3bc701441c09c62cfd67b3accbbf`. Docker healthcheck probes passed after deployment. PostgreSQL, Redis, and Mihomo were not restarted.
+- Status: production is live on `v0.1.183-nvidia.30`. The previous `v0.1.183-nvidia.29` container was replaced. No production account, group, credential, or database data was changed.
+
 ## 2026-08-27 Production Recovery and v0.1.183-nvidia.29 Deployment
 
 - Production target: `root@154.37.212.18` (`instance-0GDSx0Ws`), deployment directory `/opt/sub2api`.
