@@ -15,8 +15,8 @@ import (
 // model_not_found from 503 service_unavailable.
 type ModelAvailabilityDiagnosis struct {
 	// HasAccountsInPool is true if the group has at least one persistently
-	// eligible account on the queried platform (or, for Anthropic/Gemini, on
-	// the platform plus mixed-scheduled Antigravity accounts).
+	// eligible account. OpenAI-compatible groups use the complete compatible
+	// account pool; native groups remain protocol-scoped.
 	HasAccountsInPool bool
 	// HasModelSupport is true if at least one account's model mapping admits
 	// the requested model.
@@ -64,6 +64,7 @@ func (s *GatewayService) DiagnoseModelAvailabilityForPlatform(
 		// 503 branch rather than make an unscoped scan.
 		return ModelAvailabilityDiagnosis{HasAccountsInPool: true, HasModelSupport: true}
 	}
+	platform = strings.TrimSpace(platform)
 
 	if s.accountRepo == nil {
 		return ModelAvailabilityDiagnosis{HasAccountsInPool: true, HasModelSupport: true}
@@ -71,6 +72,14 @@ func (s *GatewayService) DiagnoseModelAvailabilityForPlatform(
 
 	useMixed := platform == PlatformAnthropic || platform == PlatformGemini
 	platforms := []string{platform}
+	if groupID != nil && !useMixed {
+		// Group routing is platform-agnostic: account credentials determine
+		// the concrete upstream transport and model mapping.
+		platforms = accountPlatformsForGroupPlatform(platform)
+		if len(platforms) == 0 {
+			return ModelAvailabilityDiagnosis{HasAccountsInPool: true, HasModelSupport: true}
+		}
+	}
 	if useMixed {
 		platforms = append(platforms, PlatformAntigravity)
 	}
@@ -98,6 +107,13 @@ func (s *GatewayService) DiagnoseModelAvailabilityForPlatform(
 
 	diag := ModelAvailabilityDiagnosis{}
 	for i := range accounts {
+		platformMatches := accountPlatformMatchesGroup(platform, accounts[i].Platform)
+		if useMixed && accounts[i].Platform == PlatformAntigravity && accounts[i].IsMixedSchedulingEnabled() {
+			platformMatches = true
+		}
+		if !platformMatches {
+			continue
+		}
 		if useMixed && accounts[i].Platform == PlatformAntigravity && !accounts[i].IsMixedSchedulingEnabled() {
 			continue
 		}

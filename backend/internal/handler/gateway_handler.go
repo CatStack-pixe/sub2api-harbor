@@ -1264,7 +1264,7 @@ func (h *GatewayHandler) compositeAvailableModels(ctx context.Context, groupID *
 		service.PlatformNvidia, service.PlatformTokenRhythm, service.PlatformKimi, service.PlatformZhipu,
 		service.PlatformChatAnywhere, service.PlatformGLM, service.PlatformModelScope, service.PlatformDashScope,
 		service.PlatformMiniMax, service.PlatformVolcengine} {
-		platformModels := h.gatewayService.GetAvailableModels(ctx, groupID, platform)
+		platformModels := h.gatewayService.GetAvailableModelsForExactPlatform(ctx, groupID, platform)
 		if len(platformModels) == 0 {
 			// CN 供应商没有静态默认模型列表（defaultModelIDsForPlatform 的
 			// default 分支是 Claude 列表），composite 下只暴露账号映射键。

@@ -9,9 +9,9 @@ import (
 
 // DiagnoseModelAvailabilityForPlatform reports whether the requested model
 // is configured to be served by any persistently eligible OpenAI-compatible
-// account in the group for the given platform (e.g. PlatformOpenAI,
-// PlatformGrok). The platform scopes the candidate pool so distinct
-// OpenAI-compatible platforms do not cross-contaminate diagnosis results.
+// account in the group for the given public platform (e.g. PlatformOpenAI,
+// PlatformGrok). Grouped requests use the full compatible account pool; the
+// account's own platform and credentials determine the upstream transport.
 // The query bypasses scheduler snapshots and ignores transient runtime state.
 //
 // Safe to call on the error path: returns {true,true} on any internal
@@ -59,6 +59,9 @@ func (s *OpenAIGatewayService) DiagnoseModelAvailabilityForPlatform(
 
 	diag := ModelAvailabilityDiagnosis{}
 	for i := range accounts {
+		if !accountPlatformMatchesGroup(platform, accounts[i].Platform) {
+			continue
+		}
 		diag.HasAccountsInPool = true
 		// Mirrors the per-candidate filter used during account selection
 		// (openai_account_scheduler.isAccountRequestCompatible): empty
