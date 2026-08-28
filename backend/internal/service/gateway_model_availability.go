@@ -107,8 +107,11 @@ func (s *GatewayService) DiagnoseModelAvailabilityForPlatform(
 
 	diag := ModelAvailabilityDiagnosis{}
 	for i := range accounts {
-		if !accountPlatformMatchesGroup(platform, accounts[i].Platform) &&
-			!(useMixed && accounts[i].Platform == PlatformAntigravity && accounts[i].IsMixedSchedulingEnabled()) {
+		platformMatches := accountPlatformMatchesGroup(platform, accounts[i].Platform)
+		if useMixed && accounts[i].Platform == PlatformAntigravity && accounts[i].IsMixedSchedulingEnabled() {
+			platformMatches = true
+		}
+		if !platformMatches {
 			continue
 		}
 		if useMixed && accounts[i].Platform == PlatformAntigravity && !accounts[i].IsMixedSchedulingEnabled() {
