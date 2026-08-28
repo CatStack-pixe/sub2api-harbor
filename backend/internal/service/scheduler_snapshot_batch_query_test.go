@@ -60,6 +60,11 @@ func batchQueryIsMixed(platforms []string) bool {
 	if len(platforms) == 2 && platforms[0] == PlatformOpenAI && platforms[1] == PlatformChatAnywhere {
 		return false
 	}
+	if len(platforms) > 2 && platforms[0] == PlatformOpenAI {
+		// OpenAI-compatible grouped buckets now share the complete compatible
+		// account pool; this is still an ordinary (non-mixed) query.
+		return false
+	}
 	return true
 }
 

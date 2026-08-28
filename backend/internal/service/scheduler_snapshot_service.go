@@ -88,7 +88,15 @@ func schedulerAccountQueryKeyForBucket(bucket SchedulerBucket) (schedulerAccount
 	if bucket.Mode != SchedulerModeSingle && bucket.Mode != SchedulerModeForced {
 		return schedulerAccountQueryKey{}, false
 	}
-	return schedulerAccountQueryKey{groupID: bucket.GroupID, platform: bucket.Platform}, true
+	platform := bucket.Platform
+	if (&Account{Platform: platform}).IsOpenAICompatible() {
+		// All OpenAI-compatible grouped buckets load the same account pool. Reuse
+		// one successful query across provider-specific snapshots and let the
+		// per-account platform matcher select the eligible entries at scheduling
+		// time.
+		platform = PlatformOpenAI
+	}
+	return schedulerAccountQueryKey{groupID: bucket.GroupID, platform: platform}, true
 }
 
 func (c *schedulerAccountQueryCache) release(bucket SchedulerBucket) {
