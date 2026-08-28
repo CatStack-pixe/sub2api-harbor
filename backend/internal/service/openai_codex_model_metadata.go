@@ -38,8 +38,9 @@ func groupCodexModelMetadata(
 
 	explicitClaims := false
 	if upstreamModel == modelID {
-		for _, account := range accounts {
-			if account.Platform == platform && codexExplicitModelMappingClaims(account, modelID) {
+		for i := range accounts {
+			account := &accounts[i]
+			if codexAccountPlatformMatches(platform, account) && codexExplicitModelMappingClaims(*account, modelID) {
 				explicitClaims = true
 				break
 			}
@@ -50,7 +51,7 @@ func groupCodexModelMetadata(
 	candidates := make([]UpstreamModelMetadata, 0)
 	for i := range accounts {
 		account := &accounts[i]
-		if account.Platform != platform {
+		if !codexAccountPlatformMatches(platform, account) {
 			continue
 		}
 		var lookupModel string
@@ -77,6 +78,12 @@ func groupCodexModelMetadata(
 				}, true
 			}
 			return codexModelMetadataOverride{}, false
+		}
+		// ChatAnywhere uses the OpenAI-compatible gateway but does not expose
+		// multimodal input through this Codex surface. Keep that restriction
+		// even when an upstream metadata snapshot claims image support.
+		if account.Platform == PlatformChatAnywhere {
+			metadata.InputModalities = []string{"text"}
 		}
 		candidates = append(candidates, metadata)
 	}
@@ -109,7 +116,7 @@ func codexExplicitModelTargetsConflictForPlatform(accounts []Account, platform, 
 	targets := make(map[string]struct{})
 	for i := range accounts {
 		account := &accounts[i]
-		if account.Platform != platform {
+		if !codexAccountPlatformMatches(platform, account) {
 			continue
 		}
 		mappedModel, matched := account.ResolveMappedModel(modelID)

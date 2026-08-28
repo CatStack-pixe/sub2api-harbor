@@ -971,6 +971,85 @@ func TestBuildGroupConfiguredCodexModelsManifestUsesAdministratorConfiguration(t
 	require.Equal(t, manifest.ETag, notModified.ETag)
 }
 
+func TestBuildGroupConfiguredCodexModelsManifestUsesChatAnywhereMappingsAsTextOnly(t *testing.T) {
+	t.Parallel()
+
+	const groupID int64 = 81
+	account := Account{
+		Platform: PlatformChatAnywhere,
+		Type:     AccountTypeAPIKey,
+		Credentials: map[string]any{
+			"model_mapping": map[string]any{"gpt-5.6-luna": "gpt-5.6-luna"},
+		},
+	}
+	reasoning := true
+	account.SetUpstreamModelMetadataSnapshot(UpstreamModelMetadataSnapshot{Models: map[string]UpstreamModelMetadata{
+		"gpt-5.6-luna": {
+			ID:              "gpt-5.6-luna",
+			Reasoning:       &reasoning,
+			InputModalities: []string{"text", "image"},
+			ContextWindow:   272_000,
+		},
+	}})
+	svc := &OpenAIGatewayService{accountRepo: codexModelsVisibilityAccountRepo{
+		byGroup: map[int64][]Account{groupID: {account}},
+	}}
+	group := &Group{
+		ID:       groupID,
+		Platform: PlatformOpenAI,
+		ModelsListConfig: GroupModelsListConfig{
+			Enabled: true,
+			Models:  []string{"gpt-5.6-luna"},
+		},
+	}
+
+	manifest, configured, err := svc.BuildGroupConfiguredCodexModelsManifest(context.Background(), group, "")
+	require.NoError(t, err)
+	require.True(t, configured)
+	models := decodeCodexManifestModels(t, manifest.Body)
+	require.Len(t, models, 1)
+	require.Equal(t, "gpt-5.6-luna", models[0]["slug"])
+	require.Equal(t, []any{"text"}, models[0]["input_modalities"])
+	require.Equal(t, false, models[0]["supports_image_detail_original"])
+}
+
+func TestBuildGroupConfiguredCodexModelsManifestIntersectsChatAnywhereImageCapability(t *testing.T) {
+	t.Parallel()
+
+	const groupID int64 = 82
+	modelMapping := map[string]any{"gpt-5.6-sol": "gpt-5.6-sol"}
+	svc := &OpenAIGatewayService{accountRepo: codexModelsVisibilityAccountRepo{
+		byGroup: map[int64][]Account{groupID: {
+			{
+				Platform: PlatformOpenAI,
+				Type:     AccountTypeOAuth,
+				Credentials: map[string]any{
+					"model_mapping": modelMapping,
+				},
+			},
+			{
+				Platform: PlatformChatAnywhere,
+				Type:     AccountTypeAPIKey,
+				Credentials: map[string]any{
+					"model_mapping": modelMapping,
+				},
+			},
+		}},
+	}}
+
+	manifest, configured, err := svc.BuildGroupConfiguredCodexModelsManifest(
+		context.Background(),
+		&Group{ID: groupID, Platform: PlatformOpenAI},
+		"",
+	)
+	require.NoError(t, err)
+	require.True(t, configured)
+	models := decodeCodexManifestModels(t, manifest.Body)
+	require.Len(t, models, 1)
+	require.Equal(t, []any{"text"}, models[0]["input_modalities"])
+	require.Equal(t, false, models[0]["supports_image_detail_original"])
+}
+
 // Scenario: OpenAI 通配映射展开组内精确选择，但不发布通配符 slug。
 func TestBuildGroupConfiguredCodexModelsManifestExpandsSelectedModelCoveredByWildcardMapping(t *testing.T) {
 	t.Parallel()
