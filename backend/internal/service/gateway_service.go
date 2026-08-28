@@ -1372,8 +1372,21 @@ func (s *GatewayService) DoGrokNativeResponsesJSON(ctx context.Context, account 
 }
 
 func (s *GatewayService) GetAvailableModels(ctx context.Context, groupID *int64, platform string) []string {
+	return s.getAvailableModels(ctx, groupID, platform, false)
+}
+
+// GetAvailableModelsForExactPlatform returns model mappings from accounts whose
+// concrete platform exactly matches the requested platform. Composite model
+// listing uses this to keep each platform's defaults and mappings isolated
+// while ordinary grouped OpenAI-compatible requests share their account pool.
+func (s *GatewayService) GetAvailableModelsForExactPlatform(ctx context.Context, groupID *int64, platform string) []string {
+	return s.getAvailableModels(ctx, groupID, platform, true)
+}
+
+func (s *GatewayService) getAvailableModels(ctx context.Context, groupID *int64, platform string, exactPlatform bool) []string {
 	cacheKey := modelsListCacheKey(groupID, platform)
-	if s.modelsListCache != nil {
+	cacheEnabled := s.modelsListCache != nil && !exactPlatform
+	if cacheEnabled {
 		if cached, found := s.modelsListCache.Get(cacheKey); found {
 			if models, ok := cached.([]string); ok {
 				modelsListCacheHitTotal.Add(1)
@@ -1400,7 +1413,8 @@ func (s *GatewayService) GetAvailableModels(ctx context.Context, groupID *int64,
 	if platform != "" {
 		filtered := make([]Account, 0)
 		for _, acc := range accounts {
-			if (groupID != nil && accountPlatformMatchesGroup(platform, acc.Platform)) ||
+			if (groupID != nil && ((exactPlatform && acc.Platform == platform) ||
+				(!exactPlatform && accountPlatformMatchesGroup(platform, acc.Platform)))) ||
 				(groupID == nil && acc.Platform == platform) {
 				filtered = append(filtered, acc)
 			}
@@ -1417,7 +1431,7 @@ func (s *GatewayService) GetAvailableModels(ctx context.Context, groupID *int64,
 		// mapping on any eligible passthrough account therefore cannot define the
 		// public whitelist; return nil so the handler uses its default model set.
 		if platform == PlatformOpenAI && acc.IsOpenAIPassthroughEnabled() {
-			if s.modelsListCache != nil {
+			if cacheEnabled {
 				s.modelsListCache.Set(cacheKey, []string(nil), s.modelsListCacheTTL)
 				modelsListCacheStoreTotal.Add(1)
 			}
@@ -1435,7 +1449,7 @@ func (s *GatewayService) GetAvailableModels(ctx context.Context, groupID *int64,
 
 	// If no account has model_mapping, return nil (use default)
 	if !hasAnyMapping {
-		if s.modelsListCache != nil {
+		if cacheEnabled {
 			s.modelsListCache.Set(cacheKey, []string(nil), s.modelsListCacheTTL)
 			modelsListCacheStoreTotal.Add(1)
 		}
@@ -1449,7 +1463,7 @@ func (s *GatewayService) GetAvailableModels(ctx context.Context, groupID *int64,
 	}
 	sort.Strings(models)
 
-	if s.modelsListCache != nil {
+	if cacheEnabled {
 		s.modelsListCache.Set(cacheKey, cloneStringSlice(models), s.modelsListCacheTTL)
 		modelsListCacheStoreTotal.Add(1)
 	}
