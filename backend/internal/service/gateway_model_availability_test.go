@@ -223,18 +223,19 @@ func TestOpenAIDiagnoseModelAvailabilityForPlatform_RateLimitedSupportingAccount
 	require.True(t, diag.HasModelSupport, "OpenAI-compatible diagnosis must keep transiently limited supporting accounts in the configured pool")
 }
 
-func TestDiagnoseModelAvailabilityForPlatform_WrongPlatformFiltersOut(t *testing.T) {
-	// Group has only Anthropic accounts; user routes to OpenAI gateway.
-	// Diagnosis must NOT see Anthropic accounts (listSchedulableAccounts filters
-	// by platform), so HasAccountsInPool is false and the caller stays on 503.
+func TestDiagnoseModelAvailabilityForPlatform_GroupIncludesCrossPlatformAccount(t *testing.T) {
+	// A grouped Zhipu request may be served by a TokenRhythm account when its
+	// model mapping exposes the requested model.
+	groupID := int64(42)
 	repo := &mockAccountRepoForPlatform{
 		accounts: []Account{
 			{
 				ID:          1,
-				Platform:    PlatformAnthropic,
+				Platform:    PlatformTokenRhythm,
 				Status:      StatusActive,
 				Schedulable: true,
-				Credentials: map[string]any{"model_mapping": map[string]any{"claude-sonnet-4-5": "claude-sonnet-4-5"}},
+				AccountGroups: []AccountGroup{{GroupID: groupID}},
+				Credentials: map[string]any{"model_mapping": map[string]any{"gpt-5": "gpt-5"}},
 			},
 		},
 		accountsByID: map[int64]*Account{},
@@ -244,8 +245,8 @@ func TestDiagnoseModelAvailabilityForPlatform_WrongPlatformFiltersOut(t *testing
 	}
 	svc := &GatewayService{accountRepo: repo, cfg: testConfig()}
 
-	diag := svc.DiagnoseModelAvailabilityForPlatform(context.Background(), nil, "gpt-5", PlatformOpenAI)
+	diag := svc.DiagnoseModelAvailabilityForPlatform(context.Background(), &groupID, "gpt-5", PlatformZhipu)
 
-	require.False(t, diag.HasAccountsInPool, "OpenAI route must not see Anthropic accounts in pool")
-	require.False(t, diag.HasModelSupport)
+	require.True(t, diag.HasAccountsInPool)
+	require.True(t, diag.HasModelSupport)
 }
