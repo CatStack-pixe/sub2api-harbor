@@ -234,7 +234,7 @@ func openAIConfiguredCodexModelIDs(accounts []Account) []string {
 	models := make([]string, 0)
 	for i := range accounts {
 		account := &accounts[i]
-		if account.Platform != PlatformOpenAI {
+		if !account.IsOpenAICompatible() {
 			continue
 		}
 		for modelID := range account.GetModelMapping() {
@@ -270,7 +270,7 @@ func openAIConfiguredCodexModelIDsForGroup(accounts []Account, group *Group) []s
 		}
 		for i := range accounts {
 			account := &accounts[i]
-			if account.Platform != PlatformOpenAI {
+			if !account.IsOpenAICompatible() {
 				continue
 			}
 			mappedModel, matched := account.ResolveMappedModel(selectedModel)
@@ -286,6 +286,16 @@ func openAIConfiguredCodexModelIDsForGroup(accounts []Account, group *Group) []s
 	}
 	sort.Strings(models)
 	return models
+}
+
+func codexAccountPlatformMatches(platform string, account *Account) bool {
+	if account == nil {
+		return false
+	}
+	if platform == PlatformOpenAI {
+		return account.IsOpenAICompatible()
+	}
+	return account.Platform == platform
 }
 
 const (
@@ -904,7 +914,7 @@ func uniqueCodexMappedModel(accounts []Account, platform string, modelID string)
 	targets := make(map[string]struct{})
 	for i := range accounts {
 		account := &accounts[i]
-		if account.Platform != platform {
+		if !codexAccountPlatformMatches(platform, account) {
 			continue
 		}
 		mappedModel, matched := account.ResolveMappedModel(modelID)
@@ -954,7 +964,7 @@ func groupCodexModelSupportsImageInput(
 	candidates := 0
 	for i := range accounts {
 		account := &accounts[i]
-		if account.Platform != platform || !account.IsModelSupported(upstreamModel) {
+		if !codexAccountPlatformMatches(platform, account) || !account.IsModelSupported(upstreamModel) {
 			continue
 		}
 		candidates++
