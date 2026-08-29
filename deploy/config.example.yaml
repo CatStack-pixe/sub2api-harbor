@@ -1016,10 +1016,10 @@ heartbeat_provisioning:
   proxy_group_id: 1
   worker_count: 2
   proxy_probe_workers: 10
-  proxy_probe_sample_size: 100
+  proxy_probe_sample_size: 300
   proxy_probe_timeout_seconds: 5
   proxy_sweep_ttl_seconds: 300
-  max_attempts: 5
+  max_attempts: 10
 
 # =============================================================================
 # Default Settings

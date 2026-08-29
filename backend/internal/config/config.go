@@ -2395,10 +2395,12 @@ func setDefaults() {
 	viper.SetDefault("heartbeat_provisioning.proxy_group_id", int64(1))
 	viper.SetDefault("heartbeat_provisioning.worker_count", 2)
 	viper.SetDefault("heartbeat_provisioning.proxy_probe_workers", 10)
-	viper.SetDefault("heartbeat_provisioning.proxy_probe_sample_size", 100)
+	// Probe a broad, region-diverse candidate pool so one fast but fragile
+	// proxy cannot monopolize Heartbeat provisioning retries.
+	viper.SetDefault("heartbeat_provisioning.proxy_probe_sample_size", 300)
 	viper.SetDefault("heartbeat_provisioning.proxy_probe_timeout_seconds", 5)
 	viper.SetDefault("heartbeat_provisioning.proxy_sweep_ttl_seconds", 300)
-	viper.SetDefault("heartbeat_provisioning.max_attempts", 5)
+	viper.SetDefault("heartbeat_provisioning.max_attempts", 10)
 
 	// Idempotency
 	viper.SetDefault("idempotency.observe_only", true)

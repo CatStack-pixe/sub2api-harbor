@@ -238,6 +238,17 @@ type heartbeatProxyTier struct {
 	expiresAt time.Time
 }
 
+type heartbeatProxyCandidate struct {
+	Proxy
+	Region string
+}
+
+type heartbeatProxyProbeResult struct {
+	id      int64
+	latency int64
+	region  string
+}
+
 type HeartbeatProvisioningService struct {
 	cfg       config.HeartbeatProvisioningConfig
 	source    string
@@ -638,7 +649,7 @@ func (s *HeartbeatProvisioningService) provision(ctx context.Context, job *Heart
 	accountID := int64(0)
 	if job.AccountID != nil {
 		accountID = *job.AccountID
-		proxyID, err := s.selectProxy(ctx, target.ProxyGroupID, cfg)
+		proxyID, err := s.selectProxy(ctx, target.ProxyGroupID, cfg, job.ProxyID, job.Attempts)
 		if err != nil {
 			return err
 		}
@@ -648,6 +659,7 @@ func (s *HeartbeatProvisioningService) provision(ctx context.Context, job *Heart
 		if err := s.repo.SetProxy(ctx, job.ID, proxyID); err != nil {
 			return err
 		}
+		job.ProxyID = &proxyID
 	} else {
 		recoveredID, err := s.findPendingAccountByFingerprint(ctx, provider.ID, job.Fingerprint)
 		if err != nil {
@@ -660,13 +672,14 @@ func (s *HeartbeatProvisioningService) provision(ctx context.Context, job *Heart
 			job.AccountID = recoveredID
 			return s.provision(ctx, job)
 		}
-		proxyID, err := s.selectProxy(ctx, target.ProxyGroupID, cfg)
+		proxyID, err := s.selectProxy(ctx, target.ProxyGroupID, cfg, job.ProxyID, job.Attempts)
 		if err != nil {
 			return err
 		}
 		if err := s.repo.SetProxy(ctx, job.ID, proxyID); err != nil {
 			return err
 		}
+		job.ProxyID = &proxyID
 		sessionKey, err := s.encryptor.Decrypt(job.SessionKeyCiphertext)
 		if err != nil {
 			return errors.New("decrypt heartbeat session key")
@@ -713,13 +726,13 @@ func (s *HeartbeatProvisioningService) provision(ctx context.Context, job *Heart
 	return err
 }
 
-func (s *HeartbeatProvisioningService) selectProxy(ctx context.Context, proxyGroupID int64, cfg config.HeartbeatProvisioningConfig) (int64, error) {
+func (s *HeartbeatProvisioningService) selectProxy(ctx context.Context, proxyGroupID int64, cfg config.HeartbeatProvisioningConfig, previousProxyID *int64, attempt int) (int64, error) {
 	now := time.Now()
 	s.proxyMu.RLock()
 	cached, valid := s.proxyTiers[proxyGroupID]
 	s.proxyMu.RUnlock()
 	if valid && len(cached.ids) > 0 && now.Before(cached.expiresAt) {
-		return chooseHeartbeatProxy(cached.ids)
+		return chooseHeartbeatProxyForAttempt(cached.ids, previousProxyID, attempt)
 	}
 	s.proxyRefreshMu.Lock()
 	defer s.proxyRefreshMu.Unlock()
@@ -727,9 +740,9 @@ func (s *HeartbeatProvisioningService) selectProxy(ctx context.Context, proxyGro
 	cached, valid = s.proxyTiers[proxyGroupID]
 	s.proxyMu.RUnlock()
 	if valid && len(cached.ids) > 0 && time.Now().Before(cached.expiresAt) {
-		return chooseHeartbeatProxy(cached.ids)
+		return chooseHeartbeatProxyForAttempt(cached.ids, previousProxyID, attempt)
 	}
-	proxies := make([]Proxy, 0)
+	proxies := make([]heartbeatProxyCandidate, 0)
 	for page := 1; ; page++ {
 		filters := ProxyListFilters{Status: StatusActive}
 		if proxyGroupID > 0 {
@@ -738,11 +751,16 @@ func (s *HeartbeatProvisioningService) selectProxy(ctx context.Context, proxyGro
 		} else {
 			filters.Ungrouped = true
 		}
-		batch, total, err := s.admin.ListProxies(ctx, page, 500, filters, "id", "asc")
+		batch, total, err := s.admin.ListProxiesWithAccountCount(ctx, page, 500, filters, "id", "asc")
 		if err != nil {
 			return 0, err
 		}
-		proxies = append(proxies, batch...)
+		for _, proxy := range batch {
+			proxies = append(proxies, heartbeatProxyCandidate{
+				Proxy:  proxy.Proxy,
+				Region: heartbeatProxyRegion(proxy.CountryCode, proxy.Country, proxy.Region, proxy.City, proxy.ProxyGroupName),
+			})
+		}
 		if len(batch) == 0 || int64(len(proxies)) >= total {
 			break
 		}
@@ -751,15 +769,14 @@ func (s *HeartbeatProvisioningService) selectProxy(ctx context.Context, proxyGro
 		return 0, errors.New("no active proxies in heartbeat target group")
 	}
 	if len(proxies) > cfg.ProxyProbeSampleSize {
-		sampled, err := sampleHeartbeatProxies(proxies, cfg.ProxyProbeSampleSize)
+		sampled, err := sampleHeartbeatProxyCandidates(proxies, cfg.ProxyProbeSampleSize)
 		if err != nil {
 			return 0, err
 		}
 		proxies = sampled
 	}
-	type probeResult struct{ id, latency int64 }
-	input := make(chan Proxy)
-	output := make(chan probeResult, len(proxies))
+	input := make(chan heartbeatProxyCandidate)
+	output := make(chan heartbeatProxyProbeResult, len(proxies))
 	var wg sync.WaitGroup
 	for i := 0; i < cfg.ProxyProbeWorkers; i++ {
 		wg.Add(1)
@@ -770,7 +787,11 @@ func (s *HeartbeatProvisioningService) selectProxy(ctx context.Context, proxyGro
 				result, err := s.admin.TestProxy(probeCtx, proxy.ID)
 				cancel()
 				if err == nil && result != nil && result.Success && result.LatencyMs > 0 {
-					output <- probeResult{id: proxy.ID, latency: result.LatencyMs}
+					region := proxy.Region
+					if result.CountryCode != "" || result.Country != "" || result.Region != "" || result.City != "" {
+						region = heartbeatProxyRegion(result.CountryCode, result.Country, result.Region, result.City, proxy.ProxyGroupName)
+					}
+					output <- heartbeatProxyProbeResult{id: proxy.ID, latency: result.LatencyMs, region: region}
 				}
 			}
 		}()
@@ -786,26 +807,18 @@ func (s *HeartbeatProvisioningService) selectProxy(ctx context.Context, proxyGro
 		}
 	}()
 	go func() { wg.Wait(); close(output) }()
-	results := make([]probeResult, 0, len(proxies))
+	results := make([]heartbeatProxyProbeResult, 0, len(proxies))
 	for result := range output {
 		results = append(results, result)
 	}
 	if len(results) == 0 {
 		return 0, errors.New("no heartbeat proxy completed a successful latency probe")
 	}
-	sort.Slice(results, func(i, j int) bool { return results[i].latency < results[j].latency })
-	tierSize := int(math.Ceil(float64(len(results)) * 0.10))
-	if tierSize < 1 {
-		tierSize = 1
-	}
-	tier := make([]int64, tierSize)
-	for i := range tier {
-		tier[i] = results[i].id
-	}
+	tier := orderHeartbeatProxyResults(results)
 	s.proxyMu.Lock()
 	s.proxyTiers[proxyGroupID] = heartbeatProxyTier{ids: append([]int64(nil), tier...), expiresAt: time.Now().Add(time.Duration(cfg.ProxySweepTTLSecond) * time.Second)}
 	s.proxyMu.Unlock()
-	return chooseHeartbeatProxy(tier)
+	return chooseHeartbeatProxyForAttempt(tier, previousProxyID, attempt)
 }
 
 func heartbeatAccountCredentials(providerID string, credential *heartbeatVaultCredential) map[string]any {
@@ -1232,31 +1245,145 @@ func decodeStoredHeartbeatConfig(raw string) (config.HeartbeatProvisioningConfig
 	}), nil
 }
 
-func chooseHeartbeatProxy(candidates []int64) (int64, error) {
+func chooseHeartbeatProxyForAttempt(candidates []int64, previousProxyID *int64, attempt int) (int64, error) {
 	if len(candidates) == 0 {
-		return 0, errors.New("no low-latency heartbeat proxy candidates")
+		return 0, errors.New("no heartbeat proxy candidates")
 	}
-	choice, err := cryptorand.Int(cryptorand.Reader, big.NewInt(int64(len(candidates))))
-	if err != nil {
-		return 0, err
+	if attempt < 1 {
+		attempt = 1
 	}
-	return candidates[choice.Int64()], nil
+	start := (attempt - 1) % len(candidates)
+	for offset := 0; offset < len(candidates); offset++ {
+		candidate := candidates[(start+offset)%len(candidates)]
+		if previousProxyID == nil || candidate != *previousProxyID {
+			return candidate, nil
+		}
+	}
+	// A single healthy candidate is still preferable to pausing immediately;
+	// the retry limit remains the terminal guard for a repeatedly bad proxy.
+	return candidates[start], nil
+}
+
+func heartbeatProxyRegion(values ...string) string {
+	for _, value := range values {
+		if normalized := strings.ToLower(strings.TrimSpace(value)); normalized != "" {
+			return normalized
+		}
+	}
+	return "unknown"
+}
+
+func sampleHeartbeatProxyCandidates(proxies []heartbeatProxyCandidate, count int) ([]heartbeatProxyCandidate, error) {
+	if count <= 0 || count >= len(proxies) {
+		return append([]heartbeatProxyCandidate(nil), proxies...), nil
+	}
+	byRegion := make(map[string][]heartbeatProxyCandidate, len(proxies))
+	for _, proxy := range proxies {
+		region := heartbeatProxyRegion(proxy.Region)
+		proxy.Region = region
+		byRegion[region] = append(byRegion[region], proxy)
+	}
+	regions := make([]string, 0, len(byRegion))
+	for region := range byRegion {
+		regions = append(regions, region)
+	}
+	sort.Strings(regions)
+	for _, region := range regions {
+		if err := shuffleHeartbeatProxyCandidates(byRegion[region]); err != nil {
+			return nil, err
+		}
+	}
+	sampled := make([]heartbeatProxyCandidate, 0, count)
+	selected := make(map[int64]struct{}, count)
+	// Reserve one slot per known region before filling the remainder. This
+	// prevents a large fast region from crowding out every other region.
+	for _, region := range regions {
+		if len(sampled) >= count {
+			break
+		}
+		candidate := byRegion[region][0]
+		sampled = append(sampled, candidate)
+		selected[candidate.ID] = struct{}{}
+	}
+	remaining := make([]heartbeatProxyCandidate, 0, len(proxies)-len(sampled))
+	for _, proxy := range proxies {
+		if _, exists := selected[proxy.ID]; !exists {
+			remaining = append(remaining, proxy)
+		}
+	}
+	if err := shuffleHeartbeatProxyCandidates(remaining); err != nil {
+		return nil, err
+	}
+	sampled = append(sampled, remaining[:count-len(sampled)]...)
+	return sampled, nil
+}
+
+func shuffleHeartbeatProxyCandidates(proxies []heartbeatProxyCandidate) error {
+	for i := len(proxies) - 1; i > 0; i-- {
+		choice, err := cryptorand.Int(cryptorand.Reader, big.NewInt(int64(i+1)))
+		if err != nil {
+			return err
+		}
+		j := int(choice.Int64())
+		proxies[i], proxies[j] = proxies[j], proxies[i]
+	}
+	return nil
+}
+
+func orderHeartbeatProxyResults(results []heartbeatProxyProbeResult) []int64 {
+	byRegion := make(map[string][]heartbeatProxyProbeResult, len(results))
+	for _, result := range results {
+		region := heartbeatProxyRegion(result.region)
+		result.region = region
+		byRegion[region] = append(byRegion[region], result)
+	}
+	regions := make([]string, 0, len(byRegion))
+	for region := range byRegion {
+		regions = append(regions, region)
+	}
+	for _, region := range regions {
+		sort.SliceStable(byRegion[region], func(i, j int) bool {
+			return byRegion[region][i].latency < byRegion[region][j].latency
+		})
+	}
+	sort.Slice(regions, func(i, j int) bool {
+		left, right := byRegion[regions[i]][0], byRegion[regions[j]][0]
+		if left.latency == right.latency {
+			return regions[i] < regions[j]
+		}
+		return left.latency < right.latency
+	})
+	ordered := make([]int64, 0, len(results))
+	for offset := 0; ; offset++ {
+		added := false
+		for _, region := range regions {
+			candidates := byRegion[region]
+			if offset >= len(candidates) {
+				continue
+			}
+			ordered = append(ordered, candidates[offset].id)
+			added = true
+		}
+		if !added {
+			return ordered
+		}
+	}
 }
 
 func sampleHeartbeatProxies(proxies []Proxy, count int) ([]Proxy, error) {
-	if count <= 0 || count >= len(proxies) {
-		return append([]Proxy(nil), proxies...), nil
+	candidates := make([]heartbeatProxyCandidate, 0, len(proxies))
+	for _, proxy := range proxies {
+		candidates = append(candidates, heartbeatProxyCandidate{Proxy: proxy})
 	}
-	sampled := append([]Proxy(nil), proxies...)
-	for i := len(sampled) - 1; i > 0; i-- {
-		choice, err := cryptorand.Int(cryptorand.Reader, big.NewInt(int64(i+1)))
-		if err != nil {
-			return nil, err
-		}
-		j := int(choice.Int64())
-		sampled[i], sampled[j] = sampled[j], sampled[i]
+	sampled, err := sampleHeartbeatProxyCandidates(candidates, count)
+	if err != nil {
+		return nil, err
 	}
-	return sampled[:count], nil
+	result := make([]Proxy, 0, len(sampled))
+	for _, candidate := range sampled {
+		result = append(result, candidate.Proxy)
+	}
+	return result, nil
 }
 
 func heartbeatFingerprint(key string) string {
