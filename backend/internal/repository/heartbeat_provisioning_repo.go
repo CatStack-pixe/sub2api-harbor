@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/service"
@@ -24,7 +25,7 @@ func (r *heartbeatProvisioningRepository) Enqueue(ctx context.Context, input ser
 	}
 	_, err := r.db.ExecContext(ctx, `
 		INSERT INTO heartbeat_provision_jobs (provider, fingerprint, session_key_ciphertext, source_balance, source_checked_at, target_group_id, target_proxy_group_id)
-		VALUES ('ds', $1, $2, $3, NULLIF($4::timestamptz, 'epoch'::timestamptz), $5, NULLIF($6::bigint, 0))
+		VALUES ($1, $2, $3, $4, NULLIF($5::timestamptz, 'epoch'::timestamptz), $6, NULLIF($7::bigint, 0))
 		ON CONFLICT (provider, fingerprint) DO UPDATE SET
 			session_key_ciphertext = EXCLUDED.session_key_ciphertext,
 			source_balance = EXCLUDED.source_balance,
@@ -88,7 +89,7 @@ func (r *heartbeatProvisioningRepository) Enqueue(ctx context.Context, input ser
 				ELSE heartbeat_provision_jobs.completed_at
 			END,
 			updated_at = NOW()
-	`, input.Fingerprint, input.SessionKeyCiphertext, input.SourceBalance, input.SourceCheckedAt, input.TargetGroupID, input.TargetProxyGroupID)
+	`, input.Provider, input.Fingerprint, input.SessionKeyCiphertext, input.SourceBalance, input.SourceCheckedAt, input.TargetGroupID, input.TargetProxyGroupID)
 	return err
 }
 
@@ -115,12 +116,12 @@ func (r *heartbeatProvisioningRepository) Claim(ctx context.Context, workerID st
 			locked_until = NOW() + ($2 * INTERVAL '1 second'), updated_at = NOW()
 		FROM candidate
 		WHERE job.id = candidate.id
-		RETURNING job.id, job.fingerprint, job.session_key_ciphertext, job.attempts,
+		RETURNING job.id, job.provider, job.fingerprint, job.session_key_ciphertext, job.attempts,
 			job.target_group_id, job.target_proxy_group_id, job.account_id, job.proxy_id
 	`, workerID, seconds)
 	job := &service.HeartbeatProvisioningJob{}
 	var targetGroupID, targetProxyGroupID, accountID, proxyID sql.NullInt64
-	if err := row.Scan(&job.ID, &job.Fingerprint, &job.SessionKeyCiphertext, &job.Attempts, &targetGroupID, &targetProxyGroupID, &accountID, &proxyID); err != nil {
+	if err := row.Scan(&job.ID, &job.Provider, &job.Fingerprint, &job.SessionKeyCiphertext, &job.Attempts, &targetGroupID, &targetProxyGroupID, &accountID, &proxyID); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
@@ -179,21 +180,32 @@ func (r *heartbeatProvisioningRepository) SetAccount(ctx context.Context, jobID,
 }
 
 func (r *heartbeatProvisioningRepository) FindPendingAccountByFingerprint(ctx context.Context, fingerprint string) (*int64, error) {
+	return r.FindPendingAccountByProviderAndFingerprint(ctx, "ds", fingerprint)
+}
+
+func (r *heartbeatProvisioningRepository) FindPendingAccountByProviderAndFingerprint(ctx context.Context, provider, fingerprint string) (*int64, error) {
 	if r == nil || r.db == nil {
 		return nil, errors.New("nil heartbeat provisioning database")
 	}
+	providerID, ok := service.HeartbeatProviderID(provider)
+	if !ok {
+		return nil, fmt.Errorf("unsupported heartbeat provider %q", provider)
+	}
+	platform, _ := service.HeartbeatProviderPlatform(providerID)
 	var id int64
 	err := r.db.QueryRowContext(ctx, `
 		SELECT id
 		FROM accounts
-		WHERE platform = 'deepseek'
+		WHERE platform = $1
 		  AND status = 'disabled'
 		  AND schedulable = FALSE
 		  AND deleted_at IS NULL
-		  AND extra ->> 'heartbeat_fp' = $1
+		  AND extra ->> 'heartbeat_fp' = $2
+		  AND (extra ->> 'heartbeat_provider' = $3
+		    OR ($3 = 'ds' AND NULLIF(extra ->> 'heartbeat_provider', '') IS NULL))
 		ORDER BY id DESC
 		LIMIT 1
-	`, fingerprint).Scan(&id)
+	`, platform, fingerprint, strings.ToLower(strings.TrimSpace(providerID))).Scan(&id)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}

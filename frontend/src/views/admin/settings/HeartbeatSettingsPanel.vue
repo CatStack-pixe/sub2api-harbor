@@ -236,7 +236,7 @@ const status = reactive<HeartbeatStatus>({
 
 const groupOptions = computed(() => options.groups.map(group => ({
   value: group.id,
-  label: `${group.name} (#${group.id})`,
+  label: `${group.name} [${group.platform}] (#${group.id})`,
 })))
 
 const proxyGroupOptions = computed(() => options.proxy_groups.map(group => ({

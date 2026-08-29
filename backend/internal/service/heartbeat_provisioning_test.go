@@ -18,6 +18,58 @@ func TestHeartbeatFingerprintValidation(t *testing.T) {
 	require.False(t, validHeartbeatSessionKey("short"))
 }
 
+func TestHeartbeatProviderRegistryCoversConfiguredPlatforms(t *testing.T) {
+	for _, raw := range []string{"ds", "deepseek", "glm", "zhipu", "kimi", "openai", "anthropic", "gemini", "grok", "nvidia", "tokenrhythm", "modelscope", "dashscope", "minimax", "volcengine", "chatanywhere", "agnes", "antigravity", "sf", "siliconflow", "mimo", "groq", "perplexity", "bailian_sp"} {
+		spec, ok := normalizeHeartbeatProvider(raw)
+		require.Truef(t, ok, "provider %q should be registered", raw)
+		require.NotEmpty(t, spec.ID)
+		require.NotEmpty(t, spec.Platform)
+	}
+
+	spec, ok := normalizeHeartbeatProvider("deepseek")
+	require.True(t, ok)
+	require.Equal(t, "ds", spec.ID)
+	require.Equal(t, PlatformDeepSeek, spec.Platform)
+}
+
+func TestHeartbeatProviderAliasesCanonicalizeToAccountPlatform(t *testing.T) {
+	platform, ok := HeartbeatProviderPlatform("glm")
+	require.True(t, ok)
+	require.Equal(t, PlatformGLM, platform)
+	platform, ok = HeartbeatProviderPlatform("bigmodel")
+	require.True(t, ok)
+	require.Equal(t, PlatformZhipu, platform)
+	providerID, ok := HeartbeatProviderID("siliconflow")
+	require.True(t, ok)
+	require.Equal(t, "sf", providerID)
+	_, ok = HeartbeatProviderPlatform("unknown-provider")
+	require.False(t, ok)
+}
+
+func TestHeartbeatAccountCanUseGroupFollowsRoutingCompatibility(t *testing.T) {
+	require.True(t, heartbeatAccountCanUseGroup(PlatformComposite, PlatformGLM))
+	require.True(t, heartbeatAccountCanUseGroup(PlatformOpenAI, PlatformGLM))
+	require.True(t, heartbeatAccountCanUseGroup(PlatformDeepSeek, PlatformOpenAI))
+	require.True(t, heartbeatAccountCanUseGroup(PlatformAnthropic, PlatformAnthropic))
+	require.False(t, heartbeatAccountCanUseGroup(PlatformAnthropic, PlatformGLM))
+}
+
+func TestHeartbeatAccountCredentialsCarriesProviderExtras(t *testing.T) {
+	credentials := heartbeatAccountCredentials(PlatformTokenRhythm, &heartbeatVaultCredential{
+		Key: "token-key",
+		Credentials: map[string]any{
+			"tr_session": "session",
+			"tr_csrf":    "csrf",
+			"base_url":   "https://tokenrhythm.studio",
+			"password":   "must-not-be-copied",
+		},
+	})
+	require.Equal(t, "token-key", credentials["api_key"])
+	require.Equal(t, "session", credentials["tr_session"])
+	require.Equal(t, "csrf", credentials["tr_csrf"])
+	require.NotContains(t, credentials, "password")
+}
+
 func TestHeartbeatRetryDelayIsBounded(t *testing.T) {
 	require.Equal(t, 30*time.Second, heartbeatRetryDelay(1))
 	require.Equal(t, time.Duration(1800)*time.Second, heartbeatRetryDelay(99))

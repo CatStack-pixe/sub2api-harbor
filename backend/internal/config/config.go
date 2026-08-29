@@ -1778,8 +1778,9 @@ type HeartbeatProvisioningConfig struct {
 	AllowedSourceIPs   []string                      `mapstructure:"allowed_source_ips"`
 	DefaultGroupID     int64                         `mapstructure:"default_group_id" json:"default_group_id"`
 	Targets            []HeartbeatProvisioningTarget `mapstructure:"targets" json:"targets"`
-	// DeepSeekGroupID and ProxyGroupID are retained for deployment compatibility.
-	// The service normalizes them into DefaultGroupID and Targets when targets are absent.
+	// DeepSeekGroupID and ProxyGroupID are retained for deployment compatibility
+	// with the original single-provider heartbeat deployment. New deployments
+	// use Targets to map every supported provider group independently.
 	DeepSeekGroupID      int64 `mapstructure:"deepseek_group_id"`
 	ProxyGroupID         int64 `mapstructure:"proxy_group_id"`
 	WorkerCount          int   `mapstructure:"worker_count"`
