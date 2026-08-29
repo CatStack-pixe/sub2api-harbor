@@ -39,6 +39,9 @@ func TestHeartbeatProviderAliasesCanonicalizeToAccountPlatform(t *testing.T) {
 	platform, ok = HeartbeatProviderPlatform("bigmodel")
 	require.True(t, ok)
 	require.Equal(t, PlatformZhipu, platform)
+	providerID, ok := HeartbeatProviderID("siliconflow")
+	require.True(t, ok)
+	require.Equal(t, "sf", providerID)
 	_, ok = HeartbeatProviderPlatform("unknown-provider")
 	require.False(t, ok)
 }

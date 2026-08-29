@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/service"
@@ -186,10 +187,11 @@ func (r *heartbeatProvisioningRepository) FindPendingAccountByProviderAndFingerp
 	if r == nil || r.db == nil {
 		return nil, errors.New("nil heartbeat provisioning database")
 	}
-	platform, ok := service.HeartbeatProviderPlatform(provider)
+	providerID, ok := service.HeartbeatProviderID(provider)
 	if !ok {
 		return nil, fmt.Errorf("unsupported heartbeat provider %q", provider)
 	}
+	platform, _ := service.HeartbeatProviderPlatform(providerID)
 	var id int64
 	err := r.db.QueryRowContext(ctx, `
 		SELECT id
@@ -199,9 +201,11 @@ func (r *heartbeatProvisioningRepository) FindPendingAccountByProviderAndFingerp
 		  AND schedulable = FALSE
 		  AND deleted_at IS NULL
 		  AND extra ->> 'heartbeat_fp' = $2
+		  AND (extra ->> 'heartbeat_provider' = $3
+		    OR ($3 = 'ds' AND NULLIF(extra ->> 'heartbeat_provider', '') IS NULL))
 		ORDER BY id DESC
 		LIMIT 1
-	`, platform, fingerprint).Scan(&id)
+	`, platform, fingerprint, strings.ToLower(strings.TrimSpace(providerID))).Scan(&id)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}

@@ -52,7 +52,11 @@ type heartbeatProviderSpec struct {
 var heartbeatProviderRegistry = []heartbeatProviderSpec{
 	{ID: "ds", Platform: PlatformDeepSeek, Aliases: []string{"ds", "deepseek"}},
 	{ID: PlatformAnthropic, Platform: PlatformAnthropic, Aliases: []string{"anthropic", "claude"}},
-	{ID: PlatformOpenAI, Platform: PlatformOpenAI, Aliases: []string{"openai", "gpt", "sf", "siliconflow", "mimo", "groq", "perplexity"}},
+	{ID: PlatformOpenAI, Platform: PlatformOpenAI, Aliases: []string{"openai", "gpt"}},
+	{ID: "sf", Platform: PlatformOpenAI, Aliases: []string{"sf", "siliconflow"}},
+	{ID: "mimo", Platform: PlatformOpenAI, Aliases: []string{"mimo"}},
+	{ID: "groq", Platform: PlatformOpenAI, Aliases: []string{"groq"}},
+	{ID: "perplexity", Platform: PlatformOpenAI, Aliases: []string{"perplexity"}},
 	{ID: PlatformGemini, Platform: PlatformGemini, Aliases: []string{"gemini", "google"}},
 	{ID: PlatformAntigravity, Platform: PlatformAntigravity, Aliases: []string{"antigravity"}},
 	{ID: PlatformGrok, Platform: PlatformGrok, Aliases: []string{"grok", "xai"}},
@@ -64,7 +68,8 @@ var heartbeatProviderRegistry = []heartbeatProviderSpec{
 	{ID: PlatformChatAnywhere, Platform: PlatformChatAnywhere, Aliases: []string{"chatanywhere"}},
 	{ID: PlatformGLM, Platform: PlatformGLM, Aliases: []string{"glm"}},
 	{ID: PlatformModelScope, Platform: PlatformModelScope, Aliases: []string{"modelscope"}},
-	{ID: PlatformDashScope, Platform: PlatformDashScope, Aliases: []string{"dashscope", "aliyun", "qwen", "bailian_sp"}},
+	{ID: PlatformDashScope, Platform: PlatformDashScope, Aliases: []string{"dashscope", "aliyun", "qwen"}},
+	{ID: "bailian_sp", Platform: PlatformDashScope, Aliases: []string{"bailian_sp"}},
 	{ID: PlatformMiniMax, Platform: PlatformMiniMax, Aliases: []string{"minimax"}},
 	{ID: PlatformVolcengine, Platform: PlatformVolcengine, Aliases: []string{"volcengine", "ark", "doubao"}},
 }
@@ -115,6 +120,16 @@ func HeartbeatProviderPlatform(provider string) (string, bool) {
 		return "", false
 	}
 	return spec.Platform, true
+}
+
+// HeartbeatProviderID resolves an incoming provider alias to the stable ID
+// persisted in heartbeat jobs and account metadata.
+func HeartbeatProviderID(provider string) (string, bool) {
+	spec, ok := normalizeHeartbeatProvider(provider)
+	if !ok {
+		return "", false
+	}
+	return spec.ID, true
 }
 
 type HeartbeatKeyInput struct {
