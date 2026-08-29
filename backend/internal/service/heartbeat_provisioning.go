@@ -795,22 +795,6 @@ func heartbeatAccountCredentials(providerID string, credential *heartbeatVaultCr
 	return result
 }
 
-// fetchVaultKey is retained as a small compatibility wrapper for callers that
-// only need the matched key. Provisioning uses fetchVaultCredential so
-// provider-specific fields can be carried through to account creation.
-
-func (s *HeartbeatProvisioningService) fetchVaultKey(ctx context.Context, sessionKey, fingerprint string, providerIDs ...string) (string, error) {
-	providerID := "ds"
-	if len(providerIDs) > 0 && strings.TrimSpace(providerIDs[0]) != "" {
-		providerID = providerIDs[0]
-	}
-	credential, err := s.fetchVaultCredential(ctx, sessionKey, fingerprint, providerID)
-	if err != nil {
-		return "", err
-	}
-	return credential.Key, nil
-}
-
 func (s *HeartbeatProvisioningService) fetchVaultCredential(ctx context.Context, sessionKey, fingerprint, providerID string) (*heartbeatVaultCredential, error) {
 	provider, ok := normalizeHeartbeatProvider(providerID)
 	if !ok {

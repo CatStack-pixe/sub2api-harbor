@@ -44,7 +44,7 @@ func (s *AccountTestService) ValidateHeartbeatAccount(ctx context.Context, accou
 			return err
 		}
 		if result == nil || !result.IsAvailable {
-			return fmt.Errorf("Kimi balance is unavailable")
+			return fmt.Errorf("kimi balance is unavailable")
 		}
 	default:
 		return s.validateHeartbeatModels(ctx, account)
