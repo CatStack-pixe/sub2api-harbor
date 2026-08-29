@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 )
 
 // ValidateHeartbeatAccount performs the post-provision readiness check. Public
@@ -37,7 +38,7 @@ func (s *AccountTestService) ValidateHeartbeatAccount(ctx context.Context, accou
 		}
 	case PlatformKimi:
 		if account.IsCodingPlan() {
-			return s.validateHeartbeatModels(ctx, account)
+			return s.validateHeartbeatModelsWithTimeout(ctx, account)
 		}
 		result, err := s.FetchKimiBalance(ctx, accountID)
 		if err != nil {
@@ -47,9 +48,15 @@ func (s *AccountTestService) ValidateHeartbeatAccount(ctx context.Context, accou
 			return fmt.Errorf("kimi balance is unavailable")
 		}
 	default:
-		return s.validateHeartbeatModels(ctx, account)
+		return s.validateHeartbeatModelsWithTimeout(ctx, account)
 	}
 	return nil
+}
+
+func (s *AccountTestService) validateHeartbeatModelsWithTimeout(ctx context.Context, account *Account) error {
+	probeCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	return s.validateHeartbeatModels(probeCtx, account)
 }
 
 func (s *AccountTestService) validateHeartbeatModels(ctx context.Context, account *Account) error {
