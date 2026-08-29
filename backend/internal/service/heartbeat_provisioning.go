@@ -52,7 +52,7 @@ type heartbeatProviderSpec struct {
 var heartbeatProviderRegistry = []heartbeatProviderSpec{
 	{ID: "ds", Platform: PlatformDeepSeek, Aliases: []string{"ds", "deepseek"}},
 	{ID: PlatformAnthropic, Platform: PlatformAnthropic, Aliases: []string{"anthropic", "claude"}},
-	{ID: PlatformOpenAI, Platform: PlatformOpenAI, Aliases: []string{"openai", "gpt"}},
+	{ID: PlatformOpenAI, Platform: PlatformOpenAI, Aliases: []string{"openai", "gpt", "sf", "siliconflow", "mimo", "groq", "perplexity"}},
 	{ID: PlatformGemini, Platform: PlatformGemini, Aliases: []string{"gemini", "google"}},
 	{ID: PlatformAntigravity, Platform: PlatformAntigravity, Aliases: []string{"antigravity"}},
 	{ID: PlatformGrok, Platform: PlatformGrok, Aliases: []string{"grok", "xai"}},
@@ -64,7 +64,7 @@ var heartbeatProviderRegistry = []heartbeatProviderSpec{
 	{ID: PlatformChatAnywhere, Platform: PlatformChatAnywhere, Aliases: []string{"chatanywhere"}},
 	{ID: PlatformGLM, Platform: PlatformGLM, Aliases: []string{"glm"}},
 	{ID: PlatformModelScope, Platform: PlatformModelScope, Aliases: []string{"modelscope"}},
-	{ID: PlatformDashScope, Platform: PlatformDashScope, Aliases: []string{"dashscope", "aliyun", "qwen"}},
+	{ID: PlatformDashScope, Platform: PlatformDashScope, Aliases: []string{"dashscope", "aliyun", "qwen", "bailian_sp"}},
 	{ID: PlatformMiniMax, Platform: PlatformMiniMax, Aliases: []string{"minimax"}},
 	{ID: PlatformVolcengine, Platform: PlatformVolcengine, Aliases: []string{"volcengine", "ark", "doubao"}},
 }
@@ -508,11 +508,19 @@ func (s *HeartbeatProvisioningService) resolveHeartbeatTargetForProvider(ctx con
 	if !ok || s == nil || s.admin == nil {
 		return target, ok
 	}
+	if requestedGroupID != nil {
+		return target, s.heartbeatGroupAcceptsPlatform(ctx, target.GroupID, platform)
+	}
+	// Prefer a target whose concrete group platform matches the provider. This
+	// keeps omitted group_id entries intuitive when multiple platform groups are
+	// configured, while the default/shared compatible group remains a fallback.
+	for _, candidate := range cfg.Targets {
+		if s.heartbeatGroupHasPlatform(ctx, candidate.GroupID, platform) {
+			return candidate, true
+		}
+	}
 	if s.heartbeatGroupAcceptsPlatform(ctx, target.GroupID, platform) {
 		return target, true
-	}
-	if requestedGroupID != nil {
-		return config.HeartbeatProvisioningTarget{}, false
 	}
 	for _, candidate := range cfg.Targets {
 		if candidate.GroupID == target.GroupID {
@@ -528,6 +536,11 @@ func (s *HeartbeatProvisioningService) resolveHeartbeatTargetForProvider(ctx con
 func (s *HeartbeatProvisioningService) heartbeatGroupAcceptsPlatform(ctx context.Context, groupID int64, platform string) bool {
 	group, err := s.admin.GetGroup(ctx, groupID)
 	return err == nil && group != nil && group.Status == StatusActive && heartbeatAccountCanUseGroup(group.Platform, platform)
+}
+
+func (s *HeartbeatProvisioningService) heartbeatGroupHasPlatform(ctx context.Context, groupID int64, platform string) bool {
+	group, err := s.admin.GetGroup(ctx, groupID)
+	return err == nil && group != nil && group.Status == StatusActive && strings.EqualFold(strings.TrimSpace(group.Platform), strings.TrimSpace(platform))
 }
 
 func (s *HeartbeatProvisioningService) runWorker(ctx context.Context, index int) {

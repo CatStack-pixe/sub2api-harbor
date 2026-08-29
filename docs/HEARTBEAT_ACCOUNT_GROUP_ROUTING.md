@@ -10,6 +10,8 @@ Heartbeat 现在按 provider 将检查结果转换为对应账户平台，并支
 - Zhipu（`zhipu`、`bigmodel`）、ChatAnywhere、GLM、ModelScope
 - DashScope（`dashscope`、`aliyun`、`qwen`）、MiniMax、Volcengine（`volcengine`、`ark`、`doubao`）
 
+旧 Key-Checker 短名 `sf`、`siliconflow`、`mimo`、`groq`、`perplexity` 会进入 OpenAI 兼容适配器，`bailian_sp` 会进入 DashScope 适配器；这些自定义供应商应在 Vault 的 `credentials.base_url` 中提供实际端点。
+
 Heartbeat 设置页的账户组下拉框读取全部活动组，并展示组名、平台和 ID。`composite` 也是可选的目标组，它会按复合组已有路由接收具体平台账户。
 
 上报请求中的 `provider` 会先规范化为稳定 ID，再写入任务表的 `provider` 列。历史任务没有 provider 时按 `ds` 兼容处理。相同 `(provider, fingerprint)` 仍保持幂等。
@@ -19,7 +21,7 @@ Heartbeat 设置页的账户组下拉框读取全部活动组，并展示组名�
 账户组和代理组是独立维度。目标组支持两种配置方式：
 
 1. 在 key 条目中传 `group_id`，明确指定该条目的账户组。
-2. 省略 `group_id`，先使用 `default_group_id`；若默认组与原生平台不兼容，则从 `targets` 中自动寻找第一个兼容目标组。
+2. 省略 `group_id`，优先从 `targets` 中寻找同平台组，再使用兼容的 `default_group_id` 或其他目标组。
 
 兼容关系遵循网关现有路由矩阵：
 
