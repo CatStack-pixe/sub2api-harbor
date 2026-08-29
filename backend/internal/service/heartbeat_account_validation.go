@@ -16,6 +16,9 @@ func (s *AccountTestService) ValidateHeartbeatAccount(ctx context.Context, accou
 	if s == nil || s.accountRepo == nil {
 		return fmt.Errorf("heartbeat account validation is not configured")
 	}
+	probeCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	ctx = probeCtx
 	account, err := s.accountRepo.GetByID(ctx, accountID)
 	if err != nil {
 		return err
