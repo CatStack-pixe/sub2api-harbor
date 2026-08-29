@@ -3333,8 +3333,8 @@ func (c *Config) Validate() error {
 		}
 		seenGroups := make(map[int64]struct{}, len(targets))
 		for _, target := range targets {
-			if target.GroupID <= 0 || target.ProxyGroupID <= 0 {
-				return fmt.Errorf("heartbeat_provisioning targets must contain positive group_id and proxy_group_id")
+			if target.GroupID <= 0 || target.ProxyGroupID < 0 {
+				return fmt.Errorf("heartbeat_provisioning targets must contain a positive group_id and a non-negative proxy_group_id")
 			}
 			if _, exists := seenGroups[target.GroupID]; exists {
 				return fmt.Errorf("heartbeat_provisioning targets contain duplicate group_id")

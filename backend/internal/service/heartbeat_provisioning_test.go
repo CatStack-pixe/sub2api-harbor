@@ -69,6 +69,19 @@ func TestResolveHeartbeatTargetUsesDefaultWhenGroupIsOmitted(t *testing.T) {
 	require.False(t, ok)
 }
 
+func TestResolveHeartbeatJobTargetAllowsUngroupedProxyPool(t *testing.T) {
+	cfg := config.HeartbeatProvisioningConfig{
+		DefaultGroupID: 12,
+		Targets: []config.HeartbeatProvisioningTarget{
+			{GroupID: 12, ProxyGroupID: 0},
+		},
+	}
+
+	target, ok := resolveHeartbeatJobTarget(cfg, &HeartbeatProvisioningJob{TargetGroupID: 12})
+	require.True(t, ok)
+	require.Equal(t, config.HeartbeatProvisioningTarget{GroupID: 12, ProxyGroupID: 0}, target)
+}
+
 func TestValidateHeartbeatRuntimeConfigRequiresDefaultMapping(t *testing.T) {
 	cfg := config.HeartbeatProvisioningConfig{
 		DefaultGroupID:       12,
@@ -82,4 +95,19 @@ func TestValidateHeartbeatRuntimeConfigRequiresDefaultMapping(t *testing.T) {
 		MaxAttempts:          1,
 	}
 	require.ErrorContains(t, validateHeartbeatRuntimeConfig(cfg), "default_group_id")
+}
+
+func TestValidateHeartbeatRuntimeConfigAcceptsUngroupedProxyPool(t *testing.T) {
+	cfg := config.HeartbeatProvisioningConfig{
+		DefaultGroupID:       12,
+		AllowedSourceIPs:     []string{"192.0.2.10"},
+		Targets:              []config.HeartbeatProvisioningTarget{{GroupID: 12, ProxyGroupID: 0}},
+		WorkerCount:          1,
+		ProxyProbeWorkers:    1,
+		ProxyProbeSampleSize: 1,
+		ProxyProbeTimeoutS:   1,
+		ProxySweepTTLSecond:  1,
+		MaxAttempts:          1,
+	}
+	require.NoError(t, validateHeartbeatRuntimeConfig(cfg))
 }

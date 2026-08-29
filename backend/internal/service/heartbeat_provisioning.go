@@ -545,8 +545,14 @@ func (s *HeartbeatProvisioningService) selectProxy(ctx context.Context, proxyGro
 	}
 	proxies := make([]Proxy, 0)
 	for page := 1; ; page++ {
-		groupID := proxyGroupID
-		batch, total, err := s.admin.ListProxies(ctx, page, 500, ProxyListFilters{Status: StatusActive, ProxyGroupID: &groupID}, "id", "asc")
+		filters := ProxyListFilters{Status: StatusActive}
+		if proxyGroupID > 0 {
+			groupID := proxyGroupID
+			filters.ProxyGroupID = &groupID
+		} else {
+			filters.Ungrouped = true
+		}
+		batch, total, err := s.admin.ListProxies(ctx, page, 500, filters, "id", "asc")
 		if err != nil {
 			return 0, err
 		}
@@ -684,6 +690,12 @@ func (s *HeartbeatProvisioningService) Options(ctx context.Context) (*HeartbeatP
 		}
 		for _, proxy := range proxies {
 			if proxy.ProxyGroupID == nil {
+				option := proxyGroups[0]
+				if option == nil {
+					option = &HeartbeatProxyGroupOption{ID: 0, Name: "Unassigned proxies"}
+					proxyGroups[0] = option
+				}
+				option.ActiveProxyCount++
 				continue
 			}
 			option := proxyGroups[*proxy.ProxyGroupID]
@@ -778,13 +790,19 @@ func (s *HeartbeatProvisioningService) prepareConfig(ctx context.Context, reques
 		if group == nil || group.Status != StatusActive || group.Platform != PlatformDeepSeek {
 			return nil, fmt.Errorf("heartbeat target group %d must be active and use the deepseek platform", target.GroupID)
 		}
-		proxyGroupID := target.ProxyGroupID
-		_, proxyTotal, err := s.admin.ListProxies(preflightCtx, 1, 1, ProxyListFilters{Status: StatusActive, ProxyGroupID: &proxyGroupID}, "id", "asc")
+		proxyFilters := ProxyListFilters{Status: StatusActive}
+		if target.ProxyGroupID > 0 {
+			proxyGroupID := target.ProxyGroupID
+			proxyFilters.ProxyGroupID = &proxyGroupID
+		} else {
+			proxyFilters.Ungrouped = true
+		}
+		_, proxyTotal, err := s.admin.ListProxies(preflightCtx, 1, 1, proxyFilters, "id", "asc")
 		if err != nil {
-			return nil, fmt.Errorf("load heartbeat proxy group %d: %w", target.ProxyGroupID, err)
+			return nil, fmt.Errorf("load heartbeat proxy pool %d: %w", target.ProxyGroupID, err)
 		}
 		if proxyTotal == 0 {
-			return nil, fmt.Errorf("heartbeat proxy group %d has no active proxies", target.ProxyGroupID)
+			return nil, fmt.Errorf("heartbeat proxy pool %d has no active proxies", target.ProxyGroupID)
 		}
 	}
 	return prepared, nil
@@ -831,8 +849,16 @@ func resolveHeartbeatTarget(cfg config.HeartbeatProvisioningConfig, groupID *int
 }
 
 func resolveHeartbeatJobTarget(cfg config.HeartbeatProvisioningConfig, job *HeartbeatProvisioningJob) (config.HeartbeatProvisioningTarget, bool) {
-	if job.TargetGroupID > 0 && job.TargetProxyGroupID > 0 {
-		return config.HeartbeatProvisioningTarget{GroupID: job.TargetGroupID, ProxyGroupID: job.TargetProxyGroupID}, true
+	if job.TargetGroupID > 0 {
+		if job.TargetProxyGroupID > 0 {
+			return config.HeartbeatProvisioningTarget{GroupID: job.TargetGroupID, ProxyGroupID: job.TargetProxyGroupID}, true
+		}
+		// A zero proxy group is a valid ungrouped-pool target, but older jobs
+		// may have omitted the target fields entirely. Resolve through current
+		// configuration so those jobs still use the configured proxy policy.
+		if target, ok := resolveHeartbeatTarget(cfg, &job.TargetGroupID); ok {
+			return target, true
+		}
 	}
 	return resolveHeartbeatTarget(cfg, nil)
 }
@@ -893,8 +919,8 @@ func validateHeartbeatRuntimeConfig(cfg config.HeartbeatProvisioningConfig) erro
 	seenGroups := make(map[int64]struct{}, len(cfg.Targets))
 	hasDefault := false
 	for _, target := range cfg.Targets {
-		if target.GroupID <= 0 || target.ProxyGroupID <= 0 {
-			return errors.New("heartbeat targets must contain positive group_id and proxy_group_id")
+		if target.GroupID <= 0 || target.ProxyGroupID < 0 {
+			return errors.New("heartbeat targets must contain a positive group_id and a non-negative proxy_group_id")
 		}
 		if _, exists := seenGroups[target.GroupID]; exists {
 			return errors.New("heartbeat targets contain duplicate group_id")

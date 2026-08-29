@@ -818,17 +818,20 @@ func (s *SchedulerSnapshotService) rebuildByAccount(ctx context.Context, account
 		return nil
 	}
 	groupIDs = s.normalizeGroupIDs(groupIDs)
-	if len(groupIDs) == 0 {
-		return nil
-	}
-
 	buckets := s.bucketsForPlatform(account.Platform, groupIDs, seen)
+	// Group removal changes the ungrouped account pool as well as the old
+	// account-group buckets. Rebuild it immediately instead of waiting for the
+	// periodic full snapshot refresh.
+	buckets = append(buckets, s.bucketsForPlatform(account.Platform, []int64{0}, seen)...)
 	if account.Platform == PlatformTokenRhythm {
 		buckets = append(buckets, s.bucketsForPlatform(PlatformDeepSeek, groupIDs, seen)...)
+		buckets = append(buckets, s.bucketsForPlatform(PlatformDeepSeek, []int64{0}, seen)...)
 	}
 	if account.Platform == PlatformAntigravity && account.IsMixedSchedulingEnabled() {
 		buckets = append(buckets, s.bucketsForPlatform(PlatformAnthropic, groupIDs, seen)...)
 		buckets = append(buckets, s.bucketsForPlatform(PlatformGemini, groupIDs, seen)...)
+		buckets = append(buckets, s.bucketsForPlatform(PlatformAnthropic, []int64{0}, seen)...)
+		buckets = append(buckets, s.bucketsForPlatform(PlatformGemini, []int64{0}, seen)...)
 	}
 	return s.rebuildBuckets(ctx, buckets, reason)
 }
