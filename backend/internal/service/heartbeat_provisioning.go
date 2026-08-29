@@ -585,9 +585,11 @@ func (s *HeartbeatProvisioningService) provision(ctx context.Context, job *Heart
 		return errors.New("nil heartbeat job")
 	}
 	provider, ok := normalizeHeartbeatProvider(job.Provider)
-	if !ok {
+	if strings.TrimSpace(job.Provider) == "" {
 		// Jobs written before provider became explicit were all DeepSeek jobs.
 		provider, _ = normalizeHeartbeatProvider("ds")
+	} else if !ok {
+		return fmt.Errorf("unsupported heartbeat provider %q", job.Provider)
 	}
 	cfg := s.configSnapshot()
 	target, ok := resolveHeartbeatJobTarget(cfg, job)

@@ -42,7 +42,7 @@ Vault 响应中的 key 项至少包含以下字段：
 }
 ```
 
-`credentials` 是可选扩展。worker 只合并白名单字段：`base_url`、`api_protocol`、`account_mode`、`tokenrhythm_cookie`、`tr_session`、`tr_csrf`、`user_agent`、`header_overrides`。TokenRhythm 需要 `tr_session` 和 `tr_csrf`（或完整 `tokenrhythm_cookie`）；未提供时该条目会按凭据校验失败处理。
+`credentials` 是可选扩展。worker 只合并白名单字段：`base_url`、`api_protocol`、`account_mode`、`tokenrhythm_cookie`、`tr_session`、`tr_csrf`、`user_agent`、`header_overrides`。TokenRhythm 需要 `tr_session` 和 `tr_csrf`（或完整 `tokenrhythm_cookie`）；Antigravity API key 需要兼容网关的 `base_url`（路径以 `/antigravity` 结尾）。缺少这些平台专属字段时，该条目会按凭据校验失败处理。
 
 创建账户后，DeepSeek 使用余额接口检查可用性；Kimi 的付费账户使用余额接口，Coding Plan 和其余 API-key 平台使用带认证的 `/models` 探测。没有公开 `/models` 的平台在返回 404/405 时保留账户，后续网关请求继续完成认证。
 
