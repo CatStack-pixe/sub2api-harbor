@@ -53,6 +53,10 @@ var heartbeatProviderRegistry = []heartbeatProviderSpec{
 	{ID: "ds", Platform: PlatformDeepSeek, Aliases: []string{"ds", "deepseek"}},
 	{ID: PlatformAnthropic, Platform: PlatformAnthropic, Aliases: []string{"anthropic", "claude"}},
 	{ID: PlatformOpenAI, Platform: PlatformOpenAI, Aliases: []string{"openai", "gpt"}},
+	// These external checker IDs use the OpenAI-compatible account runtime while
+	// remaining distinct wire IDs for Vault matching and job persistence.
+	{ID: "toapis", Platform: PlatformOpenAI, Aliases: []string{"toapis"}},
+	{ID: "kling", Platform: PlatformOpenAI, Aliases: []string{"kling"}},
 	{ID: "sf", Platform: PlatformOpenAI, Aliases: []string{"sf", "siliconflow"}},
 	{ID: "mimo", Platform: PlatformOpenAI, Aliases: []string{"mimo"}},
 	{ID: "groq", Platform: PlatformOpenAI, Aliases: []string{"groq"}},

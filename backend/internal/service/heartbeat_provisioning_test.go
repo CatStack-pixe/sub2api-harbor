@@ -19,7 +19,7 @@ func TestHeartbeatFingerprintValidation(t *testing.T) {
 }
 
 func TestHeartbeatProviderRegistryCoversConfiguredPlatforms(t *testing.T) {
-	for _, raw := range []string{"ds", "deepseek", "glm", "zhipu", "kimi", "openai", "anthropic", "gemini", "grok", "nvidia", "tokenrhythm", "modelscope", "dashscope", "minimax", "volcengine", "chatanywhere", "agnes", "antigravity", "sf", "siliconflow", "mimo", "groq", "perplexity", "bailian_sp"} {
+	for _, raw := range []string{"ds", "deepseek", "glm", "zhipu", "kimi", "openai", "toapis", "kling", "anthropic", "gemini", "grok", "nvidia", "tokenrhythm", "modelscope", "dashscope", "minimax", "volcengine", "chatanywhere", "agnes", "antigravity", "sf", "siliconflow", "mimo", "groq", "perplexity", "bailian_sp"} {
 		spec, ok := normalizeHeartbeatProvider(raw)
 		require.Truef(t, ok, "provider %q should be registered", raw)
 		require.NotEmpty(t, spec.ID)
@@ -30,6 +30,37 @@ func TestHeartbeatProviderRegistryCoversConfiguredPlatforms(t *testing.T) {
 	require.True(t, ok)
 	require.Equal(t, "ds", spec.ID)
 	require.Equal(t, PlatformDeepSeek, spec.Platform)
+}
+
+func TestHeartbeatOpenAICompatibleProviderAliases(t *testing.T) {
+	for _, tt := range []struct {
+		raw string
+		id  string
+	}{
+		{raw: "toapis", id: "toapis"},
+		{raw: "kling", id: "kling"},
+	} {
+		t.Run(tt.raw, func(t *testing.T) {
+			spec, ok := normalizeHeartbeatProvider(tt.raw)
+			require.True(t, ok)
+			require.Equal(t, tt.id, spec.ID)
+			require.Equal(t, PlatformOpenAI, spec.Platform)
+
+			platform, ok := HeartbeatProviderPlatform(tt.raw)
+			require.True(t, ok)
+			require.Equal(t, PlatformOpenAI, platform)
+			providerID, ok := HeartbeatProviderID(tt.raw)
+			require.True(t, ok)
+			require.Equal(t, tt.id, providerID)
+		})
+	}
+}
+
+func TestHeartbeatProviderRegistryRejectsUnknownProvider(t *testing.T) {
+	_, ok := normalizeHeartbeatProvider("toapis-unknown")
+	require.False(t, ok)
+	_, ok = HeartbeatProviderPlatform("kling-unknown")
+	require.False(t, ok)
 }
 
 func TestHeartbeatProviderAliasesCanonicalizeToAccountPlatform(t *testing.T) {

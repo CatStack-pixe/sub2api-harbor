@@ -6,11 +6,14 @@ Heartbeat 现在按 provider 将检查结果转换为对应账户平台，并支
 
 - DeepSeek（`ds`、`deepseek`）
 - Anthropic、OpenAI、Gemini、Antigravity、Grok、Agnes、NVIDIA
+- OpenAI-compatible checker IDs：`toapis`、`kling`（保持独立的 wire provider ID，账户运行时映射到 OpenAI）
 - TokenRhythm（`tokenrhythm`、`tr`）、Kimi（`kimi`、`moonshot`）
 - Zhipu（`zhipu`、`bigmodel`）、ChatAnywhere、GLM、ModelScope
 - DashScope（`dashscope`、`aliyun`、`qwen`）、MiniMax、Volcengine（`volcengine`、`ark`、`doubao`）
 
 旧 Key-Checker 短名 `sf`、`siliconflow`、`mimo`、`groq`、`perplexity` 会进入 OpenAI 兼容适配器，`bailian_sp` 会进入 DashScope 适配器；这些自定义供应商应在 Vault 的 `credentials.base_url` 中提供实际端点。
+
+`toapis` 和 `kling` 也是 OpenAI-compatible provider；Heartbeat 和 Vault 在第二次握手继续使用各自的稳定 ID。只有来源没有专用 provider ID、且上游确实遵循 OpenAI-compatible 协议时，才使用 `openai` 作为泛化回退，并在 Vault 的 `credentials.base_url` 提供实际端点；未知供应商保持校验失败，不进入 `ds` 路由。
 
 Heartbeat 设置页的账户组下拉框读取全部活动组，并展示组名、平台和 ID。`composite` 也是可选的目标组，它会按复合组已有路由接收具体平台账户。
 
@@ -45,6 +48,21 @@ Vault 响应中的 key 项至少包含以下字段：
 ```
 
 `credentials` 是可选扩展。worker 只合并白名单字段：`base_url`、`api_protocol`、`account_mode`、`tokenrhythm_cookie`、`tr_session`、`tr_csrf`、`user_agent`、`header_overrides`。TokenRhythm 需要 `tr_session` 和 `tr_csrf`（或完整 `tokenrhythm_cookie`）；Antigravity API key 需要兼容网关的 `base_url`（路径以 `/antigravity` 结尾）。缺少这些平台专属字段时，该条目会按凭据校验失败处理。
+
+OpenAI-compatible provider 的 Vault 条目示例：
+
+```json
+{
+  "key": "完整 API key",
+  "provider": "toapis",
+  "credentials": {
+    "base_url": "https://upstream.example/v1",
+    "api_protocol": "openai"
+  }
+}
+```
+
+将 `provider` 改为 `kling` 时仍使用同样的 OpenAI-compatible 凭据结构；`openai` 只用于没有专用 provider ID 的通用上游。Heartbeat 请求中的 `provider`、Vault 返回的 `provider` 和任务持久化 ID 必须一致，才能通过 fingerprint 匹配。
 
 创建账户后，DeepSeek 使用余额接口检查可用性；Kimi 的付费账户使用余额接口，Coding Plan 和其余 API-key 平台使用带认证的 `/models` 探测。没有公开 `/models` 的平台在返回 404/405 时保留账户，后续网关请求继续完成认证。
 
