@@ -874,6 +874,60 @@ func TestStreamRawChatCompletions_KeepaliveDuringUpstreamSilence(t *testing.T) {
 	}
 }
 
+func TestStreamRawChatCompletions_FirstOutputTimeoutReturnsFailover(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
+
+	pr, pw := io.Pipe()
+	resp := &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     http.Header{"Content-Type": []string{"text/event-stream"}, "x-request-id": []string{"rid_raw_first_timeout"}},
+		Body:       pr,
+	}
+	svc := &OpenAIGatewayService{cfg: rawChatCompletionsTestConfig()}
+	svc.cfg.Gateway.OpenAIRawChatFirstOutputTimeoutSeconds = 1
+
+	result, err := svc.streamRawChatCompletions(c, resp, rawChatCompletionsTestAccount(), "gpt-5.4", "gpt-5.4", "gpt-5.4", nil, nil, time.Now(), 0)
+	_ = pw.Close()
+
+	require.Nil(t, result)
+	var failoverErr *UpstreamFailoverError
+	require.ErrorAs(t, err, &failoverErr)
+	require.Equal(t, http.StatusGatewayTimeout, failoverErr.StatusCode)
+	require.Contains(t, string(failoverErr.ResponseBody), "first_output_timeout")
+	require.False(t, c.Writer.Written())
+}
+
+func TestStreamRawChatCompletions_DataIntervalTimeoutAfterOutputEmitsError(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
+
+	pr, pw := io.Pipe()
+	resp := &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     http.Header{"Content-Type": []string{"text/event-stream"}, "x-request-id": []string{"rid_raw_interval_timeout"}},
+		Body:       pr,
+	}
+	svc := &OpenAIGatewayService{cfg: rawChatCompletionsTestConfig()}
+	svc.cfg.Gateway.StreamDataIntervalTimeout = 1
+	go func() {
+		_, _ = pw.Write([]byte("data: {\"id\":\"chatcmpl_interval\",\"object\":\"chat.completion.chunk\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"ok\"}}]}\n\n"))
+	}()
+
+	result, err := svc.streamRawChatCompletions(c, resp, rawChatCompletionsTestAccount(), "gpt-5.4", "gpt-5.4", "gpt-5.4", nil, nil, time.Now(), 0)
+	_ = pw.Close()
+
+	require.NotNil(t, result)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "stream data interval timeout")
+	require.Contains(t, rec.Body.String(), "upstream_stream_timeout")
+	require.Contains(t, rec.Body.String(), "data: [DONE]")
+}
+
 func TestForwardAsRawChatCompletions_UpstreamRequestIgnoresClientCancel(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 

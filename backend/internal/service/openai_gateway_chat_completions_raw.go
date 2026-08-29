@@ -259,6 +259,16 @@ func (s *OpenAIGatewayService) rawChatCompletionsURL(account *Account) (string, 
 	return s.openAIChatCompletionsTargetURL(account)
 }
 
+// rawChatFirstOutputTimeout returns the optional watchdog for native Chat
+// Completions streams. It is intentionally separate from the Responses
+// first-output setting so existing OpenAI Responses behavior is unchanged.
+func (s *OpenAIGatewayService) rawChatFirstOutputTimeout() time.Duration {
+	if s == nil || s.cfg == nil || s.cfg.Gateway.OpenAIRawChatFirstOutputTimeoutSeconds <= 0 {
+		return 0
+	}
+	return time.Duration(s.cfg.Gateway.OpenAIRawChatFirstOutputTimeoutSeconds) * time.Second
+}
+
 // streamRawChatCompletions 透传上游 CC SSE 流到客户端，并提取 usage（包括
 // 末尾 [DONE] 之前的 chunk 中的 usage 字段，按 OpenAI CC 协议）。
 //
@@ -369,75 +379,162 @@ func (s *OpenAIGatewayService) streamRawChatCompletions(
 		}
 	}
 
-	var streamErr error
-	if keepaliveOwner == nil {
+	// Scanner reads block on the upstream body. Always move it to a worker so
+	// stream idle/first-output watchdogs can fire even when the upstream is
+	// silent. Closing resp.Body on return unblocks the worker and prevents a
+	// client disconnect from leaving an orphaned read goroutine.
+	type scanEvent struct {
+		line string
+		err  error
+	}
+	events := make(chan scanEvent, 16)
+	drainDone := make(chan struct{})
+	sendEvent := func(event scanEvent) bool {
+		select {
+		case events <- event:
+			return true
+		case <-drainDone:
+			return false
+		}
+	}
+	go func() {
+		defer close(events)
 		for scanner.Scan() {
-			processLine(scanner.Text())
-			if sawDone {
-				break
+			if !sendEvent(scanEvent{line: scanner.Text()}) {
+				return
 			}
 		}
-		streamErr = scanner.Err()
-	} else {
-		// Scanner reads block on the upstream body. Move it to a worker so the
-		// same goroutine can serialize keepalive and downstream SSE writes.
-		type scanEvent struct {
-			line string
-			err  error
+		if err := scanner.Err(); err != nil {
+			_ = sendEvent(scanEvent{err: err})
 		}
-		events := make(chan scanEvent, 16)
-		drainDone := make(chan struct{})
-		sendEvent := func(event scanEvent) bool {
-			select {
-			case events <- event:
-				return true
-			case <-drainDone:
-				return false
-			}
-		}
-		go func() {
-			defer close(events)
-			for scanner.Scan() {
-				if !sendEvent(scanEvent{line: scanner.Text()}) {
-					return
-				}
-			}
-			if err := scanner.Err(); err != nil {
-				_ = sendEvent(scanEvent{err: err})
-			}
-		}()
-		defer close(drainDone)
+	}()
+	defer func() {
+		close(drainDone)
+		_ = resp.Body.Close()
+	}()
 
-		ticker := time.NewTicker(keepaliveInterval)
-		defer ticker.Stop()
+	streamInterval := time.Duration(0)
+	if s.cfg != nil && s.cfg.Gateway.StreamDataIntervalTimeout > 0 {
+		streamInterval = time.Duration(s.cfg.Gateway.StreamDataIntervalTimeout) * time.Second
+	}
+	var intervalTicker *time.Ticker
+	if streamInterval > 0 {
+		intervalTicker = time.NewTicker(streamInterval)
+		defer intervalTicker.Stop()
+	}
+	var intervalCh <-chan time.Time
+	if intervalTicker != nil {
+		intervalCh = intervalTicker.C
+	}
+
+	firstOutputTimeout := s.rawChatFirstOutputTimeout()
+	var firstOutputTimer *time.Timer
+	if firstOutputTimeout > 0 {
+		remaining := startTime.Add(firstOutputTimeout).Sub(time.Now())
+		if remaining <= 0 {
+			remaining = time.Nanosecond
+		}
+		firstOutputTimer = time.NewTimer(remaining)
+		defer firstOutputTimer.Stop()
+	}
+	var firstOutputCh <-chan time.Time
+	if firstOutputTimer != nil {
+		firstOutputCh = firstOutputTimer.C
+	}
+
+	// A canceled client must not cancel the detached upstream request. Mark the
+	// client as disconnected and continue collecting usage, subject to the same
+	// stream idle watchdog used for connected clients.
+	var clientDone <-chan struct{}
+	requestCtx := context.Background()
+	if c != nil && c.Request != nil {
+		requestCtx = c.Request.Context()
+		clientDone = c.Request.Context().Done()
+	}
+	var keepaliveTicker *time.Ticker
+	if keepaliveOwner != nil && keepaliveInterval > 0 {
+		keepaliveTicker = time.NewTicker(keepaliveInterval)
+		defer keepaliveTicker.Stop()
+	}
+	var keepaliveCh <-chan time.Time
+	if keepaliveTicker != nil {
+		keepaliveCh = keepaliveTicker.C
+	}
+
+	lastUpstreamAt := time.Now()
+	var streamErr error
 	streamLoop:
-		for {
-			select {
-			case event, ok := <-events:
-				if !ok {
-					returnStreamErr := scanner.Err()
-					streamErr = returnStreamErr
-					break streamLoop
-				}
-				if event.err != nil {
-					streamErr = event.err
-					break streamLoop
-				}
-				processLine(event.line)
-				if sawDone {
-					break streamLoop
-				}
-			case <-ticker.C:
-				if clientDisconnected || (c.Request != nil && c.Request.Context().Err() != nil) {
-					clientDisconnected = true
-					continue
-				}
-				if !keepaliveOwner.beat() {
-					clientDisconnected = true
-					logger.L().Debug("openai chat_completions raw: client disconnected during keepalive, continuing to drain upstream for billing",
-						zap.String("request_id", requestID),
-					)
-				}
+	for {
+		select {
+		case event, ok := <-events:
+			if !ok {
+				streamErr = scanner.Err()
+				break streamLoop
+			}
+			if event.err != nil {
+				streamErr = event.err
+				break streamLoop
+			}
+			lastUpstreamAt = time.Now()
+			processLine(event.line)
+			if firstOutputTimer != nil && firstTokenMs != nil {
+				firstOutputTimer.Stop()
+				firstOutputTimer = nil
+				firstOutputCh = nil
+			}
+			if sawDone {
+				break streamLoop
+			}
+		case <-clientDone:
+			clientDisconnected = true
+			clientDone = nil
+			logger.L().Debug("openai chat_completions raw: client request canceled, continuing to drain upstream for billing",
+				zap.String("request_id", requestID),
+			)
+		case <-firstOutputCh:
+			if firstTokenMs != nil || sawDone {
+				continue
+			}
+			if clientDisconnected {
+				streamErr = fmt.Errorf("stream usage incomplete after first output timeout")
+				break streamLoop
+			}
+			streamErr = s.newOpenAIFirstOutputTimeoutError(
+				requestCtx, c, account, startTime, originalModel, "", firstOutputTimeout, "raw_chat_first_output", resp.Header,
+			)
+			break streamLoop
+		case <-intervalCh:
+			if time.Since(lastUpstreamAt) < streamInterval {
+				continue
+			}
+			if clientDisconnected {
+				streamErr = fmt.Errorf("stream usage incomplete after timeout")
+				break streamLoop
+			}
+			if !clientOutputStarted {
+				streamErr = s.newOpenAIFirstOutputTimeoutError(
+					requestCtx, c, account, startTime, originalModel, "", streamInterval, "raw_chat_stream_interval", resp.Header,
+				)
+				break streamLoop
+			}
+			if s.rateLimitService != nil {
+				s.rateLimitService.HandleStreamTimeout(requestCtx, account, upstreamModel)
+			}
+			logger.L().Warn("openai chat_completions raw: stream data interval timeout",
+				zap.String("request_id", requestID),
+				zap.Duration("interval", streamInterval),
+			)
+			streamErr = fmt.Errorf("stream data interval timeout")
+			break streamLoop
+		case <-keepaliveCh:
+			if clientDisconnected {
+				continue
+			}
+			if !keepaliveOwner.beat() {
+				clientDisconnected = true
+				logger.L().Debug("openai chat_completions raw: client disconnected during keepalive, continuing to drain upstream for billing",
+					zap.String("request_id", requestID),
+				)
 			}
 		}
 	}
@@ -466,6 +563,15 @@ func (s *OpenAIGatewayService) streamRawChatCompletions(
 		}
 	}
 	requestCanceled := c != nil && c.Request != nil && c.Request.Context().Err() != nil
+	var streamFailoverErr *UpstreamFailoverError
+	if streamErr != nil && errors.As(streamErr, &streamFailoverErr) {
+		// A watchdog firing before any client bytes were committed is safe to
+		// retry on another account. Do not manufacture a billable result.
+		if clientDisconnected || requestCanceled {
+			return resultWithUsage(), fmt.Errorf("stream usage incomplete after disconnect: %w", streamErr)
+		}
+		return nil, streamFailoverErr
+	}
 
 	// A client write failure must never be attributed to the selected proxy.
 	// Keep draining the upstream above so usage accounting remains complete.
@@ -483,6 +589,16 @@ func (s *OpenAIGatewayService) streamRawChatCompletions(
 	if streamErr != nil {
 		if errors.Is(streamErr, context.Canceled) || errors.Is(streamErr, context.DeadlineExceeded) {
 			return resultWithUsage(), fmt.Errorf("stream usage incomplete: %w", streamErr)
+		}
+		if strings.Contains(streamErr.Error(), "stream data interval timeout") {
+			if clientOutputStarted && !clientDisconnected {
+				writeStreamHeaders()
+				if _, werr := c.Writer.WriteString(buildChatStreamErrorSSE("upstream_stream_timeout", "Upstream stream data interval timeout")); werr == nil {
+					_, _ = c.Writer.WriteString("data: [DONE]\n\n")
+					c.Writer.Flush()
+				}
+			}
+			return resultWithUsage(), streamErr
 		}
 		if !clientOutputStarted {
 			s.recordOpenAIProxyStreamDisconnect(account, streamErr, requestID)

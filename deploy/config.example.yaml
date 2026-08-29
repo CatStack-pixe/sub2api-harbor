@@ -226,6 +226,9 @@ gateway:
   openai_first_output_timeout_seconds: 0
   # Optional high/xhigh/max override (seconds, 0=use the standard timeout)
   openai_high_effort_first_output_timeout_seconds: 0
+  # Native Chat Completions first semantic output timeout (seconds, 0=disabled)
+  # Applies to raw OpenAI-compatible SSE forwarding (including GLM-compatible endpoints).
+  openai_raw_chat_first_output_timeout_seconds: 0
   # Max request body size in bytes (default: 256MB)
   # 请求体最大字节数（默认 256MB）
   max_body_size: 268435456

@@ -181,9 +181,24 @@ func (s *OpenAIGatewayService) sendCCUpstreamRequest(
 	grokCacheIdentity string,
 ) (*http.Response, error) {
 	upstreamCtx, releaseUpstreamCtx := detachUpstreamContext(ctx)
+	// detachUpstreamContext intentionally ignores client cancellation so a
+	// streaming request can finish usage accounting. Preserve an explicit
+	// deadline supplied by a watchdog, however; otherwise a child timeout would
+	// be silently discarded before net/http sees it.
+	var deadlineCancel context.CancelFunc
+	if ctx != nil {
+		if deadline, ok := ctx.Deadline(); ok {
+			var deadlineCtx context.Context
+			deadlineCtx, deadlineCancel = context.WithDeadline(upstreamCtx, deadline)
+			upstreamCtx = deadlineCtx
+		}
+	}
 	upstreamReq, err := http.NewRequestWithContext(upstreamCtx, http.MethodPost, targetURL, bytes.NewReader(body))
 	releaseUpstreamCtx()
 	if err != nil {
+		if deadlineCancel != nil {
+			deadlineCancel()
+		}
 		return nil, fmt.Errorf("build upstream request: %w", err)
 	}
 	// 记录本次实际选择的协议端点，供错误日志和用量日志在没有
@@ -228,10 +243,20 @@ func (s *OpenAIGatewayService) sendCCUpstreamRequest(
 	}
 	resp, err := s.doOpenAIUpstream(upstreamReq, proxyURL, account)
 	if err != nil {
+		if deadlineCancel != nil {
+			deadlineCancel()
+		}
 		if stream && IsOpenAINvidiaResponsesStreamBeforeBusinessOutput(c) {
 			return nil, s.handleOpenAINvidiaResponsesTransportError(c, account, err)
 		}
 		return nil, s.handleOpenAIUpstreamTransportError(ctx, c, account, err, false)
+	}
+	if deadlineCancel != nil {
+		if resp != nil && resp.Body != nil {
+			resp.Body = &openAIRequestContextReadCloser{ReadCloser: resp.Body, cleanup: deadlineCancel}
+		} else {
+			deadlineCancel()
+		}
 	}
 	return resp, nil
 }

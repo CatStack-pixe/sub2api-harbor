@@ -687,6 +687,23 @@ func TestLoadOpenAIResponseHeaderTimeoutFromEnv(t *testing.T) {
 	require.Equal(t, 1800, cfg.Gateway.OpenAIResponseHeaderTimeout)
 }
 
+func TestLoadDefaultOpenAIRawChatFirstOutputTimeoutDisabled(t *testing.T) {
+	resetViperWithJWTSecret(t)
+
+	cfg, err := Load()
+	require.NoError(t, err)
+	require.Equal(t, 0, cfg.Gateway.OpenAIRawChatFirstOutputTimeoutSeconds)
+}
+
+func TestLoadOpenAIRawChatFirstOutputTimeoutFromEnv(t *testing.T) {
+	resetViperWithJWTSecret(t)
+	t.Setenv("GATEWAY_OPENAI_RAW_CHAT_FIRST_OUTPUT_TIMEOUT_SECONDS", "45")
+
+	cfg, err := Load()
+	require.NoError(t, err)
+	require.Equal(t, 45, cfg.Gateway.OpenAIRawChatFirstOutputTimeoutSeconds)
+}
+
 func TestLoadImageNonstreamKeepaliveFromEnv(t *testing.T) {
 	resetViperWithJWTSecret(t)
 	t.Setenv("GATEWAY_IMAGE_NONSTREAM_KEEPALIVE_INTERVAL", "15")
@@ -1870,6 +1887,11 @@ func TestValidateConfigErrors(t *testing.T) {
 			name:    "gateway openai high effort first output timeout too large",
 			mutate:  func(c *Config) { c.Gateway.OpenAIHighEffortFirstOutputTimeoutSeconds = 1801 },
 			wantErr: "gateway.openai_high_effort_first_output_timeout_seconds",
+		},
+		{
+			name:    "gateway openai raw chat first output timeout below minimum",
+			mutate:  func(c *Config) { c.Gateway.OpenAIRawChatFirstOutputTimeoutSeconds = 29 },
+			wantErr: "gateway.openai_raw_chat_first_output_timeout_seconds",
 		},
 		{
 			name:    "gateway max idle conns",
