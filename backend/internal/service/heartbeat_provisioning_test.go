@@ -119,6 +119,55 @@ func TestSampleHeartbeatProxiesKeepsUniqueMembers(t *testing.T) {
 	}
 }
 
+func TestChooseHeartbeatProxyForAttemptRotatesAfterFailure(t *testing.T) {
+	candidates := []int64{10, 20, 30}
+
+	first, err := chooseHeartbeatProxyForAttempt(candidates, nil, 1)
+	require.NoError(t, err)
+	require.Equal(t, int64(10), first)
+
+	second, err := chooseHeartbeatProxyForAttempt(candidates, &first, 2)
+	require.NoError(t, err)
+	require.Equal(t, int64(20), second)
+
+	third, err := chooseHeartbeatProxyForAttempt(candidates, &second, 3)
+	require.NoError(t, err)
+	require.Equal(t, int64(30), third)
+
+	fourth, err := chooseHeartbeatProxyForAttempt(candidates, &third, 4)
+	require.NoError(t, err)
+	require.Equal(t, int64(10), fourth)
+}
+
+func TestSampleHeartbeatProxyCandidatesSpansRegions(t *testing.T) {
+	candidates := []heartbeatProxyCandidate{
+		{Proxy: Proxy{ID: 1}, Region: "cn"},
+		{Proxy: Proxy{ID: 2}, Region: "cn"},
+		{Proxy: Proxy{ID: 3}, Region: "us"},
+		{Proxy: Proxy{ID: 4}, Region: "de"},
+	}
+
+	sampled, err := sampleHeartbeatProxyCandidates(candidates, 3)
+	require.NoError(t, err)
+	require.Len(t, sampled, 3)
+	regions := make(map[string]struct{}, len(sampled))
+	for _, candidate := range sampled {
+		regions[candidate.Region] = struct{}{}
+	}
+	require.Len(t, regions, 3)
+}
+
+func TestOrderHeartbeatProxyResultsInterleavesRegions(t *testing.T) {
+	ordered := orderHeartbeatProxyResults([]heartbeatProxyProbeResult{
+		{id: 1, latency: 10, region: "cn"},
+		{id: 2, latency: 20, region: "cn"},
+		{id: 3, latency: 11, region: "us"},
+		{id: 4, latency: 21, region: "us"},
+	})
+
+	require.Equal(t, []int64{1, 3, 2, 4}, ordered)
+}
+
 func TestNormalizeHeartbeatConfigKeepsLegacySingleTargetCompatible(t *testing.T) {
 	got := normalizeHeartbeatConfig(config.HeartbeatProvisioningConfig{
 		DeepSeekGroupID: 12,
