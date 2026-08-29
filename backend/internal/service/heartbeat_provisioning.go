@@ -40,6 +40,83 @@ var (
 	ErrHeartbeatRateLimited    = errors.New("heartbeat intake is rate limited")
 )
 
+// heartbeatProviderSpec is the wire-to-account-platform contract for the
+// external key checker. The short "ds" identifier is retained for backwards
+// compatibility with existing heartbeat jobs and Vault responses.
+type heartbeatProviderSpec struct {
+	ID       string
+	Platform string
+	Aliases  []string
+}
+
+var heartbeatProviderRegistry = []heartbeatProviderSpec{
+	{ID: "ds", Platform: PlatformDeepSeek, Aliases: []string{"ds", "deepseek"}},
+	{ID: PlatformAnthropic, Platform: PlatformAnthropic, Aliases: []string{"anthropic", "claude"}},
+	{ID: PlatformOpenAI, Platform: PlatformOpenAI, Aliases: []string{"openai", "gpt"}},
+	{ID: PlatformGemini, Platform: PlatformGemini, Aliases: []string{"gemini", "google"}},
+	{ID: PlatformAntigravity, Platform: PlatformAntigravity, Aliases: []string{"antigravity"}},
+	{ID: PlatformGrok, Platform: PlatformGrok, Aliases: []string{"grok", "xai"}},
+	{ID: PlatformAgnes, Platform: PlatformAgnes, Aliases: []string{"agnes"}},
+	{ID: PlatformNvidia, Platform: PlatformNvidia, Aliases: []string{"nvidia"}},
+	{ID: PlatformTokenRhythm, Platform: PlatformTokenRhythm, Aliases: []string{"tokenrhythm", "token_rhythm", "tr"}},
+	{ID: PlatformKimi, Platform: PlatformKimi, Aliases: []string{"kimi", "moonshot"}},
+	{ID: PlatformZhipu, Platform: PlatformZhipu, Aliases: []string{"zhipu", "zhipuai", "bigmodel"}},
+	{ID: PlatformChatAnywhere, Platform: PlatformChatAnywhere, Aliases: []string{"chatanywhere"}},
+	{ID: PlatformGLM, Platform: PlatformGLM, Aliases: []string{"glm"}},
+	{ID: PlatformModelScope, Platform: PlatformModelScope, Aliases: []string{"modelscope"}},
+	{ID: PlatformDashScope, Platform: PlatformDashScope, Aliases: []string{"dashscope", "aliyun", "qwen"}},
+	{ID: PlatformMiniMax, Platform: PlatformMiniMax, Aliases: []string{"minimax"}},
+	{ID: PlatformVolcengine, Platform: PlatformVolcengine, Aliases: []string{"volcengine", "ark", "doubao"}},
+}
+
+func normalizeHeartbeatProvider(raw string) (heartbeatProviderSpec, bool) {
+	normalized := strings.ToLower(strings.TrimSpace(raw))
+	for _, spec := range heartbeatProviderRegistry {
+		for _, alias := range spec.Aliases {
+			if normalized == alias {
+				return spec, true
+			}
+		}
+	}
+	return heartbeatProviderSpec{}, false
+}
+
+func heartbeatProviderForPlatform(platform string) (heartbeatProviderSpec, bool) {
+	platform = strings.ToLower(strings.TrimSpace(platform))
+	for _, spec := range heartbeatProviderRegistry {
+		if spec.Platform == platform {
+			return spec, true
+		}
+	}
+	return heartbeatProviderSpec{}, false
+}
+
+func isHeartbeatTargetGroupPlatform(platform string) bool {
+	if strings.EqualFold(strings.TrimSpace(platform), PlatformComposite) {
+		return true
+	}
+	_, supported := heartbeatProviderForPlatform(platform)
+	return supported
+}
+
+func heartbeatAccountCanUseGroup(groupPlatform, accountPlatform string) bool {
+	if strings.EqualFold(strings.TrimSpace(groupPlatform), PlatformComposite) {
+		return true
+	}
+	return accountPlatformMatchesGroup(groupPlatform, accountPlatform)
+}
+
+// HeartbeatProviderPlatform resolves a heartbeat wire provider to the account
+// platform used by the provisioning worker. It is exported for repository
+// queries that need to scope recovery by provider platform.
+func HeartbeatProviderPlatform(provider string) (string, bool) {
+	spec, ok := normalizeHeartbeatProvider(provider)
+	if !ok {
+		return "", false
+	}
+	return spec.Platform, true
+}
+
 type HeartbeatKeyInput struct {
 	Fingerprint string
 	Provider    string
@@ -50,6 +127,7 @@ type HeartbeatKeyInput struct {
 
 type HeartbeatProvisioningJob struct {
 	ID                   int64
+	Provider             string
 	Fingerprint          string
 	SessionKeyCiphertext string
 	Attempts             int
@@ -60,6 +138,7 @@ type HeartbeatProvisioningJob struct {
 }
 
 type HeartbeatProvisioningEnqueueInput struct {
+	Provider             string
 	Fingerprint          string
 	SessionKeyCiphertext string
 	SourceBalance        float64
@@ -92,6 +171,11 @@ type HeartbeatProvisioningStatus struct {
 	LastErrorAt     *time.Time `json:"last_error_at,omitempty"`
 }
 
+type heartbeatVaultCredential struct {
+	Key         string
+	Credentials map[string]any
+}
+
 type HeartbeatGroupOption struct {
 	ID       int64  `json:"id"`
 	Name     string `json:"name"`
@@ -119,6 +203,10 @@ type HeartbeatProvisioningRepository interface {
 	Complete(ctx context.Context, jobID int64) error
 	Retry(ctx context.Context, jobID int64, attempts int, availableAt time.Time, terminal bool, lastError string) error
 	Stats(ctx context.Context) (*HeartbeatQueueStats, error)
+}
+
+type heartbeatProviderRecoveryRepository interface {
+	FindPendingAccountByProviderAndFingerprint(ctx context.Context, provider, fingerprint string) (*int64, error)
 }
 
 type heartbeatPreparedConfig struct {
@@ -361,14 +449,28 @@ func (s *HeartbeatProvisioningService) Queue(ctx context.Context, sourceIP, sess
 	}
 
 	targets := make([]config.HeartbeatProvisioningTarget, len(keys))
+	providers := make([]heartbeatProviderSpec, len(keys))
+	resolvedTargets := make(map[string]config.HeartbeatProvisioningTarget, len(keys))
 	for index, key := range keys {
-		if !strings.EqualFold(strings.TrimSpace(key.Provider), "ds") || !validHeartbeatFingerprint(key.Fingerprint) || key.CheckedAt.IsZero() {
+		provider, providerOK := normalizeHeartbeatProvider(key.Provider)
+		if !providerOK || !validHeartbeatFingerprint(key.Fingerprint) || key.CheckedAt.IsZero() {
 			return 0, ErrHeartbeatInvalidPayload
 		}
-		target, ok := resolveHeartbeatTarget(cfg, key.GroupID)
-		if !ok {
-			return 0, ErrHeartbeatInvalidPayload
+		requestedGroupID := int64(0)
+		if key.GroupID != nil {
+			requestedGroupID = *key.GroupID
 		}
+		cacheKey := fmt.Sprintf("%s:%d", provider.ID, requestedGroupID)
+		target, cached := resolvedTargets[cacheKey]
+		if !cached {
+			var targetOK bool
+			target, targetOK = s.resolveHeartbeatTargetForProvider(ctx, cfg, provider.Platform, key.GroupID)
+			if !targetOK {
+				return 0, ErrHeartbeatInvalidPayload
+			}
+			resolvedTargets[cacheKey] = target
+		}
+		providers[index] = provider
 		targets[index] = target
 	}
 	ciphertext, err := s.encryptor.Encrypt(sessionKey)
@@ -384,6 +486,7 @@ func (s *HeartbeatProvisioningService) Queue(ctx context.Context, sourceIP, sess
 	accepted := 0
 	for index, key := range keys {
 		if err := s.repo.Enqueue(ctx, HeartbeatProvisioningEnqueueInput{
+			Provider:             providers[index].ID,
 			Fingerprint:          strings.ToLower(strings.TrimSpace(key.Fingerprint)),
 			SessionKeyCiphertext: ciphertext,
 			SourceBalance:        key.Balance,
@@ -398,6 +501,33 @@ func (s *HeartbeatProvisioningService) Queue(ctx context.Context, sourceIP, sess
 	s.rateLast = time.Now()
 	s.lastHeartbeatNS.Store(time.Now().UTC().UnixNano())
 	return accepted, nil
+}
+
+func (s *HeartbeatProvisioningService) resolveHeartbeatTargetForProvider(ctx context.Context, cfg config.HeartbeatProvisioningConfig, platform string, requestedGroupID *int64) (config.HeartbeatProvisioningTarget, bool) {
+	target, ok := resolveHeartbeatTarget(cfg, requestedGroupID)
+	if !ok || s == nil || s.admin == nil {
+		return target, ok
+	}
+	if s.heartbeatGroupAcceptsPlatform(ctx, target.GroupID, platform) {
+		return target, true
+	}
+	if requestedGroupID != nil {
+		return config.HeartbeatProvisioningTarget{}, false
+	}
+	for _, candidate := range cfg.Targets {
+		if candidate.GroupID == target.GroupID {
+			continue
+		}
+		if s.heartbeatGroupAcceptsPlatform(ctx, candidate.GroupID, platform) {
+			return candidate, true
+		}
+	}
+	return config.HeartbeatProvisioningTarget{}, false
+}
+
+func (s *HeartbeatProvisioningService) heartbeatGroupAcceptsPlatform(ctx context.Context, groupID int64, platform string) bool {
+	group, err := s.admin.GetGroup(ctx, groupID)
+	return err == nil && group != nil && group.Status == StatusActive && heartbeatAccountCanUseGroup(group.Platform, platform)
 }
 
 func (s *HeartbeatProvisioningService) runWorker(ctx context.Context, index int) {
@@ -437,14 +567,39 @@ func (s *HeartbeatProvisioningService) processOne(ctx context.Context, workerID 
 	return s.repo.Retry(context.Background(), job.ID, job.Attempts, time.Now().UTC().Add(heartbeatRetryDelay(job.Attempts)), terminal, heartbeatSafeError(err))
 }
 
+func (s *HeartbeatProvisioningService) findPendingAccountByFingerprint(ctx context.Context, provider, fingerprint string) (*int64, error) {
+	if repository, ok := s.repo.(heartbeatProviderRecoveryRepository); ok {
+		return repository.FindPendingAccountByProviderAndFingerprint(ctx, provider, fingerprint)
+	}
+	// Legacy repository implementations only know the original DeepSeek
+	// heartbeat shape. Keep that fallback for existing deployments; new
+	// providers always use the provider-aware query above.
+	if provider != "ds" {
+		return nil, nil
+	}
+	return s.repo.FindPendingAccountByFingerprint(ctx, fingerprint)
+}
+
 func (s *HeartbeatProvisioningService) provision(ctx context.Context, job *HeartbeatProvisioningJob) error {
 	if job == nil {
 		return errors.New("nil heartbeat job")
+	}
+	provider, ok := normalizeHeartbeatProvider(job.Provider)
+	if !ok {
+		// Jobs written before provider became explicit were all DeepSeek jobs.
+		provider, _ = normalizeHeartbeatProvider("ds")
 	}
 	cfg := s.configSnapshot()
 	target, ok := resolveHeartbeatJobTarget(cfg, job)
 	if !ok {
 		return errors.New("heartbeat job target is not configured")
+	}
+	group, err := s.admin.GetGroup(ctx, target.GroupID)
+	if err != nil {
+		return fmt.Errorf("load heartbeat target group %d: %w", target.GroupID, err)
+	}
+	if group == nil || group.Status != StatusActive || !heartbeatAccountCanUseGroup(group.Platform, provider.Platform) {
+		return fmt.Errorf("heartbeat provider %s does not match target group %d platform", provider.ID, target.GroupID)
 	}
 	accountID := int64(0)
 	if job.AccountID != nil {
@@ -460,7 +615,7 @@ func (s *HeartbeatProvisioningService) provision(ctx context.Context, job *Heart
 			return err
 		}
 	} else {
-		recoveredID, err := s.repo.FindPendingAccountByFingerprint(ctx, job.Fingerprint)
+		recoveredID, err := s.findPendingAccountByFingerprint(ctx, provider.ID, job.Fingerprint)
 		if err != nil {
 			return err
 		}
@@ -482,17 +637,18 @@ func (s *HeartbeatProvisioningService) provision(ctx context.Context, job *Heart
 		if err != nil {
 			return errors.New("decrypt heartbeat session key")
 		}
-		key, err := s.fetchVaultKey(ctx, sessionKey, job.Fingerprint)
+		vaultCredential, err := s.fetchVaultCredential(ctx, sessionKey, job.Fingerprint, provider.ID)
 		if err != nil {
 			return err
 		}
+		credentials := heartbeatAccountCredentials(provider.ID, vaultCredential)
 		falseValue := false
 		account, err := s.admin.CreateAccount(ctx, &CreateAccountInput{
-			Name:                 "heartbeat-ds-" + job.Fingerprint,
-			Platform:             PlatformDeepSeek,
+			Name:                 "heartbeat-" + provider.ID + "-" + job.Fingerprint,
+			Platform:             provider.Platform,
 			Type:                 AccountTypeAPIKey,
-			Credentials:          map[string]any{"api_key": key, "pool_mode": true, "pool_mode_retry_count": 3, "pool_mode_retry_status_codes": []int{401, 403, 429}},
-			Extra:                map[string]any{"heartbeat_fp": job.Fingerprint, "heartbeat_source": "key-checker"},
+			Credentials:          credentials,
+			Extra:                map[string]any{"heartbeat_fp": job.Fingerprint, "heartbeat_provider": provider.ID, "heartbeat_source": "key-checker"},
 			ProxyID:              &proxyID,
 			Concurrency:          3,
 			Priority:             50,
@@ -509,12 +665,8 @@ func (s *HeartbeatProvisioningService) provision(ctx context.Context, job *Heart
 		}
 		job.AccountID = &accountID
 	}
-	balance, err := s.balance.FetchDeepSeekBalance(ctx, accountID)
-	if err != nil {
+	if err := s.balance.ValidateHeartbeatAccount(ctx, accountID, provider.Platform); err != nil {
 		return err
-	}
-	if !balance.IsAvailable {
-		return errors.New("DeepSeek balance is unavailable")
 	}
 	groupIDs := []int64{target.GroupID}
 	if _, err := s.admin.UpdateAccount(ctx, accountID, &UpdateAccountInput{GroupIDs: &groupIDs}); err != nil {
@@ -622,11 +774,52 @@ func (s *HeartbeatProvisioningService) selectProxy(ctx context.Context, proxyGro
 	return chooseHeartbeatProxy(tier)
 }
 
-func (s *HeartbeatProvisioningService) fetchVaultKey(ctx context.Context, sessionKey, fingerprint string) (string, error) {
+func heartbeatAccountCredentials(providerID string, credential *heartbeatVaultCredential) map[string]any {
+	result := make(map[string]any)
+	if credential != nil {
+		for _, key := range []string{"base_url", "api_protocol", "account_mode", "tokenrhythm_cookie", "tr_session", "tr_csrf", "user_agent", "header_overrides"} {
+			if value, ok := credential.Credentials[key]; ok && value != nil {
+				result[key] = value
+			}
+		}
+		result["api_key"] = credential.Key
+	}
+	if providerID == PlatformTokenRhythm {
+		if _, exists := result["base_url"]; !exists {
+			result["base_url"] = TokenRhythmDefaultBaseURL
+		}
+	}
+	result["pool_mode"] = true
+	result["pool_mode_retry_count"] = 3
+	result["pool_mode_retry_status_codes"] = []int{401, 403, 429}
+	return result
+}
+
+// fetchVaultKey is retained as a small compatibility wrapper for callers that
+// only need the matched key. Provisioning uses fetchVaultCredential so
+// provider-specific fields can be carried through to account creation.
+
+func (s *HeartbeatProvisioningService) fetchVaultKey(ctx context.Context, sessionKey, fingerprint string, providerIDs ...string) (string, error) {
+	providerID := "ds"
+	if len(providerIDs) > 0 && strings.TrimSpace(providerIDs[0]) != "" {
+		providerID = providerIDs[0]
+	}
+	credential, err := s.fetchVaultCredential(ctx, sessionKey, fingerprint, providerID)
+	if err != nil {
+		return "", err
+	}
+	return credential.Key, nil
+}
+
+func (s *HeartbeatProvisioningService) fetchVaultCredential(ctx context.Context, sessionKey, fingerprint, providerID string) (*heartbeatVaultCredential, error) {
+	provider, ok := normalizeHeartbeatProvider(providerID)
+	if !ok {
+		return nil, errors.New("unsupported heartbeat provider")
+	}
 	s.cfgMu.RLock()
 	if s.vaultURL == nil {
 		s.cfgMu.RUnlock()
-		return "", errors.New("heartbeat vault is not configured")
+		return nil, errors.New("heartbeat vault is not configured")
 	}
 	u := *s.vaultURL
 	s.cfgMu.RUnlock()
@@ -635,43 +828,61 @@ func (s *HeartbeatProvisioningService) fetchVaultKey(ctx context.Context, sessio
 	u.RawQuery = query.Encode()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
 	if err != nil {
-		return "", errors.New("create heartbeat vault request")
+		return nil, errors.New("create heartbeat vault request")
 	}
 	resp, err := s.http.Do(req)
 	if err != nil {
-		return "", errors.New("heartbeat vault request failed")
+		return nil, errors.New("heartbeat vault request failed")
 	}
 	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("heartbeat vault returned HTTP %d", resp.StatusCode)
+		return nil, fmt.Errorf("heartbeat vault returned HTTP %d", resp.StatusCode)
 	}
 	body, err := io.ReadAll(io.LimitReader(resp.Body, heartbeatMaxBodyBytes+1))
 	if err != nil || len(body) > heartbeatMaxBodyBytes {
-		return "", errors.New("invalid heartbeat vault response")
+		return nil, errors.New("invalid heartbeat vault response")
 	}
 	var payload struct {
 		OK   bool `json:"ok"`
 		Keys []struct {
-			Key      string `json:"key"`
-			Provider string `json:"provider"`
+			Key         string         `json:"key"`
+			Provider    string         `json:"provider"`
+			Credentials map[string]any `json:"credentials"`
+			BaseURL     string         `json:"base_url"`
+			Session     string         `json:"tr_session"`
+			CSRF        string         `json:"tr_csrf"`
 		} `json:"keys"`
 	}
 	if err := json.Unmarshal(body, &payload); err != nil || !payload.OK {
-		return "", errors.New("invalid heartbeat vault payload")
+		return nil, errors.New("invalid heartbeat vault payload")
 	}
 	for _, candidate := range payload.Keys {
-		if strings.EqualFold(strings.TrimSpace(candidate.Provider), "ds") && heartbeatFingerprint(candidate.Key) == jobFingerprint(fingerprint) {
-			return strings.TrimSpace(candidate.Key), nil
+		candidateProvider, candidateOK := normalizeHeartbeatProvider(candidate.Provider)
+		if candidateOK && candidateProvider.ID == provider.ID && heartbeatFingerprint(candidate.Key) == jobFingerprint(fingerprint) {
+			credentials := make(map[string]any, len(candidate.Credentials)+3)
+			for key, value := range candidate.Credentials {
+				credentials[key] = value
+			}
+			if strings.TrimSpace(candidate.BaseURL) != "" {
+				credentials["base_url"] = strings.TrimSpace(candidate.BaseURL)
+			}
+			if strings.TrimSpace(candidate.Session) != "" {
+				credentials["tr_session"] = strings.TrimSpace(candidate.Session)
+			}
+			if strings.TrimSpace(candidate.CSRF) != "" {
+				credentials["tr_csrf"] = strings.TrimSpace(candidate.CSRF)
+			}
+			return &heartbeatVaultCredential{Key: strings.TrimSpace(candidate.Key), Credentials: credentials}, nil
 		}
 	}
-	return "", errors.New("matching DeepSeek key is not present in heartbeat vault")
+	return nil, fmt.Errorf("matching %s key is not present in heartbeat vault", provider.ID)
 }
 
 func (s *HeartbeatProvisioningService) Options(ctx context.Context) (*HeartbeatProvisioningOptions, error) {
 	if s == nil || s.admin == nil {
 		return nil, errors.New("heartbeat admin service is unavailable")
 	}
-	groups, err := s.admin.GetAllGroupsByPlatform(ctx, PlatformDeepSeek)
+	groups, err := s.admin.GetAllGroups(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -680,6 +891,9 @@ func (s *HeartbeatProvisioningService) Options(ctx context.Context) (*HeartbeatP
 		ProxyGroups: make([]HeartbeatProxyGroupOption, 0),
 	}
 	for _, group := range groups {
+		if !isHeartbeatTargetGroupPlatform(group.Platform) {
+			continue
+		}
 		result.Groups = append(result.Groups, HeartbeatGroupOption{ID: group.ID, Name: group.Name, Platform: group.Platform, Status: group.Status})
 	}
 	proxyGroups := make(map[int64]*HeartbeatProxyGroupOption)
@@ -787,8 +1001,11 @@ func (s *HeartbeatProvisioningService) prepareConfig(ctx context.Context, reques
 		if err != nil {
 			return nil, fmt.Errorf("load heartbeat target group %d: %w", target.GroupID, err)
 		}
-		if group == nil || group.Status != StatusActive || group.Platform != PlatformDeepSeek {
-			return nil, fmt.Errorf("heartbeat target group %d must be active and use the deepseek platform", target.GroupID)
+		if group == nil || group.Status != StatusActive {
+			return nil, fmt.Errorf("heartbeat target group %d must be active", target.GroupID)
+		}
+		if !isHeartbeatTargetGroupPlatform(group.Platform) {
+			return nil, fmt.Errorf("heartbeat target group %d uses unsupported platform %q", target.GroupID, group.Platform)
 		}
 		proxyFilters := ProxyListFilters{Status: StatusActive}
 		if target.ProxyGroupID > 0 {
@@ -870,7 +1087,7 @@ func normalizeHeartbeatConfig(input config.HeartbeatProvisioningConfig) config.H
 	if output.DefaultGroupID <= 0 {
 		output.DefaultGroupID = output.DeepSeekGroupID
 	}
-	if len(output.Targets) == 0 && output.DefaultGroupID > 0 && output.ProxyGroupID > 0 {
+	if len(output.Targets) == 0 && output.DefaultGroupID > 0 && output.ProxyGroupID >= 0 {
 		output.Targets = []config.HeartbeatProvisioningTarget{{GroupID: output.DefaultGroupID, ProxyGroupID: output.ProxyGroupID}}
 	}
 	if output.DefaultGroupID <= 0 && len(output.Targets) > 0 {
