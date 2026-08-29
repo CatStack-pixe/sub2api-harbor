@@ -724,12 +724,19 @@ func (s *AccountRepoSuite) TestBindGroups_EmptyList() {
 	account := mustCreateAccount(s.T(), s.client, &service.Account{Name: "acc-empty"})
 	group := mustCreateGroup(s.T(), s.client, &service.Group{Name: "g-empty"})
 	mustBindAccountToGroup(s.T(), s.client, account.ID, group.ID, 1)
+	_, err := s.repo.sql.ExecContext(s.ctx, "TRUNCATE scheduler_outbox")
+	s.Require().NoError(err, "truncate scheduler outbox")
 
 	s.Require().NoError(s.repo.BindGroups(s.ctx, account.ID, []int64{}), "BindGroups empty")
 
 	groups, err := s.repo.GetGroups(s.ctx, account.ID)
 	s.Require().NoError(err)
 	s.Require().Empty(groups, "expected 0 groups after binding empty list")
+
+	var eventCount int
+	err = scanSingleRow(s.ctx, s.repo.sql, "SELECT COUNT(*) FROM scheduler_outbox WHERE event_type = $1 AND account_id = $2", []any{service.SchedulerOutboxEventAccountGroupsChanged, account.ID}, &eventCount)
+	s.Require().NoError(err, "read scheduler outbox")
+	s.Require().Equal(1, eventCount, "empty group binding should refresh scheduler buckets")
 }
 
 // --- Schedulable ---

@@ -24,13 +24,69 @@ func (r *heartbeatProvisioningRepository) Enqueue(ctx context.Context, input ser
 	}
 	_, err := r.db.ExecContext(ctx, `
 		INSERT INTO heartbeat_provision_jobs (provider, fingerprint, session_key_ciphertext, source_balance, source_checked_at, target_group_id, target_proxy_group_id)
-		VALUES ('ds', $1, $2, $3, NULLIF($4::timestamptz, 'epoch'::timestamptz), $5, $6)
+		VALUES ('ds', $1, $2, $3, NULLIF($4::timestamptz, 'epoch'::timestamptz), $5, NULLIF($6::bigint, 0))
 		ON CONFLICT (provider, fingerprint) DO UPDATE SET
 			session_key_ciphertext = EXCLUDED.session_key_ciphertext,
 			source_balance = EXCLUDED.source_balance,
 			source_checked_at = COALESCE(EXCLUDED.source_checked_at, heartbeat_provision_jobs.source_checked_at),
 			target_group_id = EXCLUDED.target_group_id,
 			target_proxy_group_id = EXCLUDED.target_proxy_group_id,
+			status = CASE
+				WHEN heartbeat_provision_jobs.status <> 'processing'
+					AND (heartbeat_provision_jobs.status = 'failed'
+					OR heartbeat_provision_jobs.target_group_id IS DISTINCT FROM EXCLUDED.target_group_id
+					OR heartbeat_provision_jobs.target_proxy_group_id IS DISTINCT FROM EXCLUDED.target_proxy_group_id)
+				THEN 'queued'
+				ELSE heartbeat_provision_jobs.status
+			END,
+			attempts = CASE
+				WHEN heartbeat_provision_jobs.status <> 'processing'
+					AND (heartbeat_provision_jobs.status = 'failed'
+					OR heartbeat_provision_jobs.target_group_id IS DISTINCT FROM EXCLUDED.target_group_id
+					OR heartbeat_provision_jobs.target_proxy_group_id IS DISTINCT FROM EXCLUDED.target_proxy_group_id)
+				THEN 0
+				ELSE heartbeat_provision_jobs.attempts
+			END,
+			available_at = CASE
+				WHEN heartbeat_provision_jobs.status <> 'processing'
+					AND (heartbeat_provision_jobs.status = 'failed'
+					OR heartbeat_provision_jobs.target_group_id IS DISTINCT FROM EXCLUDED.target_group_id
+					OR heartbeat_provision_jobs.target_proxy_group_id IS DISTINCT FROM EXCLUDED.target_proxy_group_id)
+				THEN NOW()
+				ELSE heartbeat_provision_jobs.available_at
+			END,
+			locked_until = CASE
+				WHEN heartbeat_provision_jobs.status <> 'processing'
+					AND (heartbeat_provision_jobs.status = 'failed'
+					OR heartbeat_provision_jobs.target_group_id IS DISTINCT FROM EXCLUDED.target_group_id
+					OR heartbeat_provision_jobs.target_proxy_group_id IS DISTINCT FROM EXCLUDED.target_proxy_group_id)
+				THEN NULL
+				ELSE heartbeat_provision_jobs.locked_until
+			END,
+			lock_owner = CASE
+				WHEN heartbeat_provision_jobs.status <> 'processing'
+					AND (heartbeat_provision_jobs.status = 'failed'
+					OR heartbeat_provision_jobs.target_group_id IS DISTINCT FROM EXCLUDED.target_group_id
+					OR heartbeat_provision_jobs.target_proxy_group_id IS DISTINCT FROM EXCLUDED.target_proxy_group_id)
+				THEN NULL
+				ELSE heartbeat_provision_jobs.lock_owner
+			END,
+			last_error = CASE
+				WHEN heartbeat_provision_jobs.status <> 'processing'
+					AND (heartbeat_provision_jobs.status = 'failed'
+					OR heartbeat_provision_jobs.target_group_id IS DISTINCT FROM EXCLUDED.target_group_id
+					OR heartbeat_provision_jobs.target_proxy_group_id IS DISTINCT FROM EXCLUDED.target_proxy_group_id)
+				THEN NULL
+				ELSE heartbeat_provision_jobs.last_error
+			END,
+			completed_at = CASE
+				WHEN heartbeat_provision_jobs.status <> 'processing'
+					AND (heartbeat_provision_jobs.status = 'failed'
+					OR heartbeat_provision_jobs.target_group_id IS DISTINCT FROM EXCLUDED.target_group_id
+					OR heartbeat_provision_jobs.target_proxy_group_id IS DISTINCT FROM EXCLUDED.target_proxy_group_id)
+				THEN NULL
+				ELSE heartbeat_provision_jobs.completed_at
+			END,
 			updated_at = NOW()
 	`, input.Fingerprint, input.SessionKeyCiphertext, input.SourceBalance, input.SourceCheckedAt, input.TargetGroupID, input.TargetProxyGroupID)
 	return err

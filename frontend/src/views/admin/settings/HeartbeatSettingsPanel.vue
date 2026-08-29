@@ -312,7 +312,7 @@ function normalizeSourceIps(): string[] {
 function addTarget(): void {
   const usedGroups = new Set(form.targets.map(target => target.group_id))
   const group = options.groups.find(option => !usedGroups.has(option.id)) || options.groups[0]
-  const proxyGroup = options.proxy_groups[0]
+  const proxyGroup = options.proxy_groups.find(option => option.id > 0) || options.proxy_groups[0]
   form.targets.push({
     group_id: group?.id || 0,
     proxy_group_id: proxyGroup?.id || 0,
