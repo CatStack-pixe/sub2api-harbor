@@ -430,7 +430,7 @@ func (s *OpenAIGatewayService) streamRawChatCompletions(
 	firstOutputTimeout := s.rawChatFirstOutputTimeout()
 	var firstOutputTimer *time.Timer
 	if firstOutputTimeout > 0 {
-		remaining := startTime.Add(firstOutputTimeout).Sub(time.Now())
+		remaining := time.Until(startTime.Add(firstOutputTimeout))
 		if remaining <= 0 {
 			remaining = time.Nanosecond
 		}
@@ -463,7 +463,7 @@ func (s *OpenAIGatewayService) streamRawChatCompletions(
 
 	lastUpstreamAt := time.Now()
 	var streamErr error
-	streamLoop:
+streamLoop:
 	for {
 		select {
 		case event, ok := <-events:
