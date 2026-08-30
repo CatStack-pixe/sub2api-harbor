@@ -585,6 +585,18 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
+    path: '/admin/heartbeat',
+    name: 'AdminHeartbeat',
+    component: () => import('@/views/admin/HeartbeatView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: true,
+      title: 'Heartbeat',
+      titleKey: 'admin.settings.heartbeat.title',
+      descriptionKey: 'admin.settings.heartbeat.description'
+    }
+  },
+  {
     path: '/admin/settings',
     name: 'AdminSettings',
     component: () => import('@/views/admin/SettingsView.vue'),

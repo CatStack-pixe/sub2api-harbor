@@ -1,4 +1,5 @@
 import { apiClient } from '../client'
+import type { PaginatedResponse } from '@/types'
 
 export interface HeartbeatTarget {
   group_id: number
@@ -54,6 +55,26 @@ export interface HeartbeatOptions {
   proxy_groups: HeartbeatProxyGroupOption[]
 }
 
+export interface HeartbeatProvisioningLog {
+  id: number
+  provider: string
+  fingerprint: string
+  source_balance?: number | null
+  source_checked_at?: string | null
+  status: string
+  attempts: number
+  available_at: string
+  locked_until?: string | null
+  target_group_id: number
+  target_proxy_group_id?: number | null
+  account_id?: number | null
+  proxy_id?: number | null
+  last_error?: string
+  created_at: string
+  updated_at: string
+  completed_at?: string | null
+}
+
 export type HeartbeatConfigUpdate = Omit<HeartbeatConfig, 'config_source' | 'status'>
 
 export async function getConfig(): Promise<HeartbeatConfig> {
@@ -76,11 +97,19 @@ export async function getStatus(): Promise<HeartbeatStatus> {
   return data
 }
 
+export async function getLogs(page = 1, pageSize = 25): Promise<PaginatedResponse<HeartbeatProvisioningLog>> {
+  const { data } = await apiClient.get<PaginatedResponse<HeartbeatProvisioningLog>>('/admin/heartbeat/logs', {
+    params: { page, page_size: pageSize },
+  })
+  return data
+}
+
 const heartbeatAPI = {
   getConfig,
   updateConfig,
   getOptions,
   getStatus,
+  getLogs,
 }
 
 export default heartbeatAPI

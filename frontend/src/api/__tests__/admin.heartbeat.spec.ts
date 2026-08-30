@@ -55,4 +55,14 @@ describe('admin heartbeat API', () => {
     await expect(heartbeatAPI.updateConfig(payload)).resolves.toEqual(response)
     expect(put).toHaveBeenCalledWith('/admin/heartbeat/config', payload)
   })
+
+  it('reads paginated provisioning logs', async () => {
+    const logs = { items: [{ id: 1, status: 'complete' }], total: 1, page: 2, page_size: 25, pages: 1 }
+    get.mockResolvedValueOnce({ data: logs })
+
+    await expect(heartbeatAPI.getLogs(2, 25)).resolves.toEqual(logs)
+    expect(get).toHaveBeenCalledWith('/admin/heartbeat/logs', {
+      params: { page: 2, page_size: 25 },
+    })
+  })
 })

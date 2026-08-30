@@ -157,6 +157,7 @@ func registerHeartbeatRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 		heartbeat.PUT("/config", h.Admin.Heartbeat.UpdateConfig)
 		heartbeat.GET("/options", h.Admin.Heartbeat.GetOptions)
 		heartbeat.GET("/status", h.Admin.Heartbeat.GetStatus)
+		heartbeat.GET("/logs", h.Admin.Heartbeat.GetLogs)
 	}
 }
 
