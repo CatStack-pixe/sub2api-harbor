@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/config"
+	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/stretchr/testify/require"
 )
 
@@ -105,4 +107,19 @@ func TestBuildUpstreamTransport_OpenAIH2_WithHTTPProxy_EnablesKeepAlive(t *testi
 	require.True(t, tr.ForceAttemptHTTP2)
 	requireHTTP2Configured(t, tr, "经代理的 openai_h2 也必须启用 http2 keepalive")
 	require.NotNil(t, tr.Proxy, "HTTP 代理仍须通过 Transport.Proxy 生效")
+}
+
+func TestResolveProtocolMode_OpenAISOCKS5UsesHTTP1(t *testing.T) {
+	cfg := &config.Config{}
+	cfg.Gateway.OpenAIHTTP2.Enabled = true
+	cfg.Gateway.OpenAIHTTP2.AllowProxyFallbackToHTTP1 = true
+	upstream := NewHTTPUpstream(cfg)
+	svc, ok := upstream.(*httpUpstreamService)
+	require.True(t, ok)
+
+	proxyURL, err := url.Parse("socks5h://127.0.0.1:1080")
+	require.NoError(t, err)
+	got := svc.resolveProtocolMode(service.HTTPUpstreamProfileOpenAI, proxyURL.String(), proxyURL)
+	require.Equal(t, upstreamProtocolModeOpenAIH1, got,
+		"dial-only SOCKS proxies must avoid HTTP/2 framing mismatches")
 }

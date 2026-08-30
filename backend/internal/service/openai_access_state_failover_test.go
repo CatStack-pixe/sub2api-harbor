@@ -125,6 +125,19 @@ func TestOpenAIHTTPAccessStateBadRequestDoesNotDisableAccount(t *testing.T) {
 	require.False(t, svc.isOpenAIAccountRuntimeBlocked(account))
 }
 
+func TestOpenAIProxyFramingErrorFailsOverWithoutCredentialClassification(t *testing.T) {
+	body := []byte("<html><body>Request body size did not match Content-Length</body></html>")
+	svc := &OpenAIGatewayService{}
+
+	require.True(t, isOpenAIProxyFramingError(http.StatusBadRequest, string(body), body))
+	require.True(t, svc.shouldFailoverOpenAIUpstreamResponse(http.StatusBadRequest, string(body), body))
+	require.True(t, shouldFailoverOpenAIPassthroughResponse(&Account{Type: AccountTypeAPIKey}, http.StatusBadRequest, body))
+
+	err := newOpenAIUpstreamFailoverError(http.StatusBadRequest, nil, body, string(body), false)
+	require.False(t, err.IsCredentialFailure())
+	require.False(t, err.RetryableOnSameAccount)
+}
+
 func TestOpenAIStreamEchoedAccessStateMessageDoesNotDisableOrFailover(t *testing.T) {
 	repo := &openAIStream403AccountRepo{}
 	svc := &OpenAIGatewayService{rateLimitService: &RateLimitService{accountRepo: repo}}

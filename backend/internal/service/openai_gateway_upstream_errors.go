@@ -180,6 +180,22 @@ func isOpenAITransientProcessingError(upstreamStatusCode int, upstreamMsg string
 	return !gjson.ValidBytes(upstreamBody) && match(string(upstreamBody))
 }
 
+// isOpenAIProxyFramingError identifies the intermediary response emitted when
+// a proxy forwards a body with a stale Content-Length. It is a transport-path
+// failure, so the current account should be rotated without treating its
+// credential as invalid.
+func isOpenAIProxyFramingError(statusCode int, upstreamMsg string, upstreamBody []byte) bool {
+	if statusCode != http.StatusBadRequest {
+		return false
+	}
+	const marker = "request body size did not match content-length"
+	if strings.Contains(strings.ToLower(strings.TrimSpace(upstreamMsg)), marker) {
+		return true
+	}
+	return len(upstreamBody) > 0 && !gjson.ValidBytes(upstreamBody) &&
+		strings.Contains(strings.ToLower(string(upstreamBody)), marker)
+}
+
 func isOpenAICapacityShedMessage(text string) bool {
 	lower := strings.ToLower(strings.TrimSpace(text))
 	return strings.Contains(lower, "server is overloaded") ||
@@ -264,6 +280,9 @@ func (s *OpenAIGatewayService) shouldFailoverOpenAIUpstreamResponse(statusCode i
 		return true
 	}
 	if isOpenAIRequestBodyTooLargeError(statusCode, upstreamMsg, upstreamBody) {
+		return true
+	}
+	if isOpenAIProxyFramingError(statusCode, upstreamMsg, upstreamBody) {
 		return true
 	}
 	if s.shouldFailoverUpstreamError(statusCode) {

@@ -201,6 +201,7 @@ func (s *OpenAIGatewayService) sendCCUpstreamRequest(
 		}
 		return nil, fmt.Errorf("build upstream request: %w", err)
 	}
+	setOpenAIUpstreamRequestBody(upstreamReq, body)
 	// 记录本次实际选择的协议端点，供错误日志和用量日志在没有
 	// OpenAIForwardResult（例如 503/传输失败）时使用。每次发送都覆盖，
 	// 避免 Gin context 在账号 failover 尝试之间残留旧端点。
@@ -259,6 +260,22 @@ func (s *OpenAIGatewayService) sendCCUpstreamRequest(
 		}
 	}
 	return resp, nil
+}
+
+// setOpenAIUpstreamRequestBody makes the final transformed payload authoritative
+// for both the initial send and any net/http replay. A stale client length header
+// must never survive into an upstream request.
+func setOpenAIUpstreamRequestBody(req *http.Request, body []byte) {
+	if req == nil {
+		return
+	}
+	req.Header.Del("Content-Length")
+	req.Body = io.NopCloser(bytes.NewReader(body))
+	req.ContentLength = int64(len(body))
+	req.GetBody = func() (io.ReadCloser, error) {
+		return io.NopCloser(bytes.NewReader(body)), nil
+	}
+	req.TransferEncoding = nil
 }
 
 // ccStreamScanState 是 scanCCStream 返回的读取状态快照。
