@@ -1007,7 +1007,11 @@ func (s *httpUpstreamService) resolveProtocolMode(profile service.HTTPUpstreamPr
 	}
 	scheme := strings.ToLower(parsedProxy.Scheme)
 	if scheme != "http" && scheme != "https" {
-		return upstreamProtocolModeOpenAIH2
+		// Dial-only proxies do not expose a CONNECT boundary where the
+		// HTTP/2 compatibility fallback can observe or recover framing
+		// errors. Keep these routes on HTTP/1.1 because some SOCKS relays
+		// forward a Content-Length that does not match the DATA frames.
+		return upstreamProtocolModeOpenAIH1
 	}
 	if settings.allowProxyFallbackToHTTP1 && s.isOpenAIHTTP2FallbackActive(proxyKey) {
 		return upstreamProtocolModeOpenAIH1Fallback
