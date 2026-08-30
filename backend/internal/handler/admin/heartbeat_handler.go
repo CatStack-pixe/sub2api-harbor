@@ -137,6 +137,28 @@ func (h *HeartbeatHandler) GetStatus(c *gin.Context) {
 	response.Success(c, status)
 }
 
+// GetLogs returns recent heartbeat provisioning jobs for the admin page.
+func (h *HeartbeatHandler) GetLogs(c *gin.Context) {
+	if h == nil || h.provisioning == nil {
+		response.Error(c, http.StatusServiceUnavailable, "Heartbeat service not available")
+		return
+	}
+	page, pageSize := response.ParsePagination(c)
+	if pageSize > 200 {
+		pageSize = 200
+	}
+	logs, err := h.provisioning.ListLogs(c.Request.Context(), page, pageSize)
+	if err != nil {
+		response.Error(c, http.StatusInternalServerError, "Failed to get heartbeat logs")
+		return
+	}
+	if logs == nil {
+		response.Paginated(c, []*service.HeartbeatProvisioningLog{}, 0, page, pageSize)
+		return
+	}
+	response.Paginated(c, logs.Logs, int64(logs.Total), logs.Page, logs.PageSize)
+}
+
 func (h *HeartbeatHandler) configResponse(c *gin.Context, includeStatus bool) (*heartbeatConfigResponse, error) {
 	cfg, source := h.provisioning.ConfigSnapshot()
 	payload := &heartbeatConfigResponse{

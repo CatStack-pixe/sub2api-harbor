@@ -140,5 +140,6 @@ export type {
   HeartbeatOptions,
   HeartbeatProxyGroupOption,
   HeartbeatStatus,
-  HeartbeatTarget
+  HeartbeatTarget,
+  HeartbeatProvisioningLog
 } from './heartbeat'

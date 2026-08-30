@@ -176,6 +176,35 @@ type HeartbeatQueueStats struct {
 	LastErrorAt *time.Time
 }
 
+// HeartbeatProvisioningLog is the safe, operator-facing view of a
+// provisioning job. The encrypted session key is intentionally omitted.
+type HeartbeatProvisioningLog struct {
+	ID                 int64      `json:"id"`
+	Provider           string     `json:"provider"`
+	Fingerprint        string     `json:"fingerprint"`
+	SourceBalance      *float64   `json:"source_balance,omitempty"`
+	SourceCheckedAt    *time.Time `json:"source_checked_at,omitempty"`
+	Status             string     `json:"status"`
+	Attempts           int        `json:"attempts"`
+	AvailableAt        time.Time  `json:"available_at"`
+	LockedUntil        *time.Time `json:"locked_until,omitempty"`
+	TargetGroupID      int64      `json:"target_group_id"`
+	TargetProxyGroupID *int64     `json:"target_proxy_group_id,omitempty"`
+	AccountID          *int64     `json:"account_id,omitempty"`
+	ProxyID            *int64     `json:"proxy_id,omitempty"`
+	LastError          string     `json:"last_error,omitempty"`
+	CreatedAt          time.Time  `json:"created_at"`
+	UpdatedAt          time.Time  `json:"updated_at"`
+	CompletedAt        *time.Time `json:"completed_at,omitempty"`
+}
+
+type HeartbeatProvisioningLogList struct {
+	Logs     []*HeartbeatProvisioningLog `json:"logs"`
+	Total    int                         `json:"total"`
+	Page     int                         `json:"page"`
+	PageSize int                         `json:"page_size"`
+}
+
 type HeartbeatProvisioningStatus struct {
 	Enabled         bool       `json:"enabled"`
 	Running         bool       `json:"running"`
@@ -222,6 +251,7 @@ type HeartbeatProvisioningRepository interface {
 	Complete(ctx context.Context, jobID int64) error
 	Retry(ctx context.Context, jobID int64, attempts int, availableAt time.Time, terminal bool, lastError string) error
 	Stats(ctx context.Context) (*HeartbeatQueueStats, error)
+	ListLogs(ctx context.Context, page, pageSize int) (*HeartbeatProvisioningLogList, error)
 }
 
 type heartbeatProviderRecoveryRepository interface {
@@ -994,6 +1024,33 @@ func (s *HeartbeatProvisioningService) Status(ctx context.Context) (*HeartbeatPr
 		LastError:       stats.LastError,
 		LastErrorAt:     stats.LastErrorAt,
 	}, nil
+}
+
+// ListLogs returns recent provisioning jobs for the admin heartbeat page.
+func (s *HeartbeatProvisioningService) ListLogs(ctx context.Context, page, pageSize int) (*HeartbeatProvisioningLogList, error) {
+	if s == nil {
+		return nil, errors.New("nil heartbeat provisioning service")
+	}
+	if page <= 0 {
+		page = 1
+	}
+	if pageSize <= 0 {
+		pageSize = 50
+	}
+	if pageSize > 200 {
+		pageSize = 200
+	}
+	if s.repo == nil {
+		return &HeartbeatProvisioningLogList{Logs: []*HeartbeatProvisioningLog{}, Page: page, PageSize: pageSize}, nil
+	}
+	logs, err := s.repo.ListLogs(ctx, page, pageSize)
+	if err != nil {
+		return nil, err
+	}
+	if logs == nil {
+		return &HeartbeatProvisioningLogList{Logs: []*HeartbeatProvisioningLog{}, Page: page, PageSize: pageSize}, nil
+	}
+	return logs, nil
 }
 
 func (s *HeartbeatProvisioningService) prepareConfig(ctx context.Context, requested config.HeartbeatProvisioningConfig) (*heartbeatPreparedConfig, error) {

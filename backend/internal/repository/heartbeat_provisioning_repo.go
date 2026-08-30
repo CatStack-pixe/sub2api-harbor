@@ -171,6 +171,95 @@ func (r *heartbeatProvisioningRepository) Stats(ctx context.Context) (*service.H
 	return stats, nil
 }
 
+func (r *heartbeatProvisioningRepository) ListLogs(ctx context.Context, page, pageSize int) (*service.HeartbeatProvisioningLogList, error) {
+	if r == nil || r.db == nil {
+		return nil, errors.New("nil heartbeat provisioning database")
+	}
+	if page <= 0 {
+		page = 1
+	}
+	if pageSize <= 0 {
+		pageSize = 50
+	}
+	if pageSize > 200 {
+		pageSize = 200
+	}
+	var total int
+	if err := r.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM heartbeat_provision_jobs`).Scan(&total); err != nil {
+		return nil, err
+	}
+	offset := (page - 1) * pageSize
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT id, provider, fingerprint, source_balance, source_checked_at, status,
+		       attempts, available_at, locked_until, target_group_id,
+		       target_proxy_group_id, account_id, proxy_id, last_error,
+		       created_at, updated_at, completed_at
+		FROM heartbeat_provision_jobs
+		ORDER BY updated_at DESC, id DESC
+		LIMIT $1 OFFSET $2
+	`, pageSize, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	logs := make([]*service.HeartbeatProvisioningLog, 0, pageSize)
+	for rows.Next() {
+		item := &service.HeartbeatProvisioningLog{}
+		var sourceBalance sql.NullFloat64
+		var sourceCheckedAt, lockedUntil, completedAt sql.NullTime
+		var targetGroupID, targetProxyGroupID, accountID, proxyID sql.NullInt64
+		var lastError sql.NullString
+		if err := rows.Scan(
+			&item.ID, &item.Provider, &item.Fingerprint, &sourceBalance, &sourceCheckedAt,
+			&item.Status, &item.Attempts, &item.AvailableAt, &lockedUntil,
+			&targetGroupID, &targetProxyGroupID, &accountID, &proxyID,
+			&lastError, &item.CreatedAt, &item.UpdatedAt, &completedAt,
+		); err != nil {
+			return nil, err
+		}
+		if sourceBalance.Valid {
+			value := sourceBalance.Float64
+			item.SourceBalance = &value
+		}
+		if targetGroupID.Valid {
+			item.TargetGroupID = targetGroupID.Int64
+		}
+		if sourceCheckedAt.Valid {
+			value := sourceCheckedAt.Time
+			item.SourceCheckedAt = &value
+		}
+		if lockedUntil.Valid {
+			value := lockedUntil.Time
+			item.LockedUntil = &value
+		}
+		if targetProxyGroupID.Valid {
+			value := targetProxyGroupID.Int64
+			item.TargetProxyGroupID = &value
+		}
+		if accountID.Valid {
+			value := accountID.Int64
+			item.AccountID = &value
+		}
+		if proxyID.Valid {
+			value := proxyID.Int64
+			item.ProxyID = &value
+		}
+		if lastError.Valid {
+			item.LastError = lastError.String
+		}
+		if completedAt.Valid {
+			value := completedAt.Time
+			item.CompletedAt = &value
+		}
+		logs = append(logs, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return &service.HeartbeatProvisioningLogList{Logs: logs, Total: total, Page: page, PageSize: pageSize}, nil
+}
+
 func (r *heartbeatProvisioningRepository) SetProxy(ctx context.Context, jobID, proxyID int64) error {
 	return r.updateClaimed(ctx, `proxy_id = $2, updated_at = NOW()`, jobID, proxyID)
 }
