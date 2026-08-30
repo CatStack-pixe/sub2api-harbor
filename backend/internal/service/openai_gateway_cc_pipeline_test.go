@@ -37,7 +37,7 @@ func TestSetOpenAIUpstreamRequestBodyResetsFraming(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer replay.Close()
+	defer func() { _ = replay.Close() }()
 	replayed, err := io.ReadAll(replay)
 	if err != nil {
 		t.Fatal(err)
