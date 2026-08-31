@@ -21,6 +21,22 @@ import (
 	"github.com/tidwall/sjson"
 )
 
+// isOpenAIMessagesCompatiblePlatform reports whether /messages should use the
+// OpenAI-compatible bridge for a group platform. NVIDIA exposes Chat
+// Completions only, so its Anthropic messages requests must be translated.
+func isOpenAIMessagesCompatiblePlatform(platform string) bool {
+	switch platform {
+	case service.PlatformOpenAI, service.PlatformGrok, service.PlatformAgnes,
+		service.PlatformDeepSeek, service.PlatformNvidia, service.PlatformTokenRhythm,
+		service.PlatformKimi, service.PlatformZhipu, service.PlatformChatAnywhere,
+		service.PlatformGLM, service.PlatformModelScope, service.PlatformDashScope,
+		service.PlatformMiniMax, service.PlatformVolcengine:
+		return true
+	default:
+		return false
+	}
+}
+
 // RegisterGatewayRoutes 注册 API 网关路由（Claude/OpenAI/Gemini 兼容）
 func RegisterGatewayRoutes(
 	r *gin.Engine,
@@ -58,16 +74,7 @@ func RegisterGatewayRoutes(
 		}
 	}
 	isOpenAIMessagesCompatibleGatewayPlatform := func(c *gin.Context) bool {
-		switch getGroupPlatform(c) {
-		case service.PlatformOpenAI, service.PlatformGrok, service.PlatformAgnes,
-			service.PlatformDeepSeek, service.PlatformTokenRhythm, service.PlatformKimi,
-			service.PlatformZhipu, service.PlatformChatAnywhere, service.PlatformGLM,
-			service.PlatformModelScope, service.PlatformDashScope, service.PlatformMiniMax,
-			service.PlatformVolcengine:
-			return true
-		default:
-			return false
-		}
+		return isOpenAIMessagesCompatiblePlatform(getGroupPlatform(c))
 	}
 	isOpenAIChatCompatibleGatewayPlatform := func(c *gin.Context) bool {
 		if isOpenAIResponsesCompatibleGatewayPlatform(c) {
