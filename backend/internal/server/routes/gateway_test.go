@@ -58,6 +58,12 @@ func newGatewayRoutesTestRouterWithConfig(cfg *config.Config, platform ...string
 	return router
 }
 
+func TestOpenAIMessagesCompatiblePlatformIncludesNVIDIA(t *testing.T) {
+	require.True(t, isOpenAIMessagesCompatiblePlatform(service.PlatformNvidia))
+	require.True(t, isOpenAIMessagesCompatiblePlatform(service.PlatformKimi))
+	require.False(t, isOpenAIMessagesCompatiblePlatform(service.PlatformAnthropic))
+}
+
 func TestGatewayRoutesOpenAIResponsesCompactPathIsRegistered(t *testing.T) {
 	router := newGatewayRoutesTestRouter()
 
