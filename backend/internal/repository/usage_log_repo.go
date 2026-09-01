@@ -46,8 +46,8 @@ const usageLogOpsSuccessFilterUL = usageLogSuccessFilterUL + `
          oe.created_at >= ul.created_at - INTERVAL '90 minutes'
          AND oe.created_at < ul.created_at + INTERVAL '90 minutes'
          AND (
-           (ul.request_id LIKE 'local:%' AND oe.request_id = SUBSTRING(ul.request_id FROM 7))
-           OR (ul.request_id LIKE 'client:%' AND oe.client_request_id = SUBSTRING(ul.request_id FROM 8))
+           (ul.request_id LIKE 'local:%%' AND oe.request_id = SUBSTRING(ul.request_id FROM 7))
+           OR (ul.request_id LIKE 'client:%%' AND oe.client_request_id = SUBSTRING(ul.request_id FROM 8))
          )
        )
      )

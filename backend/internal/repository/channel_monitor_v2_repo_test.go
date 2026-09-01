@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -142,6 +143,13 @@ func TestUsageLogOpsSuccessFilterMatchesAllDurableRequestIDForms(t *testing.T) {
 	require.Contains(t, query, "oe.request_id = substring(ul.request_id from 7)")
 	require.Contains(t, query, "oe.client_request_id = substring(ul.request_id from 8)")
 	require.Contains(t, query, "interval '90 minutes'")
+}
+
+func TestChannelMonitorV2SQLTemplateRendersLikeWildcards(t *testing.T) {
+	query := fmt.Sprintf(channelMonitorV2UsageMetricsSQL, channelMonitorV2PlatformSQL, channelMonitorV2ModelSQL)
+	require.Contains(t, query, "LIKE 'local:%'")
+	require.Contains(t, query, "LIKE 'client:%'")
+	require.NotContains(t, query, "LIKE 'local:%%'")
 }
 
 func TestChannelMonitorV2RatesUseCoveredWindow(t *testing.T) {
