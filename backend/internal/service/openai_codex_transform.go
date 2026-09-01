@@ -1220,7 +1220,19 @@ func normalizeOpenAIModelForUpstream(account *Account, model string) string {
 	if account == nil || account.UsesOpenAICodexProtocol() {
 		return normalizeCodexModel(model)
 	}
-	return strings.TrimSpace(model)
+	model = strings.TrimSpace(model)
+	// DeepSeek's current catalog uses dated v4 IDs. Keep the public/legacy
+	// aliases usable while ensuring the provider never receives the retired
+	// undated IDs (which are rejected as model-closed by the upstream).
+	if account.Platform == PlatformDeepseek {
+		switch strings.ToLower(model) {
+		case "deepseek-v4-flash":
+			return "deepseek-v4-flash-0731"
+		case "deepseek-v4-pro":
+			return "deepseek-v4-pro-0813"
+		}
+	}
+	return model
 }
 
 func SupportsVerbosity(model string) bool {

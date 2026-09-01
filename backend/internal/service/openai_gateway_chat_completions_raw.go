@@ -91,8 +91,22 @@ func (s *OpenAIGatewayService) forwardAsRawChatCompletions(
 	if upstreamModel != originalModel {
 		upstreamBody = ReplaceModelInBody(body, upstreamModel)
 	}
+	if shouldNormalizeCNChatCompletionsStop(account) {
+		normalizedBody, changed, normalizeErr := normalizeCNChatCompletionsStopField(upstreamBody)
+		if normalizeErr != nil {
+			return nil, fmt.Errorf("normalize CN stop field: %w", normalizeErr)
+		}
+		if changed {
+			upstreamBody = normalizedBody
+		}
+	}
 	if normalizedBody, normalized := NormalizeGLMOpenAIReasoningEffort(upstreamBody, upstreamModel); normalized {
 		upstreamBody = normalizedBody
+	}
+	if deepSeekTextOnlyImageRequest(account, upstreamModel, upstreamBody) {
+		MarkOpsClientBusinessLimited(c, OpsClientBusinessLimitedReasonLocalModelConfiguration)
+		writeChatCompletionsError(c, http.StatusBadRequest, "invalid_request_error", deepSeekTextOnlyImageInputMessage)
+		return nil, errors.New(deepSeekTextOnlyImageInputMessage)
 	}
 
 	// 4. Apply OpenAI fast policy on the CC body

@@ -446,7 +446,22 @@ type opsCollectedPercentiles struct {
 func (c *OpsMetricsCollector) queryUsageCounts(ctx context.Context, start, end time.Time) (successCount int64, tokenConsumed int64, err error) {
 	q := `
 SELECT
-  COALESCE(COUNT(*), 0) AS success_count,
+  COALESCE(COUNT(*) FILTER (WHERE NOT EXISTS (
+    SELECT 1
+    FROM ops_error_logs oe
+    WHERE COALESCE(oe.status_code, 0) >= 400
+      AND (
+        NULLIF(oe.request_id, '') = usage_logs.request_id
+        OR (
+          oe.created_at >= usage_logs.created_at - INTERVAL '90 minutes'
+          AND oe.created_at < usage_logs.created_at + INTERVAL '90 minutes'
+          AND (
+            (usage_logs.request_id LIKE 'local:%' AND oe.request_id = SUBSTRING(usage_logs.request_id FROM 7))
+            OR (usage_logs.request_id LIKE 'client:%' AND oe.client_request_id = SUBSTRING(usage_logs.request_id FROM 8))
+          )
+        )
+      )
+  )), 0) AS success_count,
   COALESCE(SUM(input_tokens + output_tokens + cache_creation_tokens + cache_read_tokens), 0) AS token_consumed
 FROM usage_logs
 WHERE created_at >= $1 AND created_at < $2`

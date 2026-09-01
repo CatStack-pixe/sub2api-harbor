@@ -1740,7 +1740,10 @@ func openAIRequestBodyMayContainImageInput(body []byte) bool {
 		return false
 	}
 	input := gjson.GetBytes(body, "input")
-	messages := gjson.GetBytes(body, "messages.#-1")
+	// Scan the complete message history. An image can occur in any user turn,
+	// and checking only the last item lets text-only models receive an earlier
+	// image request that they cannot process.
+	messages := gjson.GetBytes(body, "messages")
 	return openAIJSONValueMayContainImageInput(input) || openAIJSONValueMayContainImageInput(messages)
 }
 

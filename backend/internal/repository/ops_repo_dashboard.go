@@ -793,7 +793,22 @@ func (r *opsRepository) queryUsageCounts(ctx context.Context, filter *service.Op
 
 	q := `
 SELECT
-  COALESCE(COUNT(*), 0) AS success_count,
+  COALESCE(COUNT(*) FILTER (WHERE NOT EXISTS (
+    SELECT 1
+    FROM ops_error_logs oe
+    WHERE COALESCE(oe.status_code, 0) >= 400
+      AND (
+        NULLIF(oe.request_id, '') = ul.request_id
+        OR (
+          oe.created_at >= ul.created_at - INTERVAL '90 minutes'
+          AND oe.created_at < ul.created_at + INTERVAL '90 minutes'
+          AND (
+            (ul.request_id LIKE 'local:%' AND oe.request_id = SUBSTRING(ul.request_id FROM 7))
+            OR (ul.request_id LIKE 'client:%' AND oe.client_request_id = SUBSTRING(ul.request_id FROM 8))
+          )
+        )
+      )
+  )), 0) AS success_count,
   COALESCE(SUM(input_tokens + output_tokens + cache_creation_tokens + cache_read_tokens), 0) AS token_consumed
 FROM usage_logs ul
 ` + join + `

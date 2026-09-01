@@ -371,6 +371,11 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 			upstreamModel = compactModel
 		}
 	}
+	if deepSeekTextOnlyImageRequest(account, upstreamModel, body) {
+		MarkOpsClientBusinessLimited(c, OpsClientBusinessLimitedReasonLocalModelConfiguration)
+		writeOpenAIResponsesFallbackError(c, http.StatusBadRequest, "invalid_request_error", deepSeekTextOnlyImageInputMessage)
+		return nil, errors.New(deepSeekTextOnlyImageInputMessage)
+	}
 	if billingModel != requestedModel {
 		logger.LegacyPrintf("service.openai_gateway", "[OpenAI] Model mapping applied: %s -> %s (account: %s, isCodexCLI: %v)", requestedModel, billingModel, account.Name, isCodexCLI)
 	}

@@ -107,6 +107,22 @@ WITH combined AS (
   LEFT JOIN groups g ON g.id = ul.group_id
   LEFT JOIN accounts a ON a.id = ul.account_id
   WHERE ul.created_at >= $1 AND ul.created_at < $2
+    AND NOT EXISTS (
+      SELECT 1
+      FROM ops_error_logs oe
+      WHERE COALESCE(oe.status_code, 0) >= 400
+        AND (
+          NULLIF(oe.request_id, '') = ul.request_id
+          OR (
+            oe.created_at >= ul.created_at - INTERVAL '90 minutes'
+            AND oe.created_at < ul.created_at + INTERVAL '90 minutes'
+            AND (
+              (ul.request_id LIKE 'local:%' AND oe.request_id = SUBSTRING(ul.request_id FROM 7))
+              OR (ul.request_id LIKE 'client:%' AND oe.client_request_id = SUBSTRING(ul.request_id FROM 8))
+            )
+          )
+        )
+    )
 
   UNION ALL
 
