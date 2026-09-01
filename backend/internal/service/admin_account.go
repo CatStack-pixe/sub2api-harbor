@@ -466,7 +466,11 @@ func buildAccountForCreate(input *CreateAccountInput, accountExtra map[string]an
 	}
 	probeEnabled := input.ProbeEnabled
 	if probeEnabled == nil && account.IsTokenRhythm() {
-		enabled := true
+		// TokenRhythm's billing endpoint authenticates with browser cookies.
+		// Keep the probe default for cookie-backed accounts, but leave key-only
+		// imports schedulable because their API key is valid for gateway traffic.
+		_, _, cookieErr := TokenRhythmCookieCredentials(input.Credentials)
+		enabled := cookieErr == nil
 		probeEnabled = &enabled
 	}
 	if probeEnabled != nil && *probeEnabled {

@@ -119,7 +119,7 @@ func validateAccountCredentials(platform, accountType string, credentials map[st
 				return infraerrors.BadRequest(errorPrefix+"_BASE_URL_INVALID", platformName+" base_url is fixed")
 			}
 		}
-		if _, _, err := TokenRhythmCookieCredentials(credentials); err != nil {
+		if _, _, err := TokenRhythmCookieCredentials(credentials); err != nil && tokenRhythmCookieFieldsPresent(credentials) {
 			return infraerrors.BadRequest(errorPrefix+"_COOKIE_INVALID", err.Error())
 		}
 		return nil
@@ -197,6 +197,22 @@ func validateAccountCredentials(platform, accountType string, credentials map[st
 		}
 	}
 	return nil
+}
+
+// tokenRhythmCookieFieldsPresent distinguishes an intentional key-only import
+// from a malformed cookie supplied alongside an API key. Key-only accounts can
+// forward requests with api_key, while cookie-backed management still validates
+// the complete session pair.
+func tokenRhythmCookieFieldsPresent(credentials map[string]any) bool {
+	if credentials == nil {
+		return false
+	}
+	for _, key := range []string{tokenRhythmCookieInputKey, tokenRhythmSessionKey, tokenRhythmCSRFKey} {
+		if _, exists := credentials[key]; exists {
+			return true
+		}
+	}
+	return false
 }
 
 func isKimiBaseURL(raw string) bool {
