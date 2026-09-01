@@ -52,12 +52,45 @@ func TestValidateTokenRhythmCredentials(t *testing.T) {
 		"tokenrhythm_cookie": "tr_session=session; tr_csrf=csrf",
 	}
 	require.NoError(t, validateAccountCredentials(PlatformTokenRhythm, AccountTypeAPIKey, valid))
+	require.NoError(t, validateAccountCredentials(PlatformTokenRhythm, AccountTypeAPIKey, map[string]any{
+		"api_key":  "tr-api-key",
+		"base_url": TokenRhythmDefaultBaseURL,
+	}))
 	require.Error(t, validateAccountCredentials(PlatformTokenRhythm, AccountTypeOAuth, valid))
+	require.Error(t, validateAccountCredentials(PlatformTokenRhythm, AccountTypeAPIKey, map[string]any{
+		"api_key":            "tr-api-key",
+		"tokenrhythm_cookie": "tr_session=session",
+	}))
 	require.Error(t, validateAccountCredentials(PlatformTokenRhythm, AccountTypeAPIKey, map[string]any{
 		"api_key": "tr-api-key",
 		"base_url": "https://relay.example/v1",
 		"tokenrhythm_cookie": "tr_session=session; tr_csrf=csrf",
 	}))
+}
+
+func TestBuildTokenRhythmKeyOnlyDoesNotEnableBillingProbe(t *testing.T) {
+	keyOnly, err := buildAccountForCreate(&CreateAccountInput{
+		Platform: PlatformTokenRhythm,
+		Type:     AccountTypeAPIKey,
+		Credentials: map[string]any{
+			"api_key":  "tr-api-key",
+			"base_url": TokenRhythmDefaultBaseURL,
+		},
+	}, nil)
+	require.NoError(t, err)
+	require.False(t, upstreamBillingProbeEnabled(keyOnly))
+
+	cookieBacked, err := buildAccountForCreate(&CreateAccountInput{
+		Platform: PlatformTokenRhythm,
+		Type:     AccountTypeAPIKey,
+		Credentials: map[string]any{
+			"api_key":    "tr-api-key",
+			"tr_session": "session",
+			"tr_csrf":    "csrf",
+		},
+	}, nil)
+	require.NoError(t, err)
+	require.True(t, upstreamBillingProbeEnabled(cookieBacked))
 }
 
 func TestParseTokenRhythmBalanceResponse(t *testing.T) {
