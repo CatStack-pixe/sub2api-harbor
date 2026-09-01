@@ -132,7 +132,9 @@ func TestChannelMonitorV2UsageSuccessExcludesCyberBillingRows(t *testing.T) {
 	require.Contains(t, channelMonitorV2PlatformSQL, "g.platform = 'composite'")
 	require.Contains(t, channelMonitorV2PlatformSQL, "a.platform")
 	require.Contains(t, channelMonitorV2HistogramSQL, "ul.actual_cost > 0")
-	require.Contains(t, channelMonitorV2HistogramSQL, "NOT EXISTS")
+	// Error-correlated usage rows stay in token/latency samples; only the
+	// success-request count applies the operational error anti-join.
+	require.NotContains(t, channelMonitorV2HistogramSQL, "oe.status_code")
 }
 
 func TestUsageLogOpsSuccessFilterMatchesAllDurableRequestIDForms(t *testing.T) {
