@@ -349,7 +349,7 @@ func isReplayableUpstreamRequest(req *http.Request, err error) bool {
 }
 
 func canReplayUpstreamRequest(req *http.Request) bool {
-	return req != nil && (req.Body == nil || req.GetBody != nil)
+	return req != nil && (req.Body == nil || req.Body == http.NoBody || req.GetBody != nil)
 }
 
 func isUpstreamTransportError(err error) bool {
@@ -394,7 +394,7 @@ func cloneUpstreamRequest(req *http.Request) (*http.Request, error) {
 		return nil, errors.New("request is nil")
 	}
 	clone := req.Clone(req.Context())
-	if req.Body == nil {
+	if req.Body == nil || req.Body == http.NoBody {
 		return clone, nil
 	}
 	if req.GetBody == nil {
