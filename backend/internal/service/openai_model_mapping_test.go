@@ -429,6 +429,24 @@ func TestNormalizeOpenAIModelForUpstream(t *testing.T) {
 			model:   "gpt-4.1",
 			want:    "gpt-4.1",
 		},
+		{
+			name:    "deepseek maps retired flash alias to dated catalog model",
+			account: &Account{Type: AccountTypeAPIKey, Platform: PlatformDeepseek},
+			model:   "deepseek-v4-flash",
+			want:    "deepseek-v4-flash-0731",
+		},
+		{
+			name:    "deepseek maps retired pro alias to dated catalog model",
+			account: &Account{Type: AccountTypeAPIKey, Platform: PlatformDeepseek},
+			model:   "deepseek-v4-pro",
+			want:    "deepseek-v4-pro-0813",
+		},
+		{
+			name:    "deepseek keeps dated catalog model unchanged",
+			account: &Account{Type: AccountTypeAPIKey, Platform: PlatformDeepseek},
+			model:   "deepseek-v4-flash-0731",
+			want:    "deepseek-v4-flash-0731",
+		},
 	}
 
 	for _, tt := range tests {

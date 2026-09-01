@@ -124,10 +124,24 @@ func TestChannelMonitorV2UsageSuccessExcludesCyberBillingRows(t *testing.T) {
 	for _, query := range []string{channelMonitorV2UsageMetricsSQL, channelMonitorV2UserMetricsSQL} {
 		require.Contains(t, query, "COALESCE(ul.request_type, 0) NOT IN (4, 6)")
 		require.Contains(t, query, "ul.actual_cost > 0")
+		require.Contains(t, query, "NOT EXISTS")
+		require.Contains(t, query, "oe.status_code")
+		require.Contains(t, query, "oe.client_request_id = SUBSTRING(ul.request_id FROM 8)")
 	}
 	require.Contains(t, channelMonitorV2PlatformSQL, "g.platform = 'composite'")
 	require.Contains(t, channelMonitorV2PlatformSQL, "a.platform")
 	require.Contains(t, channelMonitorV2HistogramSQL, "ul.actual_cost > 0")
+	require.Contains(t, channelMonitorV2HistogramSQL, "NOT EXISTS")
+}
+
+func TestUsageLogOpsSuccessFilterMatchesAllDurableRequestIDForms(t *testing.T) {
+	query := strings.ToLower(usageLogOpsSuccessFilterUL)
+	require.Contains(t, query, "ul.actual_cost > 0")
+	require.Contains(t, query, "not exists")
+	require.Contains(t, query, "nullif(oe.request_id, '') = ul.request_id")
+	require.Contains(t, query, "oe.request_id = substring(ul.request_id from 7)")
+	require.Contains(t, query, "oe.client_request_id = substring(ul.request_id from 8)")
+	require.Contains(t, query, "interval '90 minutes'")
 }
 
 func TestChannelMonitorV2RatesUseCoveredWindow(t *testing.T) {

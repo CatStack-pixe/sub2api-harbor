@@ -82,6 +82,20 @@ func (s *OpenAIGatewayService) forwardResponsesViaRawChatCompletions(
 	if err != nil {
 		return nil, fmt.Errorf("marshal chat completions fallback request: %w", err)
 	}
+	if shouldNormalizeCNChatCompletionsStop(account) {
+		normalizedBody, changed, normalizeErr := normalizeCNChatCompletionsStopField(chatBody)
+		if normalizeErr != nil {
+			return nil, fmt.Errorf("normalize CN stop field: %w", normalizeErr)
+		}
+		if changed {
+			chatBody = normalizedBody
+		}
+	}
+	if deepSeekTextOnlyImageRequest(account, upstreamModel, chatBody) {
+		MarkOpsClientBusinessLimited(c, OpsClientBusinessLimitedReasonLocalModelConfiguration)
+		writeOpenAIResponsesFallbackError(c, http.StatusBadRequest, "invalid_request_error", deepSeekTextOnlyImageInputMessage)
+		return nil, errors.New(deepSeekTextOnlyImageInputMessage)
+	}
 	chatBody, err = s.applyOpenAIFastPolicyToBody(ctx, account, upstreamModel, chatBody)
 	if err != nil {
 		var blocked *OpenAIFastBlockedError
