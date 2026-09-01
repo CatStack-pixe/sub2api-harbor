@@ -30,6 +30,15 @@ func TestLoadDefaultModelsListReadMaxBytes(t *testing.T) {
 	require.Equal(t, DefaultModelsListReadMaxBytes, cfg.Gateway.ModelsListReadMaxBytes)
 }
 
+func TestLoadUpstreamProxyFallbackURLFromEnvironment(t *testing.T) {
+	resetViperWithJWTSecret(t)
+	t.Setenv("GATEWAY_UPSTREAM_PROXY_FALLBACK_URL", "http://127.0.0.1:7890")
+
+	cfg, err := Load()
+	require.NoError(t, err)
+	require.Equal(t, "http://127.0.0.1:7890", cfg.Gateway.UpstreamProxyFallbackURL)
+}
+
 func TestLoadTimezonePrecedence(t *testing.T) {
 	tests := []struct {
 		name         string

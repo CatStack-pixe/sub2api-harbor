@@ -218,24 +218,30 @@ func (s *httpUpstreamService) Do(req *http.Request, proxyURL string, accountID i
 	resp, err := servertiming.Do(client, req)
 	if err != nil {
 		s.recordOpenAIHTTP2Failure(profile, entry.protocolMode, entry.proxyKey, err)
-		// 请求失败，立即减少计数
-		atomic.AddInt64(&entry.inFlight, -1)
-		atomic.StoreInt64(&entry.lastUsed, time.Now().UnixNano())
+		if resp != nil && resp.Body != nil {
+			_ = resp.Body.Close()
+		}
+		releaseUpstreamEntry(entry)
+
+		if isReplayableUpstreamRequest(req, err) {
+			if fallbackResp, ok := s.tryUpstreamProxyFallback(req, proxyURL, accountID, accountConcurrency, nil, profile); ok {
+				return fallbackResp, nil
+			}
+		}
 		return nil, err
 	}
 	s.recordOpenAIHTTP2Success(profile, entry.protocolMode, entry.proxyKey)
+	if isProxyFallbackResponse(resp) && canReplayUpstreamRequest(req) {
+		if fallbackResp, ok := s.tryUpstreamProxyFallback(req, proxyURL, accountID, accountConcurrency, nil, profile); ok {
+			if resp.Body != nil {
+				_ = resp.Body.Close()
+			}
+			releaseUpstreamEntry(entry)
+			return fallbackResp, nil
+		}
+	}
 
-	// 如果上游返回了压缩内容，解压后再交给业务层
-	decompressResponseBody(resp)
-
-	// 包装响应体，在关闭时自动减少计数并更新时间戳
-	// 这确保了流式响应（如 SSE）在完全读取前不会被淘汰
-	resp.Body = wrapTrackedBody(resp.Body, func() {
-		atomic.AddInt64(&entry.inFlight, -1)
-		atomic.StoreInt64(&entry.lastUsed, time.Now().UnixNano())
-	})
-
-	return resp, nil
+	return trackUpstreamResponse(resp, entry), nil
 }
 
 // DoWithTLS 执行带 TLS 指纹伪装的 HTTP 请求
@@ -281,20 +287,205 @@ func (s *httpUpstreamService) DoWithTLS(req *http.Request, proxyURL string, acco
 	client = httpClientWithGrokAccessDeniedFallback(client)
 	resp, err := servertiming.Do(client, req)
 	if err != nil {
-		atomic.AddInt64(&entry.inFlight, -1)
-		atomic.StoreInt64(&entry.lastUsed, time.Now().UnixNano())
+		s.recordOpenAIHTTP2Failure(upstreamProfile, entry.protocolMode, entry.proxyKey, err)
+		if resp != nil && resp.Body != nil {
+			_ = resp.Body.Close()
+		}
+		releaseUpstreamEntry(entry)
+		if isReplayableUpstreamRequest(req, err) {
+			if fallbackResp, ok := s.tryUpstreamProxyFallback(req, proxyURL, accountID, accountConcurrency, profile, upstreamProfile); ok {
+				return fallbackResp, nil
+			}
+		}
 		slog.Debug("tls_fingerprint_request_failed", "account_id", accountID, "error", err)
 		return nil, err
 	}
+	if isProxyFallbackResponse(resp) && canReplayUpstreamRequest(req) {
+		if fallbackResp, ok := s.tryUpstreamProxyFallback(req, proxyURL, accountID, accountConcurrency, profile, upstreamProfile); ok {
+			if resp.Body != nil {
+				_ = resp.Body.Close()
+			}
+			releaseUpstreamEntry(entry)
+			return fallbackResp, nil
+		}
+	}
 
+	return trackUpstreamResponse(resp, entry), nil
+}
+
+// upstreamProxyFallbackURL returns the explicitly configured fallback relay.
+// An empty value keeps the account's proxy route unchanged; in particular, it
+// never turns a failed proxy request into an unintentional direct request.
+func (s *httpUpstreamService) upstreamProxyFallbackURL(primary string) (string, bool) {
+	if s == nil || s.cfg == nil {
+		return "", false
+	}
+	raw := strings.TrimSpace(s.cfg.Gateway.UpstreamProxyFallbackURL)
+	if raw == "" {
+		return "", false
+	}
+	fallbackKey, _, err := normalizeProxyURL(raw)
+	if err != nil || fallbackKey == directProxyKey {
+		if err != nil {
+			slog.Warn("invalid_upstream_proxy_fallback_url", "error", err)
+		}
+		return "", false
+	}
+	primaryKey, _, primaryErr := normalizeProxyURL(primary)
+	if primaryErr == nil && primaryKey == fallbackKey {
+		return "", false
+	}
+	return fallbackKey, true
+}
+
+func isReplayableUpstreamRequest(req *http.Request, err error) bool {
+	if req == nil || err == nil || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return false
+	}
+	if !isUpstreamTransportError(err) {
+		return false
+	}
+	return canReplayUpstreamRequest(req)
+}
+
+func canReplayUpstreamRequest(req *http.Request) bool {
+	return req != nil && (req.Body == nil || req.GetBody != nil)
+}
+
+func isUpstreamTransportError(err error) bool {
+	if err == nil || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return false
+	}
+	var netErr net.Error
+	if errors.As(err, &netErr) {
+		lower := strings.ToLower(err.Error())
+		if strings.Contains(lower, "awaiting response headers") || strings.Contains(lower, "client.timeout exceeded") {
+			// A slow but reachable upstream may already have accepted and billed
+			// the request; replaying it through another relay would duplicate work.
+			return false
+		}
+		return true
+	}
+	if isOpenAIHTTP2CompatibilityError(err) {
+		return true
+	}
+	// A few transports expose protocol failures as plain errors rather than
+	// net.Error. Keep the fallback limited to connection/framing markers so
+	// redirect-policy and request-construction errors are never retried.
+	lower := strings.ToLower(err.Error())
+	for _, marker := range []string{
+		"connection refused",
+		"connection reset",
+		"broken pipe",
+		"no such host",
+		"network is unreachable",
+		"tls handshake",
+		"unexpected eof",
+	} {
+		if strings.Contains(lower, marker) {
+			return true
+		}
+	}
+	return false
+}
+
+func cloneUpstreamRequest(req *http.Request) (*http.Request, error) {
+	if req == nil {
+		return nil, errors.New("request is nil")
+	}
+	clone := req.Clone(req.Context())
+	if req.Body == nil {
+		return clone, nil
+	}
+	if req.GetBody == nil {
+		return nil, errors.New("request body is not replayable")
+	}
+	body, err := req.GetBody()
+	if err != nil {
+		return nil, err
+	}
+	clone.Body = body
+	return clone, nil
+}
+
+func releaseUpstreamEntry(entry *upstreamClientEntry) {
+	if entry == nil {
+		return
+	}
+	atomic.AddInt64(&entry.inFlight, -1)
+	atomic.StoreInt64(&entry.lastUsed, time.Now().UnixNano())
+}
+
+func trackUpstreamResponse(resp *http.Response, entry *upstreamClientEntry) *http.Response {
+	if resp == nil {
+		releaseUpstreamEntry(entry)
+		return nil
+	}
 	decompressResponseBody(resp)
-
+	if resp.Body == nil {
+		releaseUpstreamEntry(entry)
+		return resp
+	}
 	resp.Body = wrapTrackedBody(resp.Body, func() {
-		atomic.AddInt64(&entry.inFlight, -1)
-		atomic.StoreInt64(&entry.lastUsed, time.Now().UnixNano())
+		releaseUpstreamEntry(entry)
 	})
+	return resp
+}
 
-	return resp, nil
+// tryUpstreamProxyFallback performs one request through the configured relay.
+// The caller owns the primary entry's in-flight slot and the original response.
+func (s *httpUpstreamService) tryUpstreamProxyFallback(
+	req *http.Request,
+	primaryProxyURL string,
+	accountID int64,
+	accountConcurrency int,
+	profile *tlsfingerprint.Profile,
+	upstreamProfile service.HTTPUpstreamProfile,
+) (*http.Response, bool) {
+	fallbackURL, ok := s.upstreamProxyFallbackURL(primaryProxyURL)
+	if !ok || !canReplayUpstreamRequest(req) {
+		return nil, false
+	}
+	fallbackReq, err := cloneUpstreamRequest(req)
+	if err != nil {
+		return nil, false
+	}
+
+	var entry *upstreamClientEntry
+	if profile == nil {
+		entry, err = s.acquireClientWithProfile(fallbackURL, accountID, accountConcurrency, upstreamProfile)
+	} else {
+		entry, err = s.acquireClientWithTLS(fallbackURL, accountID, accountConcurrency, profile, upstreamProfile)
+	}
+	if err != nil {
+		slog.Debug("upstream_proxy_fallback_client_failed", "error", err)
+		return nil, false
+	}
+
+	client := httpClientForUpstreamRequest(entry.client, fallbackReq)
+	client = httpClientWithGrokAccessDeniedFallback(client)
+	resp, err := servertiming.Do(client, fallbackReq)
+	if err != nil {
+		releaseUpstreamEntry(entry)
+		slog.Debug("upstream_proxy_fallback_request_failed", "error", err)
+		return nil, false
+	}
+	if resp == nil {
+		releaseUpstreamEntry(entry)
+		slog.Debug("upstream_proxy_fallback_empty_response")
+		return nil, false
+	}
+	if upstreamProfile == service.HTTPUpstreamProfileOpenAI {
+		s.recordOpenAIHTTP2Success(upstreamProfile, entry.protocolMode, entry.proxyKey)
+	}
+	return trackUpstreamResponse(resp, entry), true
+}
+
+func isProxyFallbackResponse(resp *http.Response) bool {
+	if resp == nil {
+		return false
+	}
+	return resp.StatusCode == http.StatusBadGateway || resp.StatusCode == http.StatusGatewayTimeout
 }
 
 func httpClientForUpstreamRequest(client *http.Client, req *http.Request) *http.Client {
