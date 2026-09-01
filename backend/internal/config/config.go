@@ -1103,13 +1103,6 @@ type GatewayConfig struct {
 	// CNProviders: 国产 OpenAI 兼容供应商（kimi/zhipu/deepseek）的余额检测配置。
 	// 仅作用于 payg（按量付费）账号：周期探测余额，低于阈值则临时停调。
 	CNProviders GatewayCNProvidersConfig `mapstructure:"cn_providers"`
-
-	// UpstreamProxyFallbackURL is an optional proxy used once when the
-	// account's configured upstream proxy fails before receiving a response.
-	// Keep this empty unless an operator explicitly wants a local relay such as
-	// http://127.0.0.1:7890; an empty value preserves the account proxy route and
-	// never falls back to a direct connection.
-	UpstreamProxyFallbackURL string `mapstructure:"upstream_proxy_fallback_url"`
 }
 
 // GatewayGrokConfig holds Grok-specific gateway scheduling knobs.
@@ -2645,7 +2638,6 @@ func setDefaults() {
 // unmarshal, exactly as before.
 func setEnvReachableDefaults() {
 	viper.SetDefault("gateway.forced_codex_instructions_template_file", "")
-	viper.SetDefault("gateway.upstream_proxy_fallback_url", "")
 	viper.SetDefault("gateway.session_idle_timeout_minutes", 0)
 	viper.SetDefault("gateway.user_message_queue.mode", "")
 	viper.SetDefault("update.proxy_url", "")
