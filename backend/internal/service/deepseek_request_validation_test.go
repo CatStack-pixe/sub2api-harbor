@@ -21,6 +21,13 @@ func TestDeepSeekTextOnlyImageRequest(t *testing.T) {
 	}
 }
 
+func TestDeepSeekTextOnlyImageRequestDetectsEarlierMessage(t *testing.T) {
+	body := []byte(`{"model":"deepseek-v4-flash","messages":[{"role":"user","content":[{"type":"image_url","image_url":{"url":"https://example.test/a.png"}}]},{"role":"assistant","content":"I can help"},{"role":"user","content":"continue"}]}`)
+	if !deepSeekTextOnlyImageRequest(&Account{Platform: PlatformDeepseek}, "deepseek-v4-flash", body) {
+		t.Fatal("expected an image in message history to be rejected for text-only DeepSeek models")
+	}
+}
+
 func TestDeepSeekTextOnlyImageRequestResponsesInput(t *testing.T) {
 	t.Parallel()
 
