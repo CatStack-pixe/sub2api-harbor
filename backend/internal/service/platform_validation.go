@@ -207,7 +207,7 @@ func tokenRhythmCookieFieldsPresent(credentials map[string]any) bool {
 	if credentials == nil {
 		return false
 	}
-	for _, key := range []string{tokenrhythmCookieInputKey, tokenRhythmSessionKey, tokenRhythmCSRFKey} {
+	for _, key := range []string{tokenRhythmCookieInputKey, tokenRhythmSessionKey, tokenRhythmCSRFKey} {
 		if _, exists := credentials[key]; exists {
 			return true
 		}
