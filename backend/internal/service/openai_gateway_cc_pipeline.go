@@ -132,8 +132,30 @@ func (s *OpenAIGatewayService) failoverOpenAIUpstreamHTTPError(
 		respBody,
 		upstreamMsg,
 		shouldDisable,
-		!shouldDisable && account.IsPoolMode() && (account.IsPoolModeRetryableStatus(resp.StatusCode) || isOpenAITransientProcessingError(resp.StatusCode, upstreamMsg, respBody)),
+		openAIAccountRetryableOnSameAccount(account, resp.StatusCode, upstreamMsg, respBody, shouldDisable),
 	)
+}
+
+// openAIAccountRetryableOnSameAccount keeps transient provider failures within
+// the caller's existing bounded pool retry budget. DeepSeek's 429 and other
+// deterministic request errors should move to another account, never replay
+// against the same credentials; only transient gateway/processing failures
+// qualify for a same-account retry there.
+func openAIAccountRetryableOnSameAccount(account *Account, statusCode int, upstreamMsg string, responseBody []byte, shouldDisable bool) bool {
+	if shouldDisable || account == nil || !account.IsPoolMode() {
+		return false
+	}
+	if account.Platform == PlatformDeepseek {
+		message := strings.ToLower(strings.TrimSpace(upstreamMsg))
+		for _, marker := range []string{"model not found", "model is not supported", "unsupported model", "model is unavailable", "model unavailable", "unknown model", "invalid parameter", "invalid request", "does not exist"} {
+			if strings.Contains(message, marker) {
+				return false
+			}
+		}
+		return statusCode == http.StatusBadGateway || statusCode == http.StatusServiceUnavailable ||
+			statusCode == http.StatusGatewayTimeout || isOpenAITransientProcessingError(statusCode, upstreamMsg, responseBody)
+	}
+	return account.IsPoolModeRetryableStatus(statusCode) || isOpenAITransientProcessingError(statusCode, upstreamMsg, responseBody)
 }
 
 // openAIChatCompletionsTargetURL 解析账号的（非 Grok）Chat Completions 上游端点。
@@ -237,6 +259,9 @@ func (s *OpenAIGatewayService) sendCCUpstreamRequest(
 	// 账号级请求头覆写：放在所有内置默认头（含 Grok CLI 身份头）之后应用，
 	// 使配置值获得除共享传输层强制头之外的最高优先级。
 	account.ApplyHeaderOverrides(upstreamReq.Header)
+	// Header overrides are untrusted with respect to body framing. Reapply the
+	// final payload after all overrides so net/http and proxies see one length.
+	setOpenAIUpstreamRequestBody(upstreamReq, body)
 
 	proxyURL := ""
 	if account.Proxy != nil {
@@ -270,6 +295,7 @@ func setOpenAIUpstreamRequestBody(req *http.Request, body []byte) {
 		return
 	}
 	req.Header.Del("Content-Length")
+	req.Header.Del("Transfer-Encoding")
 	req.Body = io.NopCloser(bytes.NewReader(body))
 	req.ContentLength = int64(len(body))
 	req.GetBody = func() (io.ReadCloser, error) {

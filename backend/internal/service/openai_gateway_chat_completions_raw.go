@@ -104,6 +104,15 @@ func (s *OpenAIGatewayService) forwardAsRawChatCompletions(
 	if normalizedBody, normalized := NormalizeGLMOpenAIReasoningEffort(upstreamBody, upstreamModel); normalized {
 		upstreamBody = normalizedBody
 	}
+	if account.Platform == PlatformGLM {
+		normalizedBody, changed, normalizeErr := normalizeGLMChatCompletionsRequestBody(upstreamBody)
+		if normalizeErr != nil {
+			return nil, fmt.Errorf("normalize GLM chat request: %w", normalizeErr)
+		}
+		if changed {
+			upstreamBody = normalizedBody
+		}
+	}
 	if deepSeekTextOnlyImageRequest(account, upstreamModel, upstreamBody) {
 		MarkOpsClientBusinessLimited(c, OpsClientBusinessLimitedReasonLocalModelConfiguration)
 		writeChatCompletionsError(c, http.StatusBadRequest, "invalid_request_error", deepSeekTextOnlyImageInputMessage)

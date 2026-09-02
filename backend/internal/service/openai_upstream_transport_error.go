@@ -139,9 +139,19 @@ func (s *OpenAIGatewayService) handleOpenAIUpstreamTransportError(ctx context.Co
 		s.tempUnscheduleOpenAITransportError(ctx, account, safeErr)
 	}
 
+	// DeepSeek connection resets are commonly transient proxy/upstream blips.
+	// Let the handler spend the account's configured pool retry budget before
+	// rotating credentials; durable network failures were already blocked above.
+	transportMessage := strings.ToLower(err.Error())
+	connectionReset := errors.Is(err, syscall.ECONNRESET) ||
+		strings.Contains(transportMessage, "connection reset") || strings.Contains(transportMessage, "reset by peer")
+	retryableOnSameAccount := account != nil && account.IsPoolMode() &&
+		account.Platform == PlatformDeepseek && connectionReset &&
+		!classifyUpstreamTransportError(err).Persistent
 	return &UpstreamFailoverError{
 		StatusCode:   http.StatusBadGateway,
 		ResponseBody: openAITransportFailoverBody,
+		RetryableOnSameAccount: retryableOnSameAccount,
 	}
 }
 
