@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/tidwall/gjson"
 	"github.com/stretchr/testify/require"
+	"github.com/tidwall/gjson"
 )
 
 func TestNormalizeGLMChatCompletionsRequestBody(t *testing.T) {

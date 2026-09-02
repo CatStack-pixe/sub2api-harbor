@@ -126,7 +126,7 @@ func (s *OpenAIGatewayService) shouldBridgeOpenAIWSPassthroughFirstMessage(accou
 		return false
 	}
 	var body struct {
-		Type              string `json:"type"`
+		Type               string `json:"type"`
 		PreviousResponseID string `json:"previous_response_id"`
 	}
 	if err := json.Unmarshal(payload, &body); err != nil {
