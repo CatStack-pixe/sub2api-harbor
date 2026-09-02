@@ -169,8 +169,8 @@ type AdminGroup struct {
 	Group
 	// OpenAI Fast controls are admin-only operational settings; regular user
 	// group responses intentionally omit them.
-	ForceOpenAIFast bool `json:"force_openai_fast"`
-	FreeOpenAIFast  bool `json:"free_openai_fast"`
+	ForceOpenAIFast     bool   `json:"force_openai_fast"`
+	FreeOpenAIFast      bool   `json:"free_openai_fast"`
 	GlobalPromptEnabled bool   `json:"global_prompt_enabled"`
 	GlobalPrompt        string `json:"global_prompt"`
 

@@ -330,7 +330,7 @@ func (s *BillingService) initFallbackPricing() {
 		OutputPricePerToken:        50e-6,
 		CacheCreationPricePerToken: 12.5e-6,
 		CacheCreation5mPrice:       12.5e-6,
-		CacheCreation1hPrice:        20e-6,
+		CacheCreation1hPrice:       20e-6,
 		CacheReadPricePerToken:     0.25e-6,
 		SupportsCacheBreakdown:     true,
 	}
