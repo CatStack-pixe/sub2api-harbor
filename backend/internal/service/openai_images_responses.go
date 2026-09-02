@@ -733,13 +733,14 @@ func openAIImagesTextFallbackErrorForText(text string) *OpenAIImagesUpstreamErro
 			Message:    sanitizeUpstreamErrorMessage(text),
 		}
 	}
-	return &OpenAIImagesUpstreamError{
-		StatusCode:              http.StatusBadGateway,
-		ErrorType:               "upstream_error",
-		Code:                    "image_generation_unavailable",
-		Message:                 "Upstream did not execute image generation",
-		SynthesizedFromModelText: true,
+	err := &OpenAIImagesUpstreamError{
+		StatusCode: http.StatusBadGateway,
+		ErrorType:  "upstream_error",
+		Code:       "image_generation_unavailable",
+		Message:    "Upstream did not execute image generation",
 	}
+	err.SynthesizedFromModelText = true
+	return err
 }
 
 // summarizeOpenAIImagesNoOutputBody 从上游 SSE 响应体提取诊断摘要，用于软失败时
