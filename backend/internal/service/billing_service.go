@@ -1651,9 +1651,6 @@ func (s *BillingService) applyModelSpecificPricingPolicyEx(model string, pricing
 	if fastRatio > 0 {
 		enforceOpenAIFastPricingRatio(&cloned, fastRatio)
 	}
-	if fastRatio > 0 {
-		enforceOpenAIFastPricingRatio(&cloned, fastRatio)
-	}
 	return &cloned
 }
 

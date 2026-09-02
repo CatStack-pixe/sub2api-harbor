@@ -1512,7 +1512,7 @@ func TestOpenAIGatewayServiceRecordUsage_UsesRequestedModelAndUpstreamModelMetad
 			BillingModel:    "gpt-5.1-codex",
 			Model:           "gpt-5.1",
 			UpstreamModel:   "gpt-5.1-codex",
-			ServiceTier:     &serviceTier,
+			ServiceTier:              &serviceTier,
 			ReasoningEffort:          &reasoning,
 			RequestedReasoningEffort: &reasoning,
 			Usage: OpenAIUsage{
