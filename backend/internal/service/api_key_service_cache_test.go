@@ -301,7 +301,8 @@ func TestAPIKeyService_SnapshotRoundTrip_PreservesReasoningEffortPolicy(t *testi
 			Status:             StatusActive,
 			SubscriptionType:   SubscriptionTypeStandard,
 			RateMultiplier:     1,
-			MaxReasoningEffort: "medium",
+			MaxReasoningEffort:          "medium",
+			MaxReasoningEffortOverLimit: ReasoningEffortOverLimitDeny,
 			ReasoningEffortMappings: []ReasoningEffortMapping{
 				{From: "max", To: "xhigh"},
 			},

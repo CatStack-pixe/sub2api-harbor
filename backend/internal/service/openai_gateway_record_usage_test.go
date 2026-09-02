@@ -1513,7 +1513,8 @@ func TestOpenAIGatewayServiceRecordUsage_UsesRequestedModelAndUpstreamModelMetad
 			Model:           "gpt-5.1",
 			UpstreamModel:   "gpt-5.1-codex",
 			ServiceTier:     &serviceTier,
-			ReasoningEffort: &reasoning,
+			ReasoningEffort:          &reasoning,
+			RequestedReasoningEffort: &reasoning,
 			Usage: OpenAIUsage{
 				InputTokens:  20,
 				OutputTokens: 10,

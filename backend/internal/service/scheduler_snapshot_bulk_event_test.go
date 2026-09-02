@@ -188,7 +188,8 @@ func TestSchedulerBulkAccountEventUsesGroupZeroInSimpleMode(t *testing.T) {
 	err := svc.handleBulkAccountEvent(context.Background(), bulkEventPayload([]int64{11}, []int64{72}), make(map[batchSeenKey]struct{}))
 
 	require.NoError(t, err)
-	require.ElementsMatch(t, schedulerBucketsForTest([]int64{0}, PlatformOpenAI), cache.capturedBuckets())
+	platforms := schedulerPlatformsForAccount(&Account{Platform: PlatformOpenAI})
+	require.ElementsMatch(t, schedulerBucketsForTest([]int64{0}, platforms...), cache.capturedBuckets())
 }
 
 func TestSchedulerBulkAccountEventConservativelyExpandsAntigravityPlatforms(t *testing.T) {

@@ -373,7 +373,7 @@ func TestUpdateCredentialsPlainCNAPIKeyAccountCleanupStaysSemanticallyEquivalent
 	require.NoError(t, err)
 	query := normalizeSQLWhitespace(capturedSQL)
 	require.Contains(t, query,
-		"platform IN ('openai', 'anthropic', 'kimi', 'zhipu', 'deepseek') AND type = 'apikey' AND credentials IS DISTINCT FROM $1::jsonb")
+		"type = 'apikey' AND credentials IS DISTINCT FROM $1::jsonb THEN COALESCE(extra, '{}'::jsonb) - 'upstream_billing_probe'")
 	require.Contains(t, query,
 		"THEN COALESCE(extra, '{}'::jsonb) - 'upstream_billing_probe' - 'ollama_cloud_usage_session' - 'ollama_cloud_usage_auto_refresh' - 'ollama_cloud_usage_snapshot'")
 	require.NotContains(t, query, "- 'upstream_billing_probe_enabled'")

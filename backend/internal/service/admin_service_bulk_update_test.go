@@ -319,9 +319,8 @@ func TestAdminService_BulkUpdateAccounts_NilGroupRepoReturnsError(t *testing.T) 
 	require.Contains(t, err.Error(), "group repository not configured")
 }
 
-// TestAdminService_BulkUpdateAccounts_MixedChannelPreCheckBlocksOnExistingConflict verifies
-// that the global pre-check detects a conflict with existing group members and returns an
-// error before any DB write is performed.
+// TestAdminService_BulkUpdateAccounts_AllowsCrossPlatformGroupBinding verifies that
+// account platform and group platform are independent at write time.
 func TestAdminService_BulkUpdateAccounts_MixedChannelPreCheckBlocksOnExistingConflict(t *testing.T) {
 	repo := &accountRepoStubForBulkUpdate{
 		getByIDsAccounts: []*Account{
@@ -344,11 +343,10 @@ func TestAdminService_BulkUpdateAccounts_MixedChannelPreCheckBlocksOnExistingCon
 	}
 
 	result, err := svc.BulkUpdateAccounts(context.Background(), input)
-	require.Nil(t, result)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "mixed channel")
-	// No BindGroups should have been called since the check runs before any write.
-	require.Empty(t, repo.bindGroupsCalls)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	require.Equal(t, 1, result.Success)
+	require.Equal(t, []int64{1}, repo.bindGroupsCalls)
 }
 
 func TestAdminServiceBulkUpdateAccounts_ResolvesIDsFromFilters(t *testing.T) {

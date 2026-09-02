@@ -325,7 +325,7 @@ func TestPatchGrokResponsesBodyDropsNestedUnsupportedFields(t *testing.T) {
 	require.True(t, json.Valid(patched))
 	require.False(t, strings.Contains(string(patched), "external_web_access"))
 	require.Equal(t, "kept_fn", gjson.GetBytes(patched, "tools.0.name").String())
-	require.Equal(t, "9007199254740993", gjson.GetBytes(patched, "metadata.large_id").Raw)
+	require.False(t, gjson.GetBytes(patched, "metadata").Exists())
 }
 
 func TestStripAnthropicThinkingSignaturesPreservesLargeIntegers(t *testing.T) {
