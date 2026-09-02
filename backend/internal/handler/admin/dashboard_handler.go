@@ -701,6 +701,14 @@ func (h *DashboardHandler) GetUserBreakdown(c *gin.Context) {
 			dim.Stream = &s
 		}
 	}
+	if v := strings.TrimSpace(c.Query("native_compaction_v2")); v != "" {
+		value, err := strconv.ParseBool(v)
+		if err != nil {
+			response.BadRequest(c, "Invalid native_compaction_v2 value, use true or false")
+			return
+		}
+		dim.NativeCompactionV2 = &value
+	}
 	if v := c.Query("billing_type"); v != "" {
 		if bt, err := strconv.ParseInt(v, 10, 8); err == nil {
 			btVal := int8(bt)

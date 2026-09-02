@@ -89,8 +89,9 @@ func newAntigravityCompatAccount(accountType string) *Account {
 			"access_token": "stale-account-token",
 			"project_id":   "project-3757",
 			"model_mapping": map[string]any{
-				"gemini-3.1-pro-high": "gemini-3.1-pro-high",
-				"claude-sonnet-4-5":   "claude-sonnet-4-5",
+				"gemini-3.1-pro-high":      "gemini-3.1-pro-high",
+				"claude-sonnet-4-5":        "claude-sonnet-4-5",
+				"claude-opus-4-6-thinking": "claude-opus-4-6-thinking",
 			},
 		},
 	}

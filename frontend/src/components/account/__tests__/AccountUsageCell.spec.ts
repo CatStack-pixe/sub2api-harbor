@@ -54,6 +54,40 @@ function makeAccount(overrides: Partial<Account>): Account {
   }
 }
 
+function makeOllamaUsage(accountId: number, overrides: Partial<NonNullable<Account['ollama_cloud_usage']>> = {}) {
+  return {
+    account_id: accountId,
+    eligible: true,
+    configured: true,
+    auto_refresh_enabled: true,
+    encryption_key_configured: true,
+    snapshot: {
+      status: 'ok' as const,
+      last_attempt_at: '2026-07-23T00:00:00Z',
+      next_refresh_at: '2026-07-23T01:00:00Z',
+      data: {
+        five_hour: { used_percent: 12 },
+        seven_day: { used_percent: 34 }
+      }
+    },
+    ...overrides,
+  }
+}
+
+// CN 平台 Ollama Cloud 用例共用的子组件 stub：按 data-test 断言渲染与否
+const cnUsageCellStubs = {
+  OllamaCloudUsageCell: {
+    props: ['account'],
+    template: '<div data-test="embedded-ollama">ollama</div>'
+  },
+  CNProviderQuotaCell: {
+    template: '<div data-test="cn-quota-cell" />'
+  },
+  CNProviderBalanceCell: {
+    template: '<div data-test="cn-balance-cell" />'
+  }
+}
+
 describe('AccountUsageCell', () => {
   beforeEach(() => {
     getUsage.mockReset()

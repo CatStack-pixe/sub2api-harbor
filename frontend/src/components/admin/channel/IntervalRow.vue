@@ -117,6 +117,7 @@ const isEmpty = computed(() => {
   return (iv.input_price == null || iv.input_price === '') &&
     (iv.output_price == null || iv.output_price === '') &&
     (iv.cache_write_price == null || iv.cache_write_price === '') &&
+    (iv.cache_write_1h_price == null || iv.cache_write_1h_price === '') &&
     (iv.cache_read_price == null || iv.cache_read_price === '') &&
     (iv.input_multiplier == null || iv.input_multiplier === '') &&
     (iv.output_multiplier == null || iv.output_multiplier === '') &&
@@ -140,3 +141,9 @@ function toIntOrNull(val: string): number | null {
   return isNaN(n) ? null : n
 }
 </script>
+
+<style scoped>
+.pricing-interval-grid {
+  grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr));
+}
+</style>

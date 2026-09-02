@@ -48,6 +48,9 @@ type AdminUser struct {
 	// GroupRates 用户专属分组倍率配置
 	// map[groupID]rateMultiplier
 	GroupRates map[int64]float64 `json:"group_rates,omitempty"`
+	// RestrictPublicGroups 为 true 时，该用户仅可使用 allowed_groups 中列出的
+	// 公开分组。这是管理侧的权限开关，不下发给用户自身的接口。
+	RestrictPublicGroups bool `json:"restrict_public_groups"`
 }
 
 type APIKey struct {
@@ -151,7 +154,9 @@ type Group struct {
 	RPMLimit int `json:"rpm_limit"`
 	// MaxReasoningEffort OpenAI/Codex 请求的推理强度上限，空字符串表示不限制。
 	MaxReasoningEffort string `json:"max_reasoning_effort"`
-	// ReasoningEffortMappings OpenAI/Codex 推理强度精确映射。
+	// MaxReasoningEffortOverLimit 超过上限时的访问控制：downgrade（默认）或 deny。
+	MaxReasoningEffortOverLimit string `json:"max_reasoning_effort_over_limit"`
+	// ReasoningEffortMappings OpenAI/Codex 推理强度映射，可按模型精确名、前缀或后缀限定。
 	ReasoningEffortMappings []domain.ReasoningEffortMapping `json:"reasoning_effort_mappings"`
 
 	CreatedAt time.Time `json:"created_at"`
@@ -501,8 +506,9 @@ type UsageLog struct {
 	Model     string `json:"model"`
 	// ServiceTier records the OpenAI service tier used for billing, e.g. "priority" / "flex".
 	ServiceTier *string `json:"service_tier,omitempty"`
-	// ReasoningEffort is the request's reasoning effort level.
+	// ReasoningEffort is the client-requested effort (mapping-hidden, like Model).
 	// OpenAI: "low"/"medium"/"high"/"xhigh"; Claude: "low"/"medium"/"high"/"max".
+	// Historical rows without requested_reasoning_effort fall back to the stored effective value.
 	ReasoningEffort *string `json:"reasoning_effort,omitempty"`
 	// InboundEndpoint is the client-facing API endpoint path, e.g. /v1/chat/completions.
 	InboundEndpoint *string `json:"inbound_endpoint,omitempty"`
@@ -533,8 +539,11 @@ type UsageLog struct {
 	RequestType  string `json:"request_type"`
 	Stream       bool   `json:"stream"`
 	OpenAIWSMode bool   `json:"openai_ws_mode"`
-	DurationMs   *int   `json:"duration_ms"`
-	FirstTokenMs *int   `json:"first_token_ms"`
+	// NativeCompactionV2 is true only for requests positively identified at
+	// runtime as the native OpenAI remote compaction v2 wire.
+	NativeCompactionV2 bool `json:"native_compaction_v2"`
+	DurationMs         *int `json:"duration_ms"`
+	FirstTokenMs       *int `json:"first_token_ms"`
 
 	// 图片生成字段
 	ImageCount         int            `json:"image_count"`

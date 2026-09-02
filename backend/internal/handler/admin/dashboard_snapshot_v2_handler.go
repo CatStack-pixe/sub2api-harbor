@@ -186,6 +186,7 @@ func (h *DashboardHandler) buildSnapshotV2Response(
 			filters.Model,
 			filters.RequestType,
 			filters.Stream,
+			filters.NativeCompactionV2,
 			filters.BillingType,
 			filters.UpstreamModelMismatch,
 		)
@@ -207,6 +208,7 @@ func (h *DashboardHandler) buildSnapshotV2Response(
 			usagestats.ModelSourceRequested,
 			filters.RequestType,
 			filters.Stream,
+			filters.NativeCompactionV2,
 			filters.BillingType,
 			filters.UpstreamModelMismatch,
 		)
@@ -227,6 +229,7 @@ func (h *DashboardHandler) buildSnapshotV2Response(
 			filters.GroupID,
 			filters.RequestType,
 			filters.Stream,
+			filters.NativeCompactionV2,
 			filters.BillingType,
 			filters.UpstreamModelMismatch,
 		)
@@ -294,6 +297,14 @@ func parseDashboardSnapshotV2Filters(c *gin.Context) (*dashboardSnapshotV2Filter
 			return nil, err
 		}
 		filters.Stream = &streamVal
+	}
+
+	if nativeCompactionV2Str := strings.TrimSpace(c.Query("native_compaction_v2")); nativeCompactionV2Str != "" {
+		value, err := strconv.ParseBool(nativeCompactionV2Str)
+		if err != nil {
+			return nil, err
+		}
+		filters.NativeCompactionV2 = &value
 	}
 
 	if billingTypeStr := strings.TrimSpace(c.Query("billing_type")); billingTypeStr != "" {

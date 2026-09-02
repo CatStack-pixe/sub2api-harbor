@@ -626,8 +626,8 @@ func lockAndMergeAccountProbeExtra(
 			AND credentials = $4::jsonb
 			AND proxy_id IS NOT DISTINCT FROM $5,
 			COALESCE(
-				platform IN ('openai', 'anthropic')
-				AND $2 IN ('openai', 'anthropic')
+				platform IN (`+ollamaCloudUsagePlatformsSQL+`)
+				AND $2 IN (`+ollamaCloudUsagePlatformsSQL+`)
 				AND type = 'apikey'
 				AND $3 = 'apikey'
 				AND credentials -> 'api_key' IS NOT DISTINCT FROM $4::jsonb -> 'api_key'
@@ -2978,7 +2978,7 @@ func (r *accountRepository) BulkUpdate(ctx context.Context, ids []int64, updates
 				extraExpression = "(" + extraExpression + ") - 'ollama_cloud_usage_snapshot'"
 			}
 		}
-		eligibleAccount := "platform IN ('openai', 'anthropic') AND type = 'apikey'"
+		eligibleAccount := "platform IN (" + ollamaCloudUsagePlatformsSQL + ") AND type = 'apikey'"
 		groupIdentityChanged := ""
 		if len(ollamaGroupIdentityChanges) > 0 {
 			groupIdentityChanged = "(" + eligibleAccount + " AND (" + joinClauses(ollamaGroupIdentityChanges, " OR ") + "))"
@@ -3953,16 +3953,25 @@ func (r *accountRepository) ResetQuotaUsed(ctx context.Context, id int64) error 
 		`UPDATE accounts SET extra = (
 			COALESCE(extra, '{}'::jsonb)
 			|| '{"quota_used": 0, "quota_daily_used": 0, "quota_weekly_used": 0}'::jsonb
-		) - 'quota_daily_start' - 'quota_weekly_start' - 'quota_daily_reset_at' - 'quota_weekly_reset_at', updated_at = NOW()
+		) - 'quota_daily_start' - 'quota_weekly_start' - 'quota_daily_reset_at' - 'quota_weekly_reset_at',
+		rate_limited_at = NULL, rate_limit_reset_at = NULL, updated_at = NOW()
 		WHERE id = $1 AND deleted_at IS NULL`,
 		id)
 	if err != nil {
 		return err
 	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		return service.ErrAccountNotFound
+	}
 	// 重置配额后触发调度快照刷新，使账号重新参与调度
 	if err := enqueueSchedulerOutbox(ctx, r.sql, service.SchedulerOutboxEventAccountChanged, &id, nil, nil); err != nil {
 		logger.LegacyPrintf("repository.account", "[SchedulerOutbox] enqueue quota reset failed: account=%d err=%v", id, err)
 	}
+	r.syncSchedulerAccountSnapshot(ctx, id)
 	return nil
 }
 

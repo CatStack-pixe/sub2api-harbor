@@ -317,6 +317,19 @@ func groupSupportsOAuthOnlyFilter(platform string) bool {
 		platform == PlatformComposite
 }
 
+func groupSupportsOpenAIFast(platform string) bool {
+	return platform == PlatformOpenAI || platform == PlatformComposite
+}
+
+func sanitizeGroupOpenAIFast(group *Group) {
+	if group == nil || !groupSupportsOpenAIFast(group.Platform) {
+		if group != nil {
+			group.ForceOpenAIFast = false
+			group.FreeOpenAIFast = false
+		}
+	}
+}
+
 func (s *adminServiceImpl) CreateGroup(ctx context.Context, input *CreateGroupInput) (*Group, error) {
 	if err := ValidateGroupGlobalPrompt(input.GlobalPrompt); err != nil {
 		return nil, err
@@ -337,6 +350,10 @@ func (s *adminServiceImpl) CreateGroup(ctx context.Context, input *CreateGroupIn
 	maxReasoningEffort, err := normalizeMaxReasoningEffortForPlatform(platform, input.MaxReasoningEffort)
 	if err != nil {
 		return nil, infraerrors.Newf(http.StatusBadRequest, "INVALID_MAX_REASONING_EFFORT", "%v", err)
+	}
+	maxReasoningEffortOverLimit, err := normalizeMaxReasoningEffortOverLimitForPlatform(platform, input.MaxReasoningEffortOverLimit)
+	if err != nil {
+		return nil, infraerrors.Newf(http.StatusBadRequest, "INVALID_MAX_REASONING_EFFORT_OVER_LIMIT", "%v", err)
 	}
 	reasoningEffortMappings, err := NormalizeReasoningEffortMappings(platform, input.ReasoningEffortMappings)
 	if err != nil {
@@ -529,6 +546,8 @@ func (s *adminServiceImpl) CreateGroup(ctx context.Context, input *CreateGroupIn
 		SupportedModelScopes:            input.SupportedModelScopes,
 		AllowMessagesDispatch:           input.AllowMessagesDispatch,
 		AllowLive:                       input.AllowLive,
+		ForceOpenAIFast:                 input.ForceOpenAIFast,
+		FreeOpenAIFast:                  input.FreeOpenAIFast,
 		RequireOAuthOnly:                input.RequireOAuthOnly,
 		RequirePrivacySet:               input.RequirePrivacySet,
 		DefaultMappedModel:              input.DefaultMappedModel,
@@ -536,6 +555,7 @@ func (s *adminServiceImpl) CreateGroup(ctx context.Context, input *CreateGroupIn
 		ModelsListConfig:                normalizeGroupModelsListConfig(input.ModelsListConfig),
 		RPMLimit:                        input.RPMLimit,
 		MaxReasoningEffort:              maxReasoningEffort,
+		MaxReasoningEffortOverLimit:     maxReasoningEffortOverLimit,
 		ReasoningEffortMappings:         reasoningEffortMappings,
 	}
 	sanitizeGroupMessagesDispatchFields(group)
@@ -719,11 +739,16 @@ func (s *adminServiceImpl) UpdateGroup(ctx context.Context, id int64, input *Upd
 	if input.SubscriptionType != "" {
 		group.SubscriptionType = input.SubscriptionType
 	}
-	// 限额字段：nil/负数 表示"无限制"，0 表示"不允许用量"，正数表示具体限额
-	// 前端始终发送这三个字段，无需 nil 守卫
-	group.DailyLimitUSD = normalizeLimit(input.DailyLimitUSD)
-	group.WeeklyLimitUSD = normalizeLimit(input.WeeklyLimitUSD)
-	group.MonthlyLimitUSD = normalizeLimit(input.MonthlyLimitUSD)
+	// 限额字段：nil 表示不修改，负数表示"无限制"，0 表示"不允许用量"，正数表示具体限额。
+	if input.DailyLimitUSD != nil {
+		group.DailyLimitUSD = normalizeLimit(input.DailyLimitUSD)
+	}
+	if input.WeeklyLimitUSD != nil {
+		group.WeeklyLimitUSD = normalizeLimit(input.WeeklyLimitUSD)
+	}
+	if input.MonthlyLimitUSD != nil {
+		group.MonthlyLimitUSD = normalizeLimit(input.MonthlyLimitUSD)
+	}
 	// 图片生成计费配置：负数表示清除（使用默认价格）
 	if input.AllowImageGeneration != nil {
 		group.AllowImageGeneration = *input.AllowImageGeneration
@@ -896,6 +921,12 @@ func (s *adminServiceImpl) UpdateGroup(ctx context.Context, id int64, input *Upd
 	if input.AllowLive != nil {
 		group.AllowLive = *input.AllowLive
 	}
+	if input.ForceOpenAIFast != nil {
+		group.ForceOpenAIFast = *input.ForceOpenAIFast
+	}
+	if input.FreeOpenAIFast != nil {
+		group.FreeOpenAIFast = *input.FreeOpenAIFast
+	}
 	if input.RequireOAuthOnly != nil {
 		group.RequireOAuthOnly = *input.RequireOAuthOnly
 	}
@@ -920,6 +951,13 @@ func (s *adminServiceImpl) UpdateGroup(ctx context.Context, id int64, input *Upd
 			return nil, infraerrors.Newf(http.StatusBadRequest, "INVALID_MAX_REASONING_EFFORT", "%v", err)
 		}
 		group.MaxReasoningEffort = maxReasoningEffort
+	}
+	if input.MaxReasoningEffortOverLimit != nil {
+		maxReasoningEffortOverLimit, err := normalizeMaxReasoningEffortOverLimitForPlatform(group.Platform, *input.MaxReasoningEffortOverLimit)
+		if err != nil {
+			return nil, infraerrors.Newf(http.StatusBadRequest, "INVALID_MAX_REASONING_EFFORT_OVER_LIMIT", "%v", err)
+		}
+		group.MaxReasoningEffortOverLimit = maxReasoningEffortOverLimit
 	}
 	if input.ReasoningEffortMappings != nil {
 		reasoningEffortMappings, err := NormalizeReasoningEffortMappings(group.Platform, *input.ReasoningEffortMappings)

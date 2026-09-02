@@ -91,7 +91,15 @@
         </template>
 
         <template #cell-reasoning_effort="{ row }">
-          <span class="text-sm text-gray-900 dark:text-white">
+          <div v-if="hasReasoningEffortMapping(row)" data-testid="reasoning-effort-cell" class="space-y-0.5 text-xs">
+            <div class="font-medium text-gray-900 dark:text-white">
+              {{ formatReasoningEffort(row.reasoning_effort) }}
+            </div>
+            <div class="text-gray-500 dark:text-gray-400">
+              <span class="mr-0.5">↳</span>{{ formatReasoningEffort(row.upstream_reasoning_effort) }}
+            </div>
+          </div>
+          <span v-else data-testid="reasoning-effort-cell" class="text-sm text-gray-900 dark:text-white">
             {{ formatReasoningEffort(row.reasoning_effort) }}
           </span>
         </template>
@@ -117,9 +125,18 @@
         </template>
 
         <template #cell-stream="{ row }">
-          <span class="inline-flex items-center rounded px-2 py-0.5 text-xs font-medium" :class="getRequestTypeBadgeClass(row)">
-            {{ getRequestTypeLabel(row) }}
-          </span>
+          <div class="flex flex-wrap items-center gap-1">
+            <span data-testid="request-type-badge" class="inline-flex items-center rounded px-2 py-0.5 text-xs font-medium" :class="getRequestTypeBadgeClass(row)">
+              {{ getRequestTypeLabel(row) }}
+            </span>
+            <span
+              v-if="row.native_compaction_v2"
+              data-testid="native-compaction-badge"
+              class="inline-flex items-center rounded bg-teal-100 px-2 py-0.5 text-xs font-medium text-teal-800 dark:bg-teal-900 dark:text-teal-200"
+            >
+              {{ t('usage.nativeCompactionV2') }}
+            </span>
+          </div>
         </template>
 
         <template #cell-billing_mode="{ row }">

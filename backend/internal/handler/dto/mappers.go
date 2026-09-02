@@ -3,6 +3,7 @@ package dto
 
 import (
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/service"
@@ -68,10 +69,11 @@ func UserFromServiceAdmin(u *service.User) *AdminUser {
 		return nil
 	}
 	return &AdminUser{
-		User:       *base,
-		Notes:      u.Notes,
-		LastUsedAt: u.LastUsedAt,
-		GroupRates: u.GroupRates,
+		User:                 *base,
+		Notes:                u.Notes,
+		LastUsedAt:           u.LastUsedAt,
+		GroupRates:           u.GroupRates,
+		RestrictPublicGroups: u.RestrictPublicGroups,
 	}
 }
 
@@ -220,6 +222,7 @@ func groupFromServiceBase(g *service.Group) Group {
 		RequirePrivacySet:               g.RequirePrivacySet,
 		RPMLimit:                        g.RPMLimit,
 		MaxReasoningEffort:              g.MaxReasoningEffort,
+		MaxReasoningEffortOverLimit:     g.MaxReasoningEffortOverLimit,
 		ReasoningEffortMappings:         g.ReasoningEffortMappings,
 		CreatedAt:                       g.CreatedAt,
 		UpdatedAt:                       g.UpdatedAt,
@@ -661,7 +664,7 @@ func usageLogFromServiceUser(l *service.UsageLog) UsageLog {
 		RequestID:                 l.RequestID,
 		Model:                     requestedModel,
 		ServiceTier:               l.ServiceTier,
-		ReasoningEffort:           l.ReasoningEffort,
+		ReasoningEffort:           userFacingReasoningEffort(l),
 		InboundEndpoint:           l.InboundEndpoint,
 		GroupID:                   l.GroupID,
 		SubscriptionID:            l.SubscriptionID,
@@ -683,6 +686,7 @@ func usageLogFromServiceUser(l *service.UsageLog) UsageLog {
 		RequestType:               requestType.String(),
 		Stream:                    stream,
 		OpenAIWSMode:              openAIWSMode,
+		NativeCompactionV2:        l.NativeCompactionV2,
 		DurationMs:                l.DurationMs,
 		FirstTokenMs:              l.FirstTokenMs,
 		ImageCount:                l.ImageCount,
@@ -740,6 +744,38 @@ func UsageLogFromServiceAdmin(l *service.UsageLog) *AdminUsageLog {
 		IPAddress:             l.IPAddress,
 		Account:               AccountSummaryFromService(l.Account),
 	}
+}
+
+func userFacingReasoningEffort(l *service.UsageLog) *string {
+	if l == nil {
+		return nil
+	}
+	if requested := strings.TrimSpace(derefString(l.RequestedReasoningEffort)); requested != "" {
+		return &requested
+	}
+	return l.ReasoningEffort
+}
+
+func adminUpstreamReasoningEffort(l *service.UsageLog) *string {
+	if l == nil {
+		return nil
+	}
+	forwarded := strings.TrimSpace(derefString(l.ReasoningEffort))
+	if forwarded == "" {
+		return nil
+	}
+	requested := userFacingReasoningEffort(l)
+	if requested != nil && service.NormalizeMaxReasoningEffort(*requested) == service.NormalizeMaxReasoningEffort(forwarded) {
+		return nil
+	}
+	return &forwarded
+}
+
+func derefString(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return *value
 }
 
 func UsageCleanupTaskFromService(task *service.UsageCleanupTask) *UsageCleanupTask {

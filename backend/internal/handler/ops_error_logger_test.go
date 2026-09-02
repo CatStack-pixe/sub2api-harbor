@@ -1532,6 +1532,12 @@ func TestClassifyOpsUpstreamAuthTextStillCountsForSLA(t *testing.T) {
 			status:  http.StatusForbidden,
 		},
 		{
+			name:    "provider reasoning effort over limit shaped error",
+			message: `reasoning effort "high" exceeds this group's limit of "low"`,
+			code:    "403",
+			status:  http.StatusForbidden,
+		},
+		{
 			name:    "provider token counting unsupported shaped error",
 			message: "Token counting is not supported for this platform",
 			code:    "404",

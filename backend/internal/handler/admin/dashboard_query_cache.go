@@ -85,6 +85,7 @@ func (h *DashboardHandler) getUsageTrendCached(
 	model string,
 	requestType *int16,
 	stream *bool,
+	nativeCompactionV2 *bool,
 	billingType *int8,
 	upstreamModelMismatch *bool,
 ) ([]usagestats.TrendDataPoint, bool, error) {
@@ -123,6 +124,7 @@ func (h *DashboardHandler) getModelStatsCached(
 	modelSource string,
 	requestType *int16,
 	stream *bool,
+	nativeCompactionV2 *bool,
 	billingType *int8,
 	upstreamModelMismatch *bool,
 ) ([]usagestats.ModelStat, bool, error) {
@@ -159,6 +161,7 @@ func (h *DashboardHandler) getGroupStatsCached(
 	userID, apiKeyID, accountID, groupID int64,
 	requestType *int16,
 	stream *bool,
+	nativeCompactionV2 *bool,
 	billingType *int8,
 	upstreamModelMismatch *bool,
 ) ([]usagestats.GroupStat, bool, error) {

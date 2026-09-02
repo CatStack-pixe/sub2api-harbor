@@ -70,6 +70,44 @@ export function sanitizeAccountSchedulingThresholdsMap(
   return normalizeAccountSchedulingThresholdsMap(input)
 }
 
+export type SchedulingThresholdPlatformType =
+  | "openai"
+  | "anthropic"
+  | "grok"
+  | "kimi"
+  | "zhipu"
+
+export type AccountSchedulingThresholdsMap = Record<SchedulingThresholdPlatformType, number>
+
+// 与后端 AllowedSchedulingThresholdPlatforms 保持一致（deepseek 为余额型，
+// 走余额检测而非用量阈值）。
+export const SCHEDULING_THRESHOLD_PLATFORMS: SchedulingThresholdPlatformType[] = [
+  "openai",
+  "anthropic",
+  "grok",
+  "kimi",
+  "zhipu",
+]
+
+export function normalizeAccountSchedulingThresholdsMap(
+  input?: Partial<Record<SchedulingThresholdPlatformType, number>> | null,
+): AccountSchedulingThresholdsMap {
+  const result = {} as AccountSchedulingThresholdsMap
+  for (const platform of SCHEDULING_THRESHOLD_PLATFORMS) {
+    const value = input?.[platform]
+    result[platform] = typeof value === "number" && Number.isFinite(value)
+      ? Math.min(100, Math.max(1, Math.trunc(value)))
+      : 100
+  }
+  return result
+}
+
+export function sanitizeAccountSchedulingThresholdsMap(
+  input?: Partial<Record<SchedulingThresholdPlatformType, number>> | null,
+): AccountSchedulingThresholdsMap {
+  return normalizeAccountSchedulingThresholdsMap(input)
+}
+
 /** 归一化为全 4 平台 × 3 窗口（缺失填 null），供模板非空绑定 */
 export function normalizePlatformQuotasMap(input?: DefaultPlatformQuotasMap | null): DefaultPlatformQuotasMap {
   const result: DefaultPlatformQuotasMap = {}
@@ -621,6 +659,7 @@ export interface SystemSettings {
   allow_ungrouped_key_scheduling: boolean;
 
   // Gateway forwarding behavior
+  openai_ttft_mode: string;
   enable_fingerprint_unification: boolean;
   enable_metadata_passthrough: boolean;
   enable_cch_signing: boolean;
@@ -937,6 +976,7 @@ export interface UpdateSettingsRequest {
   min_claude_code_version?: string;
   max_claude_code_version?: string;
   allow_ungrouped_key_scheduling?: boolean;
+  openai_ttft_mode?: string;
   enable_fingerprint_unification?: boolean;
   enable_metadata_passthrough?: boolean;
   enable_cch_signing?: boolean;

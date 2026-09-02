@@ -315,6 +315,7 @@ func TestAPIKeyService_SnapshotRoundTrip_PreservesReasoningEffortPolicy(t *testi
 	require.NotNil(t, roundTrip.Group)
 	require.Equal(t, PlatformComposite, roundTrip.Group.Platform)
 	require.Equal(t, "medium", roundTrip.Group.MaxReasoningEffort)
+	require.Equal(t, ReasoningEffortOverLimitDeny, roundTrip.Group.MaxReasoningEffortOverLimit)
 	require.Equal(t, apiKey.Group.ReasoningEffortMappings, roundTrip.Group.ReasoningEffortMappings)
 }
 

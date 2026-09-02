@@ -358,6 +358,9 @@ func normalizeClientToolOutput(item map[string]any) {
 	if _, ok := output.(string); ok {
 		return
 	}
+	if isResponsesToolOutputContent(output) {
+		return
+	}
 	if output == nil {
 		item["output"] = ""
 		return

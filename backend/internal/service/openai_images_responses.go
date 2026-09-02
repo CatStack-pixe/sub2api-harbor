@@ -37,6 +37,13 @@ type OpenAIImagesUpstreamError struct {
 	Message           string
 	Param             string
 	UpstreamRequestID string
+
+	// SynthesizedFromModelText marks an error the gateway inferred from the
+	// model's plain-text output instead of reading it off a structured upstream
+	// error frame. Such a verdict describes this one turn ("the model answered
+	// with words instead of an image"), not the account — see
+	// shouldCoolOpenAIImagesToolForError.
+	SynthesizedFromModelText bool
 }
 
 func (e *OpenAIImagesUpstreamError) Error() string {
@@ -326,6 +333,26 @@ func openAIImageUploadToDataURL(upload OpenAIImagesUpload) (string, error) {
 		contentType = http.DetectContentType(upload.Data)
 	}
 	return "data:" + contentType + ";base64," + base64.StdEncoding.EncodeToString(upload.Data), nil
+}
+
+// openAIImagesSelfBuiltRequestContextKey marks a request whose upstream body was
+// fully constructed by buildOpenAIImagesResponsesRequest, i.e. tool_choice and the
+// matching image_generation tool are always both present and never client-controlled.
+type openAIImagesSelfBuiltRequestContextKey struct{}
+
+func withOpenAIImagesSelfBuiltRequest(ctx context.Context) context.Context {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	return context.WithValue(ctx, openAIImagesSelfBuiltRequestContextKey{}, true)
+}
+
+func isOpenAIImagesSelfBuiltRequest(ctx context.Context) bool {
+	if ctx == nil {
+		return false
+	}
+	selfBuilt, _ := ctx.Value(openAIImagesSelfBuiltRequestContextKey{}).(bool)
+	return selfBuilt
 }
 
 func buildOpenAIImagesResponsesRequest(parsed *OpenAIImagesRequest, toolModel string) ([]byte, error) {
@@ -1775,6 +1802,7 @@ func (s *OpenAIGatewayService) forwardOpenAIImagesOAuth(
 	if err != nil {
 		return nil, err
 	}
+	upstreamCtx = withOpenAIImagesSelfBuiltRequest(upstreamCtx)
 	upstreamReq, err := s.buildUpstreamRequest(upstreamCtx, c, account, responsesBody, token, true, parsed.StickySessionSeed(), false)
 	if err != nil {
 		return nil, err

@@ -176,6 +176,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 	body = parsedReq.Body.Bytes()
 	reqModel := parsedReq.Model
 	reqStream := parsedReq.Stream
+	bindRequestedReasoningEffort(c, body, reqModel)
 	ensureCompositeTargetPlatform(c, apiKey, reqModel)
 	reqLog = reqLog.With(zap.String("model", reqModel), zap.Bool("stream", reqStream))
 
@@ -548,6 +549,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 			inboundEndpoint := GetInboundEndpoint(c)
 			upstreamEndpoint := GetUpstreamEndpoint(c, account.Platform)
 
+			stampForwardRequestedReasoningEffort(result, service.NormalizeClaudeOutputEffort(parsedReq.OutputEffort))
 			if result.ReasoningEffort == nil {
 				result.ReasoningEffort = service.NormalizeClaudeOutputEffort(parsedReq.OutputEffort)
 			}
@@ -1252,6 +1254,79 @@ func (h *GatewayHandler) codexModelIDsForGroup(ctx context.Context, group *servi
 	return fallbackModels
 }
 
+// CodexModels returns the effective group model list using the manifest shape
+// expected by Codex custom providers. Official OpenAI groups continue to use
+// OpenAIGatewayHandler.CodexModels so their live upstream metadata is preserved.
+func (h *GatewayHandler) CodexModels(c *gin.Context) {
+	apiKey, ok := middleware2.GetAPIKeyFromContext(c)
+	if !ok || apiKey == nil || apiKey.Group == nil {
+		h.errorResponse(c, http.StatusUnauthorized, "invalid_request_error", "API key group is required")
+		return
+	}
+
+	forcedPlatform := ""
+	if value, exists := middleware2.GetForcePlatformFromContext(c); exists {
+		forcedPlatform = strings.TrimSpace(value)
+	}
+	modelIDs := h.codexModelIDsForGroup(c.Request.Context(), apiKey.Group, forcedPlatform)
+	modelIDs = service.FilterCodexModelIDsForGroup(modelIDs, apiKey.Group)
+	body, err := h.gatewayService.BuildCodexModelsManifestForGroup(
+		c.Request.Context(),
+		apiKey.Group,
+		forcedPlatform,
+		modelIDs,
+	)
+	if err != nil {
+		h.errorResponse(c, http.StatusInternalServerError, "api_error", "Failed to build Codex models manifest")
+		return
+	}
+	etag := service.CodexModelsManifestETag(body)
+	c.Header("ETag", etag)
+	if service.CodexModelsManifestETagMatches(c.GetHeader("If-None-Match"), etag) {
+		c.Status(http.StatusNotModified)
+		c.Writer.WriteHeaderNow()
+		return
+	}
+	c.Data(http.StatusOK, "application/json", body)
+}
+
+func (h *GatewayHandler) codexModelIDsForGroup(ctx context.Context, group *service.Group, platformOverride string) []string {
+	if h == nil || h.gatewayService == nil || group == nil {
+		return nil
+	}
+
+	groupID := &group.ID
+	platform := strings.TrimSpace(platformOverride)
+	if platform == "" {
+		platform = group.Platform
+	}
+	if platform == service.PlatformComposite {
+		availableModels := h.compositeAvailableModels(ctx, groupID)
+		fallbackModels := defaultCodexModelIDsForPlatform(service.PlatformComposite)
+		if group.CustomModelsListEnabled() {
+			return filterModelsByCustomList(availableModels, fallbackModels, group.ModelsListConfig.Models)
+		}
+		if len(availableModels) > 0 {
+			return availableModels
+		}
+		return fallbackModels
+	}
+
+	availableModels := h.gatewayService.GetAvailableModels(ctx, groupID, platform)
+	fallbackModels := defaultCodexModelIDsForPlatform(platform)
+	if group.CustomModelsListEnabled() {
+		return filterModelsByCustomList(
+			customModelsListSource(platform, availableModels, fallbackModels),
+			fallbackModels,
+			group.ModelsListConfig.Models,
+		)
+	}
+	if len(availableModels) > 0 {
+		return availableModels
+	}
+	return fallbackModels
+}
+
 func (h *GatewayHandler) compositeAvailableModels(ctx context.Context, groupID *int64) []string {
 	if h == nil || h.gatewayService == nil {
 		return nil
@@ -1350,11 +1425,15 @@ func writeGrokModelsList(c *gin.Context, modelIDs []string) {
 		if grokModelSupportsConfigurableReasoning(modelID) {
 			item.SupportsReasoningEffort = true
 			item.ReasoningEffort = "high"
-			item.ReasoningEfforts = []grokReasoningEffortOption{
+			efforts := []grokReasoningEffortOption{
 				{Value: "low", Label: "Low"},
 				{Value: "medium", Label: "Medium"},
 				{Value: "high", Label: "High", Default: true},
 			}
+			if service.GrokSupportsXHighReasoningEffort(modelID) {
+				efforts = append(efforts, grokReasoningEffortOption{Value: "xhigh", Label: "xHigh"})
+			}
+			item.ReasoningEfforts = efforts
 		}
 		models = append(models, item)
 	}
