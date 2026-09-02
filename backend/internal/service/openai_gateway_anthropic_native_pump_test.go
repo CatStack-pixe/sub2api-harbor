@@ -34,7 +34,6 @@ func newHangingUpstreamResponse() (*http.Response, *io.PipeReader, *io.PipeWrite
 	return &http.Response{StatusCode: http.StatusOK, Body: pr, Header: http.Header{}}, pr, pw
 }
 
-//nolint:unused // Shared by integration tests that are selectively built in CI.
 func toolAnthropicSSEStream() string {
 	return strings.Join([]string{
 		"event: message_start",
@@ -57,6 +56,8 @@ func toolAnthropicSSEStream() string {
 		"",
 	}, "\n")
 }
+
+var _ = toolAnthropicSSEStream
 
 func miniAnthropicSSEStream() string {
 	return strings.Join([]string{
