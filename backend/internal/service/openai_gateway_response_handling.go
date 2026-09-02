@@ -569,6 +569,9 @@ func (s *OpenAIGatewayService) handleStreamingResponseWithReasoning(ctx context.
 						} else {
 							shouldFailover = openAIStreamFailedEventShouldFailover(dataBytes, failedMessage)
 						}
+						if isDeepSeekDeterministicPassthroughError(account, openAIStreamFailedEventSemanticStatus(dataBytes, failedMessage), dataBytes) {
+							shouldFailover = false
+						}
 					}
 					if shouldFailover {
 						sawFailedEvent = true

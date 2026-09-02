@@ -760,6 +760,25 @@ func stripOpenAILegacyResponsesBeta(headers http.Header) {
 	}
 }
 
+// isDeepSeekDeterministicPassthroughError identifies DeepSeek responses that
+// describe the request/model rather than a transient upstream condition. They
+// must not be retried on the same account (or needlessly replayed) even when a
+// pool has a broad custom retry-status list.
+func isDeepSeekDeterministicPassthroughError(account *Account, statusCode int, _ []byte) bool {
+	if account == nil || account.Platform != PlatformDeepSeek {
+		return false
+	}
+	if statusCode == http.StatusTooManyRequests || statusCode == http.StatusBadRequest ||
+		statusCode == http.StatusNotFound || statusCode == http.StatusUnprocessableEntity ||
+		statusCode == http.StatusConflict {
+		return true
+	}
+	// Other 4xx responses are deterministic unless they are account access
+	// failures (401/403), which remain eligible for credential failover.
+	return statusCode >= http.StatusBadRequest && statusCode < http.StatusInternalServerError &&
+		statusCode != http.StatusUnauthorized && statusCode != http.StatusForbidden
+}
+
 func shouldFailoverOpenAIPassthroughResponse(account *Account, statusCode int, responseBody []byte) bool {
 	if hit, _, _ := detectOpenAICyberPolicy(responseBody); hit {
 		return false
@@ -775,6 +794,9 @@ func shouldFailoverOpenAIPassthroughResponse(account *Account, statusCode int, r
 	}
 	if isOpenAIProxyFramingError(statusCode, "", responseBody) {
 		return true
+	}
+	if isDeepSeekDeterministicPassthroughError(account, statusCode, responseBody) {
+		return false
 	}
 	if account != nil && account.IsPoolMode() && account.IsPoolModeRetryableStatus(statusCode) {
 		return true
@@ -915,7 +937,8 @@ func (s *OpenAIGatewayService) handleFailoverErrorResponsePassthrough(
 		body,
 		upstreamMsg,
 		shouldDisable,
-		!shouldDisable && account.IsPoolMode() && account.IsPoolModeRetryableStatus(resp.StatusCode),
+		!shouldDisable && account.IsPoolMode() && account.IsPoolModeRetryableStatus(resp.StatusCode) &&
+			!isDeepSeekDeterministicPassthroughError(account, resp.StatusCode, body),
 	)
 }
 
@@ -1645,6 +1668,9 @@ func openAIStreamFailedEventRetryableOnSameAccount(account *Account, payload []b
 	if isOpenAIUpstreamCapacityShedEvent(payload) {
 		return true
 	}
+	if isDeepSeekDeterministicPassthroughError(account, openAIStreamFailedEventSemanticStatus(payload, message), payload) {
+		return false
+	}
 	if !account.IsPoolMode() {
 		return false
 	}
@@ -1765,6 +1791,9 @@ func (s *OpenAIGatewayService) nonStreamingTerminalFailureFailover(c *gin.Contex
 	shouldFailover := openAIStreamFailedEventShouldFailover(payload, message)
 	if terminalType == "error" {
 		shouldFailover = openAIStreamErrorEventShouldFailover(payload, message)
+	}
+	if isDeepSeekDeterministicPassthroughError(account, openAIStreamFailedEventSemanticStatus(payload, message), payload) {
+		shouldFailover = false
 	}
 	if !shouldFailover {
 		return nil
@@ -2041,6 +2070,9 @@ func (s *OpenAIGatewayService) handleStreamingResponsePassthrough(
 							shouldFailover = openAIStreamErrorEventShouldFailover(dataBytes, failedMessage)
 						} else {
 							shouldFailover = openAIStreamFailedEventShouldFailover(dataBytes, failedMessage)
+						}
+						if isDeepSeekDeterministicPassthroughError(account, openAIStreamFailedEventSemanticStatus(dataBytes, failedMessage), dataBytes) {
+							shouldFailover = false
 						}
 					}
 					if shouldFailover {
