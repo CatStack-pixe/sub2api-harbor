@@ -167,6 +167,10 @@ type Group struct {
 // 注意：普通用户接口不得返回 model_routing/account_count/account_groups 等内部信息。
 type AdminGroup struct {
 	Group
+	// OpenAI Fast controls are admin-only operational settings; regular user
+	// group responses intentionally omit them.
+	ForceOpenAIFast bool `json:"force_openai_fast"`
+	FreeOpenAIFast  bool `json:"free_openai_fast"`
 	GlobalPromptEnabled bool   `json:"global_prompt_enabled"`
 	GlobalPrompt        string `json:"global_prompt"`
 

@@ -14,7 +14,7 @@ import (
 	"github.com/dgraph-io/ristretto"
 )
 
-const apiKeyAuthSnapshotVersion = 20 // v20: group long-context and model pricing fields (force refresh of pre-fix snapshots)
+const apiKeyAuthSnapshotVersion = 23 // v23: preserve group global prompt, Fast, and reasoning policy fields
 
 type apiKeyAuthCacheConfig struct {
 	l1Size        int
