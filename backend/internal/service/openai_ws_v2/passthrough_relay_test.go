@@ -41,6 +41,11 @@ type closeSpyFrameConn struct {
 	closeCalls atomic.Int32
 }
 
+type eofReplacementFrameConn struct {
+	FrameConn
+	err error
+}
+
 type cancelJoinProbeFrameConn struct {
 	readStarted  chan struct{}
 	readCanceled chan struct{}

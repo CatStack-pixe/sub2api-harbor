@@ -719,7 +719,7 @@ func hasMixedToolInvocations(declarations []GeminiToolDeclaration) bool {
 		if len(d.FunctionDeclarations) > 0 {
 			hasFunc = true
 		}
-		if d.GoogleSearch != nil {
+		if d.GoogleSearch != nil || d.CodeExecution != nil {
 			hasBuiltin = true
 		}
 	}
@@ -818,4 +818,8 @@ func buildTools(tools []ClaudeTool) []GeminiToolDeclaration {
 	}
 
 	return declarations
+}
+
+func isCodeExecutionTool(tool ClaudeTool) bool {
+	return strings.TrimSpace(tool.Type) == "code_execution"
 }
