@@ -762,6 +762,12 @@ func grokSupportsXHighReasoningEffort(model string) bool {
 	return model == "grok-4.6" || model == "grok-4.6-latest"
 }
 
+// GrokSupportsXHighReasoningEffort reports whether a Grok model accepts the
+// xhigh reasoning effort value.
+func GrokSupportsXHighReasoningEffort(model string) bool {
+	return grokSupportsXHighReasoningEffort(model)
+}
+
 func grokSupportsReasoningEffort(model string) bool {
 	model = strings.ToLower(xai.StripGrokProviderPrefix(strings.TrimSpace(model)))
 	switch model {
