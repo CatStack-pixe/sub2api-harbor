@@ -1226,6 +1226,7 @@ func ChatCompletionsResponseToResponses(resp *ChatCompletionsResponse, model str
 		Object:      "response",
 		Model:       model,
 		Status:      "completed",
+		CreatedAt:   createdAt,
 		ServiceTier: chatServiceTier(resp),
 	}
 	if resp == nil {

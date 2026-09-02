@@ -1950,6 +1950,10 @@ const (
 	openAIImagesOAuthUnavailableReason   = "openai_images_oauth_tool_unavailable"
 )
 
+func shouldCoolOpenAIImagesToolForError(upstreamErr *OpenAIImagesUpstreamError) bool {
+	return upstreamErr != nil && !upstreamErr.SynthesizedFromModelText
+}
+
 func (s *OpenAIGatewayService) coolOpenAIImagesOAuthTool(ctx context.Context, account *Account) {
 	if s == nil || s.accountRepo == nil || account == nil || account.Platform != PlatformOpenAI {
 		return

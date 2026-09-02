@@ -587,6 +587,8 @@ type AdminUsageLog struct {
 	// UpstreamModel is the actual model sent to the upstream provider after mapping.
 	// Omitted when no mapping was applied (requested model was used as-is).
 	UpstreamModel *string `json:"upstream_model,omitempty"`
+	// UpstreamReasoningEffort is the effort forwarded after policy mapping.
+	UpstreamReasoningEffort *string `json:"upstream_reasoning_effort,omitempty"`
 	// UpstreamResponseModel is the raw model declared by the upstream response.
 	UpstreamResponseModel *string `json:"upstream_response_model,omitempty"`
 	// UpstreamModelMismatch is nil when the upstream did not declare a model.

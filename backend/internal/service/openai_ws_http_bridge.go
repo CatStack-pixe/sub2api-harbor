@@ -115,6 +115,27 @@ func (s *OpenAIGatewayService) shouldBridgeOpenAIWSHTTP(account *Account, payloa
 	return threshold > 0 && int64(payloadBytes) >= threshold
 }
 
+// shouldBridgeOpenAIWSPassthroughFirstMessage limits the HTTP bridge to the
+// initial response.create frame. Follow-up turns require the persistent WS
+// session and must stay on the native relay path.
+func (s *OpenAIGatewayService) shouldBridgeOpenAIWSPassthroughFirstMessage(account *Account, payload []byte) bool {
+	if account != nil && account.Platform == PlatformGrok {
+		return true
+	}
+	if !s.openAIWSHTTPBridgeEnabled() || int64(len(payload)) < s.openAIWSHTTPBridgeThresholdBytes() {
+		return false
+	}
+	var body struct {
+		Type              string `json:"type"`
+		PreviousResponseID string `json:"previous_response_id"`
+	}
+	if err := json.Unmarshal(payload, &body); err != nil {
+		return false
+	}
+	typeValue := strings.TrimSpace(body.Type)
+	return (typeValue == "" || typeValue == "response.create") && strings.TrimSpace(body.PreviousResponseID) == ""
+}
+
 func prepareOpenAIWSHTTPBridgeBody(account *Account, payload []byte) ([]byte, error) {
 	var body map[string]any
 	if err := decodeOpenAIJSONUseNumber(payload, &body); err != nil {

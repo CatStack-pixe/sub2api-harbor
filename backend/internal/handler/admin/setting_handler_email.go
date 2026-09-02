@@ -93,7 +93,7 @@ type SendTestEmailRequest struct {
 	SMTPFrom     string `json:"smtp_from_email"`
 	SMTPFromName string `json:"smtp_from_name"`
 	SMTPReplyTo  string `json:"smtp_reply_to"`
-	SMTPUseTLS   bool   `json:"smtp_use_tls"`
+	SMTPUseTLS   *bool  `json:"smtp_use_tls"`
 }
 
 // SendTestEmail 发送测试邮件
@@ -155,7 +155,7 @@ func (h *SettingHandler) SendTestEmail(c *gin.Context) {
 		From:     req.SMTPFrom,
 		FromName: req.SMTPFromName,
 		ReplyTo:  req.SMTPReplyTo,
-		UseTLS:   req.SMTPUseTLS,
+		UseTLS:   resolveSMTPUseTLS(req.SMTPUseTLS, savedConfig),
 	}
 
 	siteName := h.settingService.GetSiteName(c.Request.Context())

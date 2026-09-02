@@ -35,6 +35,29 @@ func newHangingUpstreamResponse() (*http.Response, *io.PipeReader, *io.PipeWrite
 }
 
 // miniAnthropicSSEStream 是一段最小可转换的 Anthropic 事件流。
+func toolAnthropicSSEStream() string {
+	return strings.Join([]string{
+		"event: message_start",
+		`data: {"type":"message_start","message":{"id":"msg_tool","type":"message","role":"assistant","content":[],"model":"glm-4.7","usage":{"input_tokens":10}}}`,
+		"",
+		"event: content_block_start",
+		`data: {"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"toolu_1","name":"lookup","input":{}}}`,
+		"",
+		"event: content_block_delta",
+		`data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"{\"query\":\"status\"}"}}`,
+		"",
+		"event: content_block_stop",
+		`data: {"type":"content_block_stop","index":0}`,
+		"",
+		"event: message_delta",
+		`data: {"type":"message_delta","delta":{"stop_reason":"tool_use"},"usage":{"output_tokens":5}}`,
+		"",
+		"event: message_stop",
+		`data: {"type":"message_stop"}`,
+		"",
+	}, "\n")
+}
+
 func miniAnthropicSSEStream() string {
 	return strings.Join([]string{
 		"event: message_start",

@@ -63,6 +63,7 @@ type channelModelPricingRequest struct {
 	InputPrice       *float64                   `json:"input_price" binding:"omitempty,min=0"`
 	OutputPrice      *float64                   `json:"output_price" binding:"omitempty,min=0"`
 	CacheWritePrice  *float64                   `json:"cache_write_price" binding:"omitempty,min=0"`
+	CacheWrite1hPrice *float64                  `json:"cache_write_1h_price" binding:"omitempty,min=0"`
 	CacheReadPrice   *float64                   `json:"cache_read_price" binding:"omitempty,min=0"`
 	FastMultiplier   *float64                   `json:"fast_multiplier" binding:"omitempty,gt=0"`
 	FlexMultiplier   *float64                   `json:"flex_multiplier" binding:"omitempty,gt=0"`
@@ -103,6 +104,7 @@ type pricingIntervalRequest struct {
 	InputPrice           *float64 `json:"input_price"`
 	OutputPrice          *float64 `json:"output_price"`
 	CacheWritePrice      *float64 `json:"cache_write_price"`
+	CacheWrite1hPrice    *float64 `json:"cache_write_1h_price"`
 	CacheReadPrice       *float64 `json:"cache_read_price"`
 	InputMultiplier      *float64 `json:"input_multiplier" binding:"omitempty,gt=0"`
 	OutputMultiplier     *float64 `json:"output_multiplier" binding:"omitempty,gt=0"`
@@ -145,6 +147,7 @@ type channelModelPricingResponse struct {
 	InputPrice       *float64                    `json:"input_price"`
 	OutputPrice      *float64                    `json:"output_price"`
 	CacheWritePrice  *float64                    `json:"cache_write_price"`
+	CacheWrite1hPrice *float64                    `json:"cache_write_1h_price"`
 	CacheReadPrice   *float64                    `json:"cache_read_price"`
 	FastMultiplier   *float64                    `json:"fast_multiplier"`
 	FlexMultiplier   *float64                    `json:"flex_multiplier"`
@@ -187,6 +190,7 @@ type pricingIntervalResponse struct {
 	InputPrice           *float64 `json:"input_price"`
 	OutputPrice          *float64 `json:"output_price"`
 	CacheWritePrice      *float64 `json:"cache_write_price"`
+	CacheWrite1hPrice    *float64 `json:"cache_write_1h_price"`
 	CacheReadPrice       *float64 `json:"cache_read_price"`
 	InputMultiplier      *float64 `json:"input_multiplier"`
 	OutputMultiplier     *float64 `json:"output_multiplier"`
@@ -292,6 +296,7 @@ func pricingToResponse(p *service.ChannelModelPricing) channelModelPricingRespon
 		InputPrice:       p.InputPrice,
 		OutputPrice:      p.OutputPrice,
 		CacheWritePrice:  p.CacheWritePrice,
+		CacheWrite1hPrice: p.CacheWrite1hPrice,
 		CacheReadPrice:   p.CacheReadPrice,
 		FastMultiplier:   p.FastMultiplier,
 		FlexMultiplier:   p.FlexMultiplier,
@@ -332,6 +337,7 @@ func intervalToResponse(iv service.PricingInterval) pricingIntervalResponse {
 		InputPrice:           iv.InputPrice,
 		OutputPrice:          iv.OutputPrice,
 		CacheWritePrice:      iv.CacheWritePrice,
+		CacheWrite1hPrice:    iv.CacheWrite1hPrice,
 		CacheReadPrice:       iv.CacheReadPrice,
 		InputMultiplier:      iv.InputMultiplier,
 		OutputMultiplier:     iv.OutputMultiplier,
@@ -366,6 +372,7 @@ func pricingRequestToService(reqs []channelModelPricingRequest, allowChannelMult
 				InputPrice:           iv.InputPrice,
 				OutputPrice:          iv.OutputPrice,
 				CacheWritePrice:      iv.CacheWritePrice,
+				CacheWrite1hPrice:    iv.CacheWrite1hPrice,
 				CacheReadPrice:       iv.CacheReadPrice,
 				InputMultiplier:      inputMultiplier,
 				OutputMultiplier:     outputMultiplier,
@@ -402,6 +409,7 @@ func pricingRequestToService(reqs []channelModelPricingRequest, allowChannelMult
 			InputPrice:       r.InputPrice,
 			OutputPrice:      r.OutputPrice,
 			CacheWritePrice:  r.CacheWritePrice,
+			CacheWrite1hPrice: r.CacheWrite1hPrice,
 			CacheReadPrice:   r.CacheReadPrice,
 			FastMultiplier:   fastMultiplier,
 			FlexMultiplier:   flexMultiplier,

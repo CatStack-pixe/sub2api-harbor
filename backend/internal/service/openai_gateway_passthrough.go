@@ -1742,6 +1742,26 @@ func (s *OpenAIGatewayService) newOpenAIStreamFailoverError(
 	return failoverErr
 }
 
+func (s *OpenAIGatewayService) nonStreamingTerminalFailureFailover(c *gin.Context, resp *http.Response, account *Account, passthrough bool, terminalType string, payload []byte, message string, canonicalModel ...string) *UpstreamFailoverError {
+	if account == nil || IsResponseCommitted(c) {
+		return nil
+	}
+	shouldFailover := openAIStreamFailedEventShouldFailover(payload, message)
+	if terminalType == "error" {
+		shouldFailover = openAIStreamErrorEventShouldFailover(payload, message)
+	}
+	if !shouldFailover {
+		return nil
+	}
+	var headers http.Header
+	requestID := ""
+	if resp != nil {
+		headers = resp.Header
+		requestID = strings.TrimSpace(resp.Header.Get("x-request-id"))
+	}
+	return s.newOpenAIStreamFailoverErrorWithModel(c, account, passthrough, requestID, payload, message, firstNonEmpty(canonicalModel...), headers)
+}
+
 func (s *OpenAIGatewayService) handleStreamingResponsePassthrough(
 	ctx context.Context,
 	resp *http.Response,
