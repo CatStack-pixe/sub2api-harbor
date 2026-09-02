@@ -34,7 +34,6 @@ func newHangingUpstreamResponse() (*http.Response, *io.PipeReader, *io.PipeWrite
 	return &http.Response{StatusCode: http.StatusOK, Body: pr, Header: http.Header{}}, pr, pw
 }
 
-// toolAnthropicSSEStream 是一段最小可转换的 Anthropic 工具事件流。
 //nolint:unused // Shared by integration tests that are selectively built in CI.
 func toolAnthropicSSEStream() string {
 	return strings.Join([]string{
