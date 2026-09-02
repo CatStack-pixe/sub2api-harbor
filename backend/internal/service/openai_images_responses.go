@@ -734,10 +734,11 @@ func openAIImagesTextFallbackErrorForText(text string) *OpenAIImagesUpstreamErro
 		}
 	}
 	return &OpenAIImagesUpstreamError{
-		StatusCode: http.StatusBadGateway,
-		ErrorType:  "upstream_error",
-		Code:       "image_generation_unavailable",
-		Message:    "Upstream did not execute image generation",
+		StatusCode:              http.StatusBadGateway,
+		ErrorType:               "upstream_error",
+		Code:                    "image_generation_unavailable",
+		Message:                 "Upstream did not execute image generation",
+		SynthesizedFromModelText: true,
 	}
 }
 

@@ -443,6 +443,63 @@ func normalizeOpenAIParallelToolCallsWithoutTools(body []byte, responsesLite boo
 }
 
 // openAIRequestBodyHasTools 同时识别顶层 tools 和 input[].additional_tools。
+// normalizeOpenAIResponsesReasoningContentReplay removes non-portable
+// reasoning content arrays before history is sent to a real OpenAI Responses
+// endpoint. Compatible providers may return visible reasoning blocks there,
+// while OpenAI accepts only portable summary/encrypted fields on replay.
+func normalizeOpenAIResponsesReasoningContentReplay(body []byte) ([]byte, bool, error) {
+	input := gjson.GetBytes(body, "input")
+	if !input.IsArray() {
+		return body, false, nil
+	}
+
+	needsNormalization := false
+	input.ForEach(func(_, item gjson.Result) bool {
+		if strings.TrimSpace(item.Get("type").String()) != "reasoning" {
+			return true
+		}
+		content := item.Get("content")
+		if content.IsArray() && len(content.Array()) > 0 {
+			needsNormalization = true
+			return false
+		}
+		return true
+	})
+	if !needsNormalization {
+		return body, false, nil
+	}
+
+	var reqBody map[string]any
+	if err := decodeOpenAIJSONUseNumber(body, &reqBody); err != nil {
+		return body, false, fmt.Errorf("normalize OpenAI reasoning content replay: %w", err)
+	}
+	items, ok := reqBody["input"].([]any)
+	if !ok {
+		return body, false, nil
+	}
+	changed := false
+	for _, rawItem := range items {
+		item, ok := rawItem.(map[string]any)
+		if !ok || strings.TrimSpace(firstNonEmptyString(item["type"])) != "reasoning" {
+			continue
+		}
+		content, ok := item["content"].([]any)
+		if !ok || len(content) == 0 {
+			continue
+		}
+		delete(item, "content")
+		changed = true
+	}
+	if !changed {
+		return body, false, nil
+	}
+	normalized, err := marshalOpenAIUpstreamJSON(reqBody)
+	if err != nil {
+		return body, false, fmt.Errorf("serialize normalized OpenAI reasoning content replay: %w", err)
+	}
+	return normalized, true, nil
+}
+
 func openAIRequestBodyHasTools(body []byte) bool {
 	if tools := gjson.GetBytes(body, "tools"); tools.IsArray() && len(tools.Array()) > 0 {
 		return true
