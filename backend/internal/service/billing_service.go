@@ -1317,6 +1317,19 @@ func (s *BillingService) calculateTokenCost(resolved *ResolvedPricing, input Cos
 	// 默认价卡（Source=LiteLLM）应用 DeepSeek 官方价强制覆盖（幂等，GetModelPricing
 	// 内部已强制过）；分组/渠道自定义定价保留运营者配置，不强制覆盖官方价。
 	pricing = s.applyModelSpecificPricingPolicyEx(input.Model, pricing, resolved.Source == PricingSourceLiteLLM)
+	if resolved.Source == PricingSourceLiteLLM && isDeepSeekModel(input.Model) {
+		pricingAt := input.PricingAt
+		if pricingAt.IsZero() {
+			pricingAt = timezone.Now()
+		}
+		if mult := deepseekPeakMultiplierAt(pricingAt); mult > 1 {
+			cloned := *pricing
+			cloned.InputPricePerToken *= mult
+			cloned.OutputPricePerToken *= mult
+			cloned.CacheReadPricePerToken *= mult
+			pricing = &cloned
+		}
+	}
 
 	// 官方长上下文阶梯仅在无区间定价时应用（区间定价已包含上下文分层）。
 	applyLongCtx := len(resolved.Intervals) == 0 && contextTierPricingEnabled

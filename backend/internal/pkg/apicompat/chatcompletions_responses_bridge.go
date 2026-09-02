@@ -1743,6 +1743,7 @@ func ensureChatToResponsesCreated(state *ChatCompletionsToResponsesStreamState) 
 		Response: &ResponsesResponse{
 			ID:          state.ResponseID,
 			Object:      "response",
+			CreatedAt:   state.Created,
 			Model:       state.Model,
 			Status:      "in_progress",
 			ServiceTier: state.ServiceTier,

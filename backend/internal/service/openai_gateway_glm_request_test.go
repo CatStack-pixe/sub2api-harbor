@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"net/http"
 	"testing"
 
@@ -43,7 +44,7 @@ func TestFailoverDeepSeekTransientStatusesRetrySameAccountInPool(t *testing.T) {
 	for _, status := range []int{http.StatusBadGateway, http.StatusServiceUnavailable, http.StatusGatewayTimeout} {
 		t.Run(http.StatusText(status), func(t *testing.T) {
 			resp := &http.Response{StatusCode: status, Header: make(http.Header)}
-			err := service.failoverOpenAIUpstreamHTTPError(nil, nil, account, resp, []byte(`{"error":{"message":"temporary"}}`), "temporary", "deepseek-v4-pro")
+			err := service.failoverOpenAIUpstreamHTTPError(context.TODO(), nil, account, resp, []byte(`{"error":{"message":"temporary"}}`), "temporary", "deepseek-v4-pro")
 			require.NotNil(t, err)
 			require.True(t, err.RetryableOnSameAccount)
 		})

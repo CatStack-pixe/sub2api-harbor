@@ -34,7 +34,7 @@ func TestOpsSystemLogSink_ShouldIndex(t *testing.T) {
 		{
 			name:  "access component",
 			event: &logger.LogEvent{Level: "info", Component: "http.access"},
-			want:  true,
+			want:  false,
 		},
 		{
 			name: "rejected access excluded from database sink",
@@ -47,12 +47,12 @@ func TestOpsSystemLogSink_ShouldIndex(t *testing.T) {
 		},
 		{
 			name: "access component from fields (real zap path)",
-			event: &logger.LogEvent{
+				event: &logger.LogEvent{
 				Level:     "info",
 				Component: "",
 				Fields:    map[string]any{"component": "http.access"},
 			},
-			want: true,
+			want: false,
 		},
 		{
 			name:  "audit component",

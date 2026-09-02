@@ -335,6 +335,7 @@ func (s *OpenAIGatewayService) streamRawChatCompletions(
 	clientDisconnected := false
 	clientOutputStarted := false
 	sawDone := false
+	var terminal openAIRawStreamTerminalState
 	pendingLines := make([]string, 0, 8)
 	refusalDetector := newOpenAIChatSilentRefusalDetector(requestBodyLen)
 
@@ -374,6 +375,7 @@ func (s *OpenAIGatewayService) streamRawChatCompletions(
 		refusalDetector.ObserveSSELine(line)
 		if payload, ok := extractOpenAISSEDataLine(line); ok {
 			trimmedPayload := strings.TrimSpace(payload)
+			terminal.ObserveDataLine(trimmedPayload)
 			if trimmedPayload == "[DONE]" {
 				sawDone = true
 			} else {
@@ -643,6 +645,9 @@ streamLoop:
 	if !sawDone {
 		if !clientOutputStarted {
 			s.recordOpenAIProxyStreamDisconnect(account, errors.New("stream ended before terminal event"), requestID)
+			if terminal.IsTruncated(clientOutputStarted) {
+				return nil, newOpenAIRawStreamTruncatedFailoverError(c, account, requestID, errors.New("stream ended before terminal event"))
+			}
 			if refusalDetector.IsSilentRefusal() {
 				return nil, newOpenAISilentRefusalFailoverError(c, account, requestID)
 			}

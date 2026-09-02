@@ -1569,6 +1569,7 @@ func (s *RateLimitService) persistAnthropicFableWindowLimit(ctx context.Context,
 	// Fable 请求不再调度到该账号，若不在此处采样，7d F 进度条会冻结在
 	// 限流前的旧值直到窗口重置。
 	s.samplePassiveUsageFromHeaders(ctx, account, headers)
+	setAccountModelRateLimitSnapshot(account, anthropicFableRateLimitKey, limit.resetAt, limit.reason, now)
 	if err := s.accountRepo.SetModelRateLimit(ctx, account.ID, anthropicFableRateLimitKey, limit.resetAt, limit.reason); err != nil {
 		slog.Warn("anthropic_fable_window_rate_limit_set_failed",
 			"account_id", account.ID,

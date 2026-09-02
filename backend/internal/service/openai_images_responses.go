@@ -2049,7 +2049,9 @@ func (s *OpenAIGatewayService) handleOpenAIImagesOAuthResponseError(
 
 	responseBody := openAIImagesUpstreamErrorResponseBody(upstreamErr)
 	if upstreamErr.Code == "image_generation_unavailable" {
-		s.coolOpenAIImagesOAuthTool(ctx, account)
+		if shouldCoolOpenAIImagesToolForError(upstreamErr) {
+			s.coolOpenAIImagesOAuthTool(ctx, account)
+		}
 		if responseWritten {
 			return err
 		}

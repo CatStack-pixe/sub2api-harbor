@@ -555,11 +555,8 @@ func (s *adminServiceImpl) CreateAccount(ctx context.Context, input *CreateAccou
 	}
 
 	// 检查混合渠道风险（除非用户已确认）
-	if len(groupIDs) > 0 && !input.SkipMixedChannelCheck {
-		if err := s.checkMixedChannelRisk(ctx, 0, input.Platform, groupIDs); err != nil {
-			return nil, err
-		}
-	}
+	// Cross-platform group membership is valid. Mixed-channel inspection remains
+	// available through the explicit diagnostic endpoint, but never blocks writes.
 	if err := validateAccountGroupPlatforms(ctx, s.groupRepo, input.Platform, groupIDs); err != nil {
 		return nil, err
 	}
@@ -890,11 +887,6 @@ func (s *adminServiceImpl) UpdateAccount(ctx context.Context, id int64, input *U
 		}
 
 		// 检查混合渠道风险（除非用户已确认）
-		if !input.SkipMixedChannelCheck {
-			if err := s.checkMixedChannelRisk(ctx, account.ID, account.Platform, *input.GroupIDs); err != nil {
-				return nil, err
-			}
-		}
 	}
 
 	billingSettingsAppliedAtomically := false
@@ -1026,11 +1018,12 @@ func (s *adminServiceImpl) BulkUpdateAccounts(ctx context.Context, input *BulkUp
 		return nil, err
 	}
 
-	needMixedChannelCheck := input.GroupIDs != nil && !input.SkipMixedChannelCheck
+	// Cross-platform group membership is valid; retain the legacy field for API
+	// compatibility while disabling the old write-time risk gate.
 
 	// 预取所有目标账号，供凭据守卫/代理守卫/混合渠道检查共用，避免多次 DB 查询。
 	var cachedTargets []*Account
-	if len(input.Credentials) > 0 || input.ProxyID != nil || needMixedChannelCheck || hasGroupBindingUpdate || openAISettings.any() || input.ProbeEnabled != nil || input.RateMultiplier != nil {
+	if len(input.Credentials) > 0 || input.ProxyID != nil || hasGroupBindingUpdate || openAISettings.any() || input.ProbeEnabled != nil || input.RateMultiplier != nil {
 		loaded, err := s.accountRepo.GetByIDs(ctx, input.AccountIDs)
 		if err != nil {
 			return nil, err
@@ -1112,27 +1105,8 @@ func (s *adminServiceImpl) BulkUpdateAccounts(ctx context.Context, input *BulkUp
 	}
 
 	// 预加载账号平台信息（混合渠道检查需要）。
-	platformByID := map[int64]string{}
-	if needMixedChannelCheck {
-		for _, account := range cachedTargets {
-			if account != nil {
-				platformByID[account.ID] = account.Platform
-			}
-		}
-	}
-
 	// 预检查混合渠道风险：在任何写操作之前，若发现风险立即返回错误。
-	if needMixedChannelCheck {
-		for _, accountID := range input.AccountIDs {
-			platform := platformByID[accountID]
-			if platform == "" {
-				continue
-			}
-			if err := s.checkMixedChannelRisk(ctx, accountID, platform, *input.GroupIDs); err != nil {
-				return nil, err
-			}
-		}
-	}
+	// Cross-platform membership is accepted without a write-time risk gate.
 
 	if input.RateMultiplier != nil {
 		if *input.RateMultiplier < 0 {

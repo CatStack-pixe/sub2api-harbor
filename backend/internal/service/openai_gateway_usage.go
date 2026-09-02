@@ -149,10 +149,8 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 	user := input.User
 	account := input.Account
 	subscription := input.Subscription
-	billingAccount, err := resolveCredentialAccount(ctx, s.accountRepo, account)
-	if err != nil {
-		return err
-	}
+	var err error
+	var billingAccount *Account
 	if !isGrokVideoUsageResult(result, nil) {
 		ApplyOpenAIImageBillingResolution(result)
 	}
