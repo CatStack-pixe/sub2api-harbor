@@ -91,6 +91,12 @@ func classifyUpstreamTransportError(err error) upstreamTransportErrorClass {
 	return upstreamTransportErrorClass{}
 }
 
+// classifyOpenAITransportError is retained as the OpenAI gateway name for the
+// shared transport classifier used by failover handling.
+func classifyOpenAITransportError(err error) upstreamTransportErrorClass {
+	return classifyUpstreamTransportError(err)
+}
+
 // handleOpenAIUpstreamTransportError handles a transport-level upstream failure
 // (Do/DoWithTLS returned a non-HTTP error: proxy/DNS/TCP/TLS). It:
 //  1. records the failure in Ops error logs (status 0, kind=request_error);

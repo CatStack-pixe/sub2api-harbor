@@ -28,6 +28,7 @@ const (
 type OpenAIOAuth429FailoverState struct {
 }
 
+/*
 type openAIOAuth429Disposition uint8
 
 const (
@@ -70,6 +71,7 @@ func classifyOpenAIOAuth429(headers http.Header, responseBody []byte) (openAIOAu
 	}
 	return openAIOAuth429Transient, nil
 }
+*/
 
 type openAIOAuth429Disposition uint8
 

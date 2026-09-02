@@ -216,7 +216,7 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 	if result.ServiceTier != nil {
 		serviceTier = strings.TrimSpace(*result.ServiceTier)
 	}
-	billingAccount := account
+	billingAccount = account
 	if account.IsShadow() {
 		billingAccount, err = resolveCredentialAccount(ctx, s.accountRepo, account)
 		if err != nil {
