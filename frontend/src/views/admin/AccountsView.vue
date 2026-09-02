@@ -725,24 +725,6 @@ let usageBatchFlushTimer: ReturnType<typeof setTimeout> | null = null
 let queuedUsageBatchForce = false
 let usageBatchRequestToken = 0
 
-const desktopViewportQuery = '(min-width: 768px)'
-const isDesktopViewport = ref(
-  typeof window === 'undefined' ? true : window.matchMedia(desktopViewportQuery).matches
-)
-let desktopViewportMediaQuery: MediaQueryList | null = null
-let desktopViewportListener: ((event: MediaQueryListEvent) => void) | null = null
-
-const usageBatchByAccountId = ref<Record<string, AccountUsageInfo | null>>({})
-const usageBatchErrorByAccountId = ref<Record<string, string | null>>({})
-const usageBatchLoadingByAccountId = ref<Record<string, boolean>>({})
-const usageBatchRequestTokenByAccountId = ref<Record<string, number>>({})
-const usageBatchCache = new Map<number, { data: AccountUsageInfo; ts: number }>()
-const USAGE_BATCH_CACHE_TTL = 5 * 60 * 1000
-const pendingUsageBatchIds = new Set<number>()
-let usageBatchFlushTimer: ReturnType<typeof setTimeout> | null = null
-let queuedUsageBatchForce = false
-let usageBatchRequestToken = 0
-
 const buildDefaultTodayStats = (): WindowStats => ({
   requests: 0,
   tokens: 0,

@@ -32,44 +32,8 @@ export type DefaultPlatformQuotasMap = Partial<Record<PlatformType, PlatformQuot
 
 const PLATFORMS: PlatformType[] = ["anthropic", "openai", "gemini", "antigravity", "grok", "agnes", "deepseek", "kimi", "zhipu", "nvidia", "tokenrhythm", "chatanywhere", "glm", "modelscope", "dashscope", "minimax", "volcengine"]
 
-export type SchedulingThresholdPlatformType =
-  | "openai"
-  | "anthropic"
-  | "grok"
-  | "kimi"
-  | "zhipu"
-
-export type AccountSchedulingThresholdsMap = Record<SchedulingThresholdPlatformType, number>
-
 // 与后端 AllowedSchedulingThresholdPlatforms 保持一致（deepseek 为余额型，
 // 走余额检测而非用量阈值）。
-export const SCHEDULING_THRESHOLD_PLATFORMS: SchedulingThresholdPlatformType[] = [
-  "openai",
-  "anthropic",
-  "grok",
-  "kimi",
-  "zhipu",
-]
-
-export function normalizeAccountSchedulingThresholdsMap(
-  input?: Partial<Record<SchedulingThresholdPlatformType, number>> | null,
-): AccountSchedulingThresholdsMap {
-  const result = {} as AccountSchedulingThresholdsMap
-  for (const platform of SCHEDULING_THRESHOLD_PLATFORMS) {
-    const value = input?.[platform]
-    result[platform] = typeof value === "number" && Number.isFinite(value)
-      ? Math.min(100, Math.max(1, Math.trunc(value)))
-      : 100
-  }
-  return result
-}
-
-export function sanitizeAccountSchedulingThresholdsMap(
-  input?: Partial<Record<SchedulingThresholdPlatformType, number>> | null,
-): AccountSchedulingThresholdsMap {
-  return normalizeAccountSchedulingThresholdsMap(input)
-}
-
 export type SchedulingThresholdPlatformType =
   | "openai"
   | "anthropic"
