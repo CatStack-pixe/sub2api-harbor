@@ -2787,6 +2787,13 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 				c.Set(securityAuditWSTurnContextKey, turn)
 				service.BeginOpsStreamTurn(c, turn)
 				setCyberTurnBody(turn, payload)
+				// Passthrough v2 admits response.create frames through
+				// BeforeRequest/BeforeTurnAdmission and does not invoke BeforeTurn.
+				// Once a cyber-policy violation marks the connection, reject the
+				// next turn before it can reach the upstream account.
+				if turn > 1 && cyberBlockedThisConn {
+					return service.NewOpenAIWSClientCloseError(coderws.StatusPolicyViolation, cyberSessionBlockedClientMsg, nil)
+				}
 				if turn == 1 {
 					return nil
 				}
