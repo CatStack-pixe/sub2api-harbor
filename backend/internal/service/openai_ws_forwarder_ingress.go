@@ -136,6 +136,7 @@ func (s *OpenAIGatewayService) ProxyResponsesWebSocketFromClient(
 			// persistent HTTP session.
 			if s.shouldBridgeOpenAIWSPassthroughFirstMessage(account, firstClientMessage) {
 				ingressMode = OpenAIWSIngressModeHTTPBridge
+				forceHTTPBridge = true
 				break
 			}
 			if wsDecision.Transport != OpenAIUpstreamTransportResponsesWebsocketV2 {
