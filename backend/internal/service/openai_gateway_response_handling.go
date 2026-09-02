@@ -1691,16 +1691,10 @@ func (s *OpenAIGatewayService) handleSSEToJSON(resp *http.Response, c *gin.Conte
 		// Responses-compatible upstreams. Classify its terminal frame with the
 		// same transient/access-state rules used by the streaming relay so a
 		// retryable 502/504/reset/capacity failure can fail over before any
-		// client bytes are committed. Deterministic parameter/policy errors
-		// continue through the normal protocol-error response below.
-		shouldFailover := false
-		if terminalType == "error" {
-			shouldFailover = openAIStreamErrorEventShouldFailover(terminalPayload, msg)
-		} else {
-			shouldFailover = openAIStreamFailedEventShouldFailover(terminalPayload, msg)
-		}
-		if shouldFailover {
-			return nil, s.newOpenAIStreamFailoverError(c, account, false, resp.Header.Get("x-request-id"), terminalPayload, msg, resp.Header)
+		// client bytes are committed. Deterministic parameter/policy errors and
+		// already-committed responses continue through the protocol-error path.
+		if failoverErr := s.nonStreamingTerminalFailureFailover(c, resp, account, false, terminalType, terminalPayload, msg, mappedModel); failoverErr != nil {
+			return nil, failoverErr
 		}
 		return nil, s.writeOpenAINonStreamingProtocolError(resp, c, msg)
 	}
