@@ -263,7 +263,7 @@ func (h *DashboardHandler) GetUsageTrend(c *gin.Context) {
 			return
 		}
 	}
-	nativeCompactionV2, err := parseOptionalBoolDashboardFilter(c, "native_compaction_v2")
+	nativeCompactionV2, err = parseOptionalBoolDashboardFilter(c, "native_compaction_v2")
 	if err != nil {
 		response.BadRequest(c, "Invalid native_compaction_v2 value, use true or false")
 		return
@@ -356,7 +356,7 @@ func (h *DashboardHandler) GetModelStats(c *gin.Context) {
 			return
 		}
 	}
-	nativeCompactionV2, err := parseOptionalBoolDashboardFilter(c, "native_compaction_v2")
+	nativeCompactionV2, err = parseOptionalBoolDashboardFilter(c, "native_compaction_v2")
 	if err != nil {
 		response.BadRequest(c, "Invalid native_compaction_v2 value, use true or false")
 		return
@@ -439,7 +439,7 @@ func (h *DashboardHandler) GetGroupStats(c *gin.Context) {
 			return
 		}
 	}
-	nativeCompactionV2, err := parseOptionalBoolDashboardFilter(c, "native_compaction_v2")
+	nativeCompactionV2, err = parseOptionalBoolDashboardFilter(c, "native_compaction_v2")
 	if err != nil {
 		response.BadRequest(c, "Invalid native_compaction_v2 value, use true or false")
 		return

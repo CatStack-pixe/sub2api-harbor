@@ -544,6 +544,9 @@ const (
 	// runtime override. When absent, the deployment configuration is used.
 	SettingKeyHeartbeatProvisioningConfig = "heartbeat_provisioning_config"
 
+	// SettingKeyOpenAIImagesOAuthUnavailableCooldownSettings stores the OAuth image capability cooldown.
+	SettingKeyOpenAIImagesOAuthUnavailableCooldownSettings = "openai_images_oauth_unavailable_cooldown_settings"
+
 	// =========================
 	// Channel Monitor (渠道监控)
 	// =========================

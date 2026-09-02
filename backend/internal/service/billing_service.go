@@ -1607,7 +1607,7 @@ func (s *BillingService) applyModelSpecificPricingPolicyEx(model string, pricing
 	needsCacheCreationPolicy := isGPT56 && !pricing.CacheCreationPriceExplicit && (pricing.CacheCreationPricePerToken <= 0 ||
 		(pricing.InputPricePerTokenPriority > 0 && pricing.CacheCreationPricePerTokenPriority <= 0))
 	fastRatio := openAIModelFastPricingRatio(normalized)
-	if !needsLongContextPolicy && !needsCacheCreationPolicy && fastRatio <= 0 {
+	if !needsCacheCreationPolicy && fastRatio <= 0 {
 		return pricing
 	}
 	cloned := *pricing
@@ -2036,6 +2036,44 @@ func (s *BillingService) getDefaultVideoPrice(model string, resolution string) f
 	// rate; today only Grok models reach video billing, so this path is a safety net),
 	// while letting group-level video prices override it independently from image prices.
 	return s.getDefaultImagePrice(model, ImageBillingSize2K)
+}
+
+func longContextMultiplierOrOne(m float64) float64 {
+	if m <= 0 {
+		return 1
+	}
+	return m
+}
+
+// CalculateCostWithLongContext applies an additional multiplier only to input
+// and cache-read tokens above the supplied threshold.
+func (s *BillingService) CalculateCostWithLongContext(model string, tokens UsageTokens, rateMultiplier float64, threshold int, extraMultiplier float64) (*CostBreakdown, error) {
+	if threshold <= 0 || extraMultiplier <= 1 {
+		return s.CalculateCost(model, tokens, rateMultiplier)
+	}
+	totalInput := tokens.InputTokens + tokens.CacheReadTokens
+	if totalInput <= threshold {
+		return s.CalculateCost(model, tokens, rateMultiplier)
+	}
+	base, err := s.CalculateCost(model, tokens, rateMultiplier)
+	if err != nil {
+		return nil, err
+	}
+	baseInput := tokens.InputTokens
+	baseCacheRead := tokens.CacheReadTokens
+	if baseInput+baseCacheRead == 0 {
+		return base, nil
+	}
+	above := totalInput - threshold
+	if above > baseInput+baseCacheRead {
+		above = baseInput + baseCacheRead
+	}
+	base.InputCost *= 1 + float64(above)/float64(baseInput+baseCacheRead)*(extraMultiplier-1)
+	base.CacheReadCost *= 1 + float64(above)/float64(baseInput+baseCacheRead)*(extraMultiplier-1)
+	base.TotalCost = base.InputCost + base.ImageInputCost + base.OutputCost + base.ImageOutputCost + base.CacheCreationCost + base.CacheReadCost
+	base.ActualCost = base.TotalCost
+	base.LongContextBillingApplied = true
+	return base, nil
 }
 
 func getDefaultGrokImagineImagePrice(model string, imageSize string) (float64, bool) {
