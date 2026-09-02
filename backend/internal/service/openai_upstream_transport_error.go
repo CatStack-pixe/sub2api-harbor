@@ -155,8 +155,8 @@ func (s *OpenAIGatewayService) handleOpenAIUpstreamTransportError(ctx context.Co
 		account.Platform == PlatformDeepseek && connectionReset &&
 		!classifyUpstreamTransportError(err).Persistent
 	return &UpstreamFailoverError{
-		StatusCode:   http.StatusBadGateway,
-		ResponseBody: openAITransportFailoverBody,
+		StatusCode:             http.StatusBadGateway,
+		ResponseBody:           openAITransportFailoverBody,
 		RetryableOnSameAccount: retryableOnSameAccount,
 	}
 }

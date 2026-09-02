@@ -403,22 +403,22 @@ func pricingRequestToService(reqs []channelModelPricingRequest, allowChannelMult
 			flexMultiplier = r.FlexMultiplier
 		}
 		result = append(result, service.ChannelModelPricing{
-			Platform:         platform,
-			Models:           r.Models,
-			BillingMode:      billingMode,
-			InputPrice:       r.InputPrice,
-			OutputPrice:      r.OutputPrice,
-			CacheWritePrice:  r.CacheWritePrice,
+			Platform:          platform,
+			Models:            r.Models,
+			BillingMode:       billingMode,
+			InputPrice:        r.InputPrice,
+			OutputPrice:       r.OutputPrice,
+			CacheWritePrice:   r.CacheWritePrice,
 			CacheWrite1hPrice: r.CacheWrite1hPrice,
-			CacheReadPrice:   r.CacheReadPrice,
-			FastMultiplier:   fastMultiplier,
-			FlexMultiplier:   flexMultiplier,
-			ImageInputPrice:  r.ImageInputPrice,
-			ImageOutputPrice: r.ImageOutputPrice,
-			PerRequestPrice:  r.PerRequestPrice,
-			Intervals:        intervals,
-			TimeWindows:      timeWindows,
-			TimePricing:      timePricingRequestToService(r.TimePricing),
+			CacheReadPrice:    r.CacheReadPrice,
+			FastMultiplier:    fastMultiplier,
+			FlexMultiplier:    flexMultiplier,
+			ImageInputPrice:   r.ImageInputPrice,
+			ImageOutputPrice:  r.ImageOutputPrice,
+			PerRequestPrice:   r.PerRequestPrice,
+			Intervals:         intervals,
+			TimeWindows:       timeWindows,
+			TimePricing:       timePricingRequestToService(r.TimePricing),
 		})
 	}
 	return result
