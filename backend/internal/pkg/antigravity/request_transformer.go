@@ -823,7 +823,3 @@ func buildTools(tools []ClaudeTool) []GeminiToolDeclaration {
 func isCodeExecutionTool(tool ClaudeTool) bool {
 	return strings.TrimSpace(tool.Type) == "code_execution"
 }
-
-func isCodeExecutionTool(tool ClaudeTool) bool {
-	return strings.TrimSpace(tool.Type) == "code_execution"
-}
