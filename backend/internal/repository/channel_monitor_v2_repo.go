@@ -704,13 +704,6 @@ func (r *channelMonitorV2Repository) loadErrorDetails(ctx context.Context, filte
 		"current_error.created_at < $2",
 		"NOT current_error.is_count_tokens",
 		"(COALESCE(current_error.status_code, 0) >= 400 OR current_error.error_type = 'cyber_policy')",
-		`(NULLIF(current_error.request_id, '') IS NULL OR NOT EXISTS (
-				SELECT 1 FROM ops_error_logs newer
-				WHERE newer.request_id = current_error.request_id
-				  AND NOT newer.is_count_tokens
-				  AND (COALESCE(newer.status_code, 0) >= 400 OR newer.error_type = 'cyber_policy')
-				  AND (newer.created_at, newer.id) > (current_error.created_at, current_error.id)
-		))`,
 	}
 	args := []any{filter.Start, filter.End}
 	platforms := channelMonitorV2EnabledPlatforms(cfg)
@@ -739,7 +732,16 @@ func (r *channelMonitorV2Repository) loadErrorDetails(ctx context.Context, filte
 		args = append(args, pq.Array(groups))
 		conditions = append(conditions, fmt.Sprintf("COALESCE(current_error.group_id, 0) = ANY($%d)", len(args)))
 	}
-	query := `SELECT
+	query := `WITH latest_request_errors AS (
+			SELECT DISTINCT ON (request_id)
+				request_id, created_at, id
+			FROM ops_error_logs
+			WHERE NULLIF(request_id, '') IS NOT NULL
+			  AND NOT is_count_tokens
+			  AND (COALESCE(status_code, 0) >= 400 OR error_type = 'cyber_policy')
+			ORDER BY request_id, created_at DESC, id DESC
+		)
+		SELECT
 			lower(COALESCE(NULLIF(TRIM(current_error.platform), ''), 'unknown')) AS platform,
 			COALESCE(current_error.group_id, 0) AS group_id,
 			COALESCE(NULLIF(TRIM(current_error.requested_model), ''), NULLIF(TRIM(current_error.model), ''), 'unknown') AS model,
@@ -751,7 +753,11 @@ func (r *channelMonitorV2Repository) loadErrorDetails(ctx context.Context, filte
 			LEFT(COALESCE(NULLIF(current_error.upstream_error_message, ''), NULLIF(current_error.error_message, ''), NULLIF(current_error.upstream_error_detail, ''), NULLIF(current_error.error_body, ''), current_error.error_type, ''), 600) AS message,
 			COUNT(*) AS count
 		FROM ops_error_logs current_error
+		LEFT JOIN latest_request_errors newer
+			ON newer.request_id = current_error.request_id
+			AND (newer.created_at, newer.id) > (current_error.created_at, current_error.id)
 		WHERE ` + strings.Join(conditions, " AND ") + `
+		  AND (NULLIF(current_error.request_id, '') IS NULL OR newer.request_id IS NULL)
 		GROUP BY 1,2,3,4,5,6,7,8,9
 		ORDER BY count DESC
 		LIMIT 400`
