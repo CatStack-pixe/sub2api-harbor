@@ -3946,10 +3946,10 @@ func parseRequestQuotaTime(raw json.RawMessage) time.Time {
 	return time.Time{}
 }
 
-// ResetQuotaUsed 重置账号所有维度的配额用量为 0
-// 保留固定重置模式的配置字段（quota_daily_reset_mode 等），仅清零用量和窗口起始时间
-func (r *accountRepository) ResetQuotaUsed(ctx context.Context, id int64) error {
-	_, err := r.sql.ExecContext(ctx,
+// ResetQuotaUsedAndClearRateLimitCooldown resets all quota dimensions and the
+// account-level cooldown in one statement. Other scheduler blocking state is preserved.
+func (r *accountRepository) ResetQuotaUsedAndClearRateLimitCooldown(ctx context.Context, id int64) error {
+	result, err := r.sql.ExecContext(ctx,
 		`UPDATE accounts SET extra = (
 			COALESCE(extra, '{}'::jsonb)
 			|| '{"quota_used": 0, "quota_daily_used": 0, "quota_weekly_used": 0}'::jsonb
@@ -3973,6 +3973,12 @@ func (r *accountRepository) ResetQuotaUsed(ctx context.Context, id int64) error 
 	}
 	r.syncSchedulerAccountSnapshot(ctx, id)
 	return nil
+}
+
+// ResetQuotaUsed preserves the legacy repository method name for callers that
+// only need the quota reset behavior.
+func (r *accountRepository) ResetQuotaUsed(ctx context.Context, id int64) error {
+	return r.ResetQuotaUsedAndClearRateLimitCooldown(ctx, id)
 }
 
 // RevertProxyFallback 将账号的 proxy_id 切回 proxy_fallback_origin_id，并清空 origin 字段。
