@@ -63,6 +63,7 @@ const usageLogsEffectiveModelIndexesMigration = "226_add_usage_log_effective_mod
 const usageLogsEffectiveRequestedModelIndex = "idx_usage_logs_effective_requested_model_created"
 const usageLogsEffectiveUpstreamModelIndex = "idx_usage_logs_effective_upstream_model_created"
 const channelMonitorV2PerformanceMigration = "234_channel_monitor_v2_performance_notx.sql"
+
 var channelMonitorV2PerformanceIndexes = []string{
 	"idx_usage_logs_created_at_group_id",
 	"idx_ops_error_logs_created_request_status",
