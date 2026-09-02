@@ -185,6 +185,20 @@ jobs:
           GITHUB_REPO_NAME: ${{ github.event.repository.name }}
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME || 'skip' }}
 
+      - name: Pull and inspect the published GHCR image
+        env:
+          GHCR_IMAGE: ghcr.io/${{ steps.lowercase.outputs.owner }}/sub2api
+          RELEASE_TAG: ${{ github.event.inputs.tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          VERSION="${RELEASE_TAG#v}"
+          docker pull "${GHCR_IMAGE}:${VERSION}"
+          docker image inspect "${GHCR_IMAGE}:${VERSION}" \
+            --format '{{.Os}}/{{.Architecture}} {{index .Config.Labels "org.opencontainers.image.version"}}' \
+            | tee /tmp/sub2api-image-metadata.txt
+          grep -q "linux/amd64" /tmp/sub2api-image-metadata.txt
+          grep -q "${VERSION}" /tmp/sub2api-image-metadata.txt
+
       # Update DockerHub description
       - name: Update DockerHub description
         if: ${{ env.SIMPLE_RELEASE != 'true' && env.DOCKERHUB_USERNAME != '' }}
