@@ -76,8 +76,12 @@ func tryModelFilePricing(billingService *BillingService, model string, tokens Us
 		}
 		return &breakdown.TotalCost
 	}
+	textOutputTokens := tokens.OutputTokens - tokens.ImageOutputTokens
+	if textOutputTokens < 0 {
+		textOutputTokens = 0
+	}
 	cost := float64(tokens.InputTokens)*pricing.InputPricePerToken +
-		float64(tokens.OutputTokens)*pricing.OutputPricePerToken +
+		float64(textOutputTokens)*pricing.OutputPricePerToken +
 		float64(tokens.CacheCreationTokens)*pricing.CacheCreationPricePerToken +
 		float64(tokens.CacheReadTokens)*pricing.CacheReadPricePerToken +
 		float64(tokens.ImageOutputTokens)*pricing.ImageOutputPricePerToken
