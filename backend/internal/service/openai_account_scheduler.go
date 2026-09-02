@@ -277,15 +277,15 @@ func (s *openAIAccountRuntimeStats) report(accountID int64, success bool, firstT
 }
 
 func (s *openAIAccountRuntimeStats) reportLatency(accountID int64, routingMs, upstreamMs int64) {
-	if s == nil || accountID <= 0 {
+	if s == nil || accountID <= 0 || (routingMs <= 0 && upstreamMs <= 0) {
 		return
 	}
 	stat := s.loadOrCreate(accountID)
 	const alpha = 0.2
-	if routingMs >= 0 {
+	if routingMs > 0 {
 		updateEWMAAtomic(&stat.routingEWMABits, float64(routingMs), alpha)
 	}
-	if upstreamMs >= 0 {
+	if upstreamMs > 0 {
 		updateEWMAAtomic(&stat.upstreamEWMABits, float64(upstreamMs), alpha)
 	}
 }
@@ -2554,7 +2554,7 @@ func (s *OpenAIGatewayService) ReportOpenAIAccountScheduleResult(account *Accoun
 }
 
 // ReportOpenAIAccountScheduleLatency feeds measured stage latency into the
-// scheduler's bounded EWMA health signal. Missing or negative samples are
+// scheduler's bounded EWMA health signal. Missing or non-positive samples are
 // ignored, allowing callers to report only the stages they measured.
 func (s *OpenAIGatewayService) ReportOpenAIAccountScheduleLatency(account *Account, routingMs, upstreamMs int64) {
 	if s == nil || account == nil {
