@@ -2,6 +2,7 @@ package service
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -125,6 +126,9 @@ func (s *OpenAIGatewayService) shouldBridgeOpenAIWSPassthroughFirstMessage(accou
 	if !s.openAIWSHTTPBridgeEnabled() || int64(len(payload)) < s.openAIWSHTTPBridgeThresholdBytes() {
 		return false
 	}
+	if hasDuplicateOpenAIWSJSONObjectKeys(payload, "type", "previous_response_id") {
+		return false
+	}
 	var body struct {
 		Type               string `json:"type"`
 		PreviousResponseID string `json:"previous_response_id"`
@@ -134,6 +138,47 @@ func (s *OpenAIGatewayService) shouldBridgeOpenAIWSPassthroughFirstMessage(accou
 	}
 	typeValue := strings.TrimSpace(body.Type)
 	return (typeValue == "" || typeValue == "response.create") && strings.TrimSpace(body.PreviousResponseID) == ""
+}
+
+// hasDuplicateOpenAIWSJSONObjectKeys detects duplicate keys in the top-level
+// JSON object without accepting the last-write-wins behavior of json.Unmarshal.
+// Duplicate routing controls are ambiguous and must stay on the native relay.
+func hasDuplicateOpenAIWSJSONObjectKeys(payload []byte, keys ...string) bool {
+	dec := json.NewDecoder(bytes.NewReader(payload))
+	tok, err := dec.Token()
+	if err != nil {
+		return false
+	}
+	delim, ok := tok.(json.Delim)
+	if !ok || delim != '{' {
+		return false
+	}
+	wanted := make(map[string]struct{}, len(keys))
+	for _, key := range keys {
+		wanted[key] = struct{}{}
+	}
+	seen := make(map[string]struct{}, len(keys))
+	for dec.More() {
+		tok, err = dec.Token()
+		if err != nil {
+			return false
+		}
+		key, ok := tok.(string)
+		if !ok {
+			return false
+		}
+		if _, interested := wanted[key]; interested {
+			if _, duplicate := seen[key]; duplicate {
+				return true
+			}
+			seen[key] = struct{}{}
+		}
+		var value json.RawMessage
+		if err := dec.Decode(&value); err != nil {
+			return false
+		}
+	}
+	return false
 }
 
 func prepareOpenAIWSHTTPBridgeBody(account *Account, payload []byte) ([]byte, error) {

@@ -130,6 +130,14 @@ func (s *OpenAIGatewayService) ProxyResponsesWebSocketFromClient(
 		}
 		switch ingressMode {
 		case OpenAIWSIngressModePassthrough:
+			// Very large initial frames are routed through the HTTP bridge even
+			// when the account's normal mode is passthrough. The bridge avoids the
+			// upstream websocket frame limit; follow-up turns remain in its
+			// persistent HTTP session.
+			if s.shouldBridgeOpenAIWSPassthroughFirstMessage(account, firstClientMessage) {
+				ingressMode = OpenAIWSIngressModeHTTPBridge
+				break
+			}
 			if wsDecision.Transport != OpenAIUpstreamTransportResponsesWebsocketV2 {
 				return fmt.Errorf("websocket ingress requires ws_v2 transport, got=%s", wsDecision.Transport)
 			}

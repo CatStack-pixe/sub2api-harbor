@@ -1684,6 +1684,21 @@ func (s *OpenAIGatewayService) handleSSEToJSON(resp *http.Response, c *gin.Conte
 		if compactErr := newOpenAICompactFallbackSignal(c, terminalPayload, msg); compactErr != nil {
 			return nil, compactErr
 		}
+		// Non-streaming callers still receive an SSE-shaped body from some
+		// Responses-compatible upstreams. Classify its terminal frame with the
+		// same transient/access-state rules used by the streaming relay so a
+		// retryable 502/504/reset/capacity failure can fail over before any
+		// client bytes are committed. Deterministic parameter/policy errors
+		// continue through the normal protocol-error response below.
+		shouldFailover := false
+		if terminalType == "error" {
+			shouldFailover = openAIStreamErrorEventShouldFailover(terminalPayload, msg)
+		} else {
+			shouldFailover = openAIStreamFailedEventShouldFailover(terminalPayload, msg)
+		}
+		if shouldFailover {
+			return nil, s.newOpenAIStreamFailoverError(c, account, false, resp.Header.Get("x-request-id"), terminalPayload, msg, resp.Header)
+		}
 		return nil, s.writeOpenAINonStreamingProtocolError(resp, c, msg)
 	}
 	finalResponse, ok := extractCodexFinalResponse(bodyText)
