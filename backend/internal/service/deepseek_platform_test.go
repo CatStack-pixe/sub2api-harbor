@@ -82,6 +82,27 @@ func TestAccountGroupPlatformAssignmentIsUnrestricted(t *testing.T) {
 	require.NoError(t, validateAccountGroupPlatforms(context.Background(), groups, PlatformTokenRhythm, []int64{1, 2}))
 }
 
+func TestAccountGroupPlatformAssignmentMatrixAllowsEveryValidPair(t *testing.T) {
+	platforms := schedulerSnapshotPlatforms()
+	groups := make(map[int64]*Group, len(platforms)+1)
+	groupIDs := make([]int64, 0, len(platforms)+1)
+	for i, platform := range platforms {
+		id := int64(i + 1)
+		groups[id] = &Group{ID: id, Platform: platform}
+		groupIDs = append(groupIDs, id)
+	}
+	compositeID := int64(len(platforms) + 1)
+	groups[compositeID] = &Group{ID: compositeID, Platform: PlatformComposite}
+	groupIDs = append(groupIDs, compositeID)
+	groupRepo := &groupRepoStubForAdmin{getByIDByID: groups}
+
+	for _, accountPlatform := range platforms {
+		require.NoError(t,
+			validateAccountGroupPlatforms(context.Background(), groupRepo, accountPlatform, groupIDs),
+			"account platform %q should be assignable to every valid group", accountPlatform)
+	}
+}
+
 func TestValidateAccountGroupPlatformsPreservesGroupExistenceCheck(t *testing.T) {
 	groups := &groupRepoStubForAdmin{getByIDByID: map[int64]*Group{}}
 

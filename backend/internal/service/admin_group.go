@@ -302,10 +302,11 @@ func compositeDefaultModelsListCandidateIDs() []string {
 }
 
 func canCopyAccountsFromGroupPlatform(targetPlatform, sourcePlatform string) bool {
-	if targetPlatform == PlatformComposite {
-		return sourcePlatform == PlatformComposite || isConcreteRequestPlatform(sourcePlatform)
-	}
-	return sourcePlatform == targetPlatform
+	// Account membership is independent of the group's platform. Keep this
+	// helper as a lightweight guard for callers that pass untrusted platform
+	// values, but do not reject valid cross-platform copies.
+	return ValidateGroupPlatform(strings.TrimSpace(targetPlatform)) == nil &&
+		ValidateGroupPlatform(strings.TrimSpace(sourcePlatform)) == nil
 }
 
 func groupSupportsOAuthOnlyFilter(platform string) bool {
@@ -486,7 +487,7 @@ func (s *adminServiceImpl) CreateGroup(ctx context.Context, input *CreateGroupIn
 				return nil, fmt.Errorf("source group %d not found: %w", srcGroupID, err)
 			}
 			if !canCopyAccountsFromGroupPlatform(platform, srcGroup.Platform) {
-				return nil, fmt.Errorf("source group %d platform mismatch: expected %s, got %s", srcGroupID, platform, srcGroup.Platform)
+				return nil, fmt.Errorf("source group %d has unsupported platform: %s", srcGroupID, srcGroup.Platform)
 			}
 		}
 
@@ -1011,7 +1012,7 @@ func (s *adminServiceImpl) UpdateGroup(ctx context.Context, id int64, input *Upd
 				return nil, fmt.Errorf("source group %d not found: %w", srcGroupID, err)
 			}
 			if !canCopyAccountsFromGroupPlatform(group.Platform, srcGroup.Platform) {
-				return nil, fmt.Errorf("source group %d platform mismatch: expected %s, got %s", srcGroupID, group.Platform, srcGroup.Platform)
+				return nil, fmt.Errorf("source group %d has unsupported platform: %s", srcGroupID, srcGroup.Platform)
 			}
 		}
 
