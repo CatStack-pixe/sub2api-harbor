@@ -39,7 +39,8 @@ var openaiCCRawAllowedHeaders = map[string]bool{
 // `{base_url}/v1/chat/completions`，**不**做 CC↔Responses 协议转换。
 //
 // 适用场景：account.platform=openai && account.type=apikey && 上游已被探测确认
-// 不支持 /v1/responses 端点（如 DeepSeek/Kimi/GLM/Qwen 等第三方 OpenAI 兼容上游）。
+// 不支持 /v1/responses 端点（如 GLM/Qwen 等第三方 OpenAI 兼容上游）；CN 供应商
+// 固定 chat_completions 协议也走此路径。
 //
 // 与 ForwardAsChatCompletions 的关键差异：
 //
@@ -102,6 +103,15 @@ func (s *OpenAIGatewayService) forwardAsRawChatCompletions(
 	}
 	if normalizedBody, normalized := NormalizeGLMOpenAIReasoningEffort(upstreamBody, upstreamModel); normalized {
 		upstreamBody = normalizedBody
+	}
+	if account.Platform == PlatformGLM {
+		normalizedBody, changed, normalizeErr := normalizeGLMChatCompletionsRequestBody(upstreamBody)
+		if normalizeErr != nil {
+			return nil, fmt.Errorf("normalize GLM chat request: %w", normalizeErr)
+		}
+		if changed {
+			upstreamBody = normalizedBody
+		}
 	}
 	if deepSeekTextOnlyImageRequest(account, upstreamModel, upstreamBody) {
 		MarkOpsClientBusinessLimited(c, OpsClientBusinessLimitedReasonLocalModelConfiguration)
@@ -325,6 +335,7 @@ func (s *OpenAIGatewayService) streamRawChatCompletions(
 	clientDisconnected := false
 	clientOutputStarted := false
 	sawDone := false
+	var terminal openAIRawStreamTerminalState
 	pendingLines := make([]string, 0, 8)
 	refusalDetector := newOpenAIChatSilentRefusalDetector(requestBodyLen)
 
@@ -364,6 +375,7 @@ func (s *OpenAIGatewayService) streamRawChatCompletions(
 		refusalDetector.ObserveSSELine(line)
 		if payload, ok := extractOpenAISSEDataLine(line); ok {
 			trimmedPayload := strings.TrimSpace(payload)
+			terminal.ObserveDataLine(trimmedPayload)
 			if trimmedPayload == "[DONE]" {
 				sawDone = true
 			} else {
@@ -633,6 +645,9 @@ streamLoop:
 	if !sawDone {
 		if !clientOutputStarted {
 			s.recordOpenAIProxyStreamDisconnect(account, errors.New("stream ended before terminal event"), requestID)
+			if terminal.IsTruncated(clientOutputStarted) {
+				return nil, newOpenAIRawStreamTruncatedFailoverError(c, account, requestID, errors.New("stream ended before terminal event"))
+			}
 			if refusalDetector.IsSilentRefusal() {
 				return nil, newOpenAISilentRefusalFailoverError(c, account, requestID)
 			}

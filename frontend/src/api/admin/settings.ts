@@ -32,6 +32,8 @@ export type DefaultPlatformQuotasMap = Partial<Record<PlatformType, PlatformQuot
 
 const PLATFORMS: PlatformType[] = ["anthropic", "openai", "gemini", "antigravity", "grok", "agnes", "deepseek", "kimi", "zhipu", "nvidia", "tokenrhythm", "chatanywhere", "glm", "modelscope", "dashscope", "minimax", "volcengine"]
 
+// 与后端 AllowedSchedulingThresholdPlatforms 保持一致（deepseek 为余额型，
+// 走余额检测而非用量阈值）。
 export type SchedulingThresholdPlatformType =
   | "openai"
   | "anthropic"
@@ -621,6 +623,7 @@ export interface SystemSettings {
   allow_ungrouped_key_scheduling: boolean;
 
   // Gateway forwarding behavior
+  openai_ttft_mode: string;
   enable_fingerprint_unification: boolean;
   enable_metadata_passthrough: boolean;
   enable_cch_signing: boolean;
@@ -937,6 +940,7 @@ export interface UpdateSettingsRequest {
   min_claude_code_version?: string;
   max_claude_code_version?: string;
   allow_ungrouped_key_scheduling?: boolean;
+  openai_ttft_mode?: string;
   enable_fingerprint_unification?: boolean;
   enable_metadata_passthrough?: boolean;
   enable_cch_signing?: boolean;

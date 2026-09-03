@@ -634,6 +634,42 @@ func TestAdminService_UpdateGroup_PreservesImageGenerationControlsWhenOmitted(t 
 	require.InDelta(t, 0.5, repo.updated.ImageRateMultiplier, 1e-12)
 }
 
+func TestAdminService_UpdateGroup_LimitFieldsPartialUpdate(t *testing.T) {
+	daily, weekly, monthly := 10.0, 20.0, 30.0
+	existingGroup := &Group{
+		ID:              1,
+		Name:            "existing-group",
+		Platform:        PlatformOpenAI,
+		Status:          StatusActive,
+		DailyLimitUSD:   &daily,
+		WeeklyLimitUSD:  &weekly,
+		MonthlyLimitUSD: &monthly,
+	}
+	repo := &groupRepoStubForAdmin{getByID: existingGroup}
+	svc := &adminServiceImpl{groupRepo: repo}
+
+	t.Run("non-quota update preserves all limits", func(t *testing.T) {
+		description := "updated"
+		group, err := svc.UpdateGroup(context.Background(), existingGroup.ID, &UpdateGroupInput{Description: &description})
+		require.NoError(t, err)
+		require.Equal(t, 10.0, *group.DailyLimitUSD)
+		require.Equal(t, 20.0, *group.WeeklyLimitUSD)
+		require.Equal(t, 30.0, *group.MonthlyLimitUSD)
+	})
+
+	t.Run("explicit changes and unlimited clear only touched limits", func(t *testing.T) {
+		newDaily, unlimited := 15.0, -1.0
+		group, err := svc.UpdateGroup(context.Background(), existingGroup.ID, &UpdateGroupInput{
+			DailyLimitUSD:  &newDaily,
+			WeeklyLimitUSD: &unlimited,
+		})
+		require.NoError(t, err)
+		require.Equal(t, 15.0, *group.DailyLimitUSD)
+		require.Nil(t, group.WeeklyLimitUSD)
+		require.Equal(t, 30.0, *group.MonthlyLimitUSD)
+	})
+}
+
 func TestAdminService_UpdateGroup_DisablesBatchImageWhenImageGenerationDisabled(t *testing.T) {
 	existingGroup := &Group{
 		ID:                        1,
@@ -914,6 +950,20 @@ func TestAdminService_UpdateGroup_ReasoningEffortMappingsTriState(t *testing.T) 
 			}(),
 			want: []ReasoningEffortMapping{{From: "xhigh", To: "high"}},
 		},
+		{
+			name: "model scoped mappings are canonicalized independently",
+			input: func() *UpdateGroupInput {
+				replacement := []ReasoningEffortMapping{
+					{From: " MAX ", To: " low ", MatchType: "PREFIX", Model: " gpt "},
+					{From: "max", To: "medium", Model: "gpt-5.4"},
+				}
+				return &UpdateGroupInput{ReasoningEffortMappings: &replacement}
+			}(),
+			want: []ReasoningEffortMapping{
+				{From: "max", To: "low", MatchType: "prefix", Model: "gpt"},
+				{From: "max", To: "medium", MatchType: "exact", Model: "gpt-5.4"},
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -963,12 +1013,13 @@ func TestAdminService_UpdateGroup_RejectsInvalidReasoningEffortMappings(t *testi
 
 func TestAdminService_UpdateGroup_ClearsReasoningPolicyForUnsupportedPlatform(t *testing.T) {
 	existing := &Group{
-		ID:                      1,
-		Name:                    "openai-group",
-		Platform:                PlatformOpenAI,
-		Status:                  StatusActive,
-		MaxReasoningEffort:      "medium",
-		ReasoningEffortMappings: []ReasoningEffortMapping{{From: "max", To: "xhigh"}},
+		ID:                          1,
+		Name:                        "openai-group",
+		Platform:                    PlatformOpenAI,
+		Status:                      StatusActive,
+		MaxReasoningEffort:          "medium",
+		MaxReasoningEffortOverLimit: ReasoningEffortOverLimitDeny,
+		ReasoningEffortMappings:     []ReasoningEffortMapping{{From: "max", To: "xhigh"}},
 	}
 	repo := &groupRepoStubForAdmin{getByID: existing}
 	svc := &adminServiceImpl{groupRepo: repo}
@@ -977,6 +1028,7 @@ func TestAdminService_UpdateGroup_ClearsReasoningPolicyForUnsupportedPlatform(t 
 
 	require.NoError(t, err)
 	require.Empty(t, repo.updated.MaxReasoningEffort)
+	require.Equal(t, ReasoningEffortOverLimitDowngrade, repo.updated.MaxReasoningEffortOverLimit)
 	require.Empty(t, repo.updated.ReasoningEffortMappings)
 }
 

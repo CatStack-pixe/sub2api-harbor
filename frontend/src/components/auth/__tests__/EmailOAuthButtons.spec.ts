@@ -33,6 +33,7 @@ describe('EmailOAuthButtons', () => {
       props: {
         githubEnabled: true,
         googleEnabled: false,
+        promoCode: ' PROMO123 ',
       },
       global: {
         stubs: {

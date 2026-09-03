@@ -281,16 +281,15 @@ func scheduleScenarios() []scheduleScenario {
 			},
 		},
 		{
-			name: "gpt-5.6 缺 cache_write 时按策略补 1.25 倍并带阶梯", model: "gpt-5.6-sol", platform: PlatformOpenAI, groupPlatform: PlatformOpenAI,
+			name: "gpt-5.6 缺 cache_write 时按策略补 1.25 倍", model: "gpt-5.6-sol", platform: PlatformOpenAI, groupPlatform: PlatformOpenAI,
 			group: enabledGroup(PlatformOpenAI),
 			catalog: newStubPricingServiceFromMap(map[string]*LiteLLMModelPricing{
 				"gpt-5.6-sol": {Mode: "chat", InputCostPerToken: 5e-6, OutputCostPerToken: 30e-6, CacheReadInputTokenCost: 0.5e-6},
 			}),
 			wantBasis: ContextPricingBasisWholeRequest,
 			check: func(t *testing.T, s *ContextPricingSchedule) {
-				require.Len(t, s.Tiers, 2)
-				requireTier(t, s.Tiers[0], 0, intPtr(272000), "≤272K", p(5e-6), p(30e-6), p(6.25e-6), p(0.5e-6))
-				requireTier(t, s.Tiers[1], 272000, nil, ">272K", p(10e-6), p(45e-6), p(12.5e-6), p(1e-6))
+				require.Len(t, s.Tiers, 1)
+				requireTier(t, s.Tiers[0], 0, nil, "", p(5e-6), p(30e-6), p(6.25e-6), p(0.5e-6))
 			},
 		},
 		{

@@ -25,6 +25,33 @@ type schedulerTestOpenAIAccountRepo struct {
 	accounts []Account
 }
 
+func TestOpenAIAccountSchedulerLatencySignalDeprioritizesSlowAccount(t *testing.T) {
+	stats := newOpenAIAccountRuntimeStats()
+	stats.reportLatency(1, 100, 200)
+	stats.reportLatency(2, 500, 1000)
+
+	accounts := []*Account{{ID: 1}, {ID: 2}}
+	weights := GatewayOpenAIWSSchedulerScoreWeightsView{}
+	scores := buildOpenAIAccountSchedulerScoreSnapshot(
+		accounts,
+		nil,
+		weights,
+		false,
+		defaultOpenAIOAuthSchedulingRateMultiplier,
+		stats,
+	)
+
+	require.Greater(t, scores[1].BaseScore, scores[2].BaseScore)
+	require.Equal(t, 1.0, scores[1].BaseScore)
+	require.Equal(t, 0.0, scores[2].BaseScore)
+
+	routing, upstream, hasRouting, hasUpstream := stats.latencySnapshot(1)
+	require.Equal(t, 100.0, routing)
+	require.Equal(t, 200.0, upstream)
+	require.True(t, hasRouting)
+	require.True(t, hasUpstream)
+}
+
 func TestAccountRequestCompatibilityBlocksTokenRhythmWithoutFreshBalance(t *testing.T) {
 	scheduler := &defaultOpenAIAccountScheduler{service: &OpenAIGatewayService{}}
 	account := &Account{

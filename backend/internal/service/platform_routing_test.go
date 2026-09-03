@@ -40,6 +40,42 @@ func TestAccountPlatformQueriesUseCompatiblePools(t *testing.T) {
 	require.ElementsMatch(t, allPlatforms[:], accountPlatformsForGroupPlatform(PlatformComposite))
 }
 
+func TestSchedulerPlatformsForAccountProjectsCrossPlatformMembership(t *testing.T) {
+	compatible := (&Account{Platform: PlatformDeepSeek}).IsOpenAICompatible()
+	projected := schedulerPlatformsForAccount(&Account{Platform: PlatformDeepSeek})
+	for _, platform := range projected {
+		require.True(t, (&Account{Platform: platform}).IsOpenAICompatible(),
+			"deepseek account should only project into compatible request buckets")
+	}
+	if compatible {
+		require.Contains(t, projected, PlatformOpenAI)
+		require.Contains(t, projected, PlatformDeepSeek)
+		require.NotContains(t, projected, PlatformAnthropic)
+	}
+
+	antigravity := &Account{
+		Platform: PlatformAntigravity,
+		Extra:    map[string]any{"mixed_scheduling": true},
+	}
+	require.ElementsMatch(t,
+		[]string{PlatformAntigravity, PlatformAnthropic, PlatformGemini},
+		schedulerPlatformsForAccount(antigravity),
+	)
+}
+
+func TestCopyingAccountsBetweenAnyValidGroupPlatformsIsAllowed(t *testing.T) {
+	platforms := schedulerSnapshotPlatforms()
+	groupPlatforms := append([]string{PlatformComposite}, platforms[:]...)
+	for _, target := range groupPlatforms {
+		for _, source := range groupPlatforms {
+			require.True(t, canCopyAccountsFromGroupPlatform(target, source),
+				"valid group platform pair %q <- %q should be copyable", target, source)
+		}
+	}
+	require.False(t, canCopyAccountsFromGroupPlatform("unknown", PlatformOpenAI))
+	require.False(t, canCopyAccountsFromGroupPlatform(PlatformOpenAI, "unknown"))
+}
+
 func TestInvalidPlatformsAreNotCompatible(t *testing.T) {
 	require.False(t, accountPlatformMatchesGroup("unknown", PlatformOpenAI))
 	require.False(t, accountPlatformMatchesGroup(PlatformOpenAI, "unknown"))

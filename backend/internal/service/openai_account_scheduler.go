@@ -41,6 +41,11 @@ const (
 	openAIQuotaHeadroomSnapshotStaleAfter      = 8 * time.Hour
 	openAIUpstreamCostNeutralFactor            = 0.5
 	defaultOpenAIOAuthSchedulingRateMultiplier = 1.0
+	// Latency samples are intentionally bounded secondary signals. Existing
+	// priority/load/error weights remain dominant while unhealthy upstreams are
+	// gradually deprioritized after at least two accounts have samples.
+	openAIRoutingLatencyScoreWeight  = 0.35
+	openAIUpstreamLatencyScoreWeight = 0.65
 )
 
 type cachedOpenAIAdvancedSchedulerSetting struct {
@@ -189,6 +194,8 @@ type openAIAccountRuntimeStats struct {
 type openAIAccountRuntimeStat struct {
 	errorRateEWMABits atomic.Uint64
 	ttftEWMABits      atomic.Uint64
+	routingEWMABits   atomic.Uint64
+	upstreamEWMABits  atomic.Uint64
 }
 
 func newOpenAIAccountRuntimeStats() *openAIAccountRuntimeStats {
@@ -205,6 +212,8 @@ func (s *openAIAccountRuntimeStats) loadOrCreate(accountID int64) *openAIAccount
 
 	stat := &openAIAccountRuntimeStat{}
 	stat.ttftEWMABits.Store(math.Float64bits(math.NaN()))
+	stat.routingEWMABits.Store(math.Float64bits(math.NaN()))
+	stat.upstreamEWMABits.Store(math.Float64bits(math.NaN()))
 	actual, loaded := s.accounts.LoadOrStore(accountID, stat)
 	if !loaded {
 		s.accountCount.Add(1)
@@ -221,6 +230,12 @@ func updateEWMAAtomic(target *atomic.Uint64, sample float64, alpha float64) {
 	for {
 		oldBits := target.Load()
 		oldValue := math.Float64frombits(oldBits)
+		if math.IsNaN(oldValue) {
+			if target.CompareAndSwap(oldBits, math.Float64bits(sample)) {
+				return
+			}
+			continue
+		}
 		newValue := alpha*sample + (1-alpha)*oldValue
 		if target.CompareAndSwap(oldBits, math.Float64bits(newValue)) {
 			return
@@ -259,6 +274,39 @@ func (s *openAIAccountRuntimeStats) report(accountID int64, success bool, firstT
 			}
 		}
 	}
+}
+
+func (s *openAIAccountRuntimeStats) reportLatency(accountID int64, routingMs, upstreamMs int64) {
+	if s == nil || accountID <= 0 || (routingMs <= 0 && upstreamMs <= 0) {
+		return
+	}
+	stat := s.loadOrCreate(accountID)
+	const alpha = 0.2
+	if routingMs > 0 {
+		updateEWMAAtomic(&stat.routingEWMABits, float64(routingMs), alpha)
+	}
+	if upstreamMs > 0 {
+		updateEWMAAtomic(&stat.upstreamEWMABits, float64(upstreamMs), alpha)
+	}
+}
+
+func (s *openAIAccountRuntimeStats) latencySnapshot(accountID int64) (routing, upstream float64, hasRouting, hasUpstream bool) {
+	if s == nil || accountID <= 0 {
+		return 0, 0, false, false
+	}
+	value, ok := s.accounts.Load(accountID)
+	if !ok {
+		return 0, 0, false, false
+	}
+	stat, _ := value.(*openAIAccountRuntimeStat)
+	if stat == nil {
+		return 0, 0, false, false
+	}
+	routing = math.Float64frombits(stat.routingEWMABits.Load())
+	upstream = math.Float64frombits(stat.upstreamEWMABits.Load())
+	hasRouting = !math.IsNaN(routing) && routing > 0
+	hasUpstream = !math.IsNaN(upstream) && upstream > 0
+	return routing, upstream, hasRouting, hasUpstream
 }
 
 func (s *openAIAccountRuntimeStats) snapshot(accountID int64) (errorRate float64, ttft float64, hasTTFT bool) {
@@ -644,14 +692,18 @@ func (s *defaultOpenAIAccountScheduler) shouldEscapeStickyAccount(accountID int6
 }
 
 type openAIAccountCandidateScore struct {
-	account   *Account
-	loadInfo  *AccountLoadInfo
-	loadKnown bool
-	score     float64
-	priority  int
-	errorRate float64
-	ttft      float64
-	hasTTFT   bool
+	account     *Account
+	loadInfo    *AccountLoadInfo
+	loadKnown   bool
+	score       float64
+	priority    int
+	errorRate   float64
+	ttft        float64
+	hasTTFT     bool
+	routing     float64
+	upstream    float64
+	hasRouting  bool
+	hasUpstream bool
 }
 
 type openAIAccountCandidateHeap []openAIAccountCandidateScore
@@ -860,16 +912,22 @@ func (s *defaultOpenAIAccountScheduler) buildOpenAIAccountLoadPlan(
 			loadKnown = false
 		}
 		errorRate, ttft, hasTTFT := 0.0, 0.0, false
+		routing, upstream, hasRouting, hasUpstream := 0.0, 0.0, false, false
 		if s.stats != nil {
 			errorRate, ttft, hasTTFT = s.stats.snapshot(account.ID)
+			routing, upstream, hasRouting, hasUpstream = s.stats.latencySnapshot(account.ID)
 		}
 		allCandidates = append(allCandidates, openAIAccountCandidateScore{
-			account:   account,
-			loadInfo:  loadInfo,
-			loadKnown: loadKnown,
-			errorRate: errorRate,
-			ttft:      ttft,
-			hasTTFT:   hasTTFT,
+			account:     account,
+			loadInfo:    loadInfo,
+			loadKnown:   loadKnown,
+			errorRate:   errorRate,
+			ttft:        ttft,
+			hasTTFT:     hasTTFT,
+			routing:     routing,
+			upstream:    upstream,
+			hasRouting:  hasRouting,
+			hasUpstream: hasUpstream,
 		})
 	}
 
@@ -903,6 +961,10 @@ func (s *defaultOpenAIAccountScheduler) buildOpenAIAccountLoadPlan(
 	loadRateSumSquares := 0.0
 	minTTFT, maxTTFT := 0.0, 0.0
 	hasTTFTSample := false
+	minRouting, maxRouting := 0.0, 0.0
+	hasRoutingSample := false
+	minUpstream, maxUpstream := 0.0, 0.0
+	hasUpstreamSample := false
 	for i := range candidates {
 		candidate := &candidates[i]
 		candidate.priority = openAIAccountSchedulingPriority(candidate.account)
@@ -925,6 +987,32 @@ func (s *defaultOpenAIAccountScheduler) buildOpenAIAccountLoadPlan(
 				}
 				if candidate.ttft > maxTTFT {
 					maxTTFT = candidate.ttft
+				}
+			}
+		}
+		if candidate.hasRouting && candidate.routing > 0 {
+			if !hasRoutingSample {
+				minRouting, maxRouting = candidate.routing, candidate.routing
+				hasRoutingSample = true
+			} else {
+				if candidate.routing < minRouting {
+					minRouting = candidate.routing
+				}
+				if candidate.routing > maxRouting {
+					maxRouting = candidate.routing
+				}
+			}
+		}
+		if candidate.hasUpstream && candidate.upstream > 0 {
+			if !hasUpstreamSample {
+				minUpstream, maxUpstream = candidate.upstream, candidate.upstream
+				hasUpstreamSample = true
+			} else {
+				if candidate.upstream < minUpstream {
+					minUpstream = candidate.upstream
+				}
+				if candidate.upstream > maxUpstream {
+					maxUpstream = candidate.upstream
 				}
 			}
 		}
@@ -990,6 +1078,14 @@ func (s *defaultOpenAIAccountScheduler) buildOpenAIAccountLoadPlan(
 		if item.hasTTFT && hasTTFTSample && maxTTFT > minTTFT {
 			ttftFactor = 1 - clamp01((item.ttft-minTTFT)/(maxTTFT-minTTFT))
 		}
+		routingFactor := 0.5
+		if item.hasRouting && hasRoutingSample && maxRouting > minRouting {
+			routingFactor = 1 - clamp01((item.routing-minRouting)/(maxRouting-minRouting))
+		}
+		upstreamFactor := 0.5
+		if item.hasUpstream && hasUpstreamSample && maxUpstream > minUpstream {
+			upstreamFactor = 1 - clamp01((item.upstream-minUpstream)/(maxUpstream-minUpstream))
+		}
 		resetFactor := 0.0
 		if weights.Reset > 0 && hasResetSample {
 			if end := item.account.SessionWindowEnd; end != nil && now.Before(*end) {
@@ -1015,6 +1111,8 @@ func (s *defaultOpenAIAccountScheduler) buildOpenAIAccountLoadPlan(
 			weights.Queue*queueFactor +
 			weights.ErrorRate*errorFactor +
 			weights.TTFT*ttftFactor +
+			openAIRoutingLatencyScoreWeight*routingFactor +
+			openAIUpstreamLatencyScoreWeight*upstreamFactor +
 			weights.Reset*resetFactor +
 			weights.QuotaHeadroom*quotaHeadroomFactor +
 			weights.UpstreamCost*(upstreamCostFactor-openAIUpstreamCostNeutralFactor)
@@ -1826,6 +1924,13 @@ func (s *defaultOpenAIAccountScheduler) ReportResult(accountID int64, success bo
 	s.stats.report(accountID, success, firstTokenMs)
 }
 
+func (s *defaultOpenAIAccountScheduler) ReportLatency(accountID int64, routingMs, upstreamMs int64) {
+	if s == nil || s.stats == nil {
+		return
+	}
+	s.stats.reportLatency(accountID, routingMs, upstreamMs)
+}
+
 func (s *defaultOpenAIAccountScheduler) ReportSwitch() {
 	if s == nil {
 		return
@@ -2070,7 +2175,11 @@ func (s *OpenAIGatewayService) getOpenAIAccountScheduler(ctx context.Context) Op
 	}
 	s.openaiSchedulerOnce.Do(func() {
 		if s.openaiAccountStats == nil {
-			s.openaiAccountStats = newOpenAIAccountRuntimeStats()
+			if s.rateLimitService != nil && s.rateLimitService.openAIAccountRuntimeStats != nil {
+				s.openaiAccountStats = s.rateLimitService.openAIAccountRuntimeStats
+			} else {
+				s.openaiAccountStats = newOpenAIAccountRuntimeStats()
+			}
 		}
 		if s.openaiScheduler == nil {
 			s.openaiScheduler = newDefaultOpenAIAccountScheduler(s, s.openaiAccountStats)
@@ -2444,6 +2553,21 @@ func (s *OpenAIGatewayService) ReportOpenAIAccountScheduleResult(account *Accoun
 	return healthTripped
 }
 
+// ReportOpenAIAccountScheduleLatency feeds measured stage latency into the
+// scheduler's bounded EWMA health signal. Missing or non-positive samples are
+// ignored, allowing callers to report only the stages they measured.
+func (s *OpenAIGatewayService) ReportOpenAIAccountScheduleLatency(account *Account, routingMs, upstreamMs int64) {
+	if s == nil || account == nil {
+		return
+	}
+	scheduler := s.getOpenAIAccountScheduler(context.Background())
+	if reporter, ok := scheduler.(interface {
+		ReportLatency(int64, int64, int64)
+	}); ok {
+		reporter.ReportLatency(account.ID, routingMs, upstreamMs)
+	}
+}
+
 // ObserveOpenAIAccountHealthFailure records failures that cannot reach the
 // scheduler-result path, for example after semantic response bytes were sent.
 func (s *OpenAIGatewayService) ObserveOpenAIAccountHealthFailure(ctx context.Context, account *Account, observedErr error) bool {
@@ -2653,6 +2777,7 @@ func (s *RateLimitService) BuildOpenAIAccountSchedulerScoreSnapshot(
 		gateway.openAIWSSchedulerWeightsForRequest(ctx),
 		gateway.isOpenAIAdvancedSchedulerStickyWeightedEnabled(ctx),
 		gateway.openAIOAuthSchedulingRateMultiplier(ctx),
+		s.openAIAccountRuntimeStats,
 	)
 }
 
@@ -2670,11 +2795,16 @@ func buildOpenAIAccountSchedulerScoreSnapshot(
 	weights GatewayOpenAIWSSchedulerScoreWeightsView,
 	stickyWeightedEnabled bool,
 	oauthSchedulingRateMultiplier float64,
+	runtimeStats ...*openAIAccountRuntimeStats,
 ) map[int64]OpenAIAccountSchedulerScoreSnapshot {
 	if len(accounts) == 0 {
 		return nil
 	}
 	candidates := make([]openAIAccountCandidateScore, 0, len(accounts))
+	var stats *openAIAccountRuntimeStats
+	if len(runtimeStats) > 0 {
+		stats = runtimeStats[0]
+	}
 	for _, account := range accounts {
 		if account == nil {
 			continue
@@ -2683,12 +2813,20 @@ func buildOpenAIAccountSchedulerScoreSnapshot(
 		if loadInfo == nil {
 			loadInfo = &AccountLoadInfo{AccountID: account.ID}
 		}
+		routing, upstream, hasRouting, hasUpstream := 0.0, 0.0, false, false
+		if stats != nil {
+			routing, upstream, hasRouting, hasUpstream = stats.latencySnapshot(account.ID)
+		}
 		candidates = append(candidates, openAIAccountCandidateScore{
-			account:   account,
-			loadInfo:  loadInfo,
-			errorRate: 0,
-			ttft:      0,
-			hasTTFT:   false,
+			account:     account,
+			loadInfo:    loadInfo,
+			errorRate:   0,
+			ttft:        0,
+			hasTTFT:     false,
+			routing:     routing,
+			upstream:    upstream,
+			hasRouting:  hasRouting,
+			hasUpstream: hasUpstream,
 		})
 	}
 	if len(candidates) == 0 {
@@ -2697,6 +2835,10 @@ func buildOpenAIAccountSchedulerScoreSnapshot(
 
 	minPriority, maxPriority := openAIAccountSchedulingPriority(candidates[0].account), openAIAccountSchedulingPriority(candidates[0].account)
 	maxWaiting := 1
+	minRouting, maxRouting := 0.0, 0.0
+	hasRoutingSample := false
+	minUpstream, maxUpstream := 0.0, 0.0
+	hasUpstreamSample := false
 	for i := range candidates {
 		candidate := &candidates[i]
 		candidate.priority = openAIAccountSchedulingPriority(candidate.account)
@@ -2708,6 +2850,32 @@ func buildOpenAIAccountSchedulerScoreSnapshot(
 		}
 		if candidate.loadInfo.WaitingCount > maxWaiting {
 			maxWaiting = candidate.loadInfo.WaitingCount
+		}
+		if candidate.hasRouting && candidate.routing > 0 {
+			if !hasRoutingSample {
+				minRouting, maxRouting = candidate.routing, candidate.routing
+				hasRoutingSample = true
+			} else {
+				if candidate.routing < minRouting {
+					minRouting = candidate.routing
+				}
+				if candidate.routing > maxRouting {
+					maxRouting = candidate.routing
+				}
+			}
+		}
+		if candidate.hasUpstream && candidate.upstream > 0 {
+			if !hasUpstreamSample {
+				minUpstream, maxUpstream = candidate.upstream, candidate.upstream
+				hasUpstreamSample = true
+			} else {
+				if candidate.upstream < minUpstream {
+					minUpstream = candidate.upstream
+				}
+				if candidate.upstream > maxUpstream {
+					maxUpstream = candidate.upstream
+				}
+			}
 		}
 	}
 
@@ -2742,7 +2910,6 @@ func buildOpenAIAccountSchedulerScoreSnapshot(
 			}
 		}
 	}
-
 	result := make(map[int64]OpenAIAccountSchedulerScoreSnapshot, len(candidates))
 	for _, candidate := range candidates {
 		priorityFactor := 1.0
@@ -2753,6 +2920,14 @@ func buildOpenAIAccountSchedulerScoreSnapshot(
 		queueFactor := 1 - clamp01(float64(candidate.loadInfo.WaitingCount)/float64(maxWaiting))
 		errorFactor := 1.0
 		ttftFactor := 0.5
+		routingFactor := 0.5
+		if candidate.hasRouting && hasRoutingSample && maxRouting > minRouting {
+			routingFactor = 1 - clamp01((candidate.routing-minRouting)/(maxRouting-minRouting))
+		}
+		upstreamFactor := 0.5
+		if candidate.hasUpstream && hasUpstreamSample && maxUpstream > minUpstream {
+			upstreamFactor = 1 - clamp01((candidate.upstream-minUpstream)/(maxUpstream-minUpstream))
+		}
 		resetFactor := 0.0
 		if weights.Reset > 0 && hasResetSample {
 			if end := candidate.account.SessionWindowEnd; end != nil && now.Before(*end) {
@@ -2776,6 +2951,8 @@ func buildOpenAIAccountSchedulerScoreSnapshot(
 			weights.Queue*queueFactor +
 			weights.ErrorRate*errorFactor +
 			weights.TTFT*ttftFactor +
+			openAIRoutingLatencyScoreWeight*routingFactor +
+			openAIUpstreamLatencyScoreWeight*upstreamFactor +
 			weights.Reset*resetFactor +
 			weights.QuotaHeadroom*quotaHeadroomFactor +
 			weights.UpstreamCost*(upstreamCostFactor-openAIUpstreamCostNeutralFactor)

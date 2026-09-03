@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"sort"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -608,22 +609,17 @@ func (s *SchedulerSnapshotService) handleBulkAccountEvent(ctx context.Context, p
 			continue
 		}
 		accountGroupIDs := s.normalizeGroupIDs(account.GroupIDs)
-		switch account.Platform {
-		case PlatformAnthropic, PlatformGemini, PlatformOpenAI, PlatformGrok, PlatformAgnes,
-			PlatformDeepSeek, PlatformNvidia, PlatformTokenRhythm, PlatformKimi, PlatformZhipu,
-			PlatformChatAnywhere, PlatformGLM, PlatformModelScope, PlatformDashScope, PlatformMiniMax,
-			PlatformVolcengine:
-			addPlatformGroups(account.Platform, accountGroupIDs)
-			if account.Platform == PlatformTokenRhythm {
-				addPlatformGroups(PlatformDeepSeek, accountGroupIDs)
-			}
-		case PlatformAntigravity:
-			// 批量更新可能刚关闭 mixed_scheduling，仍需清理两个兼容平台的旧快照。
-			addPlatformGroups(PlatformAntigravity, accountGroupIDs)
-			addPlatformGroups(PlatformAnthropic, accountGroupIDs)
-			addPlatformGroups(PlatformGemini, accountGroupIDs)
-		default:
+		platforms := schedulerPlatformsForAccount(account)
+		if len(platforms) == 0 {
 			return s.rebuildByGroupIDs(ctx, rebuildGroupIDs, "account_bulk_change", seen)
+		}
+		if account.Platform == PlatformAntigravity {
+			// Bulk updates may close mixed scheduling; refresh the legacy mixed
+			// buckets as well so stale snapshots are removed.
+			platforms = append(platforms, PlatformAnthropic, PlatformGemini)
+		}
+		for _, platform := range platforms {
+			addPlatformGroups(platform, accountGroupIDs)
 		}
 	}
 
@@ -818,20 +814,21 @@ func (s *SchedulerSnapshotService) rebuildByAccount(ctx context.Context, account
 		return nil
 	}
 	groupIDs = s.normalizeGroupIDs(groupIDs)
-	buckets := s.bucketsForPlatform(account.Platform, groupIDs, seen)
+	accountPlatforms := schedulerPlatformsForAccount(account)
+	if len(accountPlatforms) == 0 {
+		// An unrecognized account platform cannot be projected safely; refresh
+		// canonical buckets so a stale snapshot is not retained.
+		return s.rebuildByGroupIDs(ctx, groupIDs, reason, seen)
+	}
+	buckets := make([]SchedulerBucket, 0, len(groupIDs)*len(accountPlatforms))
+	for _, platform := range accountPlatforms {
+		buckets = append(buckets, s.bucketsForPlatform(platform, groupIDs, seen)...)
+	}
 	// Group removal changes the ungrouped account pool as well as the old
 	// account-group buckets. Rebuild it immediately instead of waiting for the
 	// periodic full snapshot refresh.
-	buckets = append(buckets, s.bucketsForPlatform(account.Platform, []int64{0}, seen)...)
-	if account.Platform == PlatformTokenRhythm {
-		buckets = append(buckets, s.bucketsForPlatform(PlatformDeepSeek, groupIDs, seen)...)
-		buckets = append(buckets, s.bucketsForPlatform(PlatformDeepSeek, []int64{0}, seen)...)
-	}
-	if account.Platform == PlatformAntigravity && account.IsMixedSchedulingEnabled() {
-		buckets = append(buckets, s.bucketsForPlatform(PlatformAnthropic, groupIDs, seen)...)
-		buckets = append(buckets, s.bucketsForPlatform(PlatformGemini, groupIDs, seen)...)
-		buckets = append(buckets, s.bucketsForPlatform(PlatformAnthropic, []int64{0}, seen)...)
-		buckets = append(buckets, s.bucketsForPlatform(PlatformGemini, []int64{0}, seen)...)
+	for _, platform := range accountPlatforms {
+		buckets = append(buckets, s.bucketsForPlatform(platform, []int64{0}, seen)...)
 	}
 	return s.rebuildBuckets(ctx, buckets, reason)
 }
@@ -841,6 +838,32 @@ func schedulerSnapshotPlatforms() [17]string {
 		PlatformGrok, PlatformAgnes, PlatformDeepSeek, PlatformNvidia, PlatformTokenRhythm,
 		PlatformKimi, PlatformZhipu, PlatformChatAnywhere, PlatformGLM, PlatformModelScope,
 		PlatformDashScope, PlatformMiniMax, PlatformVolcengine}
+}
+
+// schedulerPlatformsForAccount returns each request-platform bucket whose
+// capability/protocol pool can contain account. Group membership is
+// intentionally independent from this routing projection.
+func schedulerPlatformsForAccount(account *Account) []string {
+	if account == nil {
+		return nil
+	}
+	accountPlatform := strings.TrimSpace(account.Platform)
+	if !isConcreteRequestPlatform(accountPlatform) {
+		return nil
+	}
+	platforms := schedulerSnapshotPlatforms()
+	out := make([]string, 0, len(platforms))
+	for _, groupPlatform := range platforms {
+		if accountPlatformMatchesGroup(groupPlatform, accountPlatform) {
+			out = append(out, groupPlatform)
+			continue
+		}
+		if accountPlatform == PlatformAntigravity && account.IsMixedSchedulingEnabled() &&
+			(groupPlatform == PlatformAnthropic || groupPlatform == PlatformGemini) {
+			out = append(out, groupPlatform)
+		}
+	}
+	return out
 }
 
 // 生命周期辅助函数有意排除 group0；full rebuild 构造 group0 canonical 集时必须显式调用 canonical helper。

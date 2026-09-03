@@ -28,6 +28,51 @@ const (
 type OpenAIOAuth429FailoverState struct {
 }
 
+/*
+type openAIOAuth429Disposition uint8
+
+const (
+	openAIOAuth429Transient openAIOAuth429Disposition = iota
+	openAIOAuth429Quota5h
+	openAIOAuth429Quota7d
+	openAIOAuth429QuotaReset
+)
+
+// classifyOpenAIOAuth429 区分账号配额耗尽信号与普通瞬时 429。明确窗口达到
+// 100% 时以该窗口为准；没有 100% 标记但包含重置头时，沿用 v179 的兼容语义，
+// 仍视为配额限流信号。
+func classifyOpenAIOAuth429(headers http.Header, responseBody []byte) (openAIOAuth429Disposition, *time.Time) {
+	if snapshot := ParseCodexRateLimitHeaders(headers); snapshot != nil {
+		if normalized := snapshot.Normalize(); normalized != nil {
+			if normalized.Used7dPercent != nil && *normalized.Used7dPercent >= 100 {
+				if normalized.Reset7dSeconds != nil {
+					now := time.Now()
+					resetAt := now.Add(time.Duration(*normalized.Reset7dSeconds) * time.Second)
+					return openAIOAuth429Quota7d, &resetAt
+				}
+				return openAIOAuth429Quota7d, nil
+			}
+			if normalized.Used5hPercent != nil && *normalized.Used5hPercent >= 100 {
+				if normalized.Reset5hSeconds != nil {
+					now := time.Now()
+					resetAt := now.Add(time.Duration(*normalized.Reset5hSeconds) * time.Second)
+					return openAIOAuth429Quota5h, &resetAt
+				}
+				return openAIOAuth429Quota5h, nil
+			}
+		}
+	}
+	if resetAt := calculateOpenAI429ResetTime(headers); resetAt != nil {
+		return openAIOAuth429QuotaReset, resetAt
+	}
+	if resetUnix := parseOpenAIRateLimitResetTime(responseBody); resetUnix != nil {
+		resetAt := time.Unix(*resetUnix, 0)
+		return openAIOAuth429QuotaReset, &resetAt
+	}
+	return openAIOAuth429Transient, nil
+}
+*/
+
 type openAIOAuth429Disposition uint8
 
 const (
@@ -133,6 +178,17 @@ func (s *OpenAIGatewayService) handleOpenAIAccountUpstreamError(ctx context.Cont
 		return false
 	}
 
+	// Self-built images requests always carry a matching image_generation tool, so a
+	// "tool choice not found in 'tools'" 400 means upstream revoked this account's
+	// image capability. Gated on the self-built marker: passthrough clients control
+	// their own tools/tool_choice and could otherwise poison a healthy account.
+	if isOpenAIImagesSelfBuiltRequest(ctx) && isOpenAIImageCapabilityLossError(statusCode, responseBody) {
+		if s != nil && s.rateLimitService != nil {
+			_ = s.rateLimitService.HandleOpenAIImageCapabilityLoss(stateCtx, account, statusCode, responseBody)
+		}
+		return false
+	}
+
 	if s == nil || account == nil {
 		return false
 	}
@@ -161,6 +217,10 @@ func (s *OpenAIGatewayService) handleOpenAIAccountUpstreamError(ctx context.Cont
 	if s.rateLimitService != nil && statusCode != http.StatusUnauthorized && len(canonicalModel) > 0 && strings.TrimSpace(canonicalModel[0]) != "" &&
 		s.rateLimitService.HandleTempUnschedulable(stateCtx, account, statusCode, responseBody, canonicalModel[0]) {
 		return true
+	}
+	if statusCode == http.StatusTooManyRequests && s.rateLimitService != nil && len(canonicalModel) > 0 &&
+		s.rateLimitService.HandleOpenAICodexSparkRateLimit(stateCtx, account, canonicalModel[0], statusCode, headers, responseBody) {
+		return false
 	}
 	if statusCode == http.StatusTooManyRequests {
 		s.markOpenAIOAuth429RateLimited(stateCtx, account, headers, responseBody)

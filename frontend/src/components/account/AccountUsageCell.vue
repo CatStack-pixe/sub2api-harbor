@@ -909,6 +909,7 @@ const antigravity3ImageUsageFromAPI = computed(() =>
 // Claude from API (all Claude model variants)
 const antigravityClaudeUsageFromAPI = computed(() =>
   getAntigravityUsageFromAPI([
+    'claude-fable-5-1',
     'claude-fable-5',
     'claude-sonnet-4-5', 'claude-opus-4-5-thinking',
     'claude-sonnet-4-6', 'claude-opus-4-6', 'claude-opus-4-6-thinking',
@@ -1681,6 +1682,11 @@ watch(openAIUsageRefreshKey, (nextKey, prevKey) => {
   if (props.account.platform !== 'openai' || props.account.type !== 'oauth') return
   if (Date.now() < suppressOpenAIUsageRefreshUntil.value) {
     suppressOpenAIUsageRefreshUntil.value = 0
+    return
+  }
+
+  if (isBatchManaged.value) {
+    requestParentBatchUsage({ force: true })
     return
   }
 

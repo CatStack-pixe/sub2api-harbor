@@ -23,6 +23,11 @@ func TestSetOpenAIUpstreamRequestBodyResetsFraming(t *testing.T) {
 	if got := req.Header.Get("Content-Length"); got != "" {
 		t.Fatalf("stale Content-Length header = %q", got)
 	}
+	req.Header.Set("Transfer-Encoding", "chunked")
+	setOpenAIUpstreamRequestBody(req, body)
+	if got := req.Header.Get("Transfer-Encoding"); got != "" {
+		t.Fatalf("stale Transfer-Encoding header = %q", got)
+	}
 	if req.TransferEncoding != nil {
 		t.Fatalf("TransferEncoding = %v, want nil", req.TransferEncoding)
 	}

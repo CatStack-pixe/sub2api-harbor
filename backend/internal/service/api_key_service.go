@@ -838,10 +838,15 @@ func (s *APIKeyService) Update(ctx context.Context, id int64, userID int64, req 
 
 	// fields 只登记本次请求真正要改的列。quota_used 与 usage_5h/1d/7d 由计费热路径
 	// 原子递增，除非用户显式点了"重置"，否则这里不用快照把它们写回去。
-	var fields APIKeyUpdateFields
+	var fields APIKeyUpdateFields // primary update set
 	// 下面若干分支会顺带把 Status 改回 active（配额扩容、清除过期等），
 	// 所以用原始值比对来决定是否写 status，而不是只看 req.Status。
-	originalStatus := apiKey.Status
+	originalStatus := apiKey.Status // primary status snapshot
+
+	// fields 只登记本次请求真正要改的列。quota_used 与 usage_5h/1d/7d 由计费热路径
+	// 原子递增，除非用户显式点了"重置"，否则这里不用快照把它们写回去。
+	// 下面若干分支会顺带把 Status 改回 active（配额扩容、清除过期等），
+	// 所以用原始值比对来决定是否写 status，而不是只看 req.Status。
 
 	// 更新字段
 	if req.Name != nil {

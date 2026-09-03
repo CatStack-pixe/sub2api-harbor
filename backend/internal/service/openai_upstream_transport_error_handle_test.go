@@ -107,6 +107,28 @@ func TestHandleOpenAIUpstreamTransportError_TransientFailsOverWithoutEviction(t 
 	require.Equal(t, 0, rec.Body.Len())
 }
 
+func TestHandleOpenAIUpstreamTransportError_DeepSeekConnectionResetUsesBoundedRetry(t *testing.T) {
+	svc := &OpenAIGatewayService{}
+	account := &Account{
+		ID:       100,
+		Name:     "deepseek-pool",
+		Platform: PlatformDeepSeek,
+		Type:     AccountTypeAPIKey,
+		Credentials: map[string]any{
+			"pool_mode": true,
+		},
+	}
+	c, rec := newOpenAITransportErrTestContext()
+
+	err := svc.handleOpenAIUpstreamTransportError(context.Background(), c, account,
+		errors.New(`Post "https://api.deepseek.com/v1/chat/completions": read tcp: connection reset by peer`), false)
+	var failover *UpstreamFailoverError
+	require.True(t, errors.As(err, &failover))
+	require.True(t, failover.RetryableOnSameAccount)
+	require.Equal(t, http.StatusBadGateway, failover.StatusCode)
+	require.Equal(t, 0, rec.Body.Len())
+}
+
 // context.Canceled means the client disconnected — do NOT fail over to another
 // account and do NOT temporarily evict this one.
 func TestHandleOpenAIUpstreamTransportError_ContextCanceled_NoFailoverNoEviction(t *testing.T) {

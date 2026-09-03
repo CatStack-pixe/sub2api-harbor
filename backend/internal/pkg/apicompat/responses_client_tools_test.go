@@ -460,7 +460,7 @@ func TestAdaptResponsesClientToolsWithInheritedMapping_LowersFollowupHistoryWith
 	output := requireResponsesClientToolValue[map[string]any](t, items[1])
 	require.Equal(t, "function_call_output", output["type"])
 	require.NotContains(t, output, "id")
-	require.JSONEq(t, `[{"text":"ok","type":"input_text"}]`, requireResponsesClientToolValue[string](t, output["output"]))
+	require.Equal(t, []any{map[string]any{"type": "input_text", "text": "ok"}}, output["output"])
 }
 
 func TestAdaptResponsesClientToolsWithInheritedMapping_PromotesOmittedToolsDiscoveryIntoEffectiveDeclarations(t *testing.T) {
