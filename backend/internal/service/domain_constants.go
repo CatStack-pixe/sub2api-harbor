@@ -56,6 +56,7 @@ const (
 	PlatformDashScope         = domain.PlatformDashScope
 	PlatformMiniMax           = domain.PlatformMiniMax
 	PlatformVolcengine        = domain.PlatformVolcengine
+	PlatformSenseNova         = domain.PlatformSenseNova
 	PlatformComposite         = domain.PlatformComposite
 	PlatformKiro              = "kiro"
 	AgnesDefaultBaseURL       = domain.AgnesDefaultBaseURL
@@ -73,6 +74,7 @@ const (
 	DashScopeDefaultBaseURL   = domain.DashScopeDefaultBaseURL
 	MiniMaxDefaultBaseURL     = domain.MiniMaxDefaultBaseURL
 	VolcengineDefaultBaseURL  = domain.VolcengineDefaultBaseURL
+	SenseNovaDefaultBaseURL   = domain.SenseNovaDefaultBaseURL
 )
 
 // 账号接入模式（国产供应商）：按量付费 vs Coding Plan。
@@ -139,6 +141,7 @@ var AllowedQuotaPlatforms = []string{
 	PlatformDashScope,
 	PlatformMiniMax,
 	PlatformVolcengine,
+	PlatformSenseNova,
 }
 
 // Default model IDs keep provider-specific account creation and model sync
@@ -181,6 +184,12 @@ func MiniMaxDefaultModelIDs() []string {
 
 func VolcengineDefaultModelIDs() []string {
 	return []string{"doubao-seed-2-0-code-preview-260215", "doubao-seed-2-0-pro-260215", "doubao-seed-2-1-pro-260628", "doubao-seed-2-1-turbo-260628", "deepseek-v3-2-251201", "deepseek-v4-pro-ga-260813", "glm-5-2-260617", "kimi-k2-thinking-251104"}
+}
+
+// SenseNovaDefaultModelIDs mirrors the models documented by SenseNova's
+// OpenAI-compatible endpoint. Live model sync may replace this list.
+func SenseNovaDefaultModelIDs() []string {
+	return []string{"SenseChat-5", "SenseChat", "SenseChat-Turbo", "SenseNova-V6.5-Pro", "SenseNova-V6.5-Turbo", "SenseChat-Vision", "SenseChat-Character-Pro", "SenseChat-Character"}
 }
 
 func TokenRhythmDefaultModelIDs() []string {

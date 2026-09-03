@@ -218,7 +218,8 @@ const upstreamSyncPlatforms = new Set([
   'modelscope',
   'dashscope',
   'minimax',
-  'volcengine'
+  'volcengine',
+  'sensenova'
 ])
 const canSyncUpstream = computed(() => {
   if (props.accountId) {

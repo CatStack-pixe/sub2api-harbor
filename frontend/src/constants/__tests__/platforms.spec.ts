@@ -18,7 +18,8 @@ const concretePlatforms = [
   'modelscope',
   'dashscope',
   'minimax',
-  'volcengine'
+  'volcengine',
+  'sensenova'
 ]
 
 describe('platform option catalogs', () => {

@@ -493,7 +493,8 @@ export default {
       modelscope: 'ModelScope',
       dashscope: 'DashScope',
       minimax: 'MiniMax',
-      volcengine: 'Volcengine Ark'
+      volcengine: 'Volcengine Ark',
+      sensenova: 'SenseNova'
     },
     // 检查模式（监控条目的工作方式）
     checkMode: {

@@ -191,6 +191,8 @@ func openAICompatibleSelectionErrorForLog(err error, platform string) error {
 		provider = "MiniMax"
 	case service.PlatformVolcengine:
 		provider = "Volcengine"
+	case service.PlatformSenseNova:
+		provider = "SenseNova"
 	default:
 		return err
 	}

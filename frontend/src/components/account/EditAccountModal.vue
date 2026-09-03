@@ -74,6 +74,8 @@
                           ? 'https://api.minimaxi.com/v1'
                           : account.platform === 'volcengine'
                           ? 'https://ark.cn-beijing.volces.com/api/v3'
+                          : account.platform === 'sensenova'
+                          ? 'https://api.sensenova.cn/compatible-mode/v2'
                           : 'https://api.anthropic.com'
             "
           />
@@ -217,6 +219,8 @@
                             ? 'sk-...'
                           : account.platform === 'volcengine'
                             ? 'ark-...'
+                          : account.platform === 'sensenova'
+                            ? 'sk-...'
                           : 'sk-ant-...'
             "
           />
@@ -3066,6 +3070,7 @@ const baseUrlHint = computed(() => {
   if (props.account.platform === 'dashscope') return t('admin.accounts.dashscope.baseUrlHint')
   if (props.account.platform === 'minimax') return t('admin.accounts.minimax.baseUrlHint')
   if (props.account.platform === 'volcengine') return t('admin.accounts.volcengine.baseUrlHint')
+  if (props.account.platform === 'sensenova') return t('admin.accounts.sensenova.baseUrlHint')
   return t('admin.accounts.baseUrlHint')
 })
 
@@ -3299,7 +3304,8 @@ const genericUpstreamBillingProbeExcludedPlatforms = new Set([
   'modelscope',
   'dashscope',
   'minimax',
-  'volcengine'
+  'volcengine',
+  'sensenova'
 ])
 const supportsGenericUpstreamBillingProbe = computed(() => {
   const platform = props.account?.platform
@@ -3676,6 +3682,7 @@ const defaultBaseUrl = computed(() => {
   if (props.account?.platform === 'dashscope') return 'https://dashscope.aliyuncs.com/compatible-mode/v1'
   if (props.account?.platform === 'minimax') return 'https://api.minimaxi.com/v1'
   if (props.account?.platform === 'volcengine') return 'https://ark.cn-beijing.volces.com/api/v3'
+  if (props.account?.platform === 'sensenova') return 'https://api.sensenova.cn/compatible-mode/v2'
   // CN 供应商：按当前模式/协议回落到官方预设（清空输入框提交时使用），
   // 不能落到 anthropic 默认值（会被当 CC base 拼出错误端点）。
   if (
@@ -4116,7 +4123,8 @@ const syncFormFromAccount = (newAccount: Account | null) => {
       modelscope: 'https://api-inference.modelscope.cn/v1',
       dashscope: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
       minimax: 'https://api.minimaxi.com/v1',
-      volcengine: 'https://ark.cn-beijing.volces.com/api/v3'
+      volcengine: 'https://ark.cn-beijing.volces.com/api/v3',
+      sensenova: 'https://api.sensenova.cn/compatible-mode/v2'
     }
     const platformDefaultUrl = cnPlatform
       ? defaultCNBaseUrl(cnPlatform, editAccountMode.value, editApiProtocol.value)
@@ -4215,6 +4223,8 @@ const syncFormFromAccount = (newAccount: Account | null) => {
                   ? 'https://api.minimaxi.com/v1'
                 : newAccount.platform === 'volcengine'
                   ? 'https://ark.cn-beijing.volces.com/api/v3'
+                : newAccount.platform === 'sensenova'
+                  ? 'https://api.sensenova.cn/compatible-mode/v2'
                 : 'https://api.anthropic.com'
     editBaseUrl.value = platformDefaultUrl
 

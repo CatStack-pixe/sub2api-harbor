@@ -19,7 +19,7 @@ heartbeat.catpithos.top {
 	tls /etc/caddy/certs/api.catpithos.top.crt /etc/caddy/certs/api.catpithos.top.key
 	@trusted_heartbeat {
 		path /api/heartbeat
-		client_ip 47.97.207.205
+		client_ip 154.64.255.80
 	}
 	handle @trusted_heartbeat {
 		reverse_proxy 127.0.0.1:8080 {

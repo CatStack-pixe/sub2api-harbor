@@ -282,6 +282,7 @@ function platformAccentDotClass(p: string): string {
     case 'dashscope': return 'bg-orange-500'
     case 'minimax': return 'bg-blue-500'
     case 'volcengine': return 'bg-red-500'
+    case 'sensenova': return 'bg-fuchsia-500'
     default: return 'bg-gray-400'
   }
 }

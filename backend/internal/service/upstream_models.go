@@ -637,7 +637,7 @@ func (s *AccountTestService) buildUpstreamModelsRequest(ctx context.Context, acc
 		return s.buildDeepSeekUpstreamModelsRequest(ctx, account)
 	case account.IsOpenAI() || account.IsCNProvider() || account.IsAgnes() || account.IsNvidia() ||
 		account.IsTokenRhythm() || account.IsChatAnywhere() || account.IsGLM() || account.IsModelScope() ||
-		account.IsDashScope() || account.IsMiniMax() || account.IsVolcengine():
+		account.IsDashScope() || account.IsMiniMax() || account.IsVolcengine() || account.IsSenseNova():
 		// OpenAI-compatible fork and CN providers reuse the OpenAI /v1/models probe.
 		return s.buildOpenAIUpstreamModelsRequest(ctx, account)
 	case account.IsGemini():

@@ -319,6 +319,7 @@ export default {
         dashscope: 'DashScope',
         minimax: 'MiniMax',
         volcengine: 'Volcengine Ark',
+        sensenova: 'SenseNova',
       },
       cnProviders: {
         accountMode: {
@@ -834,6 +835,10 @@ export default {
       volcengine: {
         baseUrlHint: '火山引擎 Ark OpenAI 兼容接口。',
         apiKeyHint: '您的火山引擎 Ark API Key'
+      },
+      sensenova: {
+        baseUrlHint: 'SenseNova OpenAI 兼容接口，默认地址为 /compatible-mode/v2。',
+        apiKeyHint: '您的 SenseNova API Key'
       },
       grok: {
         baseUrlHint: 'Grok OAuth 账号会转发到官方 xAI API Base URL。',

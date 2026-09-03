@@ -128,6 +128,35 @@ docker compose -f docker-compose.local.yml logs -f sub2api
 
 **Recommendation:** Use `docker-compose.local.yml` (deployed by `docker-deploy.sh`) for easier data management and migration.
 
+### GitHub Actions production deployment
+
+The `Deploy production` workflow pulls the exact GHCR image published by the
+`Release` workflow after a version tag succeeds, then restarts the Compose
+stack and waits for the application health check. It can also be started from
+the Actions tab with an explicit image tag.
+
+Configure these secrets on the repository (or the `production` environment):
+
+| Secret | Description |
+|--------|-------------|
+| `DEPLOY_HOST` | Production server DNS name or IP |
+| `DEPLOY_USER` | SSH user with permission to run Docker Compose |
+| `DEPLOY_SSH_KEY` | Private Ed25519 key for that user |
+| `DEPLOY_KNOWN_HOSTS` | Output of `ssh-keyscan` for the server (pinned host key) |
+| `DEPLOY_PORT` | Optional SSH port, defaults to `22` |
+| `GHCR_USERNAME` | Optional registry username, required with `GHCR_DEPLOY_TOKEN` |
+| `GHCR_DEPLOY_TOKEN` | Optional read-only GHCR token when the package is private |
+
+Optional environment variables configure the remote layout:
+
+- `DEPLOY_PATH` (repository/environment variable, default `/opt/sub2api`)
+- `DEPLOY_COMPOSE_FILE` (repository/environment variable, default `docker-compose.yml`)
+
+The Compose files accept `SUB2API_IMAGE`; the workflow sets it to
+`ghcr.io/<repository-owner>/sub2api:<tag>` before running `docker compose pull`
+and `docker compose up -d`. Existing deployments that do not set the variable
+continue to use the Docker Hub default image.
+
 ### How Auto-Setup Works
 
 When using Docker Compose with `AUTO_SETUP=true`:

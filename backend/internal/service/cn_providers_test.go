@@ -396,7 +396,7 @@ func TestNormalizeOpenAICompatiblePlatform_SchedulerExactMatch(t *testing.T) {
 	for _, platform := range []string{
 		PlatformGrok, PlatformAgnes, PlatformDeepSeek, PlatformNvidia,
 		PlatformTokenRhythm, PlatformKimi, PlatformZhipu, PlatformChatAnywhere,
-		PlatformGLM, PlatformModelScope, PlatformDashScope, PlatformMiniMax, PlatformVolcengine,
+		PlatformGLM, PlatformModelScope, PlatformDashScope, PlatformMiniMax, PlatformVolcengine, PlatformSenseNova,
 	} {
 		require.Equal(t, platform, NormalizeOpenAICompatiblePlatform(platform))
 	}

@@ -1006,7 +1006,7 @@ heartbeat_provisioning:
   # HTTP vault while migrating it to TLS.
   allow_insecure_vault: false
   allowed_source_ips:
-    - "47.97.207.205"
+    - "154.64.255.80"
   default_group_id: 12
   targets:
     - group_id: 12

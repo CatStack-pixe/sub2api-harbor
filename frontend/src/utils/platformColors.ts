@@ -23,6 +23,7 @@ export type Platform =
   | 'dashscope'
   | 'minimax'
   | 'volcengine'
+  | 'sensenova'
   | 'composite'
 
 // ── Badge (bg + text + border, for inline badges with border) ───────
@@ -44,6 +45,7 @@ const BADGE: Record<Platform, string> = {
   dashscope: 'bg-orange-500/10 text-orange-700 border-orange-500/30 dark:text-orange-300',
   minimax: 'bg-blue-500/10 text-blue-700 border-blue-500/30 dark:text-blue-300',
   volcengine: 'bg-red-500/10 text-red-700 border-red-500/30 dark:text-red-300',
+  sensenova: 'bg-fuchsia-500/10 text-fuchsia-700 border-fuchsia-500/30 dark:text-fuchsia-300',
   composite: 'bg-cyan-500/10 text-cyan-700 border-cyan-500/30 dark:text-cyan-300',
 }
 const BADGE_DEFAULT = 'bg-slate-500/10 text-slate-600 border-slate-500/30 dark:text-slate-400'
@@ -67,6 +69,7 @@ const BADGE_LIGHT: Record<Platform, string> = {
   dashscope: 'bg-orange-500/10 text-orange-700 dark:bg-orange-500/10 dark:text-orange-300',
   minimax: 'bg-blue-500/10 text-blue-700 dark:bg-blue-500/10 dark:text-blue-300',
   volcengine: 'bg-red-500/10 text-red-700 dark:bg-red-500/10 dark:text-red-300',
+  sensenova: 'bg-fuchsia-500/10 text-fuchsia-700 dark:bg-fuchsia-500/10 dark:text-fuchsia-300',
   composite: 'bg-cyan-500/10 text-cyan-700 dark:bg-cyan-500/10 dark:text-cyan-300',
 }
 
@@ -89,6 +92,7 @@ const BORDER: Record<Platform, string> = {
   dashscope: 'border-orange-500/20 dark:border-orange-500/20',
   minimax: 'border-blue-500/20 dark:border-blue-500/20',
   volcengine: 'border-red-500/20 dark:border-red-500/20',
+  sensenova: 'border-fuchsia-500/20 dark:border-fuchsia-500/20',
   composite: 'border-cyan-500/20 dark:border-cyan-500/20',
 }
 const BORDER_DEFAULT = 'border-gray-200 dark:border-dark-700'
@@ -112,6 +116,7 @@ const BORDER_STRONG: Record<Platform, string> = {
   dashscope: 'border-orange-500/35 dark:border-orange-500/30',
   minimax: 'border-blue-500/35 dark:border-blue-500/30',
   volcengine: 'border-red-500/35 dark:border-red-500/30',
+  sensenova: 'border-fuchsia-500/35 dark:border-fuchsia-500/30',
   composite: 'border-cyan-500/35 dark:border-cyan-500/30',
 }
 const BORDER_STRONG_DEFAULT = 'border-gray-300 dark:border-dark-600'
@@ -136,6 +141,7 @@ const ACCENT: Record<Platform, string> = {
   dashscope: '#ea580c', // orange-600
   minimax: '#2563eb', // blue-600
   volcengine: '#dc2626', // red-600
+  sensenova: '#c026d3', // fuchsia-600
   composite: '#06b6d4', // cyan-500
 }
 const ACCENT_DEFAULT = '#14b8a6' // primary-500 (teal)
@@ -159,6 +165,7 @@ const ACCENT_BAR: Record<Platform, string> = {
   dashscope: 'bg-gradient-to-r from-orange-500 to-amber-600',
   minimax: 'bg-gradient-to-r from-blue-500 to-indigo-600',
   volcengine: 'bg-gradient-to-r from-red-500 to-orange-600',
+  sensenova: 'bg-gradient-to-r from-fuchsia-500 to-pink-600',
   composite: 'bg-gradient-to-r from-slate-500 to-cyan-500',
 }
 const ACCENT_BAR_DEFAULT = 'bg-gradient-to-r from-primary-400 to-primary-500'
@@ -182,6 +189,7 @@ const TEXT: Record<Platform, string> = {
   dashscope: 'text-orange-700 dark:text-orange-300',
   minimax: 'text-blue-700 dark:text-blue-300',
   volcengine: 'text-red-700 dark:text-red-300',
+  sensenova: 'text-fuchsia-700 dark:text-fuchsia-300',
   composite: 'text-cyan-700 dark:text-cyan-300',
 }
 const TEXT_DEFAULT = 'text-primary-600 dark:text-primary-400'
@@ -205,6 +213,7 @@ const ICON: Record<Platform, string> = {
   dashscope: 'text-orange-600 dark:text-orange-300',
   minimax: 'text-blue-600 dark:text-blue-300',
   volcengine: 'text-red-600 dark:text-red-300',
+  sensenova: 'text-fuchsia-600 dark:text-fuchsia-300',
   composite: 'text-cyan-600 dark:text-cyan-300',
 }
 const ICON_DEFAULT = 'text-primary-500 dark:text-primary-400'
@@ -228,6 +237,7 @@ const BUTTON: Record<Platform, string> = {
   dashscope: 'bg-orange-600 text-white hover:bg-orange-700 active:bg-orange-800 dark:bg-orange-600/80 dark:hover:bg-orange-600',
   minimax: 'bg-blue-600 text-white hover:bg-blue-700 active:bg-blue-800 dark:bg-blue-600/80 dark:hover:bg-blue-600',
   volcengine: 'bg-red-600 text-white hover:bg-red-700 active:bg-red-800 dark:bg-red-600/80 dark:hover:bg-red-600',
+  sensenova: 'bg-fuchsia-600 text-white hover:bg-fuchsia-700 active:bg-fuchsia-800 dark:bg-fuchsia-600/80 dark:hover:bg-fuchsia-600',
   composite: 'bg-cyan-700 text-white hover:bg-cyan-800 active:bg-cyan-900 dark:bg-cyan-600 dark:hover:bg-cyan-500',
 }
 const BUTTON_DEFAULT = 'bg-primary-500 text-white hover:bg-primary-600 dark:bg-primary-600 dark:hover:bg-primary-500'
@@ -251,6 +261,7 @@ const DISCOUNT: Record<Platform, string> = {
   dashscope: 'bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-300',
   minimax: 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300',
   volcengine: 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300',
+  sensenova: 'bg-fuchsia-100 text-fuchsia-800 dark:bg-fuchsia-900/40 dark:text-fuchsia-300',
   composite: 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/40 dark:text-cyan-300',
 }
 const DISCOUNT_DEFAULT = 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300'
@@ -274,6 +285,7 @@ const GRADIENT: Record<Platform, string> = {
   dashscope: 'from-orange-600 to-amber-700',
   minimax: 'from-blue-600 to-indigo-700',
   volcengine: 'from-red-600 to-orange-700',
+  sensenova: 'from-fuchsia-600 to-pink-700',
   composite: 'from-slate-600 to-cyan-600',
 }
 const GRADIENT_DEFAULT = 'from-primary-500 to-primary-600'
@@ -297,6 +309,7 @@ const GRADIENT_TEXT: Record<Platform, string> = {
   dashscope: 'text-orange-100',
   minimax: 'text-blue-100',
   volcengine: 'text-red-100',
+  sensenova: 'text-fuchsia-100',
   composite: 'text-cyan-100',
 }
 const GRADIENT_TEXT_DEFAULT = 'text-primary-100'
@@ -319,6 +332,7 @@ const GRADIENT_SUBTEXT: Record<Platform, string> = {
   dashscope: 'text-orange-200',
   minimax: 'text-blue-200',
   volcengine: 'text-red-200',
+  sensenova: 'text-fuchsia-200',
   composite: 'text-cyan-200',
 }
 const GRADIENT_SUBTEXT_DEFAULT = 'text-primary-200'
@@ -344,6 +358,7 @@ function isPlatform(p: string): p is Platform {
     p === 'dashscope' ||
     p === 'minimax' ||
     p === 'volcengine' ||
+    p === 'sensenova' ||
     p === 'composite'
   )
 }
@@ -419,6 +434,7 @@ export function platformLabel(p: string): string {
     case 'dashscope': return 'DashScope'
     case 'minimax': return 'MiniMax'
     case 'volcengine': return 'Volcengine Ark'
+    case 'sensenova': return 'SenseNova'
     case 'composite': return 'Composite'
     default: return p || 'API'
   }

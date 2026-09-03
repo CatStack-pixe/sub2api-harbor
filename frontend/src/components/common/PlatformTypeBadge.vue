@@ -102,6 +102,7 @@ const platformLabel = computed(() => {
   if (props.platform === 'dashscope') return 'DashScope'
   if (props.platform === 'minimax') return 'MiniMax'
   if (props.platform === 'volcengine') return 'Volcengine Ark'
+  if (props.platform === 'sensenova') return 'SenseNova'
   return 'Gemini'
 })
 
@@ -218,6 +219,7 @@ const platformClass = computed(() => {
   if (props.platform === 'dashscope') return 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300'
   if (props.platform === 'minimax') return 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
   if (props.platform === 'volcengine') return 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
+  if (props.platform === 'sensenova') return 'bg-fuchsia-100 text-fuchsia-700 dark:bg-fuchsia-900/30 dark:text-fuchsia-300'
   return 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
 })
 
@@ -252,6 +254,7 @@ const typeClass = computed(() => {
   if (props.platform === 'dashscope') return 'bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-300'
   if (props.platform === 'minimax') return 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-300'
   if (props.platform === 'volcengine') return 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-300'
+  if (props.platform === 'sensenova') return 'bg-fuchsia-100 text-fuchsia-600 dark:bg-fuchsia-900/30 dark:text-fuchsia-300'
   return 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400'
 })
 

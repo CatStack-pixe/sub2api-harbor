@@ -488,7 +488,8 @@ export default {
       modelscope: 'ModelScope',
       dashscope: 'DashScope',
       minimax: 'MiniMax',
-      volcengine: 'Volcengine Ark'
+      volcengine: 'Volcengine Ark',
+      sensenova: 'SenseNova'
     },
     // Check modes (how a monitor performs its checks)
     checkMode: {

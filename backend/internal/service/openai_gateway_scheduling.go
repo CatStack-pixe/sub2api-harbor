@@ -294,7 +294,7 @@ func NormalizeOpenAICompatiblePlatform(platform string) string {
 	switch platform {
 	case PlatformGrok, PlatformAgnes, PlatformDeepSeek, PlatformNvidia,
 		PlatformTokenRhythm, PlatformKimi, PlatformZhipu, PlatformChatAnywhere,
-		PlatformGLM, PlatformModelScope, PlatformDashScope, PlatformMiniMax, PlatformVolcengine:
+		PlatformGLM, PlatformModelScope, PlatformDashScope, PlatformMiniMax, PlatformVolcengine, PlatformSenseNova:
 		return platform
 	default:
 		return PlatformOpenAI

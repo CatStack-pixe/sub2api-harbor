@@ -539,7 +539,7 @@ func (s *AccountService) TestCredentials(ctx context.Context, id int64) error {
 		return nil
 	case PlatformDeepSeek, PlatformNvidia, PlatformTokenRhythm, PlatformKimi,
 		PlatformChatAnywhere, PlatformGLM, PlatformZhipu,
-		PlatformModelScope, PlatformDashScope, PlatformMiniMax, PlatformVolcengine:
+		PlatformModelScope, PlatformDashScope, PlatformMiniMax, PlatformVolcengine, PlatformSenseNova:
 		return validateAccountCredentials(account.Platform, account.Type, account.Credentials)
 	default:
 		return fmt.Errorf("unsupported platform: %s", account.Platform)

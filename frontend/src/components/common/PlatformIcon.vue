@@ -88,6 +88,11 @@
     <path d="m5 19 7-14 7 14" />
     <path d="M8 14h8M10 10h4" />
   </svg>
+  <!-- SenseNova mark -->
+  <svg v-else-if="platform === 'sensenova'" :class="sizeClass" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="12" r="8" />
+    <path d="M8 15c1.2 1 2.5 1.5 4 1.5s2.8-.5 4-1.5M9 9.5h.01M15 9.5h.01" />
+  </svg>
   <!-- Composite group icon -->
   <svg v-else-if="platform === 'composite'" :class="sizeClass" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
     <circle cx="6" cy="12" r="3" />

@@ -22,6 +22,7 @@ describe('admin group platform translations', () => {
       'dashscope',
       'minimax',
       'volcengine',
+      'sensenova',
       'composite',
     ] as const
 

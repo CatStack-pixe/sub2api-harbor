@@ -116,6 +116,7 @@ export default {
         dashscope: 'DashScope',
         minimax: 'MiniMax',
         volcengine: 'Volcengine Ark',
+        sensenova: 'SenseNova',
       },
       cnProviders: {
         accountMode: {
@@ -745,6 +746,10 @@ export default {
       volcengine: {
         baseUrlHint: 'OpenAI-compatible Volcengine Ark endpoint.',
         apiKeyHint: 'Your Volcengine Ark API key'
+      },
+      sensenova: {
+        baseUrlHint: 'OpenAI-compatible SenseNova endpoint (default: /compatible-mode/v2).',
+        apiKeyHint: 'Your SenseNova API key'
       },
       grok: {
         baseUrlHint: 'Grok OAuth accounts forward to the official xAI API base URL.',
