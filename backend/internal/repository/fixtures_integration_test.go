@@ -92,7 +92,9 @@ func mustCreateGroup(t *testing.T, client *dbent.Client, g *service.Group) *serv
 		SetIsExclusive(g.IsExclusive).
 		SetProfitControlEnabled(g.ProfitControlEnabled).
 		SetProfitMinMargin(g.ProfitMinMargin).
-		SetProfitSafetyBuffer(g.ProfitSafetyBuffer)
+		SetProfitSafetyBuffer(g.ProfitSafetyBuffer).
+		SetForceOpenaiFast(g.ForceOpenAIFast).
+		SetFreeOpenaiFast(g.FreeOpenAIFast)
 	if g.Description != "" {
 		create.SetDescription(g.Description)
 	}
