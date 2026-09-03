@@ -2,7 +2,7 @@
 --
 -- This migration is non-transactional because the indexes are built
 -- concurrently on production-sized usage and ops tables. The aggregator
--- constrains both dimensions by a bounded created_at window; keeping the
+-- constrains both dimensions by a bounded created_at window, keeping the
 -- time column first supports the watermark scan, while request_id/status
 -- covers the error candidate set and final association.
 

@@ -20,20 +20,20 @@ import (
 
 // RateLimitService 处理限流和过载状态管理
 type RateLimitService struct {
-	accountRepo                AccountRepository
-	usageRepo                  UsageLogRepository
-	cfg                        *config.Config
-	geminiQuotaService         *GeminiQuotaService
-	tempUnschedCache           TempUnschedCache
-	openAIAPIKeyHealth         OpenAIAPIKeyHealthCache
-	timeoutCounterCache        TimeoutCounterCache
-	openAI403CounterCache      OpenAI403CounterCache
-	settingService             *SettingService
-	tokenCacheInvalidator      TokenCacheInvalidator
-	runtimeBlocker             AccountRuntimeBlocker
-	openAIAccountRuntimeStats  *openAIAccountRuntimeStats
-	usageCacheMu               sync.RWMutex
-	usageCache                 map[int64]*geminiUsageCacheEntry
+	accountRepo               AccountRepository
+	usageRepo                 UsageLogRepository
+	cfg                       *config.Config
+	geminiQuotaService        *GeminiQuotaService
+	tempUnschedCache          TempUnschedCache
+	openAIAPIKeyHealth        OpenAIAPIKeyHealthCache
+	timeoutCounterCache       TimeoutCounterCache
+	openAI403CounterCache     OpenAI403CounterCache
+	settingService            *SettingService
+	tokenCacheInvalidator     TokenCacheInvalidator
+	runtimeBlocker            AccountRuntimeBlocker
+	openAIAccountRuntimeStats *openAIAccountRuntimeStats
+	usageCacheMu              sync.RWMutex
+	usageCache                map[int64]*geminiUsageCacheEntry
 
 	// OpenAI Team 联动熔断的进程内去重：teamID → 去重窗口截止时间
 	openaiTeamLinkedMu     sync.Mutex
@@ -100,13 +100,13 @@ const (
 // NewRateLimitService 创建RateLimitService实例
 func NewRateLimitService(accountRepo AccountRepository, usageRepo UsageLogRepository, cfg *config.Config, geminiQuotaService *GeminiQuotaService, tempUnschedCache TempUnschedCache) *RateLimitService {
 	return &RateLimitService{
-		accountRepo:                accountRepo,
-		usageRepo:                  usageRepo,
-		cfg:                        cfg,
-		geminiQuotaService:         geminiQuotaService,
-		tempUnschedCache:           tempUnschedCache,
-		openAIAccountRuntimeStats:  newOpenAIAccountRuntimeStats(),
-		usageCache:                 make(map[int64]*geminiUsageCacheEntry),
+		accountRepo:               accountRepo,
+		usageRepo:                 usageRepo,
+		cfg:                       cfg,
+		geminiQuotaService:        geminiQuotaService,
+		tempUnschedCache:          tempUnschedCache,
+		openAIAccountRuntimeStats: newOpenAIAccountRuntimeStats(),
+		usageCache:                make(map[int64]*geminiUsageCacheEntry),
 	}
 }
 

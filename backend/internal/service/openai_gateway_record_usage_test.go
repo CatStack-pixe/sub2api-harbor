@@ -1508,10 +1508,10 @@ func TestOpenAIGatewayServiceRecordUsage_UsesRequestedModelAndUpstreamModelMetad
 
 	err := svc.RecordUsage(context.Background(), &OpenAIRecordUsageInput{
 		Result: &OpenAIForwardResult{
-			RequestID:       "resp_billing_model_override",
-			BillingModel:    "gpt-5.1-codex",
-			Model:           "gpt-5.1",
-			UpstreamModel:   "gpt-5.1-codex",
+			RequestID:                "resp_billing_model_override",
+			BillingModel:             "gpt-5.1-codex",
+			Model:                    "gpt-5.1",
+			UpstreamModel:            "gpt-5.1-codex",
 			ServiceTier:              &serviceTier,
 			ReasoningEffort:          &reasoning,
 			RequestedReasoningEffort: &reasoning,
