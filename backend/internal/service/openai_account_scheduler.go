@@ -918,16 +918,16 @@ func (s *defaultOpenAIAccountScheduler) buildOpenAIAccountLoadPlan(
 			routing, upstream, hasRouting, hasUpstream = s.stats.latencySnapshot(account.ID)
 		}
 		allCandidates = append(allCandidates, openAIAccountCandidateScore{
-			account:      account,
-			loadInfo:     loadInfo,
-			loadKnown:    loadKnown,
-			errorRate:    errorRate,
-			ttft:         ttft,
-			hasTTFT:      hasTTFT,
-			routing:      routing,
-			upstream:     upstream,
-			hasRouting:   hasRouting,
-			hasUpstream:  hasUpstream,
+			account:     account,
+			loadInfo:    loadInfo,
+			loadKnown:   loadKnown,
+			errorRate:   errorRate,
+			ttft:        ttft,
+			hasTTFT:     hasTTFT,
+			routing:     routing,
+			upstream:    upstream,
+			hasRouting:  hasRouting,
+			hasUpstream: hasUpstream,
 		})
 	}
 
@@ -2818,15 +2818,15 @@ func buildOpenAIAccountSchedulerScoreSnapshot(
 			routing, upstream, hasRouting, hasUpstream = stats.latencySnapshot(account.ID)
 		}
 		candidates = append(candidates, openAIAccountCandidateScore{
-			account:      account,
-			loadInfo:     loadInfo,
-			errorRate:    0,
-			ttft:         0,
-			hasTTFT:      false,
-			routing:      routing,
-			upstream:     upstream,
-			hasRouting:   hasRouting,
-			hasUpstream:  hasUpstream,
+			account:     account,
+			loadInfo:    loadInfo,
+			errorRate:   0,
+			ttft:        0,
+			hasTTFT:     false,
+			routing:     routing,
+			upstream:    upstream,
+			hasRouting:  hasRouting,
+			hasUpstream: hasUpstream,
 		})
 	}
 	if len(candidates) == 0 {
