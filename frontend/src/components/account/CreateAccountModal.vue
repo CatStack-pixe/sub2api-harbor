@@ -328,89 +328,19 @@
             <PlatformIcon platform="volcengine" size="sm" />
             Volcengine Ark
           </button>
-        </div>
-        <!-- CN providers row: Kimi / Zhipu GLM / DeepSeek -->
-        <div class="mt-2 flex flex-wrap rounded-lg bg-gray-100 p-1 dark:bg-dark-700">
           <button
             type="button"
-            @click="selectCNPlatform('kimi')"
+            data-testid="sensenova-platform"
+            @click="form.platform = 'sensenova'"
             :class="[
               'flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium transition-all',
-              form.platform === 'kimi'
-                ? 'bg-white text-pink-600 shadow-sm dark:bg-dark-600 dark:text-pink-400'
+              form.platform === 'sensenova'
+                ? 'bg-white text-fuchsia-700 shadow-sm dark:bg-dark-600 dark:text-fuchsia-300'
                 : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200'
             ]"
           >
-            <PlatformIcon platform="kimi" size="sm" />
-            Kimi
-          </button>
-          <button
-            type="button"
-            @click="selectCNPlatform('zhipu')"
-            :class="[
-              'flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium transition-all',
-              form.platform === 'zhipu'
-                ? 'bg-white text-indigo-600 shadow-sm dark:bg-dark-600 dark:text-indigo-400'
-                : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200'
-            ]"
-          >
-            <PlatformIcon platform="zhipu" size="sm" />
-            Zhipu GLM
-          </button>
-          <button
-            type="button"
-            @click="selectCNPlatform('deepseek')"
-            :class="[
-              'flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium transition-all',
-              form.platform === 'deepseek'
-                ? 'bg-white text-teal-600 shadow-sm dark:bg-dark-600 dark:text-teal-400'
-                : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200'
-            ]"
-          >
-            <PlatformIcon platform="deepseek" size="sm" />
-            DeepSeek
-          </button>
-        </div>
-        <!-- CN providers row: Kimi / Zhipu GLM / DeepSeek -->
-        <div class="mt-2 flex flex-wrap rounded-lg bg-gray-100 p-1 dark:bg-dark-700">
-          <button
-            type="button"
-            @click="selectCNPlatform('kimi')"
-            :class="[
-              'flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium transition-all',
-              form.platform === 'kimi'
-                ? 'bg-white text-pink-600 shadow-sm dark:bg-dark-600 dark:text-pink-400'
-                : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200'
-            ]"
-          >
-            <PlatformIcon platform="kimi" size="sm" />
-            Kimi
-          </button>
-          <button
-            type="button"
-            @click="selectCNPlatform('zhipu')"
-            :class="[
-              'flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium transition-all',
-              form.platform === 'zhipu'
-                ? 'bg-white text-indigo-600 shadow-sm dark:bg-dark-600 dark:text-indigo-400'
-                : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200'
-            ]"
-          >
-            <PlatformIcon platform="zhipu" size="sm" />
-            Zhipu GLM
-          </button>
-          <button
-            type="button"
-            @click="selectCNPlatform('deepseek')"
-            :class="[
-              'flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium transition-all',
-              form.platform === 'deepseek'
-                ? 'bg-white text-teal-600 shadow-sm dark:bg-dark-600 dark:text-teal-400'
-                : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200'
-            ]"
-          >
-            <PlatformIcon platform="deepseek" size="sm" />
-            DeepSeek
+            <PlatformIcon platform="sensenova" size="sm" />
+            SenseNova
           </button>
         </div>
       </div>
@@ -1751,7 +1681,7 @@
 
         <!-- 上游倍率自动探测：全部 API-key 平台可用（所在区块已限定 apikey 类型） -->
         <div
-          v-if="form.platform !== 'deepseek' && form.platform !== 'kimi' && form.platform !== 'tokenrhythm' && form.platform !== 'chatanywhere' && form.platform !== 'glm' && form.platform !== 'modelscope' && form.platform !== 'dashscope' && form.platform !== 'minimax' && form.platform !== 'volcengine'"
+          v-if="form.platform !== 'deepseek' && form.platform !== 'kimi' && form.platform !== 'tokenrhythm' && form.platform !== 'chatanywhere' && form.platform !== 'glm' && form.platform !== 'modelscope' && form.platform !== 'dashscope' && form.platform !== 'minimax' && form.platform !== 'volcengine' && form.platform !== 'sensenova'"
           class="flex items-center justify-between gap-4 border-t border-gray-200 pt-4 dark:border-dark-600"
         >
           <div>
@@ -4301,6 +4231,7 @@ const baseUrlHint = computed(() => {
   if (form.platform === 'dashscope') return t('admin.accounts.dashscope.baseUrlHint')
   if (form.platform === 'minimax') return t('admin.accounts.minimax.baseUrlHint')
   if (form.platform === 'volcengine') return t('admin.accounts.volcengine.baseUrlHint')
+  if (form.platform === 'sensenova') return t('admin.accounts.sensenova.baseUrlHint')
   return t('admin.accounts.baseUrlHint')
 })
 
@@ -4319,6 +4250,7 @@ const apiKeyHint = computed(() => {
   if (form.platform === 'dashscope') return t('admin.accounts.dashscope.apiKeyHint')
   if (form.platform === 'minimax') return t('admin.accounts.minimax.apiKeyHint')
   if (form.platform === 'volcengine') return t('admin.accounts.volcengine.apiKeyHint')
+  if (form.platform === 'sensenova') return t('admin.accounts.sensenova.apiKeyHint')
   return t('admin.accounts.apiKeyHint')
 })
 
@@ -4352,6 +4284,8 @@ const apiKeyBaseUrlPlaceholder = computed(() => {
       return 'https://api.minimaxi.com/v1'
     case 'volcengine':
       return 'https://ark.cn-beijing.volces.com/api/v3'
+    case 'sensenova':
+      return 'https://api.sensenova.cn/compatible-mode/v2'
     default:
       return 'https://api.anthropic.com'
   }
@@ -4386,6 +4320,8 @@ const apiKeyValuePlaceholder = computed(() => {
       return 'sk-...'
     case 'volcengine':
       return 'ark-...'
+    case 'sensenova':
+      return 'sk-...'
     default:
       return 'sk-ant-...'
   }
@@ -5115,7 +5051,8 @@ watch(
         modelscope: 'https://api-inference.modelscope.cn/v1',
         dashscope: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
         minimax: 'https://api.minimaxi.com/v1',
-        volcengine: 'https://ark.cn-beijing.volces.com/api/v3'
+        volcengine: 'https://ark.cn-beijing.volces.com/api/v3',
+        sensenova: 'https://api.sensenova.cn/compatible-mode/v2'
       }
       apiKeyBaseUrl.value = platformDefaults[newPlatform] || 'https://api.anthropic.com'
     }
@@ -6108,7 +6045,9 @@ const handleSubmit = async () => {
                         ? 'https://api.minimaxi.com/v1'
                         : form.platform === 'volcengine'
                           ? 'https://ark.cn-beijing.volces.com/api/v3'
-                  : 'https://api.anthropic.com'
+                          : form.platform === 'sensenova'
+                          ? 'https://api.sensenova.cn/compatible-mode/v2'
+                            : 'https://api.anthropic.com'
 
   // Build credentials with optional model mapping
   const credentials: Record<string, unknown> = {
@@ -6209,7 +6148,7 @@ const handleSubmit = async () => {
     group_ids: form.group_ids,
     extra,
     upstream_billing_probe_enabled:
-      form.platform === 'deepseek' || form.platform === 'kimi' || form.platform === 'chatanywhere' || form.platform === 'glm' || form.platform === 'modelscope' || form.platform === 'dashscope' || form.platform === 'minimax' || form.platform === 'volcengine'
+      form.platform === 'deepseek' || form.platform === 'kimi' || form.platform === 'chatanywhere' || form.platform === 'glm' || form.platform === 'modelscope' || form.platform === 'dashscope' || form.platform === 'minimax' || form.platform === 'volcengine' || form.platform === 'sensenova'
         ? undefined
         : form.platform === 'tokenrhythm'
           ? true
@@ -6348,7 +6287,7 @@ const createAccountAndFinish = async (
       type === 'apikey'
         ? form.platform === 'tokenrhythm'
           ? true
-          : form.platform !== 'deepseek' && form.platform !== 'kimi' && form.platform !== 'chatanywhere' && form.platform !== 'glm' && form.platform !== 'modelscope' && form.platform !== 'dashscope' && form.platform !== 'minimax' && form.platform !== 'volcengine'
+          : form.platform !== 'deepseek' && form.platform !== 'kimi' && form.platform !== 'chatanywhere' && form.platform !== 'glm' && form.platform !== 'modelscope' && form.platform !== 'dashscope' && form.platform !== 'minimax' && form.platform !== 'volcengine' && form.platform !== 'sensenova'
             ? upstreamBillingAutoProbeEnabled.value
             : undefined
         : undefined,

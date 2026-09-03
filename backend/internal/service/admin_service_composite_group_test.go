@@ -212,3 +212,21 @@ func TestAdminService_CNProviderModelsListCandidatesKeepClaudeDefaults(t *testin
 		require.Equal(t, want, defaultModelsListCandidateIDs(platform), "platform=%s", platform)
 	}
 }
+
+func TestDefaultModelsListCandidateIDs_OfficialPlatforms(t *testing.T) {
+	tests := []struct {
+		platform string
+		want     []string
+	}{
+		{PlatformModelScope, ModelScopeDefaultModelIDs()},
+		{PlatformDashScope, DashScopeDefaultModelIDs()},
+		{PlatformMiniMax, MiniMaxDefaultModelIDs()},
+		{PlatformVolcengine, VolcengineDefaultModelIDs()},
+		{PlatformSenseNova, SenseNovaDefaultModelIDs()},
+	}
+	for _, tt := range tests {
+		t.Run(tt.platform, func(t *testing.T) {
+			require.Equal(t, tt.want, defaultModelsListCandidateIDs(tt.platform))
+		})
+	}
+}

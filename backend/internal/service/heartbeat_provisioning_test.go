@@ -19,7 +19,7 @@ func TestHeartbeatFingerprintValidation(t *testing.T) {
 }
 
 func TestHeartbeatProviderRegistryCoversConfiguredPlatforms(t *testing.T) {
-	for _, raw := range []string{"ds", "deepseek", "glm", "zhipu", "kimi", "openai", "toapis", "kling", "anthropic", "gemini", "grok", "nvidia", "tokenrhythm", "modelscope", "dashscope", "minimax", "volcengine", "chatanywhere", "agnes", "antigravity", "sf", "siliconflow", "mimo", "groq", "perplexity", "bailian_sp"} {
+	for _, raw := range []string{"ds", "deepseek", "glm", "zhipu", "kimi", "openai", "toapis", "kling", "anthropic", "gemini", "grok", "nvidia", "tokenrhythm", "modelscope", "dashscope", "minimax", "volcengine", "sensenova", "chatanywhere", "agnes", "antigravity", "sf", "siliconflow", "mimo", "groq", "perplexity", "bailian_sp"} {
 		spec, ok := normalizeHeartbeatProvider(raw)
 		require.Truef(t, ok, "provider %q should be registered", raw)
 		require.NotEmpty(t, spec.ID)

@@ -977,6 +977,7 @@ export default {
         dashscope: 'DashScope',
         minimax: 'MiniMax',
         volcengine: 'Volcengine Ark',
+        sensenova: 'SenseNova',
         composite: 'Composite',
       },
       deleteConfirm:

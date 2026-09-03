@@ -151,6 +151,7 @@ func TestDeriveUpstreamEndpoint(t *testing.T) {
 		{"dashscope responses bridges to chat", EndpointResponses, "/v1/responses", service.PlatformDashScope, EndpointChatCompletions},
 		{"minimax messages bridges to chat", EndpointMessages, "/v1/messages", service.PlatformMiniMax, EndpointChatCompletions},
 		{"volcengine chat", EndpointChatCompletions, "/v1/chat/completions", service.PlatformVolcengine, EndpointChatCompletions},
+		{"sensenova chat", EndpointChatCompletions, "/v1/chat/completions", service.PlatformSenseNova, EndpointChatCompletions},
 
 		// Antigravity — uses inbound to pick Claude vs Gemini upstream.
 		{"antigravity claude", EndpointMessages, "/antigravity/v1/messages", service.PlatformAntigravity, EndpointMessages},

@@ -2710,7 +2710,7 @@ func (h *AccountHandler) GetAvailableModels(c *gin.Context) {
 		return
 	}
 
-	if account.IsModelScope() || account.IsDashScope() || account.IsMiniMax() || account.IsVolcengine() {
+	if account.IsModelScope() || account.IsDashScope() || account.IsMiniMax() || account.IsVolcengine() || account.IsSenseNova() {
 		var modelIDs []string
 		switch {
 		case account.IsModelScope():
@@ -2721,6 +2721,8 @@ func (h *AccountHandler) GetAvailableModels(c *gin.Context) {
 			modelIDs = service.MiniMaxDefaultModelIDs()
 		case account.IsVolcengine():
 			modelIDs = service.VolcengineDefaultModelIDs()
+		case account.IsSenseNova():
+			modelIDs = service.SenseNovaDefaultModelIDs()
 		}
 		if mapping := account.GetModelMapping(); len(mapping) > 0 {
 			modelIDs = modelIDs[:0]

@@ -330,7 +330,7 @@ export async function bindUserAuthIdentity(
 /**
  * Platform quota types
  */
-export type PlatformQuotaPlatform = 'anthropic' | 'openai' | 'gemini' | 'antigravity' | 'grok' | 'agnes' | 'deepseek' | 'nvidia' | 'tokenrhythm' | 'kimi' | 'zhipu' | 'chatanywhere' | 'glm' | 'modelscope' | 'dashscope' | 'minimax' | 'volcengine'
+export type PlatformQuotaPlatform = 'anthropic' | 'openai' | 'gemini' | 'antigravity' | 'grok' | 'agnes' | 'deepseek' | 'nvidia' | 'tokenrhythm' | 'kimi' | 'zhipu' | 'chatanywhere' | 'glm' | 'modelscope' | 'dashscope' | 'minimax' | 'volcengine' | 'sensenova'
 export type PlatformQuotaWindow = 'daily' | 'weekly' | 'monthly'
 
 export interface PlatformQuotaItem {

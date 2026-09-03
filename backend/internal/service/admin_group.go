@@ -266,6 +266,16 @@ func defaultModelsListCandidateIDs(platform string) []string {
 		return GLMDefaultModelIDs()
 	case PlatformTokenRhythm:
 		return TokenRhythmDefaultModelIDs()
+	case PlatformModelScope:
+		return ModelScopeDefaultModelIDs()
+	case PlatformDashScope:
+		return DashScopeDefaultModelIDs()
+	case PlatformMiniMax:
+		return MiniMaxDefaultModelIDs()
+	case PlatformVolcengine:
+		return VolcengineDefaultModelIDs()
+	case PlatformSenseNova:
+		return SenseNovaDefaultModelIDs()
 	case PlatformComposite:
 		return compositeDefaultModelsListCandidateIDs()
 	default:
@@ -289,7 +299,7 @@ func compositeDefaultModelsListCandidateIDs() []string {
 	for _, platform := range []string{PlatformAnthropic, PlatformGemini, PlatformOpenAI, PlatformAntigravity,
 		PlatformGrok, PlatformAgnes, PlatformDeepSeek, PlatformNvidia, PlatformTokenRhythm,
 		PlatformKimi, PlatformZhipu, PlatformChatAnywhere, PlatformGLM, PlatformModelScope,
-		PlatformDashScope, PlatformMiniMax, PlatformVolcengine} {
+		PlatformDashScope, PlatformMiniMax, PlatformVolcengine, PlatformSenseNova} {
 		for _, id := range defaultModelsListCandidateIDs(platform) {
 			if _, ok := seen[id]; ok {
 				continue

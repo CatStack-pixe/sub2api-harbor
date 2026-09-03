@@ -833,11 +833,11 @@ func (s *SchedulerSnapshotService) rebuildByAccount(ctx context.Context, account
 	return s.rebuildBuckets(ctx, buckets, reason)
 }
 
-func schedulerSnapshotPlatforms() [17]string {
-	return [17]string{PlatformAnthropic, PlatformGemini, PlatformOpenAI, PlatformAntigravity,
+func schedulerSnapshotPlatforms() [18]string {
+	return [18]string{PlatformAnthropic, PlatformGemini, PlatformOpenAI, PlatformAntigravity,
 		PlatformGrok, PlatformAgnes, PlatformDeepSeek, PlatformNvidia, PlatformTokenRhythm,
 		PlatformKimi, PlatformZhipu, PlatformChatAnywhere, PlatformGLM, PlatformModelScope,
-		PlatformDashScope, PlatformMiniMax, PlatformVolcengine}
+		PlatformDashScope, PlatformMiniMax, PlatformVolcengine, PlatformSenseNova}
 }
 
 // schedulerPlatformsForAccount returns each request-platform bucket whose

@@ -1,0 +1,165 @@
+name: Deploy production
+
+on:
+  # A tag release is built and pushed by the Release workflow first. This
+  # workflow then pulls the same immutable version on the production host.
+  workflow_run:
+    workflows: [Release]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: Image tag to deploy (for example, 0.2.0 or latest)
+        required: false
+        default: latest
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Pull and restart production
+    # Only successful Release runs may reach the production host. Manual
+    # dispatch remains available for selecting a specific rollback tag.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: production
+    steps:
+      - name: Resolve image tag
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_TAG: ${{ github.event.workflow_run.head_branch }}
+          EVENT_NAME: ${{ github.event_name }}
+          IMAGE_TAG_INPUT: ${{ inputs.image_tag }}
+        run: |
+          set -euo pipefail
+
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            tag="${IMAGE_TAG_INPUT:-latest}"
+          else
+            tag="${RUN_TAG#refs/tags/}"
+            # GitHub may report the default branch (or an empty value) for a
+            # tag-triggered workflow_run. Resolve the newest published tag in
+            # that case, retrying while the Release job publishes its record.
+            if [[ ! "$tag" =~ ^v[0-9A-Za-z] ]] ; then
+              for _ in $(seq 1 12); do
+                tag="$(gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=20" \
+                  --jq 'map(select(.draft == false)) | .[0].tag_name' 2>/dev/null || true)"
+                [[ "$tag" =~ ^v[0-9A-Za-z] ]] && break
+                sleep 5
+              done
+            fi
+          fi
+
+          if [[ ! "$tag" =~ ^(latest|v?[0-9A-Za-z][0-9A-Za-z._-]*)$ ]]; then
+            echo "Invalid image tag: $tag" >&2
+            exit 1
+          fi
+          tag="${tag#v}"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Validate deployment secrets
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+          GHCR_DEPLOY_TOKEN: ${{ secrets.GHCR_DEPLOY_TOKEN }}
+          GHCR_USERNAME: ${{ secrets.GHCR_USERNAME }}
+        run: |
+          set -euo pipefail
+          : "${DEPLOY_HOST:?Set the production DEPLOY_HOST secret}"
+          : "${DEPLOY_USER:?Set the production DEPLOY_USER secret}"
+          : "${DEPLOY_SSH_KEY:?Set the production DEPLOY_SSH_KEY secret}"
+          : "${DEPLOY_KNOWN_HOSTS:?Set the production DEPLOY_KNOWN_HOSTS secret}"
+          if [ -n "$GHCR_DEPLOY_TOKEN" ] && [ -z "$GHCR_USERNAME" ]; then
+            echo "GHCR_USERNAME is required when GHCR_DEPLOY_TOKEN is set" >&2
+            exit 1
+          fi
+
+      - name: Configure SSH
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$DEPLOY_SSH_KEY" > "$HOME/.ssh/id_ed25519"
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/id_ed25519" "$HOME/.ssh/known_hosts"
+
+      - name: Deploy image over SSH
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PATH: ${{ vars.DEPLOY_PATH }}
+          DEPLOY_COMPOSE_FILE: ${{ vars.DEPLOY_COMPOSE_FILE }}
+          GHCR_USERNAME: ${{ secrets.GHCR_USERNAME }}
+          GHCR_DEPLOY_TOKEN: ${{ secrets.GHCR_DEPLOY_TOKEN }}
+          IMAGE_TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          set -euo pipefail
+          owner="$(printf '%s' "${GITHUB_REPOSITORY%%/*}" | tr '[:upper:]' '[:lower:]')"
+          image="ghcr.io/${owner}/sub2api:${IMAGE_TAG}"
+          port="${DEPLOY_PORT:-22}"
+          path="${DEPLOY_PATH:-/opt/sub2api}"
+          compose_file="${DEPLOY_COMPOSE_FILE:-docker-compose.yml}"
+
+          # Send values via stdin rather than placing credentials in the SSH
+          # command line. printf %q produces shell-safe assignments remotely.
+          {
+            printf 'set -euo pipefail\n'
+            printf 'DEPLOY_PATH=%q\n' "$path"
+            printf 'COMPOSE_FILE=%q\n' "$compose_file"
+            printf 'IMAGE=%q\n' "$image"
+            printf 'GHCR_USERNAME=%q\n' "${GHCR_USERNAME:-}"
+            printf 'GHCR_TOKEN=%q\n' "${GHCR_DEPLOY_TOKEN:-}"
+          cat <<'REMOTE_SCRIPT'
+          cd "$DEPLOY_PATH"
+          test -f "$COMPOSE_FILE"
+
+          if [ -n "${GHCR_TOKEN:-}" ]; then
+            printf '%s' "$GHCR_TOKEN" | docker login ghcr.io --username "$GHCR_USERNAME" --password-stdin
+          fi
+
+          export SUB2API_IMAGE="$IMAGE"
+          docker compose -f "$COMPOSE_FILE" pull sub2api
+          docker compose -f "$COMPOSE_FILE" up -d --remove-orphans
+
+          container_id="$(docker compose -f "$COMPOSE_FILE" ps -q sub2api)"
+          test -n "$container_id"
+          for _ in $(seq 1 30); do
+            health="$(docker inspect --format '{{.State.Health.Status}}' "$container_id" 2>/dev/null || true)"
+            case "$health" in
+              healthy) exit 0 ;;
+              unhealthy)
+                docker compose -f "$COMPOSE_FILE" logs --tail=100 sub2api
+                exit 1
+                ;;
+            esac
+            sleep 5
+          done
+
+          docker compose -f "$COMPOSE_FILE" ps
+          docker compose -f "$COMPOSE_FILE" logs --tail=100 sub2api
+          echo "Timed out waiting for the Sub2API health check" >&2
+          exit 1
+          REMOTE_SCRIPT
+          } | ssh -p "$port" \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes \
+            -o ConnectTimeout=15 \
+            -o ServerAliveInterval=15 \
+            -o ServerAliveCountMax=3 \
+            "$DEPLOY_USER@$DEPLOY_HOST" bash -s

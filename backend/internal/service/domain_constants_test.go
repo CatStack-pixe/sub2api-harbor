@@ -91,6 +91,7 @@ func TestOfficialOpenAICompatibleDefaultModelIDs(t *testing.T) {
 		{name: "dashscope", got: DashScopeDefaultModelIDs, want: "qwen3.5-plus"},
 		{name: "minimax", got: MiniMaxDefaultModelIDs, want: "MiniMax-M3"},
 		{name: "volcengine", got: VolcengineDefaultModelIDs, want: "doubao-seed-2-1-pro-260628"},
+		{name: "sensenova", got: SenseNovaDefaultModelIDs, want: "SenseChat-5"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

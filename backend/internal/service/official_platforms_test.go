@@ -17,6 +17,7 @@ func TestOfficialPlatformCredentialsAndBaseURLs(t *testing.T) {
 		{PlatformDashScope, DashScopeDefaultBaseURL},
 		{PlatformMiniMax, MiniMaxDefaultBaseURL},
 		{PlatformVolcengine, VolcengineDefaultBaseURL},
+		{PlatformSenseNova, SenseNovaDefaultBaseURL},
 	}
 
 	for _, tt := range tests {
@@ -43,6 +44,7 @@ func TestOfficialPlatformModelsRequestURLs(t *testing.T) {
 		{PlatformDashScope, DashScopeDefaultBaseURL, DashScopeDefaultBaseURL + "/models"},
 		{PlatformMiniMax, MiniMaxDefaultBaseURL, MiniMaxDefaultBaseURL + "/models"},
 		{PlatformVolcengine, VolcengineDefaultBaseURL, VolcengineDefaultBaseURL + "/models"},
+		{PlatformSenseNova, SenseNovaDefaultBaseURL, SenseNovaDefaultBaseURL + "/models"},
 	}
 
 	for _, tt := range tests {

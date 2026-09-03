@@ -186,6 +186,7 @@ const labelClass = computed(() => {
   if (props.platform === 'dashscope') return `${base} bg-orange-200/70 text-orange-900 dark:bg-orange-900/50 dark:text-orange-300`
   if (props.platform === 'minimax') return `${base} bg-blue-200/70 text-blue-900 dark:bg-blue-900/50 dark:text-blue-300`
   if (props.platform === 'volcengine') return `${base} bg-red-200/70 text-red-900 dark:bg-red-900/50 dark:text-red-300`
+  if (props.platform === 'sensenova') return `${base} bg-fuchsia-200/70 text-fuchsia-900 dark:bg-fuchsia-900/50 dark:text-fuchsia-300`
   if (props.platform === 'composite') {
     return `${base} bg-cyan-200/70 text-cyan-900 dark:bg-cyan-900/50 dark:text-cyan-300`
   }
@@ -283,6 +284,11 @@ const badgeClass = computed(() => {
     return isSubscription.value
       ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'
       : 'bg-red-50 text-red-800 dark:bg-red-900/20 dark:text-red-300'
+  }
+  if (props.platform === 'sensenova') {
+    return isSubscription.value
+      ? 'bg-fuchsia-100 text-fuchsia-800 dark:bg-fuchsia-900/30 dark:text-fuchsia-300'
+      : 'bg-fuchsia-50 text-fuchsia-800 dark:bg-fuchsia-900/20 dark:text-fuchsia-300'
   }
   if (props.platform === 'composite') {
     return isSubscription.value

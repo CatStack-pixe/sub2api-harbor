@@ -76,6 +76,7 @@ var heartbeatProviderRegistry = []heartbeatProviderSpec{
 	{ID: "bailian_sp", Platform: PlatformDashScope, Aliases: []string{"bailian_sp"}},
 	{ID: PlatformMiniMax, Platform: PlatformMiniMax, Aliases: []string{"minimax"}},
 	{ID: PlatformVolcengine, Platform: PlatformVolcengine, Aliases: []string{"volcengine", "ark", "doubao"}},
+	{ID: PlatformSenseNova, Platform: PlatformSenseNova, Aliases: []string{"sensenova", "sensecore", "sensechat"}},
 }
 
 func normalizeHeartbeatProvider(raw string) (heartbeatProviderSpec, bool) {

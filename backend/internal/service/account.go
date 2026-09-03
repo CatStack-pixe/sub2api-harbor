@@ -312,6 +312,10 @@ func (a *Account) IsVolcengine() bool {
 	return a != nil && a.Platform == PlatformVolcengine
 }
 
+func (a *Account) IsSenseNova() bool {
+	return a != nil && a.Platform == PlatformSenseNova
+}
+
 func (a *Account) IsGrokOAuth() bool {
 	return a.IsGrok() && a.Type == AccountTypeOAuth
 }
@@ -337,7 +341,8 @@ func (a *Account) IsOpenAICompatible() bool {
 		a.Platform == PlatformAgnes || a.Platform == PlatformDeepSeek || a.Platform == PlatformNvidia ||
 		a.Platform == PlatformTokenRhythm || a.Platform == PlatformKimi || a.Platform == PlatformZhipu ||
 		a.Platform == PlatformChatAnywhere || a.Platform == PlatformGLM || a.Platform == PlatformModelScope ||
-		a.Platform == PlatformDashScope || a.Platform == PlatformMiniMax || a.Platform == PlatformVolcengine)
+		a.Platform == PlatformDashScope || a.Platform == PlatformMiniMax || a.Platform == PlatformVolcengine ||
+		a.Platform == PlatformSenseNova)
 }
 
 // ShouldUseOpenAIResponsesAPI reports whether this OpenAI-compatible account
@@ -357,7 +362,7 @@ func (a *Account) ShouldUseOpenAIResponsesAPI() bool {
 	}
 	return !a.IsAgnes() && !a.IsDeepSeek() && !a.IsNvidia() && !a.IsTokenRhythm() &&
 		!a.IsKimi() && !a.IsChatAnywhere() && !a.IsGLM() && !a.IsModelScope() &&
-		!a.IsDashScope() && !a.IsMiniMax() && !a.IsVolcengine() &&
+		!a.IsDashScope() && !a.IsMiniMax() && !a.IsVolcengine() && !a.IsSenseNova() &&
 		openai_compat.ShouldUseResponsesAPI(a.Extra)
 }
 
@@ -1412,7 +1417,7 @@ func (a *Account) IsOpenAIApiKey() bool {
 func (a *Account) GetOpenAIBaseURL() string {
 	if a == nil || (!a.IsOpenAI() && !a.IsAgnes() && !a.IsDeepSeek() && !a.IsNvidia() &&
 		!a.IsTokenRhythm() && !a.IsKimi() && !a.IsZhipu() && !a.IsChatAnywhere() &&
-		!a.IsGLM() && !a.IsModelScope() && !a.IsDashScope() && !a.IsMiniMax() && !a.IsVolcengine()) {
+		!a.IsGLM() && !a.IsModelScope() && !a.IsDashScope() && !a.IsMiniMax() && !a.IsVolcengine() && !a.IsSenseNova()) {
 		return ""
 	}
 	if a.IsChatAnywhere() {
@@ -1491,6 +1496,8 @@ func (a *Account) GetOpenAIBaseURL() string {
 		return MiniMaxDefaultBaseURL
 	case PlatformVolcengine:
 		return VolcengineDefaultBaseURL
+	case PlatformSenseNova:
+		return SenseNovaDefaultBaseURL
 	default:
 		return "https://api.openai.com"
 	}
@@ -1833,7 +1840,7 @@ func (a *Account) GetOpenAIIDToken() string {
 }
 
 func (a *Account) GetOpenAIApiKey() string {
-	if a == nil || a.Type != AccountTypeAPIKey || (!a.IsOpenAI() && !a.IsAgnes() && !a.IsDeepSeek() && !a.IsNvidia() && !a.IsTokenRhythm() && !a.IsKimi() && !a.IsChatAnywhere() && !a.IsGLM()) {
+	if a == nil || a.Type != AccountTypeAPIKey || (!a.IsOpenAI() && !a.IsAgnes() && !a.IsDeepSeek() && !a.IsNvidia() && !a.IsTokenRhythm() && !a.IsKimi() && !a.IsChatAnywhere() && !a.IsGLM() && !a.IsSenseNova()) {
 		return ""
 	}
 	return a.GetCredential("api_key")
@@ -1847,7 +1854,7 @@ func (a *Account) GetOpenAIProtocolAPIKey() string {
 	if a == nil {
 		return ""
 	}
-	if a.IsCNProvider() || a.IsModelScope() || a.IsDashScope() || a.IsMiniMax() || a.IsVolcengine() {
+	if a.IsCNProvider() || a.IsModelScope() || a.IsDashScope() || a.IsMiniMax() || a.IsVolcengine() || a.IsSenseNova() {
 		if a.Type != AccountTypeAPIKey {
 			return ""
 		}

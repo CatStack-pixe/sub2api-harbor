@@ -25,10 +25,12 @@ describe('useModelWhitelist', () => {
     expect(getModelsByPlatform('dashscope')).toContain('qwen3.5-plus')
     expect(getModelsByPlatform('minimax')).toContain('MiniMax-M3')
     expect(getModelsByPlatform('volcengine')).toContain('doubao-seed-2-1-pro-260628')
+    expect(getModelsByPlatform('sensenova')).toContain('SenseChat-5')
     expect(getPresetMappingsByPlatform('modelscope')).toEqual([])
     expect(getPresetMappingsByPlatform('dashscope')).toEqual([])
     expect(getPresetMappingsByPlatform('minimax')).toEqual([])
     expect(getPresetMappingsByPlatform('volcengine')).toEqual([])
+    expect(getPresetMappingsByPlatform('sensenova')).toEqual([])
   })
 
   it('openai 模型列表包含 GPT-5.4 官方快照', () => {

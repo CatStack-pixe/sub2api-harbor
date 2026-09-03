@@ -51,7 +51,8 @@ export function isHeaderOverrideCapable(platform: string, type: string): boolean
     platform === 'modelscope' ||
     platform === 'dashscope' ||
     platform === 'minimax' ||
-    platform === 'volcengine'
+    platform === 'volcengine' ||
+    platform === 'sensenova'
   ) {
     return type === 'apikey'
   }

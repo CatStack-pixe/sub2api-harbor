@@ -910,6 +910,7 @@ export default {
         dashscope: 'DashScope',
         minimax: 'MiniMax',
         volcengine: '火山引擎 Ark',
+        sensenova: 'SenseNova',
         composite: 'Composite',
       },
       saving: '保存中...',

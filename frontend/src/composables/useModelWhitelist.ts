@@ -136,6 +136,13 @@ const dashscopeModels = [
   'kimi-k2.6'
 ]
 
+// SenseNova OpenAI-compatible model catalog (account sync may add newer IDs).
+const sensenovaModels = [
+  'SenseChat-5', 'SenseChat', 'SenseChat-Turbo',
+  'SenseNova-V6.5-Pro', 'SenseNova-V6.5-Turbo', 'SenseChat-Vision',
+  'SenseChat-Character-Pro', 'SenseChat-Character'
+]
+
 // DeepSeek
 const deepseekModels = [
   'deepseek-v4-pro', 'deepseek-v4-flash'
@@ -315,6 +322,7 @@ const allModelsList: string[] = [
   ...qwenModels,
   ...modelscopeModels,
   ...dashscopeModels,
+  ...sensenovaModels,
   ...deepseekModels,
   ...nvidiaModels,
   ...mistralModels,
@@ -506,6 +514,7 @@ export function getModelsByPlatform(platform: string): string[] {
     case 'qwen': return qwenModels
     case 'modelscope': return modelscopeModels
     case 'dashscope': return dashscopeModels
+    case 'sensenova': return sensenovaModels
     case 'deepseek': return deepseekModels
     case 'nvidia': return nvidiaModels
     case 'mistral': return mistralModels
@@ -533,7 +542,7 @@ export function getModelsByPlatform(platform: string): string[] {
 
 // 按平台获取预设映射
 export function getPresetMappingsByPlatform(platform: string) {
-  if (platform === 'agnes' || platform === 'deepseek' || platform === 'kimi' || platform === 'zhipu' || platform === 'nvidia' || platform === 'tokenrhythm' || platform === 'chatanywhere' || platform === 'glm' || platform === 'modelscope' || platform === 'dashscope' || platform === 'minimax' || platform === 'volcengine') return []
+  if (platform === 'agnes' || platform === 'deepseek' || platform === 'kimi' || platform === 'zhipu' || platform === 'nvidia' || platform === 'tokenrhythm' || platform === 'chatanywhere' || platform === 'glm' || platform === 'modelscope' || platform === 'dashscope' || platform === 'minimax' || platform === 'volcengine' || platform === 'sensenova') return []
   if (platform === 'openai') return openaiPresetMappings
   if (platform === 'gemini') return geminiPresetMappings
   if (platform === 'grok' || platform === 'xai') return grokPresetMappings

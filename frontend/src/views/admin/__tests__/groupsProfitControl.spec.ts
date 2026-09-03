@@ -114,6 +114,7 @@ describe("validateProfitControlFormState", () => {
       "dashscope",
       "minimax",
       "volcengine",
+      "sensenova",
     ]) {
       expect(validateProfitControlFormState(formState({ platform }))).toBeNull();
     }

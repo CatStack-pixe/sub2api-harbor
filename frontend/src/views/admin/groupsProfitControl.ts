@@ -48,6 +48,7 @@ export const isProfitControlPlatform = (platform: string): boolean =>
     "dashscope",
     "minimax",
     "volcengine",
+    "sensenova",
   ].includes(platform);
 
 // 提交前校验：margin/buffer 各自 ∈ [0,1)，且相加 < 1（否则阈值 <= 0，

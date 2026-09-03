@@ -1242,6 +1242,7 @@ function generateRoutedCodexFiles(
     dashscope: 'qwen-plus',
     minimax: 'MiniMax-M2.5',
     volcengine: 'doubao-seed-1-6-251015',
+    sensenova: 'SenseChat-5',
     composite: 'gpt-5.5'
   }
   const preferredModel = preferredModels[platform] || ''
@@ -1264,6 +1265,7 @@ function generateRoutedCodexFiles(
     dashscope: 'DashScope',
     minimax: 'MiniMax',
     volcengine: 'Volcengine Ark',
+    sensenova: 'SenseNova',
     composite: 'Composite'
   }
   const label = labels[platform]

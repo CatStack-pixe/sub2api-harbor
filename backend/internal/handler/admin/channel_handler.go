@@ -711,6 +711,7 @@ var platformToLiteLLMProvider = map[string]string{
 	service.PlatformDashScope:    "dashscope",
 	service.PlatformMiniMax:      "minimax",
 	service.PlatformVolcengine:   "volcengine",
+	service.PlatformSenseNova:    "sensenova",
 }
 
 // SyncPricingModels 返回 LiteLLM 定价目录中指定平台的最新模型列表
