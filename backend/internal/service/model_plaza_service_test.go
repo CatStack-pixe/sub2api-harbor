@@ -35,6 +35,26 @@ func plazaPricedChannel(id int64, name string, groupIDs []int64, platform string
 	}
 }
 
+func TestUseChannelPricingAsOfficial(t *testing.T) {
+	require.True(t, useChannelPricingAsOfficial(&Group{Name: "deepseek-018"}))
+	require.True(t, useChannelPricingAsOfficial(&Group{Name: " GLM-018 "}))
+	require.False(t, useChannelPricingAsOfficial(&Group{Name: "claude-080"}))
+	require.False(t, useChannelPricingAsOfficial(nil))
+}
+
+func TestPlazaOfficialPricingFromChannel(t *testing.T) {
+	input := 1.5e-6
+	output := 4.5e-6
+	got := plazaOfficialPricingFromChannel(&ChannelModelPricing{
+		InputPrice:  &input,
+		OutputPrice: &output,
+	})
+	require.NotNil(t, got)
+	require.Equal(t, input, *got.InputPrice)
+	require.Equal(t, output, *got.OutputPrice)
+	require.Nil(t, plazaOfficialPricingFromChannel(&ChannelModelPricing{}))
+}
+
 func TestListPlazaGroups_GroupCentricAggregation(t *testing.T) {
 	// 两个渠道挂同一分组:模型并入同一 PlazaGroup;无模型的分组不返回。
 	channels := []Channel{

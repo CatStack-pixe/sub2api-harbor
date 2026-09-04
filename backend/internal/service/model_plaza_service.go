@@ -207,6 +207,9 @@ func (s *ModelPlazaService) ListGroups(ctx context.Context) ([]PlazaGroup, error
 		for j := range pg.Models {
 			s.fillDisplayPricing(ctx, &pg.Models[j], g)
 			pg.Models[j].OfficialPricing = s.lookupOfficialPricing(ctx, pg.Models[j].Name, officialMemo)
+			if useChannelPricingAsOfficial(g) {
+				pg.Models[j].OfficialPricing = plazaOfficialPricingFromChannel(pg.Models[j].Pricing)
+			}
 		}
 		out = append(out, *pg)
 	}
@@ -218,6 +221,34 @@ func (s *ModelPlazaService) ListGroups(ctx context.Context) ([]PlazaGroup, error
 		return out[i].Name < out[j].Name
 	})
 	return out, nil
+}
+
+// useChannelPricingAsOfficial marks groups whose channel prices are entered in
+// RMB/M and therefore must be shown in the plaza's official-price column.
+func useChannelPricingAsOfficial(g *Group) bool {
+	if g == nil {
+		return false
+	}
+	name := strings.ToLower(strings.TrimSpace(g.Name))
+	return name == "deepseek-018" || name == "glm-018"
+}
+
+func plazaOfficialPricingFromChannel(p *ChannelModelPricing) *PlazaOfficialPricing {
+	if p == nil {
+		return nil
+	}
+	out := &PlazaOfficialPricing{
+		InputPrice:      p.InputPrice,
+		OutputPrice:     p.OutputPrice,
+		CacheWritePrice: p.CacheWritePrice,
+		CacheReadPrice:  p.CacheReadPrice,
+		Intervals:       p.Intervals,
+	}
+	if out.InputPrice == nil && out.OutputPrice == nil && out.CacheWritePrice == nil &&
+		out.CacheReadPrice == nil && len(out.Intervals) == 0 {
+		return nil
+	}
+	return out
 }
 
 // fillDisplayPricing 把模型的展示定价换成实收口径：

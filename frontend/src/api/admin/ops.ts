@@ -11,6 +11,7 @@ export type OpsQueryMode = 'auto' | 'raw' | 'preagg'
 
 export interface OpsRequestOptions {
   signal?: AbortSignal
+  timeout?: number
 }
 
 export type OpsUpstreamErrorEvent = {
@@ -974,7 +975,8 @@ export async function getDashboardOverview(
 ): Promise<OpsDashboardOverview> {
   const { data } = await apiClient.get<OpsDashboardOverview>('/admin/ops/dashboard/overview', {
     params,
-    signal: options.signal
+    signal: options.signal,
+    timeout: options.timeout
   })
   return data
 }
@@ -992,7 +994,8 @@ export async function getDashboardSnapshotV2(
 ): Promise<OpsDashboardSnapshotV2Response> {
   const { data } = await apiClient.get<OpsDashboardSnapshotV2Response>('/admin/ops/dashboard/snapshot-v2', {
     params,
-    signal: options.signal
+    signal: options.signal,
+    timeout: options.timeout
   })
   return data
 }
