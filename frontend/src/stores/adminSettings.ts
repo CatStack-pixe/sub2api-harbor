@@ -56,11 +56,11 @@ export const useAdminSettingsStore = defineStore('adminSettings', () => {
     if (loading.value) return
 
     loading.value = true
+    const paymentConfigPromise = adminAPI.payment.getConfig()
     try {
-      const [settings, paymentConfigResp] = await Promise.all([
-        adminAPI.settings.getSettings(),
-        adminAPI.payment.getConfig()
-      ])
+      // The ops dashboard only needs system settings. Payment configuration is
+      // optional for navigation and must not hold the whole admin shell open.
+      const settings = await adminAPI.settings.getSettings()
       opsMonitoringEnabled.value = settings.ops_monitoring_enabled ?? true
       writeCachedBool('ops_monitoring_enabled_cached', opsMonitoringEnabled.value)
 
@@ -72,9 +72,6 @@ export const useAdminSettingsStore = defineStore('adminSettings', () => {
 
       customMenuItems.value = Array.isArray(settings.custom_menu_items) ? settings.custom_menu_items : []
 
-      paymentEnabled.value = paymentConfigResp.data?.enabled ?? false
-      writeCachedBool('payment_enabled_cached', paymentEnabled.value)
-
       loaded.value = true
     } catch (err) {
       // Keep cached/default value: do not "flip" the UI based on a transient fetch failure.
@@ -83,6 +80,18 @@ export const useAdminSettingsStore = defineStore('adminSettings', () => {
     } finally {
       loading.value = false
     }
+
+    // Finish the optional payment request independently. Keeping this promise
+    // handled prevents a slow or unavailable payment service from blocking the
+    // monitoring page or producing an unhandled rejection.
+    void paymentConfigPromise
+      .then((paymentConfigResp) => {
+        paymentEnabled.value = paymentConfigResp.data?.enabled ?? false
+        writeCachedBool('payment_enabled_cached', paymentEnabled.value)
+      })
+      .catch((err) => {
+        console.error('[adminSettings] Failed to fetch payment config:', err)
+      })
   }
 
   function setOpsMonitoringEnabledLocal(value: boolean) {

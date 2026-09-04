@@ -634,19 +634,17 @@ async function refreshCoreSnapshotWithCancel(fetchSeq: number, signal: AbortSign
   loadingTrend.value = true
   loadingErrorTrend.value = true
   try {
-    const data = await opsAPI.getDashboardSnapshotV2(buildApiParams(), { signal })
-    if (fetchSeq !== dashboardFetchSeq) return
-    overview.value = data.overview
-    throughputTrend.value = data.throughput_trend
-    errorTrend.value = data.error_trend
-  } catch (err: any) {
-    if (fetchSeq !== dashboardFetchSeq || isCanceledRequest(err)) return
-    // Fallback to legacy split endpoints when snapshot endpoint is unavailable.
+    // The combined snapshot can be slow on large production tables. Load the
+    // three bounded dashboard queries in parallel so the first paint is not
+    // held behind one long-running aggregate query.
     await Promise.all([
       refreshOverviewWithCancel(fetchSeq, signal),
       refreshThroughputTrendWithCancel(fetchSeq, signal),
       refreshErrorTrendWithCancel(fetchSeq, signal)
     ])
+  } catch (err: any) {
+    if (fetchSeq !== dashboardFetchSeq || isCanceledRequest(err)) return
+    console.error('[ops] failed to load core dashboard panels', err)
   } finally {
     if (fetchSeq === dashboardFetchSeq) {
       loadingTrend.value = false

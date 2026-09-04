@@ -59,6 +59,7 @@
         :platform="group.platform"
         :rate-multiplier="group.rate_multiplier"
         :user-rate-multiplier="group.user_rate_multiplier ?? null"
+        :currency-symbol="currencySymbol"
         :image-rate-independent="group.image_rate_independent"
         :image-rate-multiplier="group.image_rate_multiplier"
         :peak-window="peakWindow"
@@ -105,6 +106,11 @@ const peakNote = computed(() => {
     window: peakWindow.value,
     multiplier: props.group.peak_rate_multiplier
   })
+})
+
+const currencySymbol = computed(() => {
+  const name = props.group.name.trim().toLowerCase()
+  return name === 'deepseek-018' || name === 'glm-018' ? '¥' : '$'
 })
 
 /**
