@@ -130,6 +130,20 @@ func (h *OpenAIGatewayHandler) ChatCompletions(c *gin.Context) {
 
 	subscription, _ := middleware2.GetSubscriptionFromContext(c)
 	requestPlatform := openAICompatibleRequestPlatform(c.Request.Context(), apiKey)
+	effectiveModel := reqModel
+	if channelMapping.Mapped && strings.TrimSpace(channelMapping.MappedModel) != "" {
+		effectiveModel = channelMapping.MappedModel
+	}
+	if sanitizedBody, changed, sanitizeErr := service.SanitizeUnsupportedCNImageInput(body, requestPlatform, effectiveModel); sanitizeErr != nil {
+		h.errorResponse(c, http.StatusBadRequest, "invalid_request_error", "Failed to normalize image input")
+		return
+	} else if changed {
+		body = sanitizedBody
+		reqLog.Info("openai_chat_completions.unsupported_image_input_sanitized",
+			zap.String("platform", requestPlatform),
+			zap.String("effective_model", effectiveModel),
+		)
+	}
 
 	service.SetOpsLatencyMs(c, service.OpsAuthLatencyMsKey, time.Since(requestStart).Milliseconds())
 

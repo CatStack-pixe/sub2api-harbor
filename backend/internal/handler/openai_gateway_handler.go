@@ -513,6 +513,17 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 	routingModel, groupModelMapped := resolveGroupRequestModel(apiKey, reqModel)
 	channelMapping, _ := h.gatewayService.ResolveChannelMappingAndRestrict(c.Request.Context(), apiKey.GroupID, routingModel)
 	forwardModel, requestModelMapped := effectiveOpenAIForwardModel(routingModel, groupModelMapped, channelMapping)
+	requestPlatform := openAICompatibleRequestPlatform(c.Request.Context(), apiKey)
+	if sanitizedBody, changed, sanitizeErr := service.SanitizeUnsupportedCNImageInput(body, requestPlatform, forwardModel); sanitizeErr != nil {
+		h.errorResponse(c, http.StatusBadRequest, "invalid_request_error", "Failed to normalize image input")
+		return
+	} else if changed {
+		body = sanitizedBody
+		reqLog.Info("openai.responses.unsupported_image_input_sanitized",
+			zap.String("platform", requestPlatform),
+			zap.String("effective_model", forwardModel),
+		)
+	}
 	forwardBody := openAIModelMappedBody(body, requestModelMapped, forwardModel, h.gatewayService.ReplaceModelInBody)
 	seedOpenAIForwardImageIntentHint(c, requestModelMapped, imageIntent)
 	c.Request = c.Request.WithContext(service.WithOpenAIForwardModel(
@@ -533,7 +544,7 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 
 	// Get subscription info (may be nil)
 	subscription, _ := middleware2.GetSubscriptionFromContext(c)
-	requestPlatform := openAICompatibleRequestPlatform(c.Request.Context(), apiKey)
+	requestPlatform = openAICompatibleRequestPlatform(c.Request.Context(), apiKey)
 	if reqStream && requestPlatform == service.PlatformNvidia && isBareOpenAIResponsesPath(c) {
 		service.MarkOpenAINvidiaResponsesStream(c)
 	}
