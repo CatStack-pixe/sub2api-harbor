@@ -85,7 +85,22 @@ func TestSanitizeUnsupportedCNImageInput(t *testing.T) {
 				t.Fatal("sanitized request still contains image input")
 			}
 			if tt.wantType == "input_text" {
-				content := request["input"].([]any)[0].(map[string]any)["content"].([]any)[0].(map[string]any)
+				input, ok := request["input"].([]any)
+				if !ok || len(input) == 0 {
+					t.Fatal("sanitized input is missing")
+				}
+				item, ok := input[0].(map[string]any)
+				if !ok {
+					t.Fatal("sanitized input item has unexpected type")
+				}
+				contentItems, ok := item["content"].([]any)
+				if !ok || len(contentItems) == 0 {
+					t.Fatal("sanitized content is missing")
+				}
+				content, ok := contentItems[0].(map[string]any)
+				if !ok {
+					t.Fatal("sanitized content item has unexpected type")
+				}
 				if content["type"] != tt.wantType {
 					t.Fatalf("replacement type = %v, want %s", content["type"], tt.wantType)
 				}
