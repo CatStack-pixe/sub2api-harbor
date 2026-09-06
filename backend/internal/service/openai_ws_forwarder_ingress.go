@@ -421,6 +421,14 @@ func (s *OpenAIGatewayService) ProxyResponsesWebSocketFromClient(
 			}
 			normalized = next
 		}
+		if group := apiKeyGroup(getAPIKeyFromContext(c)); group != nil {
+			if sanitizedBody, changed, sanitizeErr := SanitizeUnsupportedCNImageInput(normalized, group.Platform, upstreamModel); sanitizeErr != nil {
+				return openAIWSClientPayload{}, NewOpenAIWSClientCloseError(coderws.StatusPolicyViolation, "invalid websocket request payload", sanitizeErr)
+			} else if changed {
+				normalized = sanitizedBody
+				logOpenAIWSModeInfo("ingress_ws_unsupported_image_input_sanitized account_id=%d platform=%s model=%s", account.ID, group.Platform, upstreamModel)
+			}
+		}
 		SetOpsUpstreamModel(c, upstreamModel)
 		if isCodexCLI && codexImageGenerationExplicitToolPolicy == codexImageGenerationExplicitToolPolicyStrip {
 			if stripped, changed, stripErr := stripOpenAIImageGenerationToolsFromRawPayload(normalized); stripErr != nil {
