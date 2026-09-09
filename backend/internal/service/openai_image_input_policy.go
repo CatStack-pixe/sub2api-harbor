@@ -63,6 +63,9 @@ func cnModelSupportsImageInput(model string) bool {
 	if model == "deepseek-v4-flash-vision-exp" {
 		return true
 	}
+	if model == "glm-5.3-flash" {
+		return true
+	}
 	for _, marker := range []string{"vision", "-vl", "glm-4v", "glm-4.5v", "glm-4.6v", "glm-5v"} {
 		if strings.Contains(model, marker) {
 			return true
