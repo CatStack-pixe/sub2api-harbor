@@ -837,7 +837,7 @@ export default {
         apiKeyHint: '您的火山引擎 Ark API Key'
       },
       sensenova: {
-        baseUrlHint: 'SenseNova OpenAI 兼容接口，默认地址为 /compatible-mode/v2。',
+        baseUrlHint: 'SenseNova TokenPlan OpenAI 兼容接口，默认地址为 https://token.sensenova.cn/v1。',
         apiKeyHint: '您的 SenseNova API Key'
       },
       grok: {

@@ -17,7 +17,7 @@ func TestOfficialPlatformCredentialsAndBaseURLs(t *testing.T) {
 		{PlatformDashScope, DashScopeDefaultBaseURL},
 		{PlatformMiniMax, MiniMaxDefaultBaseURL},
 		{PlatformVolcengine, VolcengineDefaultBaseURL},
-		{PlatformSenseNova, SenseNovaDefaultBaseURL},
+		{PlatformSenseNova, "https://token.sensenova.cn/v1"},
 	}
 
 	for _, tt := range tests {
@@ -44,7 +44,7 @@ func TestOfficialPlatformModelsRequestURLs(t *testing.T) {
 		{PlatformDashScope, DashScopeDefaultBaseURL, DashScopeDefaultBaseURL + "/models"},
 		{PlatformMiniMax, MiniMaxDefaultBaseURL, MiniMaxDefaultBaseURL + "/models"},
 		{PlatformVolcengine, VolcengineDefaultBaseURL, VolcengineDefaultBaseURL + "/models"},
-		{PlatformSenseNova, SenseNovaDefaultBaseURL, SenseNovaDefaultBaseURL + "/models"},
+		{PlatformSenseNova, "https://token.sensenova.cn/v1", "https://token.sensenova.cn/v1/models"},
 	}
 
 	for _, tt := range tests {

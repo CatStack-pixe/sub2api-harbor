@@ -494,9 +494,24 @@ func TestGetAPIProtocol(t *testing.T) {
 	require.Equal(t, APIProtocolAdaptive, mk(PlatformZhipu, APIProtocolAdaptive).GetAPIProtocol())
 	require.Equal(t, APIProtocolAdaptive, mk(PlatformDeepseek, APIProtocolAdaptive).GetAPIProtocol())
 	require.Equal(t, APIProtocolResponses, mk(PlatformKimi, APIProtocolResponses).GetAPIProtocol(), "kimi native responses endpoint")
+	require.True(t, (&Account{Platform: PlatformSenseNova, Type: AccountTypeAPIKey}).IsCNProvider(), "SenseNova uses the CN provider protocol family")
 	require.Equal(t, APIProtocolChatCompletions, mk(PlatformZhipu, APIProtocolResponses).GetAPIProtocol(), "zhipu 无 responses 端点")
 	require.Equal(t, APIProtocolChatCompletions, mk(PlatformKimi, "bogus").GetAPIProtocol(), "非法值回退默认")
 	require.Equal(t, APIProtocolChatCompletions, (&Account{Platform: PlatformOpenAI, Type: AccountTypeAPIKey}).GetAPIProtocol(), "非 CN 供应商恒为默认")
+}
+
+func TestSenseNovaDefaultProtocolBaseURL(t *testing.T) {
+	t.Parallel()
+
+	account := &Account{
+		Platform: PlatformSenseNova,
+		Type:     AccountTypeAPIKey,
+		Credentials: map[string]any{
+			"api_key": "sk-test",
+		},
+	}
+
+	require.Equal(t, SenseNovaDefaultBaseURL, account.GetCNProtocolBaseURL(APIProtocolChatCompletions))
 }
 
 func TestAdaptiveProtocolBaseURLs(t *testing.T) {
