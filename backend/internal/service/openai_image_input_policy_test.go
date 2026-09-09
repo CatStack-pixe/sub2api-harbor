@@ -46,6 +46,13 @@ func TestSanitizeUnsupportedCNImageInput(t *testing.T) {
 			wantChange: false,
 		},
 		{
+			name:       "zhipu glm flash vision model is allowed",
+			platform:   PlatformZhipu,
+			model:      "glm-5.3-flash",
+			body:       `{"model":"glm-5.3-flash","messages":[{"role":"user","content":[{"type":"image_url","image_url":{"url":"https://example.invalid/image.png"}}]}]}`,
+			wantChange: false,
+		},
+		{
 			name:       "non cn platform is unchanged",
 			platform:   PlatformOpenAI,
 			model:      "gpt-5",
