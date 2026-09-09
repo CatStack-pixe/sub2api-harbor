@@ -75,7 +75,7 @@
                           : account.platform === 'volcengine'
                           ? 'https://ark.cn-beijing.volces.com/api/v3'
                           : account.platform === 'sensenova'
-                          ? 'https://api.sensenova.cn/compatible-mode/v2'
+                          ? 'https://token.sensenova.cn/v1'
                           : 'https://api.anthropic.com'
             "
           />
@@ -3682,7 +3682,7 @@ const defaultBaseUrl = computed(() => {
   if (props.account?.platform === 'dashscope') return 'https://dashscope.aliyuncs.com/compatible-mode/v1'
   if (props.account?.platform === 'minimax') return 'https://api.minimaxi.com/v1'
   if (props.account?.platform === 'volcengine') return 'https://ark.cn-beijing.volces.com/api/v3'
-  if (props.account?.platform === 'sensenova') return 'https://api.sensenova.cn/compatible-mode/v2'
+  if (props.account?.platform === 'sensenova') return 'https://token.sensenova.cn/v1'
   // CN 供应商：按当前模式/协议回落到官方预设（清空输入框提交时使用），
   // 不能落到 anthropic 默认值（会被当 CC base 拼出错误端点）。
   if (
@@ -4124,7 +4124,7 @@ const syncFormFromAccount = (newAccount: Account | null) => {
       dashscope: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
       minimax: 'https://api.minimaxi.com/v1',
       volcengine: 'https://ark.cn-beijing.volces.com/api/v3',
-      sensenova: 'https://api.sensenova.cn/compatible-mode/v2'
+      sensenova: 'https://token.sensenova.cn/v1'
     }
     const platformDefaultUrl = cnPlatform
       ? defaultCNBaseUrl(cnPlatform, editAccountMode.value, editApiProtocol.value)
@@ -4224,7 +4224,7 @@ const syncFormFromAccount = (newAccount: Account | null) => {
                 : newAccount.platform === 'volcengine'
                   ? 'https://ark.cn-beijing.volces.com/api/v3'
                 : newAccount.platform === 'sensenova'
-                  ? 'https://api.sensenova.cn/compatible-mode/v2'
+                  ? 'https://token.sensenova.cn/v1'
                 : 'https://api.anthropic.com'
     editBaseUrl.value = platformDefaultUrl
 

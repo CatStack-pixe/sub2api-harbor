@@ -110,10 +110,10 @@ const (
 	DefaultDeepseekAnthropicBaseURL   = "https://api.deepseek.com/anthropic"
 )
 
-// IsCNProvider 报告 platform 是否为国产 OpenAI 兼容供应商（kimi/zhipu/deepseek）。
+// IsCNProvider reports whether platform uses the CN OpenAI-compatible provider family.
 func IsCNProvider(platform string) bool {
 	switch platform {
-	case PlatformKimi, PlatformZhipu, PlatformDeepseek:
+	case PlatformKimi, PlatformZhipu, PlatformDeepseek, PlatformSenseNova:
 		return true
 	default:
 		return false

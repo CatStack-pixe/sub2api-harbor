@@ -748,7 +748,7 @@ export default {
         apiKeyHint: 'Your Volcengine Ark API key'
       },
       sensenova: {
-        baseUrlHint: 'OpenAI-compatible SenseNova endpoint (default: /compatible-mode/v2).',
+        baseUrlHint: 'OpenAI-compatible SenseNova TokenPlan endpoint (default: https://token.sensenova.cn/v1).',
         apiKeyHint: 'Your SenseNova API key'
       },
       grok: {

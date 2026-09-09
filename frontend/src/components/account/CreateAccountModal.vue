@@ -4285,7 +4285,7 @@ const apiKeyBaseUrlPlaceholder = computed(() => {
     case 'volcengine':
       return 'https://ark.cn-beijing.volces.com/api/v3'
     case 'sensenova':
-      return 'https://api.sensenova.cn/compatible-mode/v2'
+      return 'https://token.sensenova.cn/v1'
     default:
       return 'https://api.anthropic.com'
   }
@@ -5052,7 +5052,7 @@ watch(
         dashscope: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
         minimax: 'https://api.minimaxi.com/v1',
         volcengine: 'https://ark.cn-beijing.volces.com/api/v3',
-        sensenova: 'https://api.sensenova.cn/compatible-mode/v2'
+        sensenova: 'https://token.sensenova.cn/v1'
       }
       apiKeyBaseUrl.value = platformDefaults[newPlatform] || 'https://api.anthropic.com'
     }
@@ -6046,7 +6046,7 @@ const handleSubmit = async () => {
                         : form.platform === 'volcengine'
                           ? 'https://ark.cn-beijing.volces.com/api/v3'
                           : form.platform === 'sensenova'
-                          ? 'https://api.sensenova.cn/compatible-mode/v2'
+                          ? 'https://token.sensenova.cn/v1'
                             : 'https://api.anthropic.com'
 
   // Build credentials with optional model mapping

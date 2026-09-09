@@ -328,13 +328,13 @@ func (a *Account) IsDeepseek() bool {
 	return a != nil && a.Platform == PlatformDeepseek
 }
 
-// IsCNProvider 报告是否为国产 OpenAI 兼容供应商（kimi/zhipu/deepseek）。
+// IsCNProvider 报告是否为国产 OpenAI 兼容供应商（kimi/zhipu/deepseek/sensenova）。
 func (a *Account) IsCNProvider() bool {
 	return a != nil && IsCNProvider(a.Platform)
 }
 
 // IsOpenAICompatible 报告账号是否走 OpenAI 网关（OpenAI 协议族）。
-// openai/grok 原生走 OpenAI 网关；kimi/zhipu/deepseek 同为 OpenAI Chat Completions
+// openai/grok 原生走 OpenAI 网关；kimi/zhipu/deepseek/sensenova 同为 OpenAI Chat Completions
 // 兼容上游，也经 OpenAI 网关转发。
 func (a *Account) IsOpenAICompatible() bool {
 	return a != nil && (a.Platform == PlatformOpenAI || a.Platform == PlatformGrok ||
@@ -1412,7 +1412,7 @@ func (a *Account) IsOpenAIApiKey() bool {
 }
 
 // GetOpenAIBaseURL 解析 OpenAI 协议族账号的上游 base_url。
-// 适用 openai 与国产 OpenAI 兼容供应商（kimi/zhipu/deepseek）；grok 走 GetGrokBaseURL，
+// 适用 openai 与国产 OpenAI 兼容供应商（kimi/zhipu/deepseek/sensenova）；grok 走 GetGrokBaseURL，
 // 此处对 grok 返回 "" 以保持原有行为。
 func (a *Account) GetOpenAIBaseURL() string {
 	if a == nil || (!a.IsOpenAI() && !a.IsAgnes() && !a.IsDeepSeek() && !a.IsNvidia() &&
@@ -1472,6 +1472,8 @@ func (a *Account) GetOpenAIBaseURL() string {
 			return DefaultZhipuPayGBaseURL
 		case PlatformDeepSeek:
 			return DefaultDeepseekBaseURL
+		case PlatformSenseNova:
+			return SenseNovaDefaultBaseURL
 		}
 	}
 	if a.Type == AccountTypeAPIKey || a.Type == AccountTypeUpstream {
@@ -1632,6 +1634,8 @@ func (a *Account) defaultCNProtocolBaseURL(protocol string) string {
 			return DefaultZhipuPayGBaseURL
 		case PlatformDeepSeek:
 			return DefaultDeepseekBaseURL
+		case PlatformSenseNova:
+			return SenseNovaDefaultBaseURL
 		}
 	}
 	return ""
@@ -1700,7 +1704,7 @@ func (a *Account) GetOpenAIFormatBaseURL() string {
 	}
 }
 
-// GetCNAPIKey 返回国产 OpenAI 兼容供应商账号的 api_key 凭据（kimi/zhipu/deepseek）。
+// GetCNAPIKey 返回国产 OpenAI 兼容供应商账号的 api_key 凭据（kimi/zhipu/deepseek/sensenova）。
 // 与 openai 的 GetOpenAIApiKey 区分：后者仅对 openai 平台返回。
 func (a *Account) GetCNAPIKey() string {
 	if a == nil || !a.IsCNProvider() {
@@ -1847,7 +1851,7 @@ func (a *Account) GetOpenAIApiKey() string {
 }
 
 // GetOpenAIProtocolAPIKey 返回 OpenAI 协议族 APIKey 账号的密钥。
-// 覆盖 openai 原生账号与国产 OpenAI 兼容供应商（kimi/zhipu/deepseek）账号，
+// 覆盖 openai 原生账号与国产 OpenAI 兼容供应商（kimi/zhipu/deepseek/sensenova）账号，
 // 供转发鉴权、模型列表同步等协议族共用路径使用。注意 IsOpenAIApiKey 语义上
 // 仅指 openai 平台账号，调度倍率/WS 能力门控继续以其为准，不受本方法影响。
 func (a *Account) GetOpenAIProtocolAPIKey() string {

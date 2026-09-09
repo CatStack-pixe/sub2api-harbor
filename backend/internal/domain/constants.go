@@ -58,8 +58,8 @@ const (
 	DashScopeDefaultBaseURL   = "https://dashscope.aliyuncs.com/compatible-mode/v1"
 	MiniMaxDefaultBaseURL     = "https://api.minimaxi.com/v1"
 	VolcengineDefaultBaseURL  = "https://ark.cn-beijing.volces.com/api/v3"
-	// SenseNova exposes an OpenAI-compatible v2 endpoint.
-	SenseNovaDefaultBaseURL = "https://api.sensenova.cn/compatible-mode/v2"
+	// SenseNova TokenPlan exposes an OpenAI-compatible endpoint at token.sensenova.cn.
+	SenseNovaDefaultBaseURL = "https://token.sensenova.cn/v1"
 )
 
 // Account mode constants 区分国产供应商的「按量付费（余额）」与「Coding Plan」两种接入方式。
