@@ -1393,6 +1393,8 @@ export interface AccountUsageInfo {
   gemini_shared_minute?: UsageProgress | null
   gemini_pro_minute?: UsageProgress | null
   gemini_flash_minute?: UsageProgress | null
+  sensenova_rpm?: UsageProgress | null
+  sensenova_tpm?: UsageProgress | null
   antigravity_quota?: Record<string, AntigravityModelQuota> | null
   grok_request_quota?: GrokQuotaWindow | null
   grok_token_quota?: GrokQuotaWindow | null

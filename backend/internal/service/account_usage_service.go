@@ -115,6 +115,12 @@ const (
 	grokFreeQuotaWindow = 24 * time.Hour
 )
 
+const (
+	senseNovaRateWindow       = time.Minute
+	senseNovaRPMLimit   int64 = 60
+	senseNovaTPMLimit   int64 = 128000
+)
+
 // UsageCache 封装账户使用量相关的缓存
 type UsageCache struct {
 	apiCache          sync.Map           // accountID -> *apiUsageCache
@@ -193,6 +199,8 @@ type UsageInfo struct {
 	GeminiSharedMinute *UsageProgress `json:"gemini_shared_minute,omitempty"` // Gemini shared pool RPM (Google One / Code Assist)
 	GeminiProMinute    *UsageProgress `json:"gemini_pro_minute,omitempty"`    // Gemini Pro RPM
 	GeminiFlashMinute  *UsageProgress `json:"gemini_flash_minute,omitempty"`  // Gemini Flash RPM
+	SenseNovaRPM       *UsageProgress `json:"sensenova_rpm,omitempty"`        // SenseNova documented RPM window
+	SenseNovaTPM       *UsageProgress `json:"sensenova_tpm,omitempty"`        // SenseNova documented TPM window
 
 	// Antigravity 多模型配额
 	AntigravityQuota map[string]*AntigravityModelQuota `json:"antigravity_quota,omitempty"`
@@ -391,6 +399,16 @@ func (s *AccountUsageService) getUsageForAccount(ctx context.Context, account *A
 		return usage, err
 	}
 
+	// SenseNova API key accounts expose documented RPM/TPM limits rather than
+	// an OAuth quota endpoint. The windows are calculated from local usage logs.
+	if account.IsSenseNova() {
+		usage, err := s.getSenseNovaUsage(ctx, account)
+		if err == nil {
+			s.tryClearRecoverableAccountError(ctx, account)
+		}
+		return usage, err
+	}
+
 	// 只有oauth类型账号可以通过API获取usage（有profile scope）
 	if account.CanGetUsage() {
 		var apiResp *ClaudeUsageResponse
@@ -491,7 +509,8 @@ func (s *AccountUsageService) getUsageForAccount(ctx context.Context, account *A
 // GetUsage 获取账号使用量
 // OAuth账号: 调用Anthropic API获取真实数据（需要profile scope），API响应缓存10分钟，窗口统计缓存1分钟
 // Setup Token账号: 根据session_window推算5h窗口，7d数据不可用（没有profile scope）
-// API Key账号: 不支持usage查询
+// SenseNova API Key账号: 根据本地日志计算文档定义的RPM/TPM窗口
+// 其他 API Key账号: 不支持usage查询
 func (s *AccountUsageService) GetUsage(ctx context.Context, accountID int64, force ...bool) (*UsageInfo, error) {
 	forceProbe := len(force) > 0 && force[0]
 
@@ -511,7 +530,7 @@ func (s *AccountUsageService) GetUsageForAccount(ctx context.Context, account *A
 }
 
 // GetUsageBatch 批量获取账号使用量。
-// Anthropic OAuth/SetupToken 统一走 passive 链路，其他账号复用现有主动查询逻辑。
+// Anthropic OAuth/SetupToken 统一走 passive 链路，其他支持的账号复用主动查询逻辑。
 // 单个账号失败不会中断整批请求，错误会按账号返回。
 func (s *AccountUsageService) GetUsageBatch(ctx context.Context, accountIDs []int64, force bool) (map[int64]*UsageInfo, map[int64]string, error) {
 	uniqueIDs := make([]int64, 0, len(accountIDs))
@@ -769,6 +788,73 @@ func (s *AccountUsageService) getOpenAIUsage(ctx context.Context, account *Accou
 	}
 
 	return usage, nil
+}
+
+func (s *AccountUsageService) getSenseNovaUsage(ctx context.Context, account *Account) (*UsageInfo, error) {
+	now := time.Now()
+	stats := &usagestats.AccountStats{}
+	if s.usageLogRepo != nil {
+		windowStart := now.Truncate(senseNovaRateWindow)
+		if queried, err := s.usageLogRepo.GetAccountWindowStats(ctx, account.ID, windowStart); err == nil {
+			if queried != nil {
+				stats = queried
+			}
+		} else {
+			slog.Warn("sensenova_local_usage_query_failed", "account_id", account.ID, "error", err)
+		}
+	}
+
+	rpm, tpm := buildSenseNovaUsageProgress(account, stats, now)
+	return &UsageInfo{
+		Source:       "active",
+		UpdatedAt:    &now,
+		SenseNovaRPM: rpm,
+		SenseNovaTPM: tpm,
+	}, nil
+}
+
+func buildSenseNovaUsageProgress(account *Account, stats *usagestats.AccountStats, now time.Time) (*UsageProgress, *UsageProgress) {
+	if stats == nil {
+		stats = &usagestats.AccountStats{}
+	}
+
+	resetAt := now.Truncate(senseNovaRateWindow).Add(senseNovaRateWindow)
+	rateLimited := false
+	if account != nil && account.RateLimitResetAt != nil {
+		if now.Before(*account.RateLimitResetAt) {
+			rateLimited = true
+		}
+		if account.RateLimitResetAt.After(resetAt) {
+			resetAt = *account.RateLimitResetAt
+		}
+	}
+
+	remainingSeconds := int(resetAt.Sub(now).Seconds())
+	if remainingSeconds < 0 {
+		remainingSeconds = 0
+	}
+	resetCopy := resetAt
+	windowStats := windowStatsFromAccountStats(stats)
+	rpmUtilization := float64(stats.Requests) / float64(senseNovaRPMLimit) * 100
+	tpmUtilization := float64(stats.Tokens) / float64(senseNovaTPMLimit) * 100
+	if rateLimited {
+		rpmUtilization = 100
+		tpmUtilization = 100
+	}
+
+	return &UsageProgress{
+		Utilization:      rpmUtilization,
+		ResetsAt:         &resetCopy,
+		RemainingSeconds: remainingSeconds,
+		WindowStats:      windowStats,
+		UsedRequests:     stats.Requests,
+		LimitRequests:    senseNovaRPMLimit,
+	}, &UsageProgress{
+		Utilization:      tpmUtilization,
+		ResetsAt:         &resetCopy,
+		RemainingSeconds: remainingSeconds,
+		WindowStats:      windowStats,
+	}
 }
 
 func shouldRefreshOpenAICodexSnapshot(account *Account, usage *UsageInfo, now time.Time) bool {
