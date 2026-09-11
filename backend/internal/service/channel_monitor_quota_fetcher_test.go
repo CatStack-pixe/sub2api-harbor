@@ -79,6 +79,19 @@ func (s *stubMonitorCNBalanceSource) QueryBalanceForAccount(ctx context.Context,
 	return s.result, s.err
 }
 
+type stubMonitorSenseNovaQuotaSource struct {
+	result      *SenseNovaQuotaProbeResult
+	err         error
+	calls       int
+	lastAccount *Account
+}
+
+func (s *stubMonitorSenseNovaQuotaSource) QueryUsageForAccount(ctx context.Context, account *Account) (*SenseNovaQuotaProbeResult, error) {
+	s.calls++
+	s.lastAccount = account
+	return s.result, s.err
+}
+
 type stubMonitorAccountSource struct {
 	accounts map[int64]*Account
 	err      error
@@ -171,6 +184,49 @@ func TestQuotaFetcher_CodingPlanAccountUsesCNQuota(t *testing.T) {
 	require.Equal(t, "weekly", snapshot.Tiers[1].Window)
 	require.Equal(t, 1, cnQuota.calls)
 	require.Equal(t, 0, cnBalance.calls)
+}
+
+func TestQuotaFetcher_SenseNovaAccountPreservesPoolWindows(t *testing.T) {
+	fetcher, _, cnQuota, cnBalance, accounts := newQuotaFetcherTestSetup(t)
+	senseNova := &stubMonitorSenseNovaQuotaSource{
+		result: &SenseNovaQuotaProbeResult{
+			Success: true,
+			Plan:    SenseNovaQuotaPlan{Name: "Free Plan"},
+			Pools: []SenseNovaQuotaPool{
+				{
+					ID:   "shared",
+					Name: "Shared",
+					Window5h: &SenseNovaQuotaWindow{Limit: 100, Used: 25, Remaining: 75, ResetAt: "2026-09-12T00:00:00Z"},
+					Window7d: &SenseNovaQuotaWindow{Limit: 1000, Used: 100, Remaining: 900},
+				},
+				{
+					ID:       "dedicated",
+					Name:     "Dedicated",
+					Window7d: &SenseNovaQuotaWindow{Limit: 500, Used: 450, Remaining: 50},
+				},
+			},
+		},
+	}
+	fetcher.SetSenseNovaQuotaService(senseNova)
+	accounts.accounts[12] = &Account{ID: 12, Platform: domain.PlatformSenseNova}
+
+	snapshot := fetcher.Fetch(context.Background(), 12)
+
+	require.True(t, snapshot.Success)
+	require.Equal(t, "sensenova_quota", snapshot.Source)
+	require.Equal(t, "Free Plan", snapshot.PlanLevel)
+	require.Len(t, snapshot.Tiers, 3)
+	require.Equal(t, "Shared", snapshot.Tiers[0].Label)
+	require.Equal(t, "5h", snapshot.Tiers[0].Window)
+	require.InDelta(t, 25, snapshot.Tiers[0].UsedPercent, 0.001)
+	require.Equal(t, "Shared", snapshot.Tiers[1].Label)
+	require.Equal(t, "7d", snapshot.Tiers[1].Window)
+	require.Equal(t, "Dedicated", snapshot.Tiers[2].Label)
+	require.InDelta(t, 90, snapshot.Tiers[2].UsedPercent, 0.001)
+	require.Equal(t, 1, senseNova.calls)
+	require.Equal(t, 0, cnQuota.calls)
+	require.Equal(t, 0, cnBalance.calls)
+	require.Same(t, accounts.accounts[12], senseNova.lastAccount)
 }
 
 func TestQuotaFetcher_PayGAccountUsesCNBalance(t *testing.T) {

@@ -22,6 +22,7 @@ var monitorProviders = map[string]struct{}{
 	MonitorProviderKimi:        {},
 	MonitorProviderZhipu:       {},
 	MonitorProviderDeepseek:    {},
+	MonitorProviderSenseNova:   {},
 }
 
 // probeCapableProviders 支持探活（probe / quota_probe）的 provider。
@@ -36,6 +37,7 @@ var probeCapableProviders = map[string]struct{}{
 	MonitorProviderKimi:      {},
 	MonitorProviderZhipu:     {},
 	MonitorProviderDeepseek:  {},
+	MonitorProviderSenseNova: {},
 }
 
 // validateProvider 校验 provider 字符串。
@@ -240,6 +242,10 @@ func monitorAccountQuotaCapability(account *Account) error {
 			return nil
 		}
 		return ErrChannelMonitorAccountNotSupportable
+	case PlatformSenseNova:
+		// The native quota endpoint uses the separate access_token credential;
+		// missing credentials are reported when the monitor actually probes.
+		return nil
 	default:
 		return nil
 	}

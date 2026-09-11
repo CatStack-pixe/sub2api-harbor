@@ -14,6 +14,7 @@ export type Provider =
   | 'kimi'
   | 'zhipu'
   | 'deepseek'
+  | 'sensenova'
 export type MonitorStatus = 'operational' | 'degraded' | 'failed' | 'error'
 export type BodyOverrideMode = 'off' | 'merge' | 'replace'
 export type APIMode = 'chat_completions' | 'responses'
@@ -43,7 +44,7 @@ export interface MonitorBalance {
 
 /** 归一化配额快照（与后端 domain.MonitorQuotaSnapshot 一致）。 */
 export interface MonitorQuotaSnapshot {
-  /** usage | cn_quota | cn_balance */
+  /** usage | cn_quota | cn_balance | sensenova_quota */
   source: string
   success: boolean
   tiers?: MonitorQuotaTier[]

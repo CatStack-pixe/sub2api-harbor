@@ -1657,6 +1657,21 @@
           <p v-if="apiKeyHint" class="input-hint">{{ apiKeyHint }}</p>
         </div>
 
+        <div v-if="form.platform === 'sensenova'">
+          <label class="input-label">{{ t('admin.accounts.sensenova.quotaAccessToken') }}</label>
+          <input
+            v-model="sensenovaAccessToken"
+            type="password"
+            class="input font-mono"
+            autocomplete="new-password"
+            data-1p-ignore
+            data-lpignore="true"
+            data-bwignore="true"
+            :placeholder="t('admin.accounts.sensenova.quotaAccessToken')"
+          />
+          <p class="input-hint">{{ t('admin.accounts.sensenova.quotaAccessTokenHint') }}</p>
+        </div>
+
         <div v-if="form.platform === 'tokenrhythm'">
           <TokenRhythmSessionResolver
             v-model:api-key="apiKeyValue"
@@ -4408,6 +4423,7 @@ const accountCategory = ref<'oauth-based' | 'apikey' | 'bedrock' | 'service_acco
 const addMethod = ref<AddMethod>('oauth') // For oauth-based: 'oauth' or 'setup-token'
 const apiKeyBaseUrl = ref('https://api.anthropic.com')
 const apiKeyValue = ref('')
+const sensenovaAccessToken = ref('')
 const tokenRhythmCookie = ref('')
 const upstreamBillingAutoProbeEnabled = ref(true)
 
@@ -5572,6 +5588,7 @@ const resetForm = () => {
   adaptiveBaseUrls.value = { chat_completions: '', anthropic: '', responses: '' }
   apiKeyBaseUrl.value = 'https://api.anthropic.com'
   apiKeyValue.value = ''
+  sensenovaAccessToken.value = ''
   tokenRhythmCookie.value = ''
   upstreamBillingAutoProbeEnabled.value = true
   editQuotaLimit.value = null
@@ -6053,6 +6070,9 @@ const handleSubmit = async () => {
   const credentials: Record<string, unknown> = {
     base_url: apiKeyBaseUrl.value.trim() || defaultBaseUrl,
     api_key: apiKeyValue.value.trim()
+  }
+  if (form.platform === 'sensenova' && sensenovaAccessToken.value.trim()) {
+    credentials.access_token = sensenovaAccessToken.value.trim()
   }
   if (form.platform === 'tokenrhythm') {
     if (!tokenRhythmCookie.value.trim()) {
