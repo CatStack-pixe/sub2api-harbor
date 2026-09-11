@@ -229,6 +229,7 @@ var providerDeepseekChatAdapter = newOpenAICompatibleChatAdapter(providerOpenAIP
 
 // SenseNova exposes an OpenAI-compatible chat endpoint for probe mode.
 // The separate Token Plan access token is only used by quota mode.
+
 //nolint:gochecknoglobals // static provider adapter
 var providerSenseNovaChatAdapter = newOpenAICompatibleChatAdapter(providerOpenAIPath)
 
