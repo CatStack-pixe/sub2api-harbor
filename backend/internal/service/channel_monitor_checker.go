@@ -172,9 +172,9 @@ var providerAdapters = map[string]providerAdapter{
 	MonitorProviderGrok:   providerGrokChatAdapter,
 	// 国产 3 家（配额模式引入）：均为 OpenAI 兼容 Chat Completions，
 	// 仅智谱路径前缀不同（/api/paas/v4/chat/completions）。
-	MonitorProviderKimi:     providerKimiChatAdapter,
-	MonitorProviderZhipu:    providerZhipuChatAdapter,
-	MonitorProviderDeepseek: providerDeepseekChatAdapter,
+	MonitorProviderKimi:      providerKimiChatAdapter,
+	MonitorProviderZhipu:     providerZhipuChatAdapter,
+	MonitorProviderDeepseek:  providerDeepseekChatAdapter,
 	MonitorProviderSenseNova: providerSenseNovaChatAdapter,
 	MonitorProviderAnthropic: {
 		buildPath: func(string) string { return providerAnthropicPath },

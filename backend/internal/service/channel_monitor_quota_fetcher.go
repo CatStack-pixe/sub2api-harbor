@@ -64,11 +64,11 @@ type monitorAccountSource interface {
 // ChannelMonitorQuotaFetcher 配额抓取器（成功/失败快照均带 TTL 缓存，
 // 同账号并发抓取由 singleflight 合并）。
 type ChannelMonitorQuotaFetcher struct {
-	usage     monitorUsageSource
-	cnQuota   monitorCNQuotaSource
-	cnBalance monitorCNBalanceSource
+	usage          monitorUsageSource
+	cnQuota        monitorCNQuotaSource
+	cnBalance      monitorCNBalanceSource
 	senseNovaQuota monitorSenseNovaQuotaSource
-	accounts  monitorAccountSource
+	accounts       monitorAccountSource
 	// balanceThreshold cn_balance 余额告警阈值（与账号停调共用配置，见 monitorBalanceThreshold）。
 	balanceThreshold float64
 
