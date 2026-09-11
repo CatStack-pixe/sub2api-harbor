@@ -656,6 +656,56 @@ describe('AccountUsageCell', () => {
   expect(wrapper.text()).toContain('7d|100|106540000')
   })
 
+  it('SenseNova API key renders local documented RPM and TPM windows', async () => {
+    getUsage.mockResolvedValue({
+      sensenova_rpm: {
+        utilization: 50,
+        resets_at: '2099-03-07T12:35:00Z',
+        remaining_seconds: 15,
+        window_stats: {
+          requests: 30,
+          tokens: 64000,
+          cost: 0.64,
+          standard_cost: 0.64,
+          user_cost: 0.64
+        }
+      },
+      sensenova_tpm: {
+        utilization: 50,
+        resets_at: '2099-03-07T12:35:00Z',
+        remaining_seconds: 15,
+        window_stats: {
+          requests: 30,
+          tokens: 64000,
+          cost: 0.64,
+          standard_cost: 0.64,
+          user_cost: 0.64
+        }
+      }
+    })
+
+    const wrapper = mount(AccountUsageCell, {
+      props: {
+        account: makeAccount({ id: 5001, platform: 'sensenova', type: 'apikey', extra: {} })
+      },
+      global: {
+        stubs: {
+          UsageProgressBar: {
+            props: ['label', 'utilization', 'windowStats'],
+            template: '<div class="usage-bar">{{ label }}|{{ utilization }}|{{ windowStats?.tokens }}</div>'
+          },
+          AccountQuotaInfo: true
+        }
+      }
+    })
+
+    await flushPromises()
+
+    expect(getUsage).toHaveBeenCalledWith(5001)
+    expect(wrapper.text()).toContain('RPM|50|64000')
+    expect(wrapper.text()).toContain('TPM|50|64000')
+  })
+
   it('Key 账号会展示 today stats 徽章并带 A/U 提示', async () => {
 		const wrapper = mount(AccountUsageCell, {
 		  props: {

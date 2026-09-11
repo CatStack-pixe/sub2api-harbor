@@ -350,6 +350,12 @@ func (s *RateLimitService) HandleUpstreamError(ctx context.Context, account *Acc
 	if account == nil {
 		return false
 	}
+	// The provider documents 429 as an RPM/TPM rate-limit signal. Persist it
+	// before pool/custom-error early returns so the local bars immediately fill.
+	if statusCode == http.StatusTooManyRequests && account.IsSenseNova() {
+		s.handleSenseNova429(ctx, account, headers)
+		return false
+	}
 	ctx = withTempUnschedulableModel(ctx, requestedModel)
 	if s.HandleChatAnywhereContextQuotaError(ctx, account, statusCode, "", responseBody) {
 		return false
@@ -1158,6 +1164,10 @@ func (s *RateLimitService) handleCustomErrorCode(ctx context.Context, account *A
 // handle429 处理429限流错误
 // 解析响应头获取重置时间，标记账号为限流状态
 func (s *RateLimitService) handle429(ctx context.Context, account *Account, headers http.Header, responseBody []byte) {
+	if account != nil && account.IsSenseNova() {
+		s.handleSenseNova429(ctx, account, headers)
+		return
+	}
 	// OpenAI OAuth stays on the same account for the gateway's bounded retry
 	// window. Persisting a rate-limit reset on the first 429 would make the next
 	// retry ineligible and silently turn same-account recovery into a switch.
@@ -1299,6 +1309,38 @@ func (s *RateLimitService) handle429(ctx context.Context, account *Account, head
 	}
 
 	slog.Info("account_rate_limited", "account_id", account.ID, "reset_at", resetAt)
+}
+
+func senseNovaRateLimitResetAt(headers http.Header, now time.Time) time.Time {
+	resetAt := now.Truncate(senseNovaRateWindow).Add(senseNovaRateWindow)
+	if retryAt := parseRetryAfterResetTime(headers, now); retryAt != nil && retryAt.After(resetAt) {
+		resetAt = *retryAt
+	}
+	return resetAt
+}
+
+func (s *RateLimitService) handleSenseNova429(ctx context.Context, account *Account, headers http.Header) {
+	if s == nil || account == nil {
+		return
+	}
+
+	now := time.Now()
+	resetAt := senseNovaRateLimitResetAt(headers, now)
+	if account.RateLimitResetAt != nil && account.RateLimitResetAt.After(resetAt) {
+		resetAt = *account.RateLimitResetAt
+	}
+	account.RateLimitedAt = &now
+	account.RateLimitResetAt = &resetAt
+	s.notifyAccountSchedulingBlocked(account, resetAt, "sensenova_429")
+
+	if s.accountRepo == nil {
+		return
+	}
+	if err := s.accountRepo.SetRateLimited(ctx, account.ID, resetAt); err != nil {
+		slog.Warn("sensenova_rate_limit_set_failed", "account_id", account.ID, "error", err)
+		return
+	}
+	slog.Info("sensenova_account_rate_limited", "account_id", account.ID, "reset_at", resetAt)
 }
 
 func (s *RateLimitService) apply429FallbackRateLimit(ctx context.Context, account *Account, reason string) {

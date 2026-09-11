@@ -192,6 +192,44 @@
       </div>
     </template>
 
+    <!-- SenseNova API key accounts: local documented RPM/TPM windows -->
+    <template v-else-if="account.platform === 'sensenova'">
+      <div v-if="loading" class="space-y-1.5">
+        <div class="flex items-center gap-1">
+          <div class="h-3 w-[32px] animate-pulse rounded bg-gray-200 dark:bg-gray-700"></div>
+          <div class="h-1.5 w-8 animate-pulse rounded-full bg-gray-200 dark:bg-gray-700"></div>
+          <div class="h-3 w-[32px] animate-pulse rounded bg-gray-200 dark:bg-gray-700"></div>
+        </div>
+        <div class="flex items-center gap-1">
+          <div class="h-3 w-[32px] animate-pulse rounded bg-gray-200 dark:bg-gray-700"></div>
+          <div class="h-1.5 w-8 animate-pulse rounded-full bg-gray-200 dark:bg-gray-700"></div>
+          <div class="h-3 w-[32px] animate-pulse rounded bg-gray-200 dark:bg-gray-700"></div>
+        </div>
+      </div>
+      <div v-else-if="error" class="text-xs text-red-500">
+        {{ error }}
+      </div>
+      <div v-else-if="usageInfo" class="space-y-1">
+        <UsageProgressBar
+          v-if="usageInfo.sensenova_rpm"
+          label="RPM"
+          :utilization="usageInfo.sensenova_rpm.utilization"
+          :resets-at="usageInfo.sensenova_rpm.resets_at"
+          :window-stats="usageInfo.sensenova_rpm.window_stats"
+          color="indigo"
+        />
+        <UsageProgressBar
+          v-if="usageInfo.sensenova_tpm"
+          label="TPM"
+          :utilization="usageInfo.sensenova_tpm.utilization"
+          :resets-at="usageInfo.sensenova_tpm.resets_at"
+          :window-stats="usageInfo.sensenova_tpm.window_stats"
+          color="emerald"
+        />
+      </div>
+      <div v-else class="text-xs text-gray-400">-</div>
+    </template>
+
     <!-- Antigravity OAuth accounts: fetch usage from API -->
     <template v-else-if="account.platform === 'antigravity' && account.type === 'oauth'">
       <!-- 账户类型徽章 -->
@@ -575,13 +613,9 @@
 
   <!-- Non-OAuth/Setup-Token accounts -->
   <div ref="rootRef" v-else>
-    <SenseNovaQuotaCell
-      v-if="account.platform === 'sensenova'"
-      :account="account"
-    />
     <!-- Gemini API Key accounts: show quota info -->
     <DeepSeekBalanceCell
-      v-else-if="account.platform === 'deepseek'"
+      v-if="account.platform === 'deepseek'"
       :account="account"
       :auto-load="shouldAutoLoadDeepSeekBalance"
       :refresh-token="manualRefreshToken"
@@ -689,7 +723,6 @@ import TokenRhythmBalanceCell from './TokenRhythmBalanceCell.vue'
 import KimiBalanceCell from './KimiBalanceCell.vue'
 import CNProviderQuotaCell from './CNProviderQuotaCell.vue'
 import CNProviderBalanceCell from './CNProviderBalanceCell.vue'
-import SenseNovaQuotaCell from './SenseNovaQuotaCell.vue'
 import OllamaCloudUsageCell from './OllamaCloudUsageCell.vue'
 import { cnQuotaCellVisible as cnQuotaCellVisibleFn, cnBalanceCellVisible as cnBalanceCellVisibleFn } from './credentialsBuilder'
 
@@ -755,12 +788,11 @@ let desktopViewportMediaQuery: MediaQueryList | null = null
 let desktopViewportListener: ((event: MediaQueryListEvent) => void) | null = null
 let visibilityObserver: IntersectionObserver | null = null
 
-// Show usage windows for OAuth and Setup Token accounts
+// Show usage windows for accounts with local or upstream usage data.
 const showUsageWindows = computed(() => {
   // Gemini: we can always compute local usage windows from DB logs (simulated quotas).
   if (props.account.platform === 'gemini') return true
-  // CN providers: apikey 账号也有滚动用量窗口（coding plan）或余额（payg），
-  // 由 CNProviderQuotaCell / CNProviderBalanceCell 自行探测与展示。
+  // CN providers with local quota or balance cells.
   if (
     props.account.platform === 'kimi' ||
     props.account.platform === 'zhipu' ||
@@ -768,6 +800,7 @@ const showUsageWindows = computed(() => {
   ) {
     return true
   }
+  if (props.account.platform === 'sensenova') return true
   return props.account.type === 'oauth' || props.account.type === 'setup-token'
 })
 
@@ -776,6 +809,9 @@ const shouldFetchUsage = computed(() => {
     return props.account.type === 'oauth' || props.account.type === 'setup-token'
   }
   if (props.account.platform === 'gemini') {
+    return true
+  }
+  if (props.account.platform === 'sensenova') {
     return true
   }
   if (props.account.platform === 'antigravity') {
@@ -822,6 +858,16 @@ const hasOpenAIUsageFallback = computed(() => {
 })
 
 const openAIUsageRefreshKey = computed(() => buildOpenAIUsageRefreshKey(props.account))
+
+const senseNovaUsageRefreshKey = computed(() => {
+  if (props.account.platform !== 'sensenova') return ''
+  return [
+    props.account.id,
+    props.account.updated_at,
+    props.account.last_used_at,
+    props.account.rate_limit_reset_at
+  ].map((value) => value == null ? '' : String(value)).join('|')
+})
 
 const shouldAutoLoadUsageOnMount = computed(() => {
   return shouldFetchUsage.value
@@ -1694,6 +1740,19 @@ watch(openAIUsageRefreshKey, (nextKey, prevKey) => {
     requestParentBatchUsage({ force: true })
     return
   }
+
+  if (isBatchManaged.value) {
+    requestParentBatchUsage({ force: true })
+    return
+  }
+
+  _usageCache.delete(props.account.id)
+  requestAutoLoad()
+})
+
+watch(senseNovaUsageRefreshKey, (nextKey, prevKey) => {
+  if (!prevKey || nextKey === prevKey) return
+  if (props.account.platform !== 'sensenova' || !shouldFetchUsage.value) return
 
   if (isBatchManaged.value) {
     requestParentBatchUsage({ force: true })
