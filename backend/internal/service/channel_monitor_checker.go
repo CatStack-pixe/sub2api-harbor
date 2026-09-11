@@ -462,9 +462,9 @@ var bodyMergeKeyDenyList = map[string]map[string]bool{
 	MonitorProviderAnthropic: {"model": true, "messages": true},
 	MonitorProviderGemini:    {"contents": true},
 	// 国产 3 家与 OpenAI Chat Completions 同构。
-	MonitorProviderKimi:     {"model": true, "messages": true, "stream": true},
-	MonitorProviderZhipu:    {"model": true, "messages": true, "stream": true},
-	MonitorProviderDeepseek: {"model": true, "messages": true, "stream": true},
+	MonitorProviderKimi:      {"model": true, "messages": true, "stream": true},
+	MonitorProviderZhipu:     {"model": true, "messages": true, "stream": true},
+	MonitorProviderDeepseek:  {"model": true, "messages": true, "stream": true},
 	MonitorProviderSenseNova: {"model": true, "messages": true, "stream": true},
 }
 
