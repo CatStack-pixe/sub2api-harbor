@@ -199,8 +199,8 @@ type UsageInfo struct {
 	GeminiSharedMinute *UsageProgress `json:"gemini_shared_minute,omitempty"` // Gemini shared pool RPM (Google One / Code Assist)
 	GeminiProMinute    *UsageProgress `json:"gemini_pro_minute,omitempty"`    // Gemini Pro RPM
 	GeminiFlashMinute  *UsageProgress `json:"gemini_flash_minute,omitempty"`  // Gemini Flash RPM
-	SenseNovaRPM       *UsageProgress `json:"sensenova_rpm,omitempty"`         // SenseNova documented RPM window
-	SenseNovaTPM       *UsageProgress `json:"sensenova_tpm,omitempty"`         // SenseNova documented TPM window
+	SenseNovaRPM       *UsageProgress `json:"sensenova_rpm,omitempty"`        // SenseNova documented RPM window
+	SenseNovaTPM       *UsageProgress `json:"sensenova_tpm,omitempty"`        // SenseNova documented TPM window
 
 	// Antigravity 多模型配额
 	AntigravityQuota map[string]*AntigravityModelQuota `json:"antigravity_quota,omitempty"`
