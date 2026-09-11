@@ -838,7 +838,15 @@ export default {
       },
       sensenova: {
         baseUrlHint: 'SenseNova TokenPlan OpenAI 兼容接口，默认地址为 https://token.sensenova.cn/v1。',
-        apiKeyHint: '您的 SenseNova API Key'
+        apiKeyHint: '您的 SenseNova API Key',
+        quotaAccessToken: 'Token Plan 额度访问令牌（可选）',
+        quotaAccessTokenHint: '仅用于原生 5 小时 / 7 天额度监控。编辑时留空表示保留已有令牌。',
+        quotaProbe: '查询额度',
+        quotaProbeTooltip: '查询 SenseNova 原生 Token Plan 额度',
+        quotaPool: '额度池',
+        quota5h: '5 小时',
+        quota7d: '7 天',
+        quotaResetSoon: '即将重置'
       },
       grok: {
         baseUrlHint: 'Grok OAuth 账号会转发到官方 xAI API Base URL。',

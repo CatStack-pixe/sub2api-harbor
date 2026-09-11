@@ -15,8 +15,8 @@ import "time"
 // MonitorQuotaTier 单个用量窗口的快照。
 //
 // Window 取值约定（与前端 monitorCommon.quota.windows.* 标签一一对应）：
-//   - "5h"         5 小时滚动窗口（Claude/Codex/Kimi/Zhipu coding plan）
-//   - "7d"         7 天窗口（Claude/Codex）
+//   - "5h"         5 小时滚动窗口（Claude/Codex/Kimi/Zhipu/SenseNova）
+//   - "7d"         7 天窗口（Claude/Codex/SenseNova）
 //   - "7d-sonnet"  Claude 7 天 Sonnet 独立额度
 //   - "7d-fable"   Claude 7 天 Fable 独立额度
 //   - "weekly"     周窗口（Kimi/Zhipu coding plan）
@@ -42,6 +42,7 @@ type MonitorQuotaTier struct {
 //   - "usage"      海外平台（AccountUsageService.GetUsage）
 //   - "cn_quota"   国产 Coding Plan（CNProviderQuotaService.QueryUsage）
 //   - "cn_balance" 国产按量付费余额（CNProviderBalanceService.QueryBalance）
+//   - "sensenova_quota" SenseNova Token Plan pool usage
 type MonitorQuotaSnapshot struct {
 	Source    string             `json:"source"`
 	Success   bool               `json:"success"`

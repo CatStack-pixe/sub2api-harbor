@@ -59,8 +59,8 @@ const (
 	providerGeminiPathTemplate = "/v1beta/models/%s:generateContent"
 
 	// MonitorProviderOpenAI 等 provider 字符串常量（也是 ent enum 的实际值）。
-	// 后 4 个 provider（antigravity/kimi/zhipu/deepseek）为配额模式引入：
-	// antigravity 无探活 adapter（仅配额），其余 3 个复用 OpenAI 兼容探活。
+	// 配额模式引入的 provider（antigravity/kimi/zhipu/deepseek/sensenova）：
+	// antigravity 无探活 adapter（仅配额），其余 provider 复用 OpenAI 兼容探活。
 	MonitorProviderOpenAI      = "openai"
 	MonitorProviderAnthropic   = "anthropic"
 	MonitorProviderGemini      = "gemini"
@@ -69,6 +69,7 @@ const (
 	MonitorProviderKimi        = "kimi"
 	MonitorProviderZhipu       = "zhipu"
 	MonitorProviderDeepseek    = "deepseek"
+	MonitorProviderSenseNova   = "sensenova"
 
 	// MonitorCheckMode 检测模式（channel_monitors.check_mode）。
 	//   probe       - LLM 探活（默认，原有行为）
@@ -151,7 +152,7 @@ var (
 		"CHANNEL_MONITOR_NOT_FOUND", "channel monitor not found",
 	)
 	ErrChannelMonitorInvalidProvider = infraerrors.BadRequest(
-		"CHANNEL_MONITOR_INVALID_PROVIDER", "provider must be one of openai/anthropic/gemini/grok/antigravity/kimi/zhipu/deepseek",
+		"CHANNEL_MONITOR_INVALID_PROVIDER", "provider must be one of openai/anthropic/gemini/grok/antigravity/kimi/zhipu/deepseek/sensenova",
 	)
 	ErrChannelMonitorInvalidCheckMode = infraerrors.BadRequest(
 		"CHANNEL_MONITOR_INVALID_CHECK_MODE", "check_mode must be one of probe/quota/quota_probe; antigravity only supports quota",

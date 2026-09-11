@@ -296,6 +296,16 @@ func ProvideCNProviderQuotaService(
 	return NewCNProviderQuotaService(accountRepo, proxyRepo, httpUpstream, cfg)
 }
 
+// ProvideSenseNovaQuotaService constructs the native Token Plan quota probe.
+func ProvideSenseNovaQuotaService(
+	accountRepo AccountRepository,
+	proxyRepo ProxyRepository,
+	httpUpstream HTTPUpstream,
+	cfg *config.Config,
+) *SenseNovaQuotaService {
+	return NewSenseNovaQuotaService(accountRepo, proxyRepo, httpUpstream, cfg)
+}
+
 // ProvideCNProviderBalanceService 构造国产供应商余额探测服务。
 func ProvideCNProviderBalanceService(
 	accountRepo AccountRepository,
@@ -871,6 +881,7 @@ var ProviderSet = wire.NewSet(
 	ProvideOpenAIQuotaAutoResetService,
 	ProvideGrokQuotaService,
 	ProvideCNProviderQuotaService,
+	ProvideSenseNovaQuotaService,
 	ProvideCNProviderBalanceService,
 	ProvideCNProviderBalanceCheckService,
 	ProvideClaudeTokenProvider,
@@ -1009,8 +1020,12 @@ func ProvideChannelMonitorRunner(
 	svc *ChannelMonitorService,
 	settingService *SettingService,
 	quotaFetcher *ChannelMonitorQuotaFetcher,
+	senseNovaQuota *SenseNovaQuotaService,
 ) *ChannelMonitorRunner {
 	r := NewChannelMonitorRunner(svc, settingService)
+	if quotaFetcher != nil {
+		quotaFetcher.SetSenseNovaQuotaService(senseNovaQuota)
+	}
 	if svc != nil {
 		// Ensure runtime reader is set even if ProvideChannelMonitorService
 		// was constructed without settings (tests / alternate providers).

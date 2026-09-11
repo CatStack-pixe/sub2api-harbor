@@ -575,9 +575,13 @@
 
   <!-- Non-OAuth/Setup-Token accounts -->
   <div ref="rootRef" v-else>
+    <SenseNovaQuotaCell
+      v-if="account.platform === 'sensenova'"
+      :account="account"
+    />
     <!-- Gemini API Key accounts: show quota info -->
     <DeepSeekBalanceCell
-      v-if="account.platform === 'deepseek'"
+      v-else-if="account.platform === 'deepseek'"
       :account="account"
       :auto-load="shouldAutoLoadDeepSeekBalance"
       :refresh-token="manualRefreshToken"
@@ -685,6 +689,7 @@ import TokenRhythmBalanceCell from './TokenRhythmBalanceCell.vue'
 import KimiBalanceCell from './KimiBalanceCell.vue'
 import CNProviderQuotaCell from './CNProviderQuotaCell.vue'
 import CNProviderBalanceCell from './CNProviderBalanceCell.vue'
+import SenseNovaQuotaCell from './SenseNovaQuotaCell.vue'
 import OllamaCloudUsageCell from './OllamaCloudUsageCell.vue'
 import { cnQuotaCellVisible as cnQuotaCellVisibleFn, cnBalanceCellVisible as cnBalanceCellVisibleFn } from './credentialsBuilder'
 

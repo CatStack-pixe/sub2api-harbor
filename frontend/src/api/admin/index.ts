@@ -20,6 +20,7 @@ import geminiAPI from './gemini'
 import antigravityAPI from './antigravity'
 import grokAPI from './grok'
 import cnProvidersAPI from './cnProviders'
+import sensenovaAPI from './sensenova'
 import userAttributesAPI from './userAttributes'
 import opsAPI from './ops'
 import errorPassthroughAPI from './errorPassthrough'
@@ -60,6 +61,7 @@ export const adminAPI = {
   antigravity: antigravityAPI,
   grok: grokAPI,
   cnProviders: cnProvidersAPI,
+  sensenova: sensenovaAPI,
   userAttributes: userAttributesAPI,
   ops: opsAPI,
   errorPassthrough: errorPassthroughAPI,
@@ -98,6 +100,7 @@ export {
   antigravityAPI,
   grokAPI,
   cnProvidersAPI,
+  sensenovaAPI,
   userAttributesAPI,
   opsAPI,
   errorPassthroughAPI,

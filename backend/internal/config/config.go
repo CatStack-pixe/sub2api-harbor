@@ -2087,6 +2087,7 @@ func setDefaults() {
 		"api.chatanywhere.org",
 		"open.bigmodel.cn",
 		"api.minimaxi.com",
+		"platform.sensenova.cn",
 		"generativelanguage.googleapis.com",
 		"cloudcode-pa.googleapis.com",
 		"*.openai.azure.com",

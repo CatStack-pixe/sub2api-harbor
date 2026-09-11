@@ -749,7 +749,15 @@ export default {
       },
       sensenova: {
         baseUrlHint: 'OpenAI-compatible SenseNova TokenPlan endpoint (default: https://token.sensenova.cn/v1).',
-        apiKeyHint: 'Your SenseNova API key'
+        apiKeyHint: 'Your SenseNova API key',
+        quotaAccessToken: 'Token Plan access token (optional)',
+        quotaAccessTokenHint: 'Used only for the native 5h/7d quota monitor. Leave blank when editing to keep the existing token.',
+        quotaProbe: 'Query quota',
+        quotaProbeTooltip: 'Query native SenseNova Token Plan quota',
+        quotaPool: 'Pool',
+        quota5h: '5h',
+        quota7d: '7d',
+        quotaResetSoon: 'resetting soon'
       },
       grok: {
         baseUrlHint: 'Grok OAuth accounts forward to the official xAI API base URL.',

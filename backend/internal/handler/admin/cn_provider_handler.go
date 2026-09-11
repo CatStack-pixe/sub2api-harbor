@@ -16,17 +16,20 @@ import (
 // 智谱（zhipu）无余额端点，故同一账号仅 quota 或 balance 其一可用：服务端按账号
 // platform + account_mode 校验并返回明确错误（见 CNProvider*Service 的 load*Account）。
 type CNProviderHandler struct {
-	quotaService   *service.CNProviderQuotaService
-	balanceService *service.CNProviderBalanceService
+	quotaService          *service.CNProviderQuotaService
+	balanceService        *service.CNProviderBalanceService
+	senseNovaQuotaService *service.SenseNovaQuotaService
 }
 
 func NewCNProviderHandler(
 	quotaService *service.CNProviderQuotaService,
 	balanceService *service.CNProviderBalanceService,
+	senseNovaQuotaService *service.SenseNovaQuotaService,
 ) *CNProviderHandler {
 	return &CNProviderHandler{
-		quotaService:   quotaService,
-		balanceService: balanceService,
+		quotaService:          quotaService,
+		balanceService:        balanceService,
+		senseNovaQuotaService: senseNovaQuotaService,
 	}
 }
 
@@ -61,6 +64,25 @@ func (h *CNProviderHandler) QueryBalance(c *gin.Context) {
 		return
 	}
 	result, err := h.balanceService.QueryBalance(c.Request.Context(), accountID)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, result)
+}
+
+// QuerySenseNovaQuota queries the native SenseNova Token Plan pool usage.
+func (h *CNProviderHandler) QuerySenseNovaQuota(c *gin.Context) {
+	accountID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		response.BadRequest(c, "Invalid account ID")
+		return
+	}
+	if h == nil || h.senseNovaQuotaService == nil {
+		response.BadRequest(c, "sensenova quota service is not enabled")
+		return
+	}
+	result, err := h.senseNovaQuotaService.QueryUsage(c.Request.Context(), accountID)
 	if err != nil {
 		response.ErrorFrom(c, err)
 		return

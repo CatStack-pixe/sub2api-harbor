@@ -172,9 +172,10 @@ var providerAdapters = map[string]providerAdapter{
 	MonitorProviderGrok:   providerGrokChatAdapter,
 	// 国产 3 家（配额模式引入）：均为 OpenAI 兼容 Chat Completions，
 	// 仅智谱路径前缀不同（/api/paas/v4/chat/completions）。
-	MonitorProviderKimi:     providerKimiChatAdapter,
-	MonitorProviderZhipu:    providerZhipuChatAdapter,
-	MonitorProviderDeepseek: providerDeepseekChatAdapter,
+	MonitorProviderKimi:      providerKimiChatAdapter,
+	MonitorProviderZhipu:     providerZhipuChatAdapter,
+	MonitorProviderDeepseek:  providerDeepseekChatAdapter,
+	MonitorProviderSenseNova: providerSenseNovaChatAdapter,
 	MonitorProviderAnthropic: {
 		buildPath: func(string) string { return providerAnthropicPath },
 		buildBody: func(model, prompt string) ([]byte, error) {
@@ -225,6 +226,12 @@ var providerZhipuChatAdapter = newOpenAICompatibleChatAdapter(providerZhipuPath)
 
 //nolint:gochecknoglobals // 适配器表是只读静态数据，初始化后不变更。
 var providerDeepseekChatAdapter = newOpenAICompatibleChatAdapter(providerOpenAIPath)
+
+// SenseNova exposes an OpenAI-compatible chat endpoint for probe mode.
+// The separate Token Plan access token is only used by quota mode.
+
+//nolint:gochecknoglobals // static provider adapter
+var providerSenseNovaChatAdapter = newOpenAICompatibleChatAdapter(providerOpenAIPath)
 
 func newOpenAICompatibleChatAdapter(path string) providerAdapter {
 	return providerAdapter{
@@ -455,9 +462,10 @@ var bodyMergeKeyDenyList = map[string]map[string]bool{
 	MonitorProviderAnthropic: {"model": true, "messages": true},
 	MonitorProviderGemini:    {"contents": true},
 	// 国产 3 家与 OpenAI Chat Completions 同构。
-	MonitorProviderKimi:     {"model": true, "messages": true, "stream": true},
-	MonitorProviderZhipu:    {"model": true, "messages": true, "stream": true},
-	MonitorProviderDeepseek: {"model": true, "messages": true, "stream": true},
+	MonitorProviderKimi:      {"model": true, "messages": true, "stream": true},
+	MonitorProviderZhipu:     {"model": true, "messages": true, "stream": true},
+	MonitorProviderDeepseek:  {"model": true, "messages": true, "stream": true},
+	MonitorProviderSenseNova: {"model": true, "messages": true, "stream": true},
 }
 
 func checkAPIMode(opts *CheckOptions) string {
@@ -479,7 +487,8 @@ func bodyMergeDenyKey(provider, apiMode string) string {
 func isOpenAICompatibleChatProvider(provider string) bool {
 	switch provider {
 	case MonitorProviderOpenAI, MonitorProviderGrok,
-		MonitorProviderKimi, MonitorProviderZhipu, MonitorProviderDeepseek:
+		MonitorProviderKimi, MonitorProviderZhipu, MonitorProviderDeepseek,
+		MonitorProviderSenseNova:
 		return true
 	default:
 		return false

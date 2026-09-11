@@ -21,6 +21,7 @@ import (
 // 不直接对接上游，而是把账号侧现成的用量服务归一成 domain.MonitorQuotaSnapshot：
 //   - 海外 5 家（anthropic/openai/gemini/antigravity/grok）→ AccountUsageService.GetUsageForAccount
 //   - 国产 coding plan（kimi/zhipu/deepseek）→ CNProviderQuotaService.QueryUsageForAccount
+//   - SenseNova Token Plan → SenseNovaQuotaService.QueryUsageForAccount
 //   - 国产 payg（kimi/deepseek）→ CNProviderBalanceService.QueryBalanceForAccount
 //     （zhipu payg 无公开余额端点，探测会返回该错误，原样透出）
 // 数据源统一接受已加载的 *Account：fetchUncached 路由前 GetByID 一次并传下去，
@@ -50,6 +51,11 @@ type monitorCNBalanceSource interface {
 	QueryBalanceForAccount(ctx context.Context, account *Account) (*CNProviderBalanceResult, error)
 }
 
+// monitorSenseNovaQuotaSource is the native SenseNova Token Plan probe.
+type monitorSenseNovaQuotaSource interface {
+	QueryUsageForAccount(ctx context.Context, account *Account) (*SenseNovaQuotaProbeResult, error)
+}
+
 // monitorAccountSource 账号加载（AccountRepository 天然满足）。
 type monitorAccountSource interface {
 	GetByID(ctx context.Context, id int64) (*Account, error)
@@ -58,10 +64,11 @@ type monitorAccountSource interface {
 // ChannelMonitorQuotaFetcher 配额抓取器（成功/失败快照均带 TTL 缓存，
 // 同账号并发抓取由 singleflight 合并）。
 type ChannelMonitorQuotaFetcher struct {
-	usage     monitorUsageSource
-	cnQuota   monitorCNQuotaSource
-	cnBalance monitorCNBalanceSource
-	accounts  monitorAccountSource
+	usage          monitorUsageSource
+	cnQuota        monitorCNQuotaSource
+	cnBalance      monitorCNBalanceSource
+	senseNovaQuota monitorSenseNovaQuotaSource
+	accounts       monitorAccountSource
 	// balanceThreshold cn_balance 余额告警阈值（与账号停调共用配置，见 monitorBalanceThreshold）。
 	balanceThreshold float64
 
@@ -101,6 +108,15 @@ func NewChannelMonitorQuotaFetcher(
 		f.accounts = accounts
 	}
 	return f
+}
+
+// SetSenseNovaQuotaService injects the native quota source after construction,
+// keeping the existing constructor stable for tests and alternate providers.
+func (f *ChannelMonitorQuotaFetcher) SetSenseNovaQuotaService(source monitorSenseNovaQuotaSource) {
+	if f == nil {
+		return
+	}
+	f.senseNovaQuota = source
 }
 
 // monitorBalanceThreshold 余额告警阈值，与账号停调（CNProviderBalanceCheckService）
@@ -198,6 +214,8 @@ func (f *ChannelMonitorQuotaFetcher) fetchUncached(ctx context.Context, accountI
 	// （GetUsageForAccount / QueryUsageForAccount / QueryBalanceForAccount），
 	// 下游服务不再各自 GetByID（每次含 proxies/groups 联查）。
 	switch account.Platform {
+	case domain.PlatformSenseNova:
+		return f.fetchSenseNovaQuota(ctx, account, now)
 	case domain.PlatformKimi, domain.PlatformZhipu, domain.PlatformDeepseek:
 		if account.IsCodingPlan() {
 			return f.fetchCNQuota(ctx, account, now)
@@ -433,6 +451,65 @@ func (f *ChannelMonitorQuotaFetcher) fetchCNBalance(ctx context.Context, account
 		snapshot.Error = firstNonEmpty(snapshot.Error, "cn balance probe failed")
 	}
 	return snapshot
+}
+
+// fetchSenseNovaQuota converts each upstream pool and its independent windows
+// into monitor tiers without aggregating pools together.
+func (f *ChannelMonitorQuotaFetcher) fetchSenseNovaQuota(ctx context.Context, account *Account, now time.Time) *domain.MonitorQuotaSnapshot {
+	if f.senseNovaQuota == nil {
+		return quotaErrorSnapshot("sensenova_quota", "sensenova quota service is not configured", now)
+	}
+	result, err := f.senseNovaQuota.QueryUsageForAccount(ctx, account)
+	if err != nil {
+		msg := truncateMessage(sanitizeErrorMessage(err.Error()))
+		return &domain.MonitorQuotaSnapshot{
+			Source:            "sensenova_quota",
+			Success:           false,
+			CredentialInvalid: isCredentialErrorMessage(msg),
+			Error:             msg,
+			FetchedAt:         now,
+		}
+	}
+	if result == nil {
+		return quotaErrorSnapshot("sensenova_quota", "sensenova quota service returned no data", now)
+	}
+	snapshot := &domain.MonitorQuotaSnapshot{
+		Source:    "sensenova_quota",
+		Success:   result.Success,
+		Error:     result.Error,
+		FetchedAt: now,
+	}
+	if result.Plan.Name != "" {
+		snapshot.PlanLevel = result.Plan.Name
+	} else {
+		snapshot.PlanLevel = result.Plan.ID
+	}
+	if !result.Success && (result.StatusCode == 401 || result.StatusCode == 403) {
+		snapshot.CredentialInvalid = true
+	}
+	for _, pool := range result.Pools {
+		label := firstNonEmpty(strings.TrimSpace(pool.Name), strings.TrimSpace(pool.ID))
+		appendSenseNovaQuotaTier(&snapshot.Tiers, label, "5h", pool.Window5h)
+		appendSenseNovaQuotaTier(&snapshot.Tiers, label, "7d", pool.Window7d)
+	}
+	if !snapshot.Success {
+		snapshot.Error = firstNonEmpty(snapshot.Error, "sensenova quota probe failed")
+	}
+	return snapshot
+}
+
+func appendSenseNovaQuotaTier(tiers *[]domain.MonitorQuotaTier, label, window string, quota *SenseNovaQuotaWindow) {
+	if quota == nil || quota.Limit <= 0 {
+		return
+	}
+	*tiers = append(*tiers, domain.MonitorQuotaTier{
+		Window:      window,
+		Label:       label,
+		Used:        quota.Used,
+		Limit:       quota.Limit,
+		UsedPercent: quota.Used / quota.Limit * 100,
+		ResetAt:     quota.ResetAt,
+	})
 }
 
 // quotaErrorSnapshot 构造统一错误快照。

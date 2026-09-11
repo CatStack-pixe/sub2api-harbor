@@ -227,6 +227,21 @@
           <p class="input-hint">{{ t('admin.accounts.leaveEmptyToKeep') }}</p>
         </div>
 
+        <div v-if="account.platform === 'sensenova'">
+          <label class="input-label">{{ t('admin.accounts.sensenova.quotaAccessToken') }}</label>
+          <input
+            v-model="editSenseNovaAccessToken"
+            type="password"
+            class="input font-mono"
+            autocomplete="new-password"
+            data-1p-ignore
+            data-lpignore="true"
+            data-bwignore="true"
+            :placeholder="t('admin.accounts.leaveEmptyToKeep')"
+          />
+          <p class="input-hint">{{ t('admin.accounts.sensenova.quotaAccessTokenHint') }}</p>
+        </div>
+
         <div v-if="account.platform === 'tokenrhythm'">
           <TokenRhythmSessionResolver
             v-model:api-key="editApiKey"
@@ -3094,6 +3109,7 @@ interface TempUnschedRuleForm {
 const submitting = ref(false)
 const editBaseUrl = ref('https://api.anthropic.com')
 const editApiKey = ref('')
+const editSenseNovaAccessToken = ref('')
 const tokenRhythmCookie = ref('')
 
 // ── 国产供应商（Kimi / Zhipu / DeepSeek）account_mode / api_protocol 编辑 ──
@@ -4244,6 +4260,7 @@ const syncFormFromAccount = (newAccount: Account | null) => {
     selectedErrorCodes.value = []
   }
   editApiKey.value = ''
+  editSenseNovaAccessToken.value = ''
   tokenRhythmCookie.value = ''
 }
 
@@ -4876,6 +4893,10 @@ const handleSubmit = async () => {
       } else if (!hasExistingApiKey) {
         appStore.showError(t('admin.accounts.apiKeyIsRequired'))
         return
+      }
+
+      if (props.account.platform === 'sensenova' && editSenseNovaAccessToken.value.trim()) {
+        newCredentials.access_token = editSenseNovaAccessToken.value.trim()
       }
 
       if (props.account.platform === 'tokenrhythm' && tokenRhythmCookie.value.trim()) {
