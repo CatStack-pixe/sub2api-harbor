@@ -1328,6 +1328,8 @@ export interface UsageProgress {
   window_stats?: WindowStats | null // 窗口期统计（从窗口开始到当前的使用量）
   used_requests?: number
   limit_requests?: number
+  used_tokens?: number
+  limit_tokens?: number
 }
 
 // Antigravity 单个模型的配额信息
@@ -1380,7 +1382,7 @@ export interface GrokBillingSummary {
 }
 
 export interface AccountUsageInfo {
-  source?: 'passive' | 'active'
+  source?: 'passive' | 'active' | 'local'
   updated_at: string | null
   five_hour: UsageProgress | null
   seven_day: UsageProgress | null
@@ -1395,6 +1397,9 @@ export interface AccountUsageInfo {
   gemini_flash_minute?: UsageProgress | null
   sensenova_rpm?: UsageProgress | null
   sensenova_tpm?: UsageProgress | null
+  chatanywhere_daily?: UsageProgress | null
+  chatanywhere_weekly?: UsageProgress | null
+  chatanywhere_quota_status?: 'weekly_exhausted' | 'error' | string
   antigravity_quota?: Record<string, AntigravityModelQuota> | null
   grok_request_quota?: GrokQuotaWindow | null
   grok_token_quota?: GrokQuotaWindow | null

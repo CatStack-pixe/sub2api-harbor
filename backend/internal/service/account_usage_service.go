@@ -121,6 +121,13 @@ const (
 	senseNovaTPMLimit   int64 = 128000
 )
 
+const (
+	chatAnywhereFreePointsLimit    int64 = 50000
+	chatAnywhereFreeRequestsLimit  int64 = 100
+	chatAnywhereFreePointsWindow         = 7 * 24 * time.Hour
+	chatAnywhereFreeRequestsWindow       = 24 * time.Hour
+)
+
 // UsageCache 封装账户使用量相关的缓存
 type UsageCache struct {
 	apiCache          sync.Map           // accountID -> *apiUsageCache
@@ -158,6 +165,8 @@ type UsageProgress struct {
 	WindowStats      *WindowStats `json:"window_stats,omitempty"` // 窗口期统计（从窗口开始到当前的使用量）
 	UsedRequests     int64        `json:"used_requests,omitempty"`
 	LimitRequests    int64        `json:"limit_requests,omitempty"`
+	UsedTokens       int64        `json:"used_tokens,omitempty"`
+	LimitTokens      int64        `json:"limit_tokens,omitempty"`
 }
 
 // AntigravityModelQuota Antigravity 单个模型的配额信息
@@ -187,20 +196,23 @@ type AICredit struct {
 
 // UsageInfo 账号使用量信息
 type UsageInfo struct {
-	Source             string         `json:"source,omitempty"`               // "passive" or "active"
-	UpdatedAt          *time.Time     `json:"updated_at,omitempty"`           // 更新时间
-	FiveHour           *UsageProgress `json:"five_hour"`                      // 5小时窗口
-	SevenDay           *UsageProgress `json:"seven_day,omitempty"`            // 7天窗口
-	SevenDaySonnet     *UsageProgress `json:"seven_day_sonnet,omitempty"`     // 7天Sonnet窗口
-	SevenDayFable      *UsageProgress `json:"seven_day_fable,omitempty"`      // 7天Fable窗口（响应头 7d_oi）
-	GeminiSharedDaily  *UsageProgress `json:"gemini_shared_daily,omitempty"`  // Gemini shared pool RPD (Google One / Code Assist)
-	GeminiProDaily     *UsageProgress `json:"gemini_pro_daily,omitempty"`     // Gemini Pro 日配额
-	GeminiFlashDaily   *UsageProgress `json:"gemini_flash_daily,omitempty"`   // Gemini Flash 日配额
-	GeminiSharedMinute *UsageProgress `json:"gemini_shared_minute,omitempty"` // Gemini shared pool RPM (Google One / Code Assist)
-	GeminiProMinute    *UsageProgress `json:"gemini_pro_minute,omitempty"`    // Gemini Pro RPM
-	GeminiFlashMinute  *UsageProgress `json:"gemini_flash_minute,omitempty"`  // Gemini Flash RPM
-	SenseNovaRPM       *UsageProgress `json:"sensenova_rpm,omitempty"`        // SenseNova documented RPM window
-	SenseNovaTPM       *UsageProgress `json:"sensenova_tpm,omitempty"`        // SenseNova documented TPM window
+	Source                  string         `json:"source,omitempty"`               // "passive", "active", or "local"
+	UpdatedAt               *time.Time     `json:"updated_at,omitempty"`           // 更新时间
+	FiveHour                *UsageProgress `json:"five_hour"`                      // 5小时窗口
+	SevenDay                *UsageProgress `json:"seven_day,omitempty"`            // 7天窗口
+	SevenDaySonnet          *UsageProgress `json:"seven_day_sonnet,omitempty"`     // 7天Sonnet窗口
+	SevenDayFable           *UsageProgress `json:"seven_day_fable,omitempty"`      // 7天Fable窗口（响应头 7d_oi）
+	GeminiSharedDaily       *UsageProgress `json:"gemini_shared_daily,omitempty"`  // Gemini shared pool RPD (Google One / Code Assist)
+	GeminiProDaily          *UsageProgress `json:"gemini_pro_daily,omitempty"`     // Gemini Pro 日配额
+	GeminiFlashDaily        *UsageProgress `json:"gemini_flash_daily,omitempty"`   // Gemini Flash 日配额
+	GeminiSharedMinute      *UsageProgress `json:"gemini_shared_minute,omitempty"` // Gemini shared pool RPM (Google One / Code Assist)
+	GeminiProMinute         *UsageProgress `json:"gemini_pro_minute,omitempty"`    // Gemini Pro RPM
+	GeminiFlashMinute       *UsageProgress `json:"gemini_flash_minute,omitempty"`  // Gemini Flash RPM
+	SenseNovaRPM            *UsageProgress `json:"sensenova_rpm,omitempty"`        // SenseNova documented RPM window
+	SenseNovaTPM            *UsageProgress `json:"sensenova_tpm,omitempty"`        // SenseNova documented TPM window
+	ChatAnywhereDaily       *UsageProgress `json:"chatanywhere_daily,omitempty"`   // Local rolling 24h request observation
+	ChatAnywhereWeekly      *UsageProgress `json:"chatanywhere_weekly,omitempty"`  // Local rolling 7d token observation
+	ChatAnywhereQuotaStatus string         `json:"chatanywhere_quota_status,omitempty"`
 
 	// Antigravity 多模型配额
 	AntigravityQuota map[string]*AntigravityModelQuota `json:"antigravity_quota,omitempty"`
@@ -407,6 +419,14 @@ func (s *AccountUsageService) getUsageForAccount(ctx context.Context, account *A
 			s.tryClearRecoverableAccountError(ctx, account)
 		}
 		return usage, err
+	}
+
+	// ChatAnywhere exposes its free limits in the pricing UI, but the account
+	// API does not return per-key remaining values. Keep the admin view honest by
+	// calculating observed windows from successful local usage logs instead of
+	// reusing the request admission counter.
+	if account.IsChatAnywhere() {
+		return s.getChatAnywhereUsage(ctx, account)
 	}
 
 	// 只有oauth类型账号可以通过API获取usage（有profile scope）
@@ -811,6 +831,99 @@ func (s *AccountUsageService) getSenseNovaUsage(ctx context.Context, account *Ac
 		SenseNovaRPM: rpm,
 		SenseNovaTPM: tpm,
 	}, nil
+}
+
+func (s *AccountUsageService) getChatAnywhereUsage(ctx context.Context, account *Account) (*UsageInfo, error) {
+	now := time.Now().UTC()
+	dailyStats := &usagestats.AccountStats{}
+	weeklyStats := &usagestats.AccountStats{}
+
+	if s.usageLogRepo != nil && account != nil {
+		dailyStats = queryChatAnywhereWindowStats(
+			ctx,
+			s.usageLogRepo,
+			account.ID,
+			now.Add(-chatAnywhereFreeRequestsWindow),
+			"24h",
+		)
+		weeklyStats = queryChatAnywhereWindowStats(
+			ctx,
+			s.usageLogRepo,
+			account.ID,
+			now.Add(-chatAnywhereFreePointsWindow),
+			"7d",
+		)
+	}
+
+	return &UsageInfo{
+		Source:                  "local",
+		UpdatedAt:               &now,
+		ChatAnywhereDaily:       buildChatAnywhereRequestUsageProgress(dailyStats),
+		ChatAnywhereWeekly:      buildChatAnywhereTokenUsageProgress(weeklyStats),
+		ChatAnywhereQuotaStatus: chatAnywhereQuotaStatus(account),
+	}, nil
+}
+
+func queryChatAnywhereWindowStats(
+	ctx context.Context,
+	repo UsageLogRepository,
+	accountID int64,
+	startTime time.Time,
+	windowName string,
+) *usagestats.AccountStats {
+	stats, err := repo.GetAccountWindowStats(ctx, accountID, startTime)
+	if err != nil {
+		slog.Warn("chatanywhere_local_usage_query_failed", "account_id", accountID, "window", windowName, "error", err)
+		return &usagestats.AccountStats{}
+	}
+	if stats == nil {
+		return &usagestats.AccountStats{}
+	}
+	return stats
+}
+
+func buildChatAnywhereRequestUsageProgress(stats *usagestats.AccountStats) *UsageProgress {
+	if stats == nil {
+		stats = &usagestats.AccountStats{}
+	}
+	used := maxInt64(stats.Requests, 0)
+	return &UsageProgress{
+		Utilization:   float64(used) / float64(chatAnywhereFreeRequestsLimit) * 100,
+		WindowStats:   windowStatsFromAccountStats(stats),
+		UsedRequests:  used,
+		LimitRequests: chatAnywhereFreeRequestsLimit,
+	}
+}
+
+func buildChatAnywhereTokenUsageProgress(stats *usagestats.AccountStats) *UsageProgress {
+	if stats == nil {
+		stats = &usagestats.AccountStats{}
+	}
+	used := maxInt64(stats.Tokens, 0)
+	return &UsageProgress{
+		Utilization: float64(used) / float64(chatAnywhereFreePointsLimit) * 100,
+		WindowStats: windowStatsFromAccountStats(stats),
+		UsedTokens:  used,
+		LimitTokens: chatAnywhereFreePointsLimit,
+	}
+}
+
+func chatAnywhereQuotaStatus(account *Account) string {
+	if account == nil || account.Status != StatusError {
+		return ""
+	}
+	message := strings.ToLower(account.ErrorMessage)
+	if strings.Contains(message, "free points") || strings.Contains(message, "免费点数") {
+		return "weekly_exhausted"
+	}
+	return "error"
+}
+
+func maxInt64(value, floor int64) int64 {
+	if value < floor {
+		return floor
+	}
+	return value
 }
 
 func buildSenseNovaUsageProgress(account *Account, stats *usagestats.AccountStats, now time.Time) (*UsageProgress, *UsageProgress) {

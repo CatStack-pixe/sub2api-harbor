@@ -1,8 +1,18 @@
 <template>
   <div>
     <!-- Window stats row (above progress bar) -->
+    <div v-if="usageDisplay" class="mb-0.5 flex items-center">
+      <div class="flex items-center gap-1.5 text-[9px] text-gray-500 dark:text-gray-400">
+        <span
+          class="rounded bg-gray-100 px-1.5 py-0.5 dark:bg-gray-800"
+          :title="usageDisplayTitle"
+        >
+          {{ usageDisplay }}
+        </span>
+      </div>
+    </div>
     <div
-      v-if="windowStats && (windowStats.requests > 0 || windowStats.tokens > 0)"
+      v-else-if="windowStats && (windowStats.requests > 0 || windowStats.tokens > 0)"
       class="mb-0.5 flex items-center"
     >
       <div class="flex items-center gap-1.5 text-[9px] text-gray-500 dark:text-gray-400">
@@ -67,6 +77,8 @@ const props = withDefaults(
     resetsAt?: string | null
     color: 'indigo' | 'emerald' | 'purple' | 'amber'
     windowStats?: WindowStats | null
+    usageDisplay?: string | null
+    usageDisplayTitle?: string
     showNowWhenIdle?: boolean
     remainingCapacity?: boolean
     /** fixed: 定宽居中徽章（账号页纵向对齐）；auto: 限宽截断左对齐（监控页组合标签） */

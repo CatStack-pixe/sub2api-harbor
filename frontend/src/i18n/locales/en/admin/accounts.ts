@@ -224,7 +224,7 @@ export default {
         ungrouped: 'Ungrouped',
         hint: 'Displayed as "group / base score / sticky bonus". The base score is computed within the current filtered candidate set and includes priority, load, queue depth, error rate, first-token latency, reset window, quota headroom, billing rate, and related factors. The sticky bonus applies only when sticky weighting is enabled for previous_response_id or session_hash. Higher scores are preferred.'
       },
-      usageWindowsHint: '"5h / 7d" are the upstream account\'s official rolling usage windows (e.g. OpenAI ChatGPT, Claude). They are imposed by the upstream provider on the account itself — not configured by sub2api, and unrelated to the models you map. Usage resets automatically once each window rolls over, and the limit cannot be lifted from within sub2api.',
+      usageWindowsHint: '"5h / 7d" are the upstream account\'s official rolling usage windows (e.g. OpenAI ChatGPT, Claude). The target platform also shows local successful usage for 50,000 token points per 7 days and 100 requests per 24 hours. These observations are separate from upstream balance and local admission counters.',
       ollamaCloud: {
         title: 'Ollama Cloud usage',
         sessionSecurityHint: 'The browser session is encrypted at rest and sent only to the fixed official settings URL.',
@@ -1585,6 +1585,13 @@ export default {
       usageWindow: {
         statsTitle: '5-Hour Window Usage Statistics',
         statsTitleDaily: 'Daily Usage Statistics',
+        chatAnywherePoints: 'pts',
+        chatAnywhereRequests: 'req',
+        chatAnywhereSourceHint: 'Estimated from successful local usage logs: 50,000 token points per 7 days and 100 requests per 24 hours. This display is separate from upstream balance and local admission counters.',
+        chatAnywhereWeeklyHint: 'ChatAnywhere 7-day free points: local tokens / 50,000 points',
+        chatAnywhereDailyHint: 'ChatAnywhere 24-hour requests: successful local requests / 100',
+        chatAnywhereWeeklyExhausted: 'Upstream 7-day points insufficient',
+        chatAnywhereProviderError: 'Upstream error',
         geminiProDaily: 'Pro',
         geminiFlashDaily: 'Flash',
         gemini3Pro: 'G3P',
