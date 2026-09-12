@@ -87,6 +87,21 @@ func TestAccountIsSchedulable_QuotaExceeded(t *testing.T) {
 			want: false,
 		},
 		{
+			name: "chatanywhere request quota remains observational",
+			account: &Account{
+				Status:      StatusActive,
+				Schedulable: true,
+				Platform:    PlatformChatAnywhere,
+				Type:        AccountTypeAPIKey,
+				Extra: map[string]any{
+					"request_quota_limit":    100,
+					"request_quota_used":     100,
+					"request_quota_reset_at": now.Add(24 * time.Hour).Format(time.RFC3339),
+				},
+			},
+			want: true,
+		},
+		{
 			name: "apikey request quota cooldown expired",
 			account: &Account{
 				Status:      StatusActive,

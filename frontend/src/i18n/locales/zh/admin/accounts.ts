@@ -125,7 +125,7 @@ export default {
         ungrouped: '未分组',
         hint: '显示格式为“分组名 / 基础分 / 粘性加分”。基础分按当前筛选条件限定的候选账号计算，包含优先级、负载、排队、错误率、首包延迟、重置窗口、额度余量、计费倍率等因子；粘性加分只在开启粘性加权时用于 previous_response_id 或 session_hash。分数越大越优先。'
       },
-      usageWindowsHint: '“5h / 7d”是上游账号（如 OpenAI ChatGPT、Claude）官方的滚动用量窗口限制，由上游对账号设定，并非 sub2api 配置，也与你映射的模型无关。窗口滚动到期后用量会自动重置，无法在 sub2api 端解除该限制。',
+      usageWindowsHint: '“5h / 7d”是上游账号（如 OpenAI ChatGPT、Claude）官方的滚动用量窗口限制；目标平台额外显示 7 天 50,000 Token 点和 24 小时 100 次请求的本地成功用量观察值。观察值与上游余额及本地准入计数分开。',
       ollamaCloud: {
         title: 'Ollama Cloud 用量',
         sessionSecurityHint: '浏览器会话会加密落库，且只发送到固定的 Ollama 官方设置页。',
@@ -447,6 +447,13 @@ export default {
       usageWindow: {
         statsTitle: '5小时窗口用量统计',
         statsTitleDaily: '每日用量统计',
+        chatAnywherePoints: '点',
+        chatAnywhereRequests: '次',
+        chatAnywhereSourceHint: '按本地成功用量日志估算：7 天 Token 上限 50,000 点，24 小时请求上限 100 次。该展示与上游余额及本地准入计数分开。',
+        chatAnywhereWeeklyHint: 'ChatAnywhere 7 天免费点数：本地 Token 用量 / 50,000 点',
+        chatAnywhereDailyHint: 'ChatAnywhere 24 小时请求数：本地成功请求 / 100 次',
+        chatAnywhereWeeklyExhausted: '上游 7 天点数不足',
+        chatAnywhereProviderError: '上游错误',
         geminiProDaily: 'Pro',
         geminiFlashDaily: 'Flash',
         deepseekProbe: '余额',

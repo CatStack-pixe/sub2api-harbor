@@ -1525,4 +1525,44 @@ describe('AccountUsageCell', () => {
     expect(wrapper.text()).not.toContain('7d S')
     expect(wrapper.text()).not.toContain('7d F')
   })
+
+  it('ChatAnywhere API key loads the dedicated 7d and 1d windows', async () => {
+    getUsage.mockResolvedValue({
+      source: 'local',
+      updated_at: null,
+      five_hour: null,
+      seven_day: null,
+      seven_day_sonnet: null,
+      chatanywhere_weekly: {
+        utilization: 25,
+        resets_at: null,
+        remaining_seconds: 0,
+        used_tokens: 12500,
+        limit_tokens: 50000
+      },
+      chatanywhere_daily: {
+        utilization: 17,
+        resets_at: null,
+        remaining_seconds: 0,
+        used_requests: 17,
+        limit_requests: 100
+      }
+    })
+
+    const wrapper = mount(AccountUsageCell, {
+      props: {
+        account: makeAccount({
+          id: 9301,
+          platform: 'chatanywhere',
+          type: 'apikey'
+        })
+      }
+    })
+
+    await flushPromises()
+
+    expect(getUsage).toHaveBeenCalledWith(9301)
+    expect(wrapper.text()).toContain('12,500 / 50,000')
+    expect(wrapper.text()).toContain('17 / 100')
+  })
 })

@@ -467,6 +467,16 @@
       </div>
     </template>
 
+    <!-- ChatAnywhere free windows: local observed tokens and requests -->
+    <template v-else-if="account.platform === 'chatanywhere'">
+      <ChatAnywhereUsageCell
+        :account="account"
+        :usage-info="usageInfo"
+        :loading="loading"
+        :error="error"
+      />
+    </template>
+
     <!-- CN providers (Kimi / Zhipu / DeepSeek): coding-plan quota or payg balance -->
     <template v-else-if="account.platform === 'kimi' || account.platform === 'zhipu' || account.platform === 'deepseek'">
       <div class="space-y-1">
@@ -724,6 +734,7 @@ import KimiBalanceCell from './KimiBalanceCell.vue'
 import CNProviderQuotaCell from './CNProviderQuotaCell.vue'
 import CNProviderBalanceCell from './CNProviderBalanceCell.vue'
 import OllamaCloudUsageCell from './OllamaCloudUsageCell.vue'
+import ChatAnywhereUsageCell from './ChatAnywhereUsageCell.vue'
 import { cnQuotaCellVisible as cnQuotaCellVisibleFn, cnBalanceCellVisible as cnBalanceCellVisibleFn } from './credentialsBuilder'
 
 // Module-level cache shared across all AccountUsageCell instances
@@ -796,7 +807,8 @@ const showUsageWindows = computed(() => {
   if (
     props.account.platform === 'kimi' ||
     props.account.platform === 'zhipu' ||
-    props.account.platform === 'deepseek'
+    props.account.platform === 'deepseek' ||
+    props.account.platform === 'chatanywhere'
   ) {
     return true
   }
@@ -812,6 +824,9 @@ const shouldFetchUsage = computed(() => {
     return true
   }
   if (props.account.platform === 'sensenova') {
+    return true
+  }
+  if (props.account.platform === 'chatanywhere') {
     return true
   }
   if (props.account.platform === 'antigravity') {
@@ -892,7 +907,7 @@ const shouldAutoLoadKimiBalance = computed(() => {
 })
 
 const shouldLazyLoadOnMobile = computed(() => {
-  return (shouldFetchUsage.value || props.account.platform === 'deepseek' || props.account.platform === 'tokenrhythm' || props.account.platform === 'kimi') && !isDesktopViewport.value
+  return (shouldFetchUsage.value || props.account.platform === 'deepseek' || props.account.platform === 'tokenrhythm' || props.account.platform === 'kimi' || props.account.platform === 'chatanywhere') && !isDesktopViewport.value
 })
 
 // Antigravity quota types (用于 API 返回的数据)
@@ -1530,7 +1545,7 @@ const detachVisibilityObserver = () => {
 const attachVisibilityObserver = () => {
   detachVisibilityObserver()
   if (!shouldLazyLoadOnMobile.value) return
-  if (props.account.platform !== 'deepseek' && props.account.platform !== 'tokenrhythm' && props.account.platform !== 'kimi' && hasEnteredViewport.value) return
+  if (props.account.platform !== 'deepseek' && props.account.platform !== 'tokenrhythm' && props.account.platform !== 'kimi' && props.account.platform !== 'chatanywhere' && hasEnteredViewport.value) return
   if (typeof window === 'undefined' || typeof IntersectionObserver === 'undefined') {
     hasEnteredViewport.value = true
     isRowVisible.value = true
@@ -1541,10 +1556,10 @@ const attachVisibilityObserver = () => {
 
   visibilityObserver = new IntersectionObserver((entries) => {
     const isIntersecting = entries.some((entry) => entry.isIntersecting)
-    if (props.account.platform === 'deepseek' || props.account.platform === 'tokenrhythm' || props.account.platform === 'kimi') isRowVisible.value = isIntersecting
+    if (props.account.platform === 'deepseek' || props.account.platform === 'tokenrhythm' || props.account.platform === 'kimi' || props.account.platform === 'chatanywhere') isRowVisible.value = isIntersecting
     if (!isIntersecting) return
     hasEnteredViewport.value = true
-    if (props.account.platform !== 'deepseek' && props.account.platform !== 'tokenrhythm' && props.account.platform !== 'kimi') detachVisibilityObserver()
+    if (props.account.platform !== 'deepseek' && props.account.platform !== 'tokenrhythm' && props.account.platform !== 'kimi' && props.account.platform !== 'chatanywhere') detachVisibilityObserver()
     flushPendingAutoLoad()
   }, {
     root: null,

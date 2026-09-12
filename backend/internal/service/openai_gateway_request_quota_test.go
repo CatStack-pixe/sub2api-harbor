@@ -30,3 +30,20 @@ func TestReserveAccountRequestQuota_FailsClosedWithoutRepository(t *testing.T) {
 	require.ErrorContains(t, err, "request quota storage is unavailable")
 	require.False(t, allowed)
 }
+
+func TestReserveAccountRequestQuota_ChatAnywhereUsesUpstreamDecision(t *testing.T) {
+	svc := &OpenAIGatewayService{}
+	account := &Account{
+		ID:       2,
+		Platform: PlatformChatAnywhere,
+		Extra: map[string]any{
+			"request_quota_limit": 100,
+			"request_quota_used":  100,
+		},
+	}
+
+	allowed, err := svc.ReserveAccountRequestQuota(context.Background(), account)
+
+	require.NoError(t, err)
+	require.True(t, allowed)
+}

@@ -3124,7 +3124,10 @@ func (a *Account) IsWeeklyQuotaPeriodExpired() bool {
 
 // IsQuotaExceeded 检查 API Key 账号配额是否已超限（任一维度超限即返回 true）
 func (a *Account) IsQuotaExceeded() bool {
-	if a.IsRequestQuotaExceeded() {
+	// ChatAnywhere's request count is an upstream observation window. It must
+	// not become a local scheduler gate because the provider may still accept
+	// requests while free token points remain.
+	if !a.IsChatAnywhere() && a.IsRequestQuotaExceeded() {
 		return true
 	}
 	// 总额度

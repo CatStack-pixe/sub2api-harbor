@@ -2243,7 +2243,7 @@ func (h *OpenAIGatewayHandler) acquireOpenAIAccountSlot(
 }
 
 func (h *OpenAIGatewayHandler) reserveAccountRequestQuota(c *gin.Context, ctx context.Context, account *service.Account) (bool, error) {
-	if account == nil || !account.HasRequestQuotaLimit() {
+	if account == nil || account.IsChatAnywhere() || !account.HasRequestQuotaLimit() {
 		return true, nil
 	}
 	reserved := map[int64]struct{}{}
