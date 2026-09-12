@@ -122,10 +122,10 @@ const (
 )
 
 const (
-	chatAnywhereFreePointsLimit   int64         = 50000
-	chatAnywhereFreeRequestsLimit int64         = 100
-	chatAnywhereFreePointsWindow                = 7 * 24 * time.Hour
-	chatAnywhereFreeRequestsWindow              = 24 * time.Hour
+	chatAnywhereFreePointsLimit    int64 = 50000
+	chatAnywhereFreeRequestsLimit  int64 = 100
+	chatAnywhereFreePointsWindow         = 7 * 24 * time.Hour
+	chatAnywhereFreeRequestsWindow       = 24 * time.Hour
 )
 
 // UsageCache 封装账户使用量相关的缓存
@@ -196,22 +196,22 @@ type AICredit struct {
 
 // UsageInfo 账号使用量信息
 type UsageInfo struct {
-	Source             string         `json:"source,omitempty"`               // "passive", "active", or "local"
-	UpdatedAt          *time.Time     `json:"updated_at,omitempty"`           // 更新时间
-	FiveHour           *UsageProgress `json:"five_hour"`                      // 5小时窗口
-	SevenDay           *UsageProgress `json:"seven_day,omitempty"`            // 7天窗口
-	SevenDaySonnet     *UsageProgress `json:"seven_day_sonnet,omitempty"`     // 7天Sonnet窗口
-	SevenDayFable      *UsageProgress `json:"seven_day_fable,omitempty"`      // 7天Fable窗口（响应头 7d_oi）
-	GeminiSharedDaily  *UsageProgress `json:"gemini_shared_daily,omitempty"`  // Gemini shared pool RPD (Google One / Code Assist)
-	GeminiProDaily     *UsageProgress `json:"gemini_pro_daily,omitempty"`     // Gemini Pro 日配额
-	GeminiFlashDaily   *UsageProgress `json:"gemini_flash_daily,omitempty"`   // Gemini Flash 日配额
-	GeminiSharedMinute *UsageProgress `json:"gemini_shared_minute,omitempty"` // Gemini shared pool RPM (Google One / Code Assist)
-	GeminiProMinute    *UsageProgress `json:"gemini_pro_minute,omitempty"`    // Gemini Pro RPM
-	GeminiFlashMinute  *UsageProgress `json:"gemini_flash_minute,omitempty"`  // Gemini Flash RPM
-	SenseNovaRPM       *UsageProgress `json:"sensenova_rpm,omitempty"`        // SenseNova documented RPM window
-	SenseNovaTPM       *UsageProgress `json:"sensenova_tpm,omitempty"`        // SenseNova documented TPM window
-	ChatAnywhereDaily       *UsageProgress `json:"chatanywhere_daily,omitempty"`  // Local rolling 24h request observation
-	ChatAnywhereWeekly      *UsageProgress `json:"chatanywhere_weekly,omitempty"` // Local rolling 7d token observation
+	Source                  string         `json:"source,omitempty"`               // "passive", "active", or "local"
+	UpdatedAt               *time.Time     `json:"updated_at,omitempty"`           // 更新时间
+	FiveHour                *UsageProgress `json:"five_hour"`                      // 5小时窗口
+	SevenDay                *UsageProgress `json:"seven_day,omitempty"`            // 7天窗口
+	SevenDaySonnet          *UsageProgress `json:"seven_day_sonnet,omitempty"`     // 7天Sonnet窗口
+	SevenDayFable           *UsageProgress `json:"seven_day_fable,omitempty"`      // 7天Fable窗口（响应头 7d_oi）
+	GeminiSharedDaily       *UsageProgress `json:"gemini_shared_daily,omitempty"`  // Gemini shared pool RPD (Google One / Code Assist)
+	GeminiProDaily          *UsageProgress `json:"gemini_pro_daily,omitempty"`     // Gemini Pro 日配额
+	GeminiFlashDaily        *UsageProgress `json:"gemini_flash_daily,omitempty"`   // Gemini Flash 日配额
+	GeminiSharedMinute      *UsageProgress `json:"gemini_shared_minute,omitempty"` // Gemini shared pool RPM (Google One / Code Assist)
+	GeminiProMinute         *UsageProgress `json:"gemini_pro_minute,omitempty"`    // Gemini Pro RPM
+	GeminiFlashMinute       *UsageProgress `json:"gemini_flash_minute,omitempty"`  // Gemini Flash RPM
+	SenseNovaRPM            *UsageProgress `json:"sensenova_rpm,omitempty"`        // SenseNova documented RPM window
+	SenseNovaTPM            *UsageProgress `json:"sensenova_tpm,omitempty"`        // SenseNova documented TPM window
+	ChatAnywhereDaily       *UsageProgress `json:"chatanywhere_daily,omitempty"`   // Local rolling 24h request observation
+	ChatAnywhereWeekly      *UsageProgress `json:"chatanywhere_weekly,omitempty"`  // Local rolling 7d token observation
 	ChatAnywhereQuotaStatus string         `json:"chatanywhere_quota_status,omitempty"`
 
 	// Antigravity 多模型配额
@@ -856,11 +856,11 @@ func (s *AccountUsageService) getChatAnywhereUsage(ctx context.Context, account 
 	}
 
 	return &UsageInfo{
-		Source:                   "local",
-		UpdatedAt:                &now,
-		ChatAnywhereDaily:        buildChatAnywhereRequestUsageProgress(dailyStats),
-		ChatAnywhereWeekly:       buildChatAnywhereTokenUsageProgress(weeklyStats),
-		ChatAnywhereQuotaStatus:  chatAnywhereQuotaStatus(account),
+		Source:                  "local",
+		UpdatedAt:               &now,
+		ChatAnywhereDaily:       buildChatAnywhereRequestUsageProgress(dailyStats),
+		ChatAnywhereWeekly:      buildChatAnywhereTokenUsageProgress(weeklyStats),
+		ChatAnywhereQuotaStatus: chatAnywhereQuotaStatus(account),
 	}, nil
 }
 
@@ -888,9 +888,9 @@ func buildChatAnywhereRequestUsageProgress(stats *usagestats.AccountStats) *Usag
 	}
 	used := maxInt64(stats.Requests, 0)
 	return &UsageProgress{
-		Utilization:  float64(used) / float64(chatAnywhereFreeRequestsLimit) * 100,
-		WindowStats:  windowStatsFromAccountStats(stats),
-		UsedRequests: used,
+		Utilization:   float64(used) / float64(chatAnywhereFreeRequestsLimit) * 100,
+		WindowStats:   windowStatsFromAccountStats(stats),
+		UsedRequests:  used,
 		LimitRequests: chatAnywhereFreeRequestsLimit,
 	}
 }
@@ -901,10 +901,10 @@ func buildChatAnywhereTokenUsageProgress(stats *usagestats.AccountStats) *UsageP
 	}
 	used := maxInt64(stats.Tokens, 0)
 	return &UsageProgress{
-		Utilization:  float64(used) / float64(chatAnywhereFreePointsLimit) * 100,
-		WindowStats:  windowStatsFromAccountStats(stats),
-		UsedTokens:   used,
-		LimitTokens:  chatAnywhereFreePointsLimit,
+		Utilization: float64(used) / float64(chatAnywhereFreePointsLimit) * 100,
+		WindowStats: windowStatsFromAccountStats(stats),
+		UsedTokens:  used,
+		LimitTokens: chatAnywhereFreePointsLimit,
 	}
 }
 

@@ -11,9 +11,9 @@ import (
 
 type chatAnywhereUsageLogRepoStub struct {
 	UsageLogRepository
-	daily   *usagestats.AccountStats
-	weekly  *usagestats.AccountStats
-	starts  []time.Time
+	daily  *usagestats.AccountStats
+	weekly *usagestats.AccountStats
+	starts []time.Time
 }
 
 var _ UsageLogRepository = (*chatAnywhereUsageLogRepoStub)(nil)
