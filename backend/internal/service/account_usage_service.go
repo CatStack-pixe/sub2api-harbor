@@ -119,11 +119,11 @@ const (
 	// SenseNova API key accounts use local successful-usage logs to render the
 	// documented rolling point windows. The minute window remains separate for
 	// upstream 429 cooldown handling.
-	senseNovaRateWindow           = time.Minute
-	senseNovaFiveHourWindow       = 5 * time.Hour
-	senseNovaWeeklyWindow         = 7 * 24 * time.Hour
-	senseNovaFiveHourPointsLimit  = int64(60000)
-	senseNovaWeeklyPointsLimit    = int64(600000)
+	senseNovaRateWindow          = time.Minute
+	senseNovaFiveHourWindow      = 5 * time.Hour
+	senseNovaWeeklyWindow        = 7 * 24 * time.Hour
+	senseNovaFiveHourPointsLimit = int64(60000)
+	senseNovaWeeklyPointsLimit   = int64(600000)
 )
 
 const (
@@ -215,8 +215,8 @@ type UsageInfo struct {
 	GeminiSharedMinute      *UsageProgress `json:"gemini_shared_minute,omitempty"` // Gemini shared pool RPM (Google One / Code Assist)
 	GeminiProMinute         *UsageProgress `json:"gemini_pro_minute,omitempty"`    // Gemini Pro RPM
 	GeminiFlashMinute       *UsageProgress `json:"gemini_flash_minute,omitempty"`  // Gemini Flash RPM
-	SenseNovaFiveHour       *UsageProgress `json:"sensenova_five_hour,omitempty"` // SenseNova rolling 5-hour point window
-	SenseNovaSevenDay       *UsageProgress `json:"sensenova_seven_day,omitempty"` // SenseNova rolling 7-day point window
+	SenseNovaFiveHour       *UsageProgress `json:"sensenova_five_hour,omitempty"`  // SenseNova rolling 5-hour point window
+	SenseNovaSevenDay       *UsageProgress `json:"sensenova_seven_day,omitempty"`  // SenseNova rolling 7-day point window
 	ChatAnywhereDaily       *UsageProgress `json:"chatanywhere_daily,omitempty"`   // Local rolling 24h request observation
 	ChatAnywhereWeekly      *UsageProgress `json:"chatanywhere_weekly,omitempty"`  // Local rolling 7d token observation
 	ChatAnywhereQuotaStatus string         `json:"chatanywhere_quota_status,omitempty"`
@@ -970,10 +970,10 @@ func buildSenseNovaUsageProgress(stats *usagestats.AccountStats, pointsLimit int
 
 	usedPoints := maxInt64(stats.Tokens, 0)
 	progress := &UsageProgress{
-		Utilization:  float64(usedPoints) / float64(pointsLimit) * 100,
-		WindowStats:  windowStatsFromAccountStats(stats),
-		UsedPoints:   usedPoints,
-		LimitPoints:  pointsLimit,
+		Utilization: float64(usedPoints) / float64(pointsLimit) * 100,
+		WindowStats: windowStatsFromAccountStats(stats),
+		UsedPoints:  usedPoints,
+		LimitPoints: pointsLimit,
 	}
 
 	return progress
