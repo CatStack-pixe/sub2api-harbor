@@ -838,8 +838,8 @@ func (s *AccountUsageService) getSenseNovaUsage(ctx context.Context, account *Ac
 	return &UsageInfo{
 		Source:            "local",
 		UpdatedAt:         &now,
-		SenseNovaFiveHour: buildSenseNovaUsageProgress(account, fiveHourStats, senseNovaFiveHourPointsLimit, now),
-		SenseNovaSevenDay: buildSenseNovaUsageProgress(account, weeklyStats, senseNovaWeeklyPointsLimit, now),
+		SenseNovaFiveHour: buildSenseNovaUsageProgress(fiveHourStats, senseNovaFiveHourPointsLimit),
+		SenseNovaSevenDay: buildSenseNovaUsageProgress(weeklyStats, senseNovaWeeklyPointsLimit),
 	}, nil
 }
 
@@ -963,7 +963,7 @@ func maxInt64(value, floor int64) int64 {
 	return value
 }
 
-func buildSenseNovaUsageProgress(account *Account, stats *usagestats.AccountStats, pointsLimit int64, now time.Time) *UsageProgress {
+func buildSenseNovaUsageProgress(stats *usagestats.AccountStats, pointsLimit int64) *UsageProgress {
 	if stats == nil {
 		stats = &usagestats.AccountStats{}
 	}
@@ -974,20 +974,6 @@ func buildSenseNovaUsageProgress(account *Account, stats *usagestats.AccountStat
 		WindowStats:  windowStatsFromAccountStats(stats),
 		UsedPoints:   usedPoints,
 		LimitPoints:  pointsLimit,
-	}
-
-	// A persisted upstream 429 cooldown is separate from the rolling quota.
-	// Surface it as a temporary full bar without inventing a reset timestamp for
-	// a rolling window, whose next reset depends on the oldest request.
-	if account != nil && account.RateLimitResetAt != nil && now.Before(*account.RateLimitResetAt) {
-		resetCopy := *account.RateLimitResetAt
-		remainingSeconds := int(resetCopy.Sub(now).Seconds())
-		if remainingSeconds < 0 {
-			remainingSeconds = 0
-		}
-		progress.Utilization = 100
-		progress.ResetsAt = &resetCopy
-		progress.RemainingSeconds = remainingSeconds
 	}
 
 	return progress

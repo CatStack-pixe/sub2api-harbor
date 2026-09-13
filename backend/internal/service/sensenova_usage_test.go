@@ -77,18 +77,15 @@ func TestGetUsageForAccount_SenseNovaUsesRollingPointWindows(t *testing.T) {
 	}
 }
 
-func TestBuildSenseNovaUsageProgress_RateLimitFillsWindow(t *testing.T) {
-	now := time.Date(2026, 9, 12, 12, 34, 45, 0, time.UTC)
-	rateLimitReset := now.Add(90 * time.Second)
-	account := &Account{RateLimitResetAt: &rateLimitReset}
+func TestBuildSenseNovaUsageProgress_UsesPointUsage(t *testing.T) {
 	stats := &usagestats.AccountStats{Requests: 1, Tokens: 2}
 
-	progress := buildSenseNovaUsageProgress(account, stats, senseNovaFiveHourPointsLimit, now)
-	if progress.Utilization != 100 {
-		t.Fatalf("rate-limited utilization = %v, want 100", progress.Utilization)
+	progress := buildSenseNovaUsageProgress(stats, senseNovaFiveHourPointsLimit)
+	if progress.Utilization <= 0 || progress.Utilization >= 0.01 {
+		t.Fatalf("point utilization = %v, want roughly 0.0033", progress.Utilization)
 	}
-	if progress.ResetsAt == nil || !progress.ResetsAt.Equal(rateLimitReset) {
-		t.Fatalf("rolling point reset = %v, want %v", progress.ResetsAt, rateLimitReset)
+	if progress.ResetsAt != nil || progress.RemainingSeconds != 0 {
+		t.Fatalf("rolling point reset state = (%v, %d), want (nil, 0)", progress.ResetsAt, progress.RemainingSeconds)
 	}
 }
 
