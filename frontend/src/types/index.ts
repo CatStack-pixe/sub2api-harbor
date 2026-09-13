@@ -1330,6 +1330,8 @@ export interface UsageProgress {
   limit_requests?: number
   used_tokens?: number
   limit_tokens?: number
+  used_points?: number
+  limit_points?: number
 }
 
 // Antigravity 单个模型的配额信息
@@ -1395,8 +1397,8 @@ export interface AccountUsageInfo {
   gemini_shared_minute?: UsageProgress | null
   gemini_pro_minute?: UsageProgress | null
   gemini_flash_minute?: UsageProgress | null
-  sensenova_rpm?: UsageProgress | null
-  sensenova_tpm?: UsageProgress | null
+  sensenova_five_hour?: UsageProgress | null
+  sensenova_seven_day?: UsageProgress | null
   chatanywhere_daily?: UsageProgress | null
   chatanywhere_weekly?: UsageProgress | null
   chatanywhere_quota_status?: 'weekly_exhausted' | 'error' | string

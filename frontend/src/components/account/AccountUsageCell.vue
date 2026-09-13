@@ -192,7 +192,7 @@
       </div>
     </template>
 
-    <!-- SenseNova API key accounts: local documented RPM/TPM windows -->
+    <!-- SenseNova API key accounts: local rolling point windows -->
     <template v-else-if="account.platform === 'sensenova'">
       <div v-if="loading" class="space-y-1.5">
         <div class="flex items-center gap-1">
@@ -211,19 +211,23 @@
       </div>
       <div v-else-if="usageInfo" class="space-y-1">
         <UsageProgressBar
-          v-if="usageInfo.sensenova_rpm"
-          label="RPM"
-          :utilization="usageInfo.sensenova_rpm.utilization"
-          :resets-at="usageInfo.sensenova_rpm.resets_at"
-          :window-stats="usageInfo.sensenova_rpm.window_stats"
+          v-if="usageInfo.sensenova_five_hour"
+          label="5h"
+          :utilization="usageInfo.sensenova_five_hour.utilization"
+          :resets-at="usageInfo.sensenova_five_hour.resets_at"
+          :window-stats="usageInfo.sensenova_five_hour.window_stats"
+          :usage-display="formatSenseNovaPointUsage(usageInfo.sensenova_five_hour)"
+          :usage-display-title="t('admin.accounts.usageWindow.senseNovaFiveHourHint')"
           color="indigo"
         />
         <UsageProgressBar
-          v-if="usageInfo.sensenova_tpm"
-          label="TPM"
-          :utilization="usageInfo.sensenova_tpm.utilization"
-          :resets-at="usageInfo.sensenova_tpm.resets_at"
-          :window-stats="usageInfo.sensenova_tpm.window_stats"
+          v-if="usageInfo.sensenova_seven_day"
+          label="7d"
+          :utilization="usageInfo.sensenova_seven_day.utilization"
+          :resets-at="usageInfo.sensenova_seven_day.resets_at"
+          :window-stats="usageInfo.sensenova_seven_day.window_stats"
+          :usage-display="formatSenseNovaPointUsage(usageInfo.sensenova_seven_day)"
+          :usage-display-title="t('admin.accounts.usageWindow.senseNovaWeeklyHint')"
           color="emerald"
         />
       </div>
@@ -720,7 +724,7 @@
 import { ref, computed, onMounted, onBeforeUnmount, onUnmounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { adminAPI } from '@/api/admin'
-import type { Account, AccountUsageInfo, GeminiCredentials, WindowStats } from '@/types'
+import type { Account, AccountUsageInfo, GeminiCredentials, UsageProgress, WindowStats } from '@/types'
 import { buildOpenAIUsageRefreshKey } from '@/utils/accountUsageRefresh'
 import { enqueueUsageRequest } from '@/utils/usageLoadQueue'
 import { formatCompactNumber } from '@/utils/format'
@@ -782,6 +786,15 @@ const loading = ref(false)
 const activeQueryLoading = ref(false)
 const error = ref<string | null>(null)
 const usageInfo = ref<AccountUsageInfo | null>(null)
+const formatSenseNovaPointUsage = (progress: UsageProgress | null | undefined) => {
+  if (!progress) return null
+  const used = Math.max(
+    0,
+    Math.round(progress.used_points ?? progress.used_tokens ?? progress.window_stats?.tokens ?? 0)
+  )
+  const limit = Math.max(0, Math.round(progress.limit_points ?? progress.limit_tokens ?? 0))
+  return `${used.toLocaleString('en-US')} / ${limit.toLocaleString('en-US')} ${t('admin.accounts.usageWindow.senseNovaPoints')}`
+}
 watch(usageInfo, (usage) => {
   if (usage) emit('usage-loaded', usage)
 })

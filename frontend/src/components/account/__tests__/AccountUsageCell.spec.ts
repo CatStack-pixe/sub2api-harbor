@@ -656,27 +656,31 @@ describe('AccountUsageCell', () => {
   expect(wrapper.text()).toContain('7d|100|106540000')
   })
 
-  it('SenseNova API key renders local documented RPM and TPM windows', async () => {
+  it('SenseNova API key renders local rolling 5-hour and weekly point windows', async () => {
     getUsage.mockResolvedValue({
-      sensenova_rpm: {
+      sensenova_five_hour: {
         utilization: 50,
-        resets_at: '2099-03-07T12:35:00Z',
-        remaining_seconds: 15,
+        resets_at: null,
+        remaining_seconds: 0,
+        used_points: 30000,
+        limit_points: 60000,
         window_stats: {
           requests: 30,
-          tokens: 64000,
+          tokens: 30000,
           cost: 0.64,
           standard_cost: 0.64,
           user_cost: 0.64
         }
       },
-      sensenova_tpm: {
+      sensenova_seven_day: {
         utilization: 50,
-        resets_at: '2099-03-07T12:35:00Z',
-        remaining_seconds: 15,
+        resets_at: null,
+        remaining_seconds: 0,
+        used_points: 300000,
+        limit_points: 600000,
         window_stats: {
           requests: 30,
-          tokens: 64000,
+          tokens: 300000,
           cost: 0.64,
           standard_cost: 0.64,
           user_cost: 0.64
@@ -691,8 +695,8 @@ describe('AccountUsageCell', () => {
       global: {
         stubs: {
           UsageProgressBar: {
-            props: ['label', 'utilization', 'windowStats'],
-            template: '<div class="usage-bar">{{ label }}|{{ utilization }}|{{ windowStats?.tokens }}</div>'
+            props: ['label', 'utilization', 'windowStats', 'usageDisplay'],
+            template: '<div class="usage-bar">{{ label }}|{{ utilization }}|{{ usageDisplay }}</div>'
           },
           AccountQuotaInfo: true
         }
@@ -702,8 +706,8 @@ describe('AccountUsageCell', () => {
     await flushPromises()
 
     expect(getUsage).toHaveBeenCalledWith(5001)
-    expect(wrapper.text()).toContain('RPM|50|64000')
-    expect(wrapper.text()).toContain('TPM|50|64000')
+    expect(wrapper.text()).toContain('5h|50|30,000 / 60,000')
+    expect(wrapper.text()).toContain('7d|50|300,000 / 600,000')
   })
 
   it('Key 账号会展示 today stats 徽章并带 A/U 提示', async () => {
