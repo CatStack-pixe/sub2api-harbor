@@ -7,12 +7,14 @@ const {
   listAccounts,
   listWithEtag,
   getBatchTodayStats,
+  getBatchUsage,
   getAllProxies,
   getAllGroups
 } = vi.hoisted(() => ({
   listAccounts: vi.fn(),
   listWithEtag: vi.fn(),
   getBatchTodayStats: vi.fn(),
+  getBatchUsage: vi.fn(),
   getAllProxies: vi.fn(),
   getAllGroups: vi.fn()
 }))
@@ -23,6 +25,7 @@ vi.mock('@/api/admin', () => ({
       list: listAccounts,
       listWithEtag,
       getBatchTodayStats,
+      getBatchUsage,
       getUpstreamBillingProbeSettings: vi.fn().mockResolvedValue({ enabled: true, interval_minutes: 30 }),
       delete: vi.fn(),
       batchClearError: vi.fn(),
@@ -78,6 +81,9 @@ const DataTableStub = {
       <div v-for="row in data" :key="row.id" data-test="account-rate">
         <slot name="cell-rate_multiplier" :row="row" />
       </div>
+      <div v-for="row in data" :key="'usage-' + row.id" :data-test="'account-usage-' + row.id">
+        <slot name="cell-usage" :row="row" />
+      </div>
     </div>
   `
 }
@@ -124,7 +130,10 @@ function mountView() {
         AccountStatusIndicator: true,
         AccountTodayStatsCell: true,
         AccountGroupsCell: true,
-        AccountUsageCell: true,
+        AccountUsageCell: {
+          props: ['account', 'requestBatchedUsage'],
+          template: '<button data-test="request-batched-usage" @click="requestBatchedUsage?.(account)" />'
+        },
         Icon: true
       }
     }
@@ -138,6 +147,7 @@ describe('admin AccountsView usage windows hint', () => {
     listAccounts.mockReset()
     listWithEtag.mockReset()
     getBatchTodayStats.mockReset()
+    getBatchUsage.mockReset()
     getAllProxies.mockReset()
     getAllGroups.mockReset()
 
@@ -154,6 +164,7 @@ describe('admin AccountsView usage windows hint', () => {
       data: null
     })
     getBatchTodayStats.mockResolvedValue({ stats: {} })
+    getBatchUsage.mockResolvedValue({ usage: {}, errors: {} })
     getAllProxies.mockResolvedValue([])
     getAllGroups.mockResolvedValue([])
   })
@@ -235,5 +246,33 @@ describe('admin AccountsView usage windows hint', () => {
     expect(wrapper.get('[data-test="account-rate"]').text()).toBe('0.065x')
     const indicator = wrapper.get('[data-testid="account-rate-sync-indicator"]')
     expect(indicator.attributes('title')).toBe('admin.accounts.upstreamBilling.syncedRateTooltip')
+  })
+
+  it('batches ChatAnywhere usage on desktop instead of leaving the cell empty', async () => {
+    listAccounts.mockResolvedValueOnce({
+      items: [{
+        id: 42,
+        name: 'chatanywhere-account',
+        platform: 'chatanywhere',
+        type: 'apikey',
+        status: 'active',
+        schedulable: true,
+        created_at: '2026-07-13T00:00:00Z',
+        updated_at: '2026-07-13T00:00:00Z'
+      }],
+      total: 1,
+      page: 1,
+      page_size: 20,
+      pages: 1
+    })
+
+    const wrapper = mountView()
+    await flushPromises()
+
+    await wrapper.get('[data-test="account-usage-42"] button').trigger('click')
+    await new Promise(resolve => setTimeout(resolve, 0))
+    await flushPromises()
+
+    expect(getBatchUsage).toHaveBeenCalledWith([42], false)
   })
 })
