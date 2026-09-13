@@ -69,10 +69,10 @@ func TestGetUsageForAccount_SenseNovaUsesRollingPointWindows(t *testing.T) {
 		t.Fatalf("window queries = %d, want 2", len(repo.startTimes))
 	}
 	queryNow := time.Now().UTC()
-	if got := repo.startTimes[0]; got.Before(queryNow.Add(-senseNovaFiveHourWindow - 2*time.Second)) || got.After(queryNow.Add(-senseNovaFiveHourWindow+2*time.Second)) {
+	if got := repo.startTimes[0]; got.Before(queryNow.Add(-senseNovaFiveHourWindow - 2*time.Second)) || got.After(queryNow.Add(-senseNovaFiveHourWindow + 2*time.Second)) {
 		t.Fatalf("5-hour window start = %v, want roughly now - 5h", got)
 	}
-	if got := repo.startTimes[1]; got.Before(queryNow.Add(-senseNovaWeeklyWindow - 2*time.Second)) || got.After(queryNow.Add(-senseNovaWeeklyWindow+2*time.Second)) {
+	if got := repo.startTimes[1]; got.Before(queryNow.Add(-senseNovaWeeklyWindow - 2*time.Second)) || got.After(queryNow.Add(-senseNovaWeeklyWindow + 2*time.Second)) {
 		t.Fatalf("7-day window start = %v, want roughly now - 7d", got)
 	}
 }

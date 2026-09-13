@@ -119,11 +119,11 @@ const (
 	// SenseNova API key accounts use local successful-usage logs to render the
 	// documented rolling point windows. The minute window remains separate for
 	// upstream 429 cooldown handling.
-	senseNovaRateWindow              = time.Minute
-	senseNovaFiveHourWindow          = 5 * time.Hour
-	senseNovaWeeklyWindow            = 7 * 24 * time.Hour
-	senseNovaFiveHourPointsLimit     = int64(60000)
-	senseNovaWeeklyPointsLimit       = int64(600000)
+	senseNovaRateWindow           = time.Minute
+	senseNovaFiveHourWindow       = 5 * time.Hour
+	senseNovaWeeklyWindow         = 7 * 24 * time.Hour
+	senseNovaFiveHourPointsLimit  = int64(60000)
+	senseNovaWeeklyPointsLimit    = int64(600000)
 )
 
 const (
