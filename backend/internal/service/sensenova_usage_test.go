@@ -11,13 +11,16 @@ import (
 
 type senseNovaUsageRepo struct {
 	UsageLogRepository
-	stats     *usagestats.AccountStats
-	startTime time.Time
+	stats      []*usagestats.AccountStats
+	startTimes []time.Time
 }
 
 func (r *senseNovaUsageRepo) GetAccountWindowStats(_ context.Context, _ int64, startTime time.Time) (*usagestats.AccountStats, error) {
-	r.startTime = startTime
-	return r.stats, nil
+	r.startTimes = append(r.startTimes, startTime)
+	if index := len(r.startTimes) - 1; index < len(r.stats) {
+		return r.stats[index], nil
+	}
+	return &usagestats.AccountStats{}, nil
 }
 
 type senseNovaRateLimitRepo struct {
@@ -32,8 +35,11 @@ func (r *senseNovaRateLimitRepo) SetRateLimited(_ context.Context, _ int64, rese
 	return nil
 }
 
-func TestGetUsageForAccount_SenseNovaUsesLocalRPMAndTPMWindows(t *testing.T) {
-	repo := &senseNovaUsageRepo{stats: &usagestats.AccountStats{Requests: 30, Tokens: 64000}}
+func TestGetUsageForAccount_SenseNovaUsesRollingPointWindows(t *testing.T) {
+	repo := &senseNovaUsageRepo{stats: []*usagestats.AccountStats{
+		{Requests: 30, Tokens: 30000},
+		{Requests: 30, Tokens: 300000},
+	}}
 	svc := &AccountUsageService{usageLogRepo: repo}
 	account := &Account{ID: 42, Platform: PlatformSenseNova, Type: AccountTypeAPIKey}
 
@@ -41,41 +47,45 @@ func TestGetUsageForAccount_SenseNovaUsesLocalRPMAndTPMWindows(t *testing.T) {
 	if err != nil {
 		t.Fatalf("getUsageForAccount() error = %v", err)
 	}
-	if usage == nil || usage.SenseNovaRPM == nil || usage.SenseNovaTPM == nil {
-		t.Fatalf("expected SenseNova RPM/TPM usage, got %#v", usage)
+	if usage == nil || usage.SenseNovaFiveHour == nil || usage.SenseNovaSevenDay == nil {
+		t.Fatalf("expected SenseNova rolling point usage, got %#v", usage)
 	}
-	if usage.SenseNovaRPM.Utilization != 50 {
-		t.Fatalf("RPM utilization = %v, want 50", usage.SenseNovaRPM.Utilization)
+	if usage.SenseNovaFiveHour.Utilization != 50 {
+		t.Fatalf("5-hour utilization = %v, want 50", usage.SenseNovaFiveHour.Utilization)
 	}
-	if usage.SenseNovaTPM.Utilization != 50 {
-		t.Fatalf("TPM utilization = %v, want 50", usage.SenseNovaTPM.Utilization)
+	if usage.SenseNovaSevenDay.Utilization != 50 {
+		t.Fatalf("7-day utilization = %v, want 50", usage.SenseNovaSevenDay.Utilization)
 	}
-	if usage.SenseNovaRPM.LimitRequests != senseNovaRPMLimit {
-		t.Fatalf("RPM limit = %d, want %d", usage.SenseNovaRPM.LimitRequests, senseNovaRPMLimit)
+	if usage.SenseNovaFiveHour.LimitPoints != senseNovaFiveHourPointsLimit {
+		t.Fatalf("5-hour points limit = %d, want %d", usage.SenseNovaFiveHour.LimitPoints, senseNovaFiveHourPointsLimit)
 	}
-	if usage.SenseNovaRPM.WindowStats == nil || usage.SenseNovaRPM.WindowStats.Tokens != 64000 {
-		t.Fatalf("unexpected local window stats: %#v", usage.SenseNovaRPM.WindowStats)
+	if usage.SenseNovaSevenDay.LimitPoints != senseNovaWeeklyPointsLimit {
+		t.Fatalf("7-day points limit = %d, want %d", usage.SenseNovaSevenDay.LimitPoints, senseNovaWeeklyPointsLimit)
 	}
-	if repo.startTime.IsZero() {
-		t.Fatal("expected local minute window query")
+	if usage.SenseNovaFiveHour.UsedPoints != 30000 || usage.SenseNovaSevenDay.UsedPoints != 300000 {
+		t.Fatalf("unexpected point usage: (%d, %d)", usage.SenseNovaFiveHour.UsedPoints, usage.SenseNovaSevenDay.UsedPoints)
+	}
+	if len(repo.startTimes) != 2 {
+		t.Fatalf("window queries = %d, want 2", len(repo.startTimes))
+	}
+	queryNow := time.Now().UTC()
+	if got := repo.startTimes[0]; got.Before(queryNow.Add(-senseNovaFiveHourWindow-2*time.Second)) || got.After(queryNow.Add(-senseNovaFiveHourWindow+2*time.Second)) {
+		t.Fatalf("5-hour window start = %v, want roughly now - 5h", got)
+	}
+	if got := repo.startTimes[1]; got.Before(queryNow.Add(-senseNovaWeeklyWindow-2*time.Second)) || got.After(queryNow.Add(-senseNovaWeeklyWindow+2*time.Second)) {
+		t.Fatalf("7-day window start = %v, want roughly now - 7d", got)
 	}
 }
 
-func TestBuildSenseNovaUsageProgress_RateLimitFillsBothWindows(t *testing.T) {
-	now := time.Date(2026, 9, 12, 12, 34, 45, 0, time.UTC)
-	rateLimitReset := now.Add(90 * time.Second)
-	account := &Account{RateLimitResetAt: &rateLimitReset}
+func TestBuildSenseNovaUsageProgress_UsesPointUsage(t *testing.T) {
 	stats := &usagestats.AccountStats{Requests: 1, Tokens: 2}
 
-	rpm, tpm := buildSenseNovaUsageProgress(account, stats, now)
-	if rpm.Utilization != 100 || tpm.Utilization != 100 {
-		t.Fatalf("rate-limited utilization = (%v, %v), want (100, 100)", rpm.Utilization, tpm.Utilization)
+	progress := buildSenseNovaUsageProgress(stats, senseNovaFiveHourPointsLimit)
+	if progress.Utilization <= 0 || progress.Utilization >= 0.01 {
+		t.Fatalf("point utilization = %v, want roughly 0.0033", progress.Utilization)
 	}
-	if rpm.ResetsAt == nil || !rpm.ResetsAt.Equal(rateLimitReset) {
-		t.Fatalf("RPM reset = %v, want %v", rpm.ResetsAt, rateLimitReset)
-	}
-	if tpm.ResetsAt == nil || !tpm.ResetsAt.Equal(rateLimitReset) {
-		t.Fatalf("TPM reset = %v, want %v", tpm.ResetsAt, rateLimitReset)
+	if progress.ResetsAt != nil || progress.RemainingSeconds != 0 {
+		t.Fatalf("rolling point reset state = (%v, %d), want (nil, 0)", progress.ResetsAt, progress.RemainingSeconds)
 	}
 }
 

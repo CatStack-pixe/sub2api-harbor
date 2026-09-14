@@ -116,9 +116,14 @@ const (
 )
 
 const (
-	senseNovaRateWindow       = time.Minute
-	senseNovaRPMLimit   int64 = 60
-	senseNovaTPMLimit   int64 = 128000
+	// SenseNova API key accounts use local successful-usage logs to render the
+	// documented rolling point windows. The minute window remains separate for
+	// upstream 429 cooldown handling.
+	senseNovaRateWindow          = time.Minute
+	senseNovaFiveHourWindow      = 5 * time.Hour
+	senseNovaWeeklyWindow        = 7 * 24 * time.Hour
+	senseNovaFiveHourPointsLimit = int64(60000)
+	senseNovaWeeklyPointsLimit   = int64(600000)
 )
 
 const (
@@ -167,6 +172,8 @@ type UsageProgress struct {
 	LimitRequests    int64        `json:"limit_requests,omitempty"`
 	UsedTokens       int64        `json:"used_tokens,omitempty"`
 	LimitTokens      int64        `json:"limit_tokens,omitempty"`
+	UsedPoints       int64        `json:"used_points,omitempty"`
+	LimitPoints      int64        `json:"limit_points,omitempty"`
 }
 
 // AntigravityModelQuota Antigravity 单个模型的配额信息
@@ -208,8 +215,8 @@ type UsageInfo struct {
 	GeminiSharedMinute      *UsageProgress `json:"gemini_shared_minute,omitempty"` // Gemini shared pool RPM (Google One / Code Assist)
 	GeminiProMinute         *UsageProgress `json:"gemini_pro_minute,omitempty"`    // Gemini Pro RPM
 	GeminiFlashMinute       *UsageProgress `json:"gemini_flash_minute,omitempty"`  // Gemini Flash RPM
-	SenseNovaRPM            *UsageProgress `json:"sensenova_rpm,omitempty"`        // SenseNova documented RPM window
-	SenseNovaTPM            *UsageProgress `json:"sensenova_tpm,omitempty"`        // SenseNova documented TPM window
+	SenseNovaFiveHour       *UsageProgress `json:"sensenova_five_hour,omitempty"`  // SenseNova rolling 5-hour point window
+	SenseNovaSevenDay       *UsageProgress `json:"sensenova_seven_day,omitempty"`  // SenseNova rolling 7-day point window
 	ChatAnywhereDaily       *UsageProgress `json:"chatanywhere_daily,omitempty"`   // Local rolling 24h request observation
 	ChatAnywhereWeekly      *UsageProgress `json:"chatanywhere_weekly,omitempty"`  // Local rolling 7d token observation
 	ChatAnywhereQuotaStatus string         `json:"chatanywhere_quota_status,omitempty"`
@@ -411,8 +418,9 @@ func (s *AccountUsageService) getUsageForAccount(ctx context.Context, account *A
 		return usage, err
 	}
 
-	// SenseNova API key accounts expose documented RPM/TPM limits rather than
-	// an OAuth quota endpoint. The windows are calculated from local usage logs.
+	// SenseNova API key accounts expose documented rolling point limits rather
+	// than an OAuth quota endpoint. The windows are calculated from local usage
+	// logs while local balance deduction remains in the existing billing path.
 	if account.IsSenseNova() {
 		usage, err := s.getSenseNovaUsage(ctx, account)
 		if err == nil {
@@ -529,7 +537,7 @@ func (s *AccountUsageService) getUsageForAccount(ctx context.Context, account *A
 // GetUsage 获取账号使用量
 // OAuth账号: 调用Anthropic API获取真实数据（需要profile scope），API响应缓存10分钟，窗口统计缓存1分钟
 // Setup Token账号: 根据session_window推算5h窗口，7d数据不可用（没有profile scope）
-// SenseNova API Key账号: 根据本地日志计算文档定义的RPM/TPM窗口
+// SenseNova API Key账号: 根据本地日志计算文档定义的滚动积分窗口
 // 其他 API Key账号: 不支持usage查询
 func (s *AccountUsageService) GetUsage(ctx context.Context, accountID int64, force ...bool) (*UsageInfo, error) {
 	forceProbe := len(force) > 0 && force[0]
@@ -811,26 +819,55 @@ func (s *AccountUsageService) getOpenAIUsage(ctx context.Context, account *Accou
 }
 
 func (s *AccountUsageService) getSenseNovaUsage(ctx context.Context, account *Account) (*UsageInfo, error) {
-	now := time.Now()
-	stats := &usagestats.AccountStats{}
-	if s.usageLogRepo != nil {
-		windowStart := now.Truncate(senseNovaRateWindow)
-		if queried, err := s.usageLogRepo.GetAccountWindowStats(ctx, account.ID, windowStart); err == nil {
-			if queried != nil {
-				stats = queried
-			}
-		} else {
-			slog.Warn("sensenova_local_usage_query_failed", "account_id", account.ID, "error", err)
-		}
+	now := time.Now().UTC()
+	fiveHourStats := querySenseNovaWindowStats(
+		ctx,
+		s.usageLogRepo,
+		account.ID,
+		now.Add(-senseNovaFiveHourWindow),
+		"5h",
+	)
+	weeklyStats := querySenseNovaWindowStats(
+		ctx,
+		s.usageLogRepo,
+		account.ID,
+		now.Add(-senseNovaWeeklyWindow),
+		"7d",
+	)
+
+	return &UsageInfo{
+		Source:            "local",
+		UpdatedAt:         &now,
+		SenseNovaFiveHour: buildSenseNovaUsageProgress(fiveHourStats, senseNovaFiveHourPointsLimit),
+		SenseNovaSevenDay: buildSenseNovaUsageProgress(weeklyStats, senseNovaWeeklyPointsLimit),
+	}, nil
+}
+
+func querySenseNovaWindowStats(
+	ctx context.Context,
+	repo UsageLogRepository,
+	accountID int64,
+	startTime time.Time,
+	windowName string,
+) *usagestats.AccountStats {
+	if repo == nil {
+		return &usagestats.AccountStats{}
 	}
 
-	rpm, tpm := buildSenseNovaUsageProgress(account, stats, now)
-	return &UsageInfo{
-		Source:       "active",
-		UpdatedAt:    &now,
-		SenseNovaRPM: rpm,
-		SenseNovaTPM: tpm,
-	}, nil
+	stats, err := repo.GetAccountWindowStats(ctx, accountID, startTime)
+	if err != nil {
+		slog.Warn(
+			"sensenova_local_usage_query_failed",
+			"account_id", accountID,
+			"window", windowName,
+			"error", err,
+		)
+		return &usagestats.AccountStats{}
+	}
+	if stats == nil {
+		return &usagestats.AccountStats{}
+	}
+	return stats
 }
 
 func (s *AccountUsageService) getChatAnywhereUsage(ctx context.Context, account *Account) (*UsageInfo, error) {
@@ -926,48 +963,20 @@ func maxInt64(value, floor int64) int64 {
 	return value
 }
 
-func buildSenseNovaUsageProgress(account *Account, stats *usagestats.AccountStats, now time.Time) (*UsageProgress, *UsageProgress) {
+func buildSenseNovaUsageProgress(stats *usagestats.AccountStats, pointsLimit int64) *UsageProgress {
 	if stats == nil {
 		stats = &usagestats.AccountStats{}
 	}
 
-	resetAt := now.Truncate(senseNovaRateWindow).Add(senseNovaRateWindow)
-	rateLimited := false
-	if account != nil && account.RateLimitResetAt != nil {
-		if now.Before(*account.RateLimitResetAt) {
-			rateLimited = true
-		}
-		if account.RateLimitResetAt.After(resetAt) {
-			resetAt = *account.RateLimitResetAt
-		}
+	usedPoints := maxInt64(stats.Tokens, 0)
+	progress := &UsageProgress{
+		Utilization: float64(usedPoints) / float64(pointsLimit) * 100,
+		WindowStats: windowStatsFromAccountStats(stats),
+		UsedPoints:  usedPoints,
+		LimitPoints: pointsLimit,
 	}
 
-	remainingSeconds := int(resetAt.Sub(now).Seconds())
-	if remainingSeconds < 0 {
-		remainingSeconds = 0
-	}
-	resetCopy := resetAt
-	windowStats := windowStatsFromAccountStats(stats)
-	rpmUtilization := float64(stats.Requests) / float64(senseNovaRPMLimit) * 100
-	tpmUtilization := float64(stats.Tokens) / float64(senseNovaTPMLimit) * 100
-	if rateLimited {
-		rpmUtilization = 100
-		tpmUtilization = 100
-	}
-
-	return &UsageProgress{
-		Utilization:      rpmUtilization,
-		ResetsAt:         &resetCopy,
-		RemainingSeconds: remainingSeconds,
-		WindowStats:      windowStats,
-		UsedRequests:     stats.Requests,
-		LimitRequests:    senseNovaRPMLimit,
-	}, &UsageProgress{
-		Utilization:      tpmUtilization,
-		ResetsAt:         &resetCopy,
-		RemainingSeconds: remainingSeconds,
-		WindowStats:      windowStats,
-	}
+	return progress
 }
 
 func shouldRefreshOpenAICodexSnapshot(account *Account, usage *UsageInfo, now time.Time) bool {

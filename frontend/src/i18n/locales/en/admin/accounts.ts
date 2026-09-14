@@ -224,7 +224,7 @@ export default {
         ungrouped: 'Ungrouped',
         hint: 'Displayed as "group / base score / sticky bonus". The base score is computed within the current filtered candidate set and includes priority, load, queue depth, error rate, first-token latency, reset window, quota headroom, billing rate, and related factors. The sticky bonus applies only when sticky weighting is enabled for previous_response_id or session_hash. Higher scores are preferred.'
       },
-      usageWindowsHint: '"5h / 7d" are the upstream account\'s official rolling usage windows (e.g. OpenAI ChatGPT, Claude). The target platform also shows local successful usage for 50,000 token points per 7 days and 100 requests per 24 hours. These observations are separate from upstream balance and local admission counters.',
+      usageWindowsHint: '"5h / 7d" are rolling usage windows for upstream accounts. SenseNova is shown in points: 60,000 points per rolling 5 hours and 600,000 points per rolling 7 days; models consume different point amounts based on actual usage. This is local successful-usage observation, while local balance deduction keeps the existing billing logic; authoritative balance, usage, and deduction records remain on the SenseNova account page.',
       ollamaCloud: {
         title: 'Ollama Cloud usage',
         sessionSecurityHint: 'The browser session is encrypted at rest and sent only to the fixed official settings URL.',
@@ -1592,6 +1592,9 @@ export default {
         chatAnywhereDailyHint: 'ChatAnywhere 24-hour requests: successful local requests / 100',
         chatAnywhereWeeklyExhausted: 'Upstream 7-day points insufficient',
         chatAnywhereProviderError: 'Upstream error',
+        senseNovaPoints: 'pts',
+        senseNovaFiveHourHint: 'SenseNova rolling 5-hour points: local successful usage / 60,000 points',
+        senseNovaWeeklyHint: 'SenseNova rolling 7-day points: local successful usage / 600,000 points',
         geminiProDaily: 'Pro',
         geminiFlashDaily: 'Flash',
         gemini3Pro: 'G3P',

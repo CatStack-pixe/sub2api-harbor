@@ -125,7 +125,7 @@ export default {
         ungrouped: '未分组',
         hint: '显示格式为“分组名 / 基础分 / 粘性加分”。基础分按当前筛选条件限定的候选账号计算，包含优先级、负载、排队、错误率、首包延迟、重置窗口、额度余量、计费倍率等因子；粘性加分只在开启粘性加权时用于 previous_response_id 或 session_hash。分数越大越优先。'
       },
-      usageWindowsHint: '“5h / 7d”是上游账号（如 OpenAI ChatGPT、Claude）官方的滚动用量窗口限制；目标平台额外显示 7 天 50,000 Token 点和 24 小时 100 次请求的本地成功用量观察值。观察值与上游余额及本地准入计数分开。',
+      usageWindowsHint: '“5h / 7d”是上游账号的滚动用量窗口限制。SenseNova 按积分展示：滚动 5 小时额度 60,000 积分、滚动 7 天额度 600,000 积分；不同模型按实际用量扣除不同积分。这里显示本地成功用量观察值，本地余额扣减仍按现有计费逻辑；官方余额、用量和扣减记录以 SenseNova 账户页为准。',
       ollamaCloud: {
         title: 'Ollama Cloud 用量',
         sessionSecurityHint: '浏览器会话会加密落库，且只发送到固定的 Ollama 官方设置页。',
@@ -454,6 +454,9 @@ export default {
         chatAnywhereDailyHint: 'ChatAnywhere 24 小时请求数：本地成功请求 / 100 次',
         chatAnywhereWeeklyExhausted: '上游 7 天点数不足',
         chatAnywhereProviderError: '上游错误',
+        senseNovaPoints: '积分',
+        senseNovaFiveHourHint: 'SenseNova 滚动 5 小时积分：本地成功用量 / 60,000 积分',
+        senseNovaWeeklyHint: 'SenseNova 滚动 7 天积分：本地成功用量 / 600,000 积分',
         geminiProDaily: 'Pro',
         geminiFlashDaily: 'Flash',
         deepseekProbe: '余额',
