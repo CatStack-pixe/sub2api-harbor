@@ -360,6 +360,9 @@ func (s *RateLimitService) HandleUpstreamError(ctx context.Context, account *Acc
 	if s.HandleChatAnywhereContextQuotaError(ctx, account, statusCode, "", responseBody) {
 		return false
 	}
+	if s.HandleChatAnywhereFreePointsQuotaError(ctx, account, statusCode, "", responseBody) {
+		return true
+	}
 	// Team 联动熔断必须先于池模式/自定义错误码/临时不可调度的各类早退；
 	// 同请求内与 fastpath 调用点的重复触发由方法内去重吸收。
 	s.maybeHandleOpenAITeamLinkedError(ctx, account, statusCode, responseBody)
