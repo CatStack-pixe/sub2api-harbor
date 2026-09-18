@@ -1314,8 +1314,10 @@ func (s *RateLimitService) handle429(ctx context.Context, account *Account, head
 	slog.Info("account_rate_limited", "account_id", account.ID, "reset_at", resetAt)
 }
 
+const senseNovaRateLimitCooldown = 5 * time.Minute
+
 func senseNovaRateLimitResetAt(headers http.Header, now time.Time) time.Time {
-	resetAt := now.Truncate(senseNovaRateWindow).Add(senseNovaRateWindow)
+	resetAt := now.Add(senseNovaRateLimitCooldown)
 	if retryAt := parseRetryAfterResetTime(headers, now); retryAt != nil && retryAt.After(resetAt) {
 		resetAt = *retryAt
 	}
