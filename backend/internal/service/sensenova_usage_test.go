@@ -101,30 +101,34 @@ func TestHandleUpstreamError_SenseNova429PersistsRateLimitBeforePoolModeReturn(t
 		},
 	}
 
-	before := time.Now().Add(80 * time.Second)
+	before := time.Now().Add(senseNovaRateLimitCooldown - 2*time.Second)
 	if got := svc.HandleUpstreamError(context.Background(), account, http.StatusTooManyRequests, http.Header{"Retry-After": []string{"90"}}, nil); got {
 		t.Fatal("expected 429 to remain retryable")
 	}
-	after := time.Now().Add(100 * time.Second)
+	after := time.Now().Add(senseNovaRateLimitCooldown + 2*time.Second)
 	if repo.calls != 1 {
 		t.Fatalf("SetRateLimited calls = %d, want 1", repo.calls)
 	}
 	if repo.resetAt.Before(before) || repo.resetAt.After(after) {
-		t.Fatalf("resetAt = %v, expected roughly 90 seconds from now", repo.resetAt)
+		t.Fatalf("resetAt = %v, expected roughly 5 minutes from now", repo.resetAt)
 	}
 	if account.RateLimitResetAt == nil || !account.RateLimitResetAt.Equal(repo.resetAt) {
 		t.Fatalf("account reset = %v, want persisted reset %v", account.RateLimitResetAt, repo.resetAt)
 	}
 }
 
-func TestSenseNovaRateLimitResetAtUsesMinuteBoundaryWithoutLongerRetryAfter(t *testing.T) {
+func TestSenseNovaRateLimitResetAtUsesFiveMinuteCooldownAndLongerRetryAfter(t *testing.T) {
 	now := time.Date(2026, 9, 12, 12, 34, 45, 0, time.UTC)
-	want := time.Date(2026, 9, 12, 12, 35, 0, 0, time.UTC)
+	want := now.Add(senseNovaRateLimitCooldown)
 
 	if got := senseNovaRateLimitResetAt(nil, now); !got.Equal(want) {
 		t.Fatalf("resetAt = %v, want %v", got, want)
 	}
-	if got := senseNovaRateLimitResetAt(http.Header{"Retry-After": []string{"90"}}, now); !got.Equal(now.Add(90 * time.Second)) {
-		t.Fatalf("long Retry-After resetAt = %v, want %v", got, now.Add(90*time.Second))
+	if got := senseNovaRateLimitResetAt(http.Header{"Retry-After": []string{"90"}}, now); !got.Equal(want) {
+		t.Fatalf("short Retry-After resetAt = %v, want %v", got, want)
+	}
+	longRetryAt := now.Add(10 * time.Minute)
+	if got := senseNovaRateLimitResetAt(http.Header{"Retry-After": []string{"600"}}, now); !got.Equal(longRetryAt) {
+		t.Fatalf("long Retry-After resetAt = %v, want %v", got, longRetryAt)
 	}
 }
