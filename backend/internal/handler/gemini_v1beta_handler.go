@@ -876,20 +876,6 @@ func writeUpstreamResponse(c *gin.Context, res *service.UpstreamHTTPResult) {
 	c.Data(res.StatusCode, contentType, res.Body)
 }
 
-func writeFilteredGeminiModelList(c *gin.Context, apiKey *service.APIKey, response any) {
-	body, err := json.Marshal(response)
-	if err != nil {
-		googleError(c, http.StatusBadGateway, "Failed to encode Gemini model list")
-		return
-	}
-	filtered, err := filterGeminiModelListBody(body, apiKey)
-	if err != nil {
-		googleError(c, http.StatusBadGateway, "Invalid Gemini model list response")
-		return
-	}
-	c.Data(http.StatusOK, "application/json", filtered)
-}
-
 func filterGeminiModelListBody(body []byte, apiKey *service.APIKey) ([]byte, error) {
 	if apiKey == nil || len(apiKey.ModelWhitelist) == 0 {
 		return body, nil

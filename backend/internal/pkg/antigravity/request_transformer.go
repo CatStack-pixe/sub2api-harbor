@@ -743,21 +743,6 @@ func isWebSearchTool(tool ClaudeTool) bool {
 	}
 }
 
-// hasMixedToolInvocations 判断构建后的工具声明是否同时包含函数声明与内置工具
-// （googleSearch）。仅在两者并存时需要开启 includeServerSideToolInvocations。
-func hasMixedToolInvocations(declarations []GeminiToolDeclaration) bool {
-	hasFunc, hasBuiltin := false, false
-	for _, d := range declarations {
-		if len(d.FunctionDeclarations) > 0 {
-			hasFunc = true
-		}
-		if d.GoogleSearch != nil || d.CodeExecution != nil {
-			hasBuiltin = true
-		}
-	}
-	return hasFunc && hasBuiltin
-}
-
 // buildTools 构建 tools
 func buildTools(tools []ClaudeTool) []GeminiToolDeclaration {
 	if len(tools) == 0 {

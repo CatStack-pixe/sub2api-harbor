@@ -369,9 +369,10 @@ func TestStreamingRecoveredTextWaitsForAllParallelToolArguments(t *testing.T) {
 	for _, event := range events {
 		switch event.Type {
 		case "content_block_start":
-			if event.ContentBlock.Type == "tool_use" {
+			switch event.ContentBlock.Type {
+			case "tool_use":
 				openTools[*event.Index] = true
-			} else if event.ContentBlock.Type == "text" {
+			case "text":
 				require.Empty(t, openTools, "text must start after both tool blocks close")
 				require.Equal(t, 2, *event.Index)
 				textStarts++
