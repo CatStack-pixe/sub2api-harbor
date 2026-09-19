@@ -11,117 +11,84 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const groupModelAllowlistRepairMigration = "236_group_model_allowlist_repair.sql"
+func TestGroupModelAllowlistMigrationsPreserveIndependentForkPolicies(t *testing.T) {
+	const legacyConfig = `{"enabled":true,"models":["public-alias"],"model_mapping_enabled":true,"model_mapping":{"public-alias":"agnes-2.5-pro-alpha"},"extra":{"keep":true}}`
+	const currentAllowlist = `{"enabled":true,"models":["independent-model"]}`
+	for _, migration := range []string{"235_group_model_allowlist.sql", "236_group_model_allowlist_repair.sql"} {
+		for _, scenario := range []struct {
+			name          string
+			legacyColumn  bool
+			allowColumn   bool
+			allowlist     string
+			wantAllowlist string
+		}{
+			{name: "legacy listing and mappings only", legacyColumn: true, wantAllowlist: `{}`},
+			{name: "both independent policies", legacyColumn: true, allowColumn: true, allowlist: currentAllowlist, wantAllowlist: currentAllowlist},
+			{name: "disabled allowlist remains disabled", legacyColumn: true, allowColumn: true, allowlist: `{}`, wantAllowlist: `{}`},
+			{name: "null allowlist repaired without enabling", legacyColumn: true, allowColumn: true, wantAllowlist: `{}`},
+			{name: "allowlist only", allowColumn: true, allowlist: currentAllowlist, wantAllowlist: currentAllowlist},
+			{name: "both columns absent", wantAllowlist: `{}`},
+		} {
+			t.Run(migration+"/"+scenario.name, func(t *testing.T) {
+				tx := testTx(t)
+				ctx := context.Background()
+				// A temporary table shadows public.groups and verifies search_path
+				// handling without modifying the integration fixture's schema.
+				_, err := tx.ExecContext(ctx, "CREATE TEMP TABLE groups (id BIGINT PRIMARY KEY) ON COMMIT DROP")
+				require.NoError(t, err)
+				_, err = tx.ExecContext(ctx, "INSERT INTO groups (id) VALUES (1)")
+				require.NoError(t, err)
+				legacyBefore := "{}"
+				if scenario.legacyColumn {
+					_, err = tx.ExecContext(ctx, "ALTER TABLE groups ADD COLUMN models_list_config JSONB")
+					require.NoError(t, err)
+					_, err = tx.ExecContext(ctx, "UPDATE groups SET models_list_config = $1::jsonb WHERE id = 1", legacyConfig)
+					require.NoError(t, err)
+					require.NoError(t, tx.QueryRowContext(ctx, "SELECT models_list_config::text FROM groups WHERE id = 1").Scan(&legacyBefore))
+				}
+				if scenario.allowColumn {
+					_, err = tx.ExecContext(ctx, `ALTER TABLE groups ADD COLUMN model_allowlist JSONB DEFAULT '{"enabled":true,"models":["unexpected-default"]}'::jsonb`)
+					require.NoError(t, err)
+					if scenario.allowlist == "" {
+						_, err = tx.ExecContext(ctx, "UPDATE groups SET model_allowlist = NULL WHERE id = 1")
+					} else {
+						_, err = tx.ExecContext(ctx, "UPDATE groups SET model_allowlist = $1::jsonb WHERE id = 1", scenario.allowlist)
+					}
+					require.NoError(t, err)
+				}
 
-// 236 是可重放的修复迁移：235 的重命名一旦被记账就不会重跑，数据库若回到旧结构
-// （手工改回列名、按旧结构部分恢复）应用仍能启动，但所有关联 groups 的查询都会
-// 报 column groups.model_allowlist does not exist（issue #6780）。
-func TestMigration236RenamesLegacyModelsListConfigColumn(t *testing.T) {
-	tx := testTx(t)
-	ctx := context.Background()
+				content, err := dbmigrations.FS.ReadFile(migration)
+				require.NoError(t, err)
+				for replay := 0; replay < 2; replay++ {
+					_, err = tx.ExecContext(ctx, string(content))
+					require.NoError(t, err)
+					var listing, allowlist string
+					require.NoError(t, tx.QueryRowContext(ctx, "SELECT models_list_config::text, model_allowlist::text FROM groups WHERE id = 1").Scan(&listing, &allowlist))
+					require.Equal(t, legacyBefore, listing, "stored legacy JSON must remain unchanged")
+					require.JSONEq(t, scenario.wantAllowlist, allowlist)
+					requireModelAllowlistColumnShape(ctx, t, tx)
+				}
 
-	_, err := tx.ExecContext(ctx, "ALTER TABLE groups RENAME COLUMN model_allowlist TO models_list_config")
-	require.NoError(t, err)
-
-	var groupID int64
-	require.NoError(t, tx.QueryRowContext(ctx, `
-INSERT INTO groups (name, platform, rate_multiplier, status, models_list_config)
-VALUES ('migration-236-rename', 'anthropic', 1, 'active', '{"enabled":true,"models":["claude-sonnet-5"]}'::jsonb)
-RETURNING id
-`).Scan(&groupID))
-
-	applyGroupModelAllowlistRepair(ctx, t, tx)
-
-	// 重命名保留原数据，且新列恢复 NOT NULL DEFAULT '{}' 的形状。
-	var allowlist string
-	require.NoError(t, tx.QueryRowContext(ctx,
-		"SELECT model_allowlist::text FROM groups WHERE id = $1", groupID).Scan(&allowlist))
-	require.JSONEq(t, `{"enabled":true,"models":["claude-sonnet-5"]}`, allowlist)
-	requireModelAllowlistColumnShape(ctx, t, tx)
-
-	// 可重放：重复执行不报错也不改变结果。
-	applyGroupModelAllowlistRepair(ctx, t, tx)
-	require.NoError(t, tx.QueryRowContext(ctx,
-		"SELECT model_allowlist::text FROM groups WHERE id = $1", groupID).Scan(&allowlist))
-	require.JSONEq(t, `{"enabled":true,"models":["claude-sonnet-5"]}`, allowlist)
-}
-
-func TestMigration236BackfillsWhenBothColumnsExist(t *testing.T) {
-	tx := testTx(t)
-	ctx := context.Background()
-
-	_, err := tx.ExecContext(ctx,
-		"ALTER TABLE groups ADD COLUMN models_list_config JSONB NOT NULL DEFAULT '{}'::jsonb")
-	require.NoError(t, err)
-
-	// 新列仍是默认空值：旧列里的配置应该被补回来。
-	var staleID int64
-	require.NoError(t, tx.QueryRowContext(ctx, `
-INSERT INTO groups (name, platform, rate_multiplier, status, model_allowlist, models_list_config)
-VALUES ('migration-236-backfill', 'anthropic', 1, 'active', '{}'::jsonb, '{"enabled":true,"models":["legacy-model"]}'::jsonb)
-RETURNING id
-`).Scan(&staleID))
-
-	// 新列已有配置：不能被旧列覆盖。
-	var currentID int64
-	require.NoError(t, tx.QueryRowContext(ctx, `
-INSERT INTO groups (name, platform, rate_multiplier, status, model_allowlist, models_list_config)
-VALUES ('migration-236-keep', 'anthropic', 1, 'active', '{"enabled":true,"models":["current-model"]}'::jsonb, '{"enabled":true,"models":["legacy-model"]}'::jsonb)
-RETURNING id
-`).Scan(&currentID))
-
-	applyGroupModelAllowlistRepair(ctx, t, tx)
-
-	var backfilled, kept string
-	require.NoError(t, tx.QueryRowContext(ctx,
-		"SELECT model_allowlist::text FROM groups WHERE id = $1", staleID).Scan(&backfilled))
-	require.JSONEq(t, `{"enabled":true,"models":["legacy-model"]}`, backfilled)
-	require.NoError(t, tx.QueryRowContext(ctx,
-		"SELECT model_allowlist::text FROM groups WHERE id = $1", currentID).Scan(&kept))
-	require.JSONEq(t, `{"enabled":true,"models":["current-model"]}`, kept)
-}
-
-func TestMigration236RecreatesMissingModelAllowlistColumn(t *testing.T) {
-	tx := testTx(t)
-	ctx := context.Background()
-
-	_, err := tx.ExecContext(ctx, "ALTER TABLE groups DROP COLUMN model_allowlist")
-	require.NoError(t, err)
-
-	var groupID int64
-	require.NoError(t, tx.QueryRowContext(ctx, `
-INSERT INTO groups (name, platform, rate_multiplier, status)
-VALUES ('migration-236-recreate', 'anthropic', 1, 'active')
-RETURNING id
-`).Scan(&groupID))
-
-	applyGroupModelAllowlistRepair(ctx, t, tx)
-
-	var allowlist string
-	require.NoError(t, tx.QueryRowContext(ctx,
-		"SELECT model_allowlist::text FROM groups WHERE id = $1", groupID).Scan(&allowlist))
-	require.JSONEq(t, `{}`, allowlist)
-	requireModelAllowlistColumnShape(ctx, t, tx)
-}
-
-func applyGroupModelAllowlistRepair(ctx context.Context, t *testing.T, tx *sql.Tx) {
-	t.Helper()
-
-	migrationSQL, err := dbmigrations.FS.ReadFile(groupModelAllowlistRepairMigration)
-	require.NoError(t, err)
-	_, err = tx.ExecContext(ctx, string(migrationSQL))
-	require.NoError(t, err)
+				// Even an existing unsafe default is reset to a disabled policy.
+				var newAllowlist string
+				require.NoError(t, tx.QueryRowContext(ctx, "INSERT INTO groups (id) VALUES (2) RETURNING model_allowlist::text").Scan(&newAllowlist))
+				require.JSONEq(t, `{}`, newAllowlist)
+			})
+		}
+	}
 }
 
 func requireModelAllowlistColumnShape(ctx context.Context, t *testing.T, tx *sql.Tx) {
 	t.Helper()
 
-	var isNullable, columnDefault string
+	var notNull bool
+	var columnDefault string
 	require.NoError(t, tx.QueryRowContext(ctx, `
-SELECT is_nullable, COALESCE(column_default, '')
-FROM information_schema.columns
-WHERE table_name = 'groups' AND column_name = 'model_allowlist'
-`).Scan(&isNullable, &columnDefault))
-	require.Equal(t, "NO", isNullable)
+SELECT a.attnotnull, pg_get_expr(d.adbin, d.adrelid)
+FROM pg_attribute a
+JOIN pg_attrdef d ON d.adrelid = a.attrelid AND d.adnum = a.attnum
+WHERE a.attrelid = 'groups'::regclass AND a.attname = 'model_allowlist'
+`).Scan(&notNull, &columnDefault))
+	require.True(t, notNull)
 	require.Contains(t, columnDefault, "'{}'::jsonb")
 }

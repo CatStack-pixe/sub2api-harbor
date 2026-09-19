@@ -479,7 +479,7 @@ func (_q *ProxyQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Proxy,
 	var (
 		nodes       = []*Proxy{}
 		_spec       = _q.querySpec()
-		loadedTypes = [3]bool{
+		loadedTypes = [4]bool{
 			_q.withAccounts != nil,
 			_q.withPrimaryProxies != nil,
 			_q.withBackupProxy != nil,

@@ -66,7 +66,7 @@ type ProxyEdges struct {
 	ProxyGroup *ProxyGroup `json:"proxy_group,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [3]bool
+	loadedTypes [4]bool
 }
 
 // AccountsOrErr returns the Accounts value or an error if the edge

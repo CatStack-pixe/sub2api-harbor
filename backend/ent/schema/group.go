@@ -273,7 +273,8 @@ func (Group) Fields() []ent.Field {
 			Comment("OpenAI Messages 调度模型配置：按 Claude 系列/精确模型映射到目标 GPT 模型"),
 		field.JSON("models_list_config", domain.GroupModelsListConfig{}).
 			Default(domain.GroupModelsListConfig{}).
-			Optional(),
+			SchemaType(map[string]string{dialect.Postgres: "jsonb"}).
+			Comment("Independent model listing and request alias configuration"),
 		field.JSON("model_allowlist", domain.GroupModelAllowlist{}).
 			Default(domain.GroupModelAllowlist{}).
 			SchemaType(map[string]string{dialect.Postgres: "jsonb"}).
