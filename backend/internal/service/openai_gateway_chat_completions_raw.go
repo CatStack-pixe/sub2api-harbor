@@ -596,11 +596,13 @@ streamLoop:
 			UpstreamModel:                 upstreamModel,
 			UpstreamResponseModel:         observedUpstreamResponseModel(c),
 			UpstreamResponseModelConflict: observedUpstreamResponseModelConflict(c),
+			UpstreamResponseServiceTier:   observedUpstreamResponseServiceTier(c),
 			ReasoningEffort:               reasoningEffort,
-			ServiceTier:                   serviceTier,
+			ServiceTier:                   resolvedOpenAIUpstreamServiceTier(c, serviceTier),
 			Stream:                        true,
 			Duration:                      time.Since(startTime),
 			FirstTokenMs:                  firstTokenMs,
+			ClientDisconnect:              clientDisconnected,
 		}
 	}
 	requestCanceled := c != nil && c.Request != nil && c.Request.Context().Err() != nil
@@ -616,21 +618,15 @@ streamLoop:
 
 	// A client write failure must never be attributed to the selected proxy.
 	// Keep draining the upstream above so usage accounting remains complete.
-	if clientDisconnected || requestCanceled {
-		if sawDone {
+	if clientDisconnected || requestCanceled || errors.Is(streamErr, context.Canceled) || errors.Is(streamErr, context.DeadlineExceeded) {
+		clientDisconnected = true
+		if terminal.Terminated() {
 			s.clearOpenAIProxyStreamDisconnect(account)
-			return resultWithUsage(), nil
 		}
-		if streamErr != nil {
-			return resultWithUsage(), fmt.Errorf("stream usage incomplete after disconnect: %w", streamErr)
-		}
-		return resultWithUsage(), fmt.Errorf("stream usage incomplete after disconnect: missing terminal event")
+		return resultWithUsage(), nil
 	}
 
 	if streamErr != nil {
-		if errors.Is(streamErr, context.Canceled) || errors.Is(streamErr, context.DeadlineExceeded) {
-			return resultWithUsage(), fmt.Errorf("stream usage incomplete: %w", streamErr)
-		}
 		if strings.Contains(streamErr.Error(), "stream data interval timeout") {
 			if clientOutputStarted && !clientDisconnected {
 				writeStreamHeaders()
@@ -657,24 +653,22 @@ streamLoop:
 		return resultWithUsage(), streamReadErr
 	}
 
-	if !sawDone {
+	if terminal.IsTruncated(clientOutputStarted) {
+		cause := ErrOpenAIUpstreamStreamTruncated
+		s.recordOpenAIProxyStreamDisconnect(account, cause, requestID)
 		if !clientOutputStarted {
-			s.recordOpenAIProxyStreamDisconnect(account, errors.New("stream ended before terminal event"), requestID)
-			if terminal.IsTruncated(clientOutputStarted) {
-				return nil, newOpenAIRawStreamTruncatedFailoverError(c, account, requestID, errors.New("stream ended before terminal event"))
-			}
 			if refusalDetector.IsSilentRefusal() {
 				return nil, newOpenAISilentRefusalFailoverError(c, account, requestID)
 			}
-			return nil, s.newOpenAIStreamFailoverError(c, account, false, requestID, nil, "OpenAI stream ended before a terminal event", resp.Header)
+			return nil, newOpenAIRawStreamTruncatedFailoverError(c, account, requestID, cause)
 		}
-		s.recordOpenAIProxyStreamDisconnect(account, errors.New("stream ended before terminal event"), requestID)
+		recordOpenAIRawStreamTruncation(c, account, requestID, cause, "http_error")
 		writeStreamHeaders()
-		if _, werr := c.Writer.WriteString(buildChatStreamErrorSSE(OpenAIUpstreamStreamReadErrorCode, "OpenAI stream ended before a terminal event")); werr == nil {
+		if _, werr := c.Writer.WriteString(buildChatStreamErrorSSE(OpenAIUpstreamStreamTruncatedCode, "OpenAI stream ended before a terminal event")); werr == nil {
 			_, _ = c.Writer.WriteString("data: [DONE]\n\n")
 			c.Writer.Flush()
 		}
-		return resultWithUsage(), fmt.Errorf("stream usage incomplete: missing terminal event")
+		return resultWithUsage(), newOpenAIUpstreamStreamReadError(cause)
 	}
 
 	s.clearOpenAIProxyStreamDisconnect(account)
@@ -701,21 +695,7 @@ streamLoop:
 		}
 	}
 
-	return &OpenAIForwardResult{
-		RequestID:                     requestID,
-		Usage:                         usage,
-		Model:                         originalModel,
-		BillingModel:                  billingModel,
-		UpstreamModel:                 upstreamModel,
-		UpstreamResponseModel:         observedUpstreamResponseModel(c),
-		UpstreamResponseModelConflict: observedUpstreamResponseModelConflict(c),
-		UpstreamResponseServiceTier:   observedUpstreamResponseServiceTier(c),
-		ReasoningEffort:               reasoningEffort,
-		ServiceTier:                   resolvedOpenAIUpstreamServiceTier(c, serviceTier),
-		Stream:                        true,
-		Duration:                      time.Since(startTime),
-		FirstTokenMs:                  firstTokenMs,
-	}, nil
+	return resultWithUsage(), nil
 }
 
 // ensureOpenAIChatStreamUsage 确保 raw Chat Completions 流式请求会让上游返回 usage。

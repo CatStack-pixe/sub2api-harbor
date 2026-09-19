@@ -1804,6 +1804,21 @@ func TestGetModelPricingWithChannel_CacheWriteTTLPricesCanDiffer(t *testing.T) {
 	require.InDelta(t, 21e-6, pricing.CacheCreation1hPrice, 1e-12)
 }
 
+func TestGetModelPricingWithChannel_Only1hOverrideKeepsUnsplitFallback(t *testing.T) {
+	svc := newTestBillingService()
+	for _, price1h := range []float64{21e-6, 0} {
+		pricing, err := svc.GetModelPricingWithChannel("claude-sonnet-4", &ChannelModelPricing{
+			CacheWrite1hPrice: testPtrFloat64(price1h),
+		})
+		require.NoError(t, err)
+		require.True(t, pricing.SupportsCacheBreakdown)
+		cost := svc.computeTokenBreakdown(pricing, UsageTokens{
+			CacheCreationTokens: 1000, CacheCreation5mTokens: 400, CacheCreation1hTokens: 600,
+		}, 1, "", false)
+		require.InDelta(t, 400*3.75e-6+600*price1h, cost.CacheCreationCost, 1e-12)
+	}
+}
+
 func TestGetModelPricing_Fable51FallbackPricing(t *testing.T) {
 	svc := newTestBillingService()
 

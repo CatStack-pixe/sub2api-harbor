@@ -329,7 +329,7 @@ func TestForwardAsRawChatCompletions_DeepseekOllamaCloudClampsMaxTokens(t *testi
 
 	_, err := svc.forwardAsRawChatCompletions(context.Background(), adaptiveProtocolTestContext("/v1/chat/completions", body), account, body, "")
 	require.Error(t, err)
-	require.Equal(t, "deepseek-v4-flash", gjson.GetBytes(upstream.lastBody, "model").String())
+	require.Equal(t, "deepseek-v4-flash-0731", gjson.GetBytes(upstream.lastBody, "model").String())
 	require.Equal(t, int64(65535), gjson.GetBytes(upstream.lastBody, "max_tokens").Int())
 
 	// 官方 DeepSeek（api.deepseek.com）+ 残留 usage extra：字节级不变。
@@ -360,7 +360,7 @@ func TestForwardResponsesViaRawChatCompletions_DeepseekOllamaCloudClampsMaxToken
 	_, err := svc.Forward(context.Background(), adaptiveProtocolTestContext("/v1/responses", body), account, body)
 	require.Error(t, err)
 	require.Equal(t, "https://ollama.com/v1/chat/completions", upstream.lastReq.URL.String())
-	require.Equal(t, "deepseek-v4-flash", gjson.GetBytes(upstream.lastBody, "model").String())
+	require.Equal(t, "deepseek-v4-flash-0731", gjson.GetBytes(upstream.lastBody, "model").String())
 	require.Equal(t, int64(65535), gjson.GetBytes(upstream.lastBody, "max_completion_tokens").Int())
 }
 

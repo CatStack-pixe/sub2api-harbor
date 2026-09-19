@@ -353,12 +353,7 @@ func (a *Account) ShouldUseOpenAIResponsesAPI() bool {
 		return false
 	}
 	if a.IsMultiProtocolAPIKey() {
-		switch a.GetAPIProtocol() {
-		case APIProtocolResponses, APIProtocolAdaptive:
-			return a.SupportsNativeCNResponses()
-		default:
-			return false
-		}
+		return a.UsesNativeCNResponses()
 	}
 	return !a.IsAgnes() && !a.IsDeepSeek() && !a.IsNvidia() && !a.IsTokenRhythm() &&
 		!a.IsKimi() && !a.IsChatAnywhere() && !a.IsGLM() && !a.IsModelScope() &&
@@ -1590,7 +1585,16 @@ func (a *Account) UsesNativeCNResponses() bool {
 		return false
 	}
 	switch a.GetAPIProtocol() {
-	case APIProtocolResponses, APIProtocolAdaptive:
+	case APIProtocolResponses:
+		return true
+	case APIProtocolAdaptive:
+		if a.IsKimi() {
+			// Existing adaptive Kimi accounts bridge Responses through their
+			// configured chat endpoint unless native Responses is opted into.
+			baseURLs, _ := a.Credentials["api_base_urls"].(map[string]any)
+			baseURL, _ := baseURLs[APIProtocolResponses].(string)
+			return strings.TrimSpace(baseURL) != ""
+		}
 		return true
 	default:
 		return false

@@ -469,7 +469,9 @@ func TestSchedulerGroupLifecycleActiveReopensAndRebuildsAllCurrentBuckets(t *tes
 	require.Contains(t, bucketStrings(registered), historical.String())
 	require.Len(t, cache.tokens(), len(current))
 	require.Equal(t, schedulerCanonicalAccountQueryCount(), accounts.callCount())
-	require.Equal(t, 1, accounts.platformCallCount(PlatformOpenAI))
+	// Each compatible platform rebuild queries the shared account pool. The
+	// repository fixture attributes these queries to its first platform (OpenAI).
+	require.Equal(t, len(accountPlatformsForGroupPlatform(PlatformOpenAI)), accounts.platformCallCount(PlatformOpenAI))
 	for _, bucket := range current {
 		_, published := cache.counts(bucket)
 		require.Equal(t, 1, published, bucket.String())

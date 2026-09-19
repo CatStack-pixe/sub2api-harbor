@@ -729,7 +729,9 @@ func TestForwardAsRawChatCompletions_TruncatedStreamAfterOutputFailsRequest(t *t
 	require.NotEmpty(t, message)
 	// 已写出的内容保持原样透传，客户端拿到的仍是它已经收到的那部分。
 	require.Contains(t, rec.Body.String(), `"content":"half an ans"`)
-	require.NotContains(t, rec.Body.String(), "data: [DONE]")
+	// Keep the fork's explicit SSE error and closing sentinel for direct callers.
+	require.Contains(t, rec.Body.String(), `"upstream_stream_truncated"`)
+	require.Contains(t, rec.Body.String(), "data: [DONE]")
 
 	rawEvents, ok := c.Get(OpsUpstreamErrorsKey)
 	require.True(t, ok)
@@ -956,6 +958,9 @@ func TestForwardAsRawChatCompletions_ClientDisconnectTruncationStillBills(t *tes
 	result, err := svc.forwardAsRawChatCompletions(context.Background(), c, rawChatCompletionsTestAccount(), body, "")
 	require.NoError(t, err)
 	require.NotNil(t, result)
+	require.True(t, result.ClientDisconnect)
+	_, recorded := c.Get(OpsUpstreamErrorsKey)
+	require.False(t, recorded, "client disconnect must not be recorded as an upstream failure")
 }
 
 // 客户端取消会连带取消上游请求，上游读因此报 context.Canceled：同样不判为上游截断。
@@ -985,6 +990,9 @@ func TestForwardAsRawChatCompletions_ClientCancelTruncationStillBills(t *testing
 	result, err := svc.forwardAsRawChatCompletions(context.Background(), c, rawChatCompletionsTestAccount(), body, "")
 	require.NoError(t, err)
 	require.NotNil(t, result)
+	require.True(t, result.ClientDisconnect)
+	_, recorded := c.Get(OpsUpstreamErrorsKey)
+	require.False(t, recorded, "client cancellation must not be recorded as an upstream failure")
 }
 
 func TestOpenAIRawStreamTerminalState(t *testing.T) {
@@ -1168,7 +1176,7 @@ func TestStreamRawChatCompletions_MissingDoneAfterOutputEmitsError(t *testing.T)
 	require.False(t, errors.As(err, &failoverErr))
 	body := rec.Body.String()
 	require.Contains(t, body, `"content":"partial"`)
-	require.Contains(t, body, `"upstream_stream_read_error"`)
+	require.Contains(t, body, `"upstream_stream_truncated"`)
 	require.Contains(t, body, "data: [DONE]")
 }
 

@@ -70,9 +70,11 @@ jobs:
         working-directory: backend
         run: go generate ./ent ./cmd/server
       - name: Unit tests
+        id: unit
         working-directory: backend
         run: make test-unit
       - name: Integration tests
+        if: ${{ !cancelled() && (steps.unit.outcome == 'success' || steps.unit.outcome == 'failure') }}
         working-directory: backend
         run: make test-integration
 

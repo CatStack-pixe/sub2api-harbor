@@ -1379,7 +1379,7 @@ func shouldForwardOpenAIResponsesViaRawChatCompletions(account *Account) bool {
 		case APIProtocolChatCompletions:
 			return true
 		case APIProtocolAdaptive:
-			return !account.SupportsNativeCNResponses()
+			return !account.UsesNativeCNResponses()
 		default:
 			return false
 		}

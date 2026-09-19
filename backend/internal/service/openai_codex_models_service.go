@@ -264,7 +264,7 @@ func (s *OpenAIGatewayService) groupConfiguredCodexModelIDs(ctx context.Context,
 // intersection. visible accounts are currently schedulable and decide which
 // public aliases appear. catalog accounts are all non-deleted active group
 // members; their snapshots keep advertised capabilities from widening when a
-// mapped account is only temporarily unschedulable. If ListByGroup fails, the
+// mapped account is only temporarily unschedulable. If the catalog query fails, the
 // catalog falls back to the schedulable set so a listing error does not fail
 // the client request.
 func loadCodexGroupCatalogAccounts(ctx context.Context, repo AccountRepository, groupID int64) (visible []Account, catalog []Account, err error) {
@@ -443,12 +443,6 @@ type configuredCodexTruncationPolicy struct {
 	Limit int64  `json:"limit"`
 }
 
-type configuredCodexServiceTier struct {
-	ID          string `json:"id"`
-	Name        string `json:"name"`
-	Description string `json:"description"`
-}
-
 type configuredCodexModelMessages struct {
 	InstructionsTemplate  string `json:"instructions_template"`
 	InstructionsVariables any    `json:"instructions_variables"`
@@ -589,7 +583,8 @@ func newConfiguredCodexModelDescriptor(modelID string) configuredCodexModelDescr
 		descriptor.DisplayName = openaiCodexDisplayName(modelID)
 		descriptor.Description = "OpenAI GPT coding model routed through Sub2API."
 		descriptor.SupportsParallelToolCalls = true
-		descriptor.ServiceTiers = configuredCodexServiceTiersForModel(modelID)
+		// The fork does not infer purchasable speed tiers from a model name.
+		// Explicit tiers in provider manifests remain intact during completion.
 		if isOpenAICodexReasoningGPTModel(modelID) {
 			defaultReasoningLevel := "medium"
 			if getNormalizedCodexModel(modelID) == "gpt-5.6-sol" {
@@ -620,40 +615,6 @@ func newConfiguredCodexModelDescriptor(modelID string) configuredCodexModelDescr
 	}
 
 	return descriptor
-}
-
-func configuredCodexServiceTiersForModel(modelID string) []any {
-	tiers := make([]any, 0, 2)
-	if configuredCodexSupportsPriorityServiceTier(modelID) {
-		tiers = append(tiers, configuredCodexServiceTier{
-			ID:          OpenAIFastTierPriority,
-			Name:        "Fast",
-			Description: "Priority processing for lower latency.",
-		})
-	}
-	if configuredCodexSupportsUltrafastServiceTier(modelID) {
-		tiers = append(tiers, configuredCodexServiceTier{
-			ID:          OpenAIFastTierUltrafast,
-			Name:        "Ultrafast",
-			Description: "Ultra-low latency processing.",
-		})
-	}
-	return tiers
-}
-
-func configuredCodexSupportsPriorityServiceTier(modelID string) bool {
-	normalized := canonicalizeOpenAIModelAliasSpelling(modelID)
-	for _, family := range []string{"gpt-5.4", "gpt-5.5", "gpt-5.6"} {
-		if normalized == family || strings.HasPrefix(normalized, family+"-") {
-			return true
-		}
-	}
-	// GPT-6 Astra advertises Fast via service_tier=priority in public model metadata.
-	return isOpenAIGPT6AstraModel(modelID)
-}
-
-func configuredCodexSupportsUltrafastServiceTier(modelID string) bool {
-	return normalizeKnownOpenAICodexModel(modelID) == "gpt-5.6-sol"
 }
 
 func configuredCodexGrokReasoningLevels(modelID string) []configuredCodexReasoningLevel {

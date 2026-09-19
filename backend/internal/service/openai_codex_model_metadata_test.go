@@ -646,7 +646,7 @@ func TestCodexAliasFailoverMappingHonorsModelRouting(t *testing.T) {
 			Type:     AccountTypeAPIKey,
 			Priority: priority,
 			Credentials: map[string]any{
-				"base_url":      "https://relay.example/v1",
+				"base_url":      "https://api.openai.com/v1",
 				"model_mapping": map[string]any{"gpt-6-astra": target},
 			},
 		}
@@ -726,6 +726,27 @@ func TestCodexAliasFailoverMappingHonorsModelRouting(t *testing.T) {
 		}
 		levels, _, _ := manifestFieldsOf(t, group)
 		require.Empty(t, levels, "unrelated routing rules must not resolve this alias")
+	})
+
+	t.Run("routing rule does not imply custom-host image support", func(t *testing.T) {
+		customAccounts := []Account{newAccount(16, "gpt-6-astra", 0), newAccount(1, "gpt-5.6-sol", 10)}
+		for i := range customAccounts {
+			customAccounts[i].Credentials["base_url"] = "https://relay.example/v1"
+		}
+		group := &Group{
+			ID:                  2,
+			Platform:            PlatformOpenAI,
+			ModelRoutingEnabled: true,
+			ModelRouting:        map[string][]int64{"gpt-6-astra": {16, 1}},
+		}
+		body, err := buildCodexModelsManifestForAccounts(
+			PlatformOpenAI, []string{"gpt-6-astra"}, customAccounts, group, nil, true,
+		)
+		require.NoError(t, err)
+		models := decodeCodexManifestModels(t, body)
+		require.Len(t, models, 1)
+		require.Equal(t, []any{"text"}, models[0]["input_modalities"])
+		require.Equal(t, []string{"low", "medium", "high", "xhigh", "max", "ultra"}, effortsFromManifestModel(t, models[0]))
 	})
 }
 

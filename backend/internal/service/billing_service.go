@@ -1374,6 +1374,7 @@ func applyChannelTokenPriceOverrides(pricing *ModelPricing, channelPricing *Chan
 		pricing.CacheCreation1hPrice = *channelPricing.CacheWritePrice
 	}
 	if channelPricing.CacheWrite1hPrice != nil {
+		enableCacheCreationBreakdown(pricing)
 		pricing.CacheCreation1hPrice = *channelPricing.CacheWrite1hPrice
 	}
 	if channelPricing.CacheReadPrice != nil {
@@ -1381,6 +1382,17 @@ func applyChannelTokenPriceOverrides(pricing *ModelPricing, channelPricing *Chan
 		pricing.CacheReadPricePerToken = *channelPricing.CacheReadPrice
 		pricing.CacheReadPricePerTokenPriority = priority
 	}
+}
+
+// Preserve the unsplit price when an explicit TTL override first enables
+// breakdown billing. Configuring only 1h must not make legacy 5m writes free.
+func enableCacheCreationBreakdown(pricing *ModelPricing) {
+	if pricing.SupportsCacheBreakdown {
+		return
+	}
+	pricing.CacheCreation5mPrice = pricing.CacheCreationPricePerToken
+	pricing.CacheCreation1hPrice = pricing.CacheCreationPricePerToken
+	pricing.SupportsCacheBreakdown = true
 }
 
 // --- 统一计费入口 ---
@@ -1431,9 +1443,10 @@ func (s *BillingService) CalculateCostUnified(input CostInput) (*CostBreakdown, 
 	resolved := input.Resolved
 	if resolved == nil {
 		resolved = input.Resolver.Resolve(input.Ctx, PricingInput{
-			Model:   input.Model,
-			GroupID: input.GroupID,
-			Group:   input.Group,
+			Model:     input.Model,
+			GroupID:   input.GroupID,
+			Group:     input.Group,
+			PricingAt: input.PricingAt,
 		})
 	}
 

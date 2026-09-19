@@ -216,7 +216,7 @@ func codexManifestModelSlugs(t *testing.T, body []byte) []string {
 	return slugs
 }
 
-func requireCompleteConfiguredCodexModel(t *testing.T, model map[string]any, slug string) {
+func requireCompleteConfiguredCodexModel(t *testing.T, model map[string]any, slug string, suppliedTiers ...[]any) {
 	t.Helper()
 
 	require.Equal(t, slug, model["slug"])
@@ -227,7 +227,11 @@ func requireCompleteConfiguredCodexModel(t *testing.T, model map[string]any, slu
 	require.Equal(t, true, model["supported_in_api"])
 	require.NotNil(t, model["priority"])
 	require.Equal(t, []any{}, model["additional_speed_tiers"])
-	require.Equal(t, []any{}, model["service_tiers"])
+	expectedTiers := []any{}
+	if len(suppliedTiers) > 0 {
+		expectedTiers = suppliedTiers[0]
+	}
+	require.Equal(t, expectedTiers, model["service_tiers"])
 	require.Contains(t, model, "default_service_tier")
 	require.Contains(t, model, "availability_nux")
 	require.Contains(t, model, "upgrade")
@@ -381,12 +385,7 @@ func TestNewConfiguredCodexModelDescriptorUsesProviderMetadataAndSafeFallback(t 
 	require.Equal(t, "xhigh", *gpt6Astra.MultiAgentReasoningEffort)
 	require.Equal(t, "v2", gpt6Astra.MultiAgentVersion)
 	require.NotContains(t, gpt6Astra.SupportedReasoningLevels, configuredCodexReasoningLevel{Effort: "none"})
-	require.True(t, configuredCodexSupportsPriorityServiceTier("gpt-6-astra"))
-	require.Equal(t, []configuredCodexServiceTier{{
-		ID:          "priority",
-		Name:        "Fast",
-		Description: "Priority processing for lower latency.",
-	}}, gpt6Astra.ServiceTiers)
+	require.Empty(t, gpt6Astra.ServiceTiers, "model-name defaults must not invent speed tiers")
 	require.True(t, isOpenAICodexImageInputModel("gpt-6-astra"))
 	require.True(t, isOpenAICodexReasoningGPTModel("openai/gpt-6-astra"))
 	require.True(t, isOpenAIGPT6AstraModel("gpt-6-astra-2026-09-01"))
@@ -498,8 +497,8 @@ func TestBuildCodexModelsManifestKeepsKnownReasoningChoices(t *testing.T) {
 	require.NotEqual(t, "none", firstLevel["effort"])
 }
 
-// Scenario: 支持 Fast 的 GPT 型号在目录中声明 priority service tier。
-func TestBuildCodexModelsManifestAdvertisesPriorityServiceTierForFastGPTModels(t *testing.T) {
+// Model-name fallbacks preserve the fork's policy of not advertising speed tiers.
+func TestBuildCodexModelsManifestDoesNotInventPriorityServiceTier(t *testing.T) {
 	t.Parallel()
 
 	body, err := BuildCodexModelsManifest([]string{
@@ -512,19 +511,13 @@ func TestBuildCodexModelsManifestAdvertisesPriorityServiceTierForFastGPTModels(t
 	require.Len(t, models, 3)
 
 	for _, model := range models {
-		require.Equal(t, []any{
-			map[string]any{
-				"id":          "priority",
-				"name":        "Fast",
-				"description": "Priority processing for lower latency.",
-			},
-		}, model["service_tiers"])
+		require.Equal(t, []any{}, model["service_tiers"])
 		require.Nil(t, model["default_service_tier"])
 	}
 }
 
-// Scenario: GPT-5.6 Sol 在 Fast 之外额外声明 ultrafast service tier。
-func TestBuildCodexModelsManifestAdvertisesUltrafastServiceTierForSol(t *testing.T) {
+// Sol aliases must not reintroduce synthesized Fast or Ultrafast entries.
+func TestBuildCodexModelsManifestDoesNotInventUltrafastServiceTierForSol(t *testing.T) {
 	t.Parallel()
 
 	body, err := BuildCodexModelsManifest([]string{
@@ -535,20 +528,8 @@ func TestBuildCodexModelsManifestAdvertisesUltrafastServiceTierForSol(t *testing
 	models := decodeCodexManifestModels(t, body)
 	require.Len(t, models, 2)
 
-	wantTiers := []any{
-		map[string]any{
-			"id":          "priority",
-			"name":        "Fast",
-			"description": "Priority processing for lower latency.",
-		},
-		map[string]any{
-			"id":          "ultrafast",
-			"name":        "Ultrafast",
-			"description": "Ultra-low latency processing.",
-		},
-	}
 	for _, model := range models {
-		require.Equal(t, wantTiers, model["service_tiers"])
+		require.Equal(t, []any{}, model["service_tiers"])
 		require.Nil(t, model["default_service_tier"])
 	}
 }
@@ -876,10 +857,10 @@ func TestBuildCodexModelsManifestForGroupUsesDeepSeekVisionCapabilities(t *testi
 func TestBuildCodexModelsManifestForGroupPrefersSyncedOpenAIImageCapabilities(t *testing.T) {
 	t.Parallel()
 
-	newAccount := func(id int64, modalities []string) Account {
+	newAccount := func(id int64, baseURL string, modalities []string) Account {
 		account := Account{
 			ID: id, Platform: PlatformOpenAI, Type: AccountTypeAPIKey,
-			Credentials: map[string]any{"base_url": "https://openai-compatible.example.test/v1"},
+			Credentials: map[string]any{"base_url": baseURL},
 		}
 		if modalities != nil {
 			account.SetUpstreamModelMetadataSnapshot(UpstreamModelMetadataSnapshot{Models: map[string]UpstreamModelMetadata{
@@ -897,16 +878,32 @@ func TestBuildCodexModelsManifestForGroupPrefersSyncedOpenAIImageCapabilities(t 
 		{
 			name: "explicit text-only snapshot narrows local fallback",
 			accounts: []Account{
-				newAccount(30, nil),
-				newAccount(31, []string{"text"}),
+				newAccount(30, "https://api.openai.com/v1", nil),
+				newAccount(31, "https://api.openai.com/v1", []string{"text"}),
 			},
 			modalities: []any{"text"},
 		},
 		{
 			name: "explicit multimodal snapshot preserves local fallback",
 			accounts: []Account{
-				newAccount(32, nil),
-				newAccount(33, []string{"text", "image"}),
+				newAccount(32, "https://api.openai.com/v1", nil),
+				newAccount(33, "https://api.openai.com/v1", []string{"text", "image"}),
+			},
+			modalities: []any{"text", "image"},
+		},
+		{
+			name: "unknown custom host capability stays text-only",
+			accounts: []Account{
+				newAccount(34, "https://relay.example/v1", nil),
+				newAccount(35, "https://relay.example/v1", []string{"text", "image"}),
+			},
+			modalities: []any{"text"},
+		},
+		{
+			name: "explicit custom host snapshots enable image input",
+			accounts: []Account{
+				newAccount(36, "https://relay.example/v1", []string{"text", "image"}),
+				newAccount(37, "https://relay.example/v1", []string{"text", "image"}),
 			},
 			modalities: []any{"text", "image"},
 		},
@@ -2165,7 +2162,13 @@ func TestCompleteAPIKeyCodexModelsManifestForClientPreservesProviderMetadata(t *
 	require.NoError(t, svc.CompleteAPIKeyCodexModelsManifestForClient(manifest, account))
 	models := decodeCodexManifestModels(t, manifest.Body)
 	require.Len(t, models, 1)
-	requireCompleteConfiguredCodexModel(t, models[0], "grok-4.6")
+	requireCompleteConfiguredCodexModel(t, models[0], "grok-4.6", []any{
+		map[string]any{
+			"id":          "provider-priority",
+			"name":        "Provider Fast",
+			"description": "Provider supplied tier.",
+		},
+	})
 	require.Equal(t, "Provider supplied", models[0]["description"])
 	require.Equal(t, map[string]any{"kept": true}, models[0]["unknown"])
 	require.Equal(t, []any{"text"}, models[0]["input_modalities"])
