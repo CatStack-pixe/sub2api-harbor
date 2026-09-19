@@ -82,9 +82,8 @@ const (
 	openAIOAuth429QuotaReset
 )
 
-// classifyOpenAIOAuth429 区分账号配额耗尽信号与普通瞬时 429。明确窗口达到
-// 100% 时以该窗口为准；没有 100% 标记但包含重置头时，沿用 v179 的兼容语义，
-// 仍视为配额限流信号。
+// classifyOpenAIOAuth429 区分账号配额耗尽信号与普通瞬时 429。只有窗口达到
+// 100% 或响应体明确给出 reset 时间时，才视为配额限流信号。
 func classifyOpenAIOAuth429(headers http.Header, responseBody []byte) (openAIOAuth429Disposition, *time.Time) {
 	if snapshot := ParseCodexRateLimitHeaders(headers); snapshot != nil {
 		if normalized := snapshot.Normalize(); normalized != nil {
@@ -133,7 +132,7 @@ func isGrokOAuthAccount(account *Account) bool {
 }
 
 func isOpenAIAccount(account *Account) bool {
-	return account != nil && (account.Platform == PlatformOpenAI || account.Platform == PlatformGrok || account.Platform == PlatformAgnes || account.Platform == PlatformDeepSeek || account.Platform == PlatformNvidia || account.Platform == PlatformTokenRhythm || account.Platform == PlatformKimi || account.Platform == PlatformZhipu || account.Platform == PlatformChatAnywhere || account.Platform == PlatformGLM || account.Platform == PlatformModelScope || account.Platform == PlatformDashScope || account.Platform == PlatformMiniMax || account.Platform == PlatformVolcengine || account.Platform == PlatformSenseNova)
+	return account != nil && (account.Platform == PlatformOpenAI || account.Platform == PlatformGrok || account.Platform == PlatformAgnes || account.Platform == PlatformDeepSeek || account.Platform == PlatformNvidia || account.Platform == PlatformTokenRhythm || account.Platform == PlatformKimi || account.Platform == PlatformZhipu || account.Platform == PlatformChatAnywhere || account.Platform == PlatformGLM || account.Platform == PlatformModelScope || account.Platform == PlatformDashScope || account.Platform == PlatformMiniMax || account.Platform == PlatformVolcengine || account.Platform == PlatformSenseNova || account.IsOpenCodeGo())
 }
 
 // handleOpenAIAccountUpstreamError expects canonicalModel to be the model used
@@ -284,13 +283,17 @@ func (s *OpenAIGatewayService) markOpenAIOAuth429RateLimited(ctx context.Context
 		return
 	}
 
-	cooldownUntil := time.Now().Add(openAIOAuth429FallbackCooldown)
-	if resetAt != nil && resetAt.After(time.Now()) {
+	now := time.Now()
+	cooldownUntil := now.Add(openAIOAuth429FallbackCooldown)
+	if resetAt != nil && resetAt.After(now) {
 		cooldownUntil = *resetAt
 	} else if s.rateLimitService != nil {
-		if cooldown, ok := s.rateLimitService.get429FallbackCooldown(ctx, account); ok && cooldown > 0 {
-			cooldownUntil = time.Now().Add(cooldown)
+		cooldown, ok := s.rateLimitService.get429FallbackCooldown(ctx, account)
+		if !ok || cooldown <= 0 {
+			s.openaiOAuth429RetryStartedAt.Delete(account.ID)
+			return
 		}
+		cooldownUntil = now.Add(cooldown)
 	}
 	s.BlockAccountScheduling(account, cooldownUntil, "429")
 	s.openaiOAuth429RetryStartedAt.Delete(account.ID)
@@ -529,6 +532,9 @@ func (s *OpenAIGatewayService) isOpenAIAccountModelRuntimeBlocked(account *Accou
 	return state.isBlocked(account.ID, openAIAccountModelTransientModel(canonicalModel), time.Now())
 }
 
+// Keep a runtime cooldown authoritative until its deadline or explicit recovery.
+// Scheduling snapshots can predate the persisted cooldown, so empty snapshot
+// fields must not clear a freshly observed provider rate limit.
 func (s *OpenAIGatewayService) isOpenAIAccountRequestRuntimeBlocked(account *Account, requestedModel string) bool {
 	return s != nil && (s.isOpenAIAccountRuntimeBlocked(account) || s.isOpenAIAccountModelRuntimeBlocked(account, requestedModel))
 }

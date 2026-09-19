@@ -28,7 +28,8 @@ export const CONCRETE_PLATFORM_OPTIONS = [
   { value: 'dashscope', label: 'DashScope' },
   { value: 'minimax', label: 'MiniMax' },
   { value: 'volcengine', label: 'Volcengine Ark' },
-  { value: 'sensenova', label: 'SenseNova' }
+  { value: 'sensenova', label: 'SenseNova' },
+  { value: 'opencode_go', label: 'OpenCode' }
 ] as const satisfies readonly PlatformOption<AccountPlatform>[]
 
 /** Platforms that can own a group. */

@@ -176,6 +176,7 @@ var providerAdapters = map[string]providerAdapter{
 	MonitorProviderZhipu:     providerZhipuChatAdapter,
 	MonitorProviderDeepseek:  providerDeepseekChatAdapter,
 	MonitorProviderSenseNova: providerSenseNovaChatAdapter,
+	MonitorProviderMiniMax:   providerMiniMaxChatAdapter,
 	MonitorProviderAnthropic: {
 		buildPath: func(string) string { return providerAnthropicPath },
 		buildBody: func(model, prompt string) ([]byte, error) {
@@ -199,7 +200,7 @@ var providerAdapters = map[string]providerAdapter{
 		buildBody: func(_, prompt string) ([]byte, error) {
 			return json.Marshal(map[string]any{
 				"contents": []map[string]any{
-					{"parts": []map[string]any{{"text": prompt}}},
+					{"role": "user", "parts": []map[string]any{{"text": prompt}}},
 				},
 				"generationConfig": map[string]any{"maxOutputTokens": monitorChallengeMaxTokens},
 			})
@@ -232,6 +233,9 @@ var providerDeepseekChatAdapter = newOpenAICompatibleChatAdapter(providerOpenAIP
 
 //nolint:gochecknoglobals // static provider adapter
 var providerSenseNovaChatAdapter = newOpenAICompatibleChatAdapter(providerOpenAIPath)
+
+//nolint:gochecknoglobals // 适配器表是只读静态数据，初始化后不变更。
+var providerMiniMaxChatAdapter = newOpenAICompatibleChatAdapter(providerOpenAIPath)
 
 func newOpenAICompatibleChatAdapter(path string) providerAdapter {
 	return providerAdapter{
@@ -466,6 +470,7 @@ var bodyMergeKeyDenyList = map[string]map[string]bool{
 	MonitorProviderZhipu:     {"model": true, "messages": true, "stream": true},
 	MonitorProviderDeepseek:  {"model": true, "messages": true, "stream": true},
 	MonitorProviderSenseNova: {"model": true, "messages": true, "stream": true},
+	MonitorProviderMiniMax:   {"model": true, "messages": true, "stream": true},
 }
 
 func checkAPIMode(opts *CheckOptions) string {
@@ -488,7 +493,7 @@ func isOpenAICompatibleChatProvider(provider string) bool {
 	switch provider {
 	case MonitorProviderOpenAI, MonitorProviderGrok,
 		MonitorProviderKimi, MonitorProviderZhipu, MonitorProviderDeepseek,
-		MonitorProviderSenseNova:
+		MonitorProviderSenseNova, MonitorProviderMiniMax:
 		return true
 	default:
 		return false
@@ -560,12 +565,20 @@ func postRawJSON(ctx context.Context, fullURL string, payload []byte, headers ma
 	return respBody, resp.StatusCode, nil
 }
 
-// joinURL 把 base origin 与 path 拼成完整 URL。
-// 容忍 base 末尾有/无斜杠，path 必带前导斜杠。
+// joinURL 保留 base 的上游路径前缀，并避免重复追加已有的 API 路径前缀。
+// 使用 EscapedPath 匹配完整路径段，避免把 hostname 或编码斜杠当作路径。
 func joinURL(base, path string) string {
 	base = strings.TrimRight(base, "/")
 	if !strings.HasPrefix(path, "/") {
 		path = "/" + path
+	}
+	if u, err := url.Parse(base); err == nil {
+		basePath := u.EscapedPath()
+		for end := strings.LastIndex(path, "/"); end > 0; end = strings.LastIndex(path[:end], "/") {
+			if strings.HasSuffix(basePath, path[:end]) {
+				return base + path[end:]
+			}
+		}
 	}
 	return base + path
 }

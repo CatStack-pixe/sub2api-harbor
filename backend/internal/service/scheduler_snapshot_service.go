@@ -833,11 +833,11 @@ func (s *SchedulerSnapshotService) rebuildByAccount(ctx context.Context, account
 	return s.rebuildBuckets(ctx, buckets, reason)
 }
 
-func schedulerSnapshotPlatforms() [18]string {
-	return [18]string{PlatformAnthropic, PlatformGemini, PlatformOpenAI, PlatformAntigravity,
+func schedulerSnapshotPlatforms() [19]string {
+	return [19]string{PlatformAnthropic, PlatformGemini, PlatformOpenAI, PlatformAntigravity,
 		PlatformGrok, PlatformAgnes, PlatformDeepSeek, PlatformNvidia, PlatformTokenRhythm,
 		PlatformKimi, PlatformZhipu, PlatformChatAnywhere, PlatformGLM, PlatformModelScope,
-		PlatformDashScope, PlatformMiniMax, PlatformVolcengine, PlatformSenseNova}
+		PlatformDashScope, PlatformMiniMax, PlatformVolcengine, PlatformSenseNova, PlatformOpenCodeGo}
 }
 
 // schedulerPlatformsForAccount returns each request-platform bucket whose
@@ -874,9 +874,21 @@ func schedulerBucketsForGroup(groupID int64) []SchedulerBucket {
 	return schedulerCanonicalBuckets(groupID)
 }
 
-func schedulerCanonicalBuckets(groupID int64) []SchedulerBucket {
-	buckets := make([]SchedulerBucket, 0, 18)
+func schedulerCanonicalBucketCount() int {
+	count := 0
 	for _, platform := range schedulerSnapshotPlatforms() {
+		count += 2
+		if platform == PlatformAnthropic || platform == PlatformGemini {
+			count++
+		}
+	}
+	return count
+}
+
+func schedulerCanonicalBuckets(groupID int64) []SchedulerBucket {
+	platforms := schedulerSnapshotPlatforms()
+	buckets := make([]SchedulerBucket, 0, len(platforms)*2+2)
+	for _, platform := range platforms {
 		buckets = append(buckets,
 			SchedulerBucket{GroupID: groupID, Platform: platform, Mode: SchedulerModeSingle},
 			SchedulerBucket{GroupID: groupID, Platform: platform, Mode: SchedulerModeForced},
@@ -893,7 +905,7 @@ func (s *SchedulerSnapshotService) rebuildByGroupIDs(ctx context.Context, groupI
 	if len(groupIDs) == 0 {
 		return nil
 	}
-	buckets := make([]SchedulerBucket, 0, len(groupIDs)*18)
+	buckets := make([]SchedulerBucket, 0, len(groupIDs)*schedulerCanonicalBucketCount())
 	for _, platform := range schedulerSnapshotPlatforms() {
 		buckets = append(buckets, s.bucketsForPlatform(platform, groupIDs, seen)...)
 	}

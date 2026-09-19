@@ -164,6 +164,34 @@ func TestAdaptiveProtocolConvertsKimiResponsesToChatCompletions(t *testing.T) {
 	require.False(t, gjson.GetBytes(upstream.lastBody, "input").Exists())
 }
 
+func TestKimiResponsesExplicitOptInUsesNativeEndpoint(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	body := []byte(`{"model":"kimi-k2.5","input":"hello","stream":false}`)
+	for _, tt := range []struct {
+		name     string
+		protocol string
+		baseURLs map[string]any
+		wantURL  string
+	}{
+		{name: "explicit protocol", protocol: APIProtocolResponses, wantURL: "https://api.moonshot.cn/v1/responses"},
+		{name: "adaptive explicit endpoint", protocol: APIProtocolAdaptive, baseURLs: map[string]any{APIProtocolResponses: "http://responses.example/v1"}, wantURL: "http://responses.example/v1/responses"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			upstream := &httpUpstreamRecorder{err: errors.New("stop after capture")}
+			svc := &OpenAIGatewayService{cfg: rawChatCompletionsTestConfig(), httpUpstream: upstream}
+			account := adaptiveProtocolTestAccount(PlatformKimi, tt.baseURLs)
+			account.Credentials["api_protocol"] = tt.protocol
+			require.True(t, account.ShouldUseOpenAIResponsesAPI())
+
+			_, err := svc.Forward(context.Background(), adaptiveProtocolTestContext("/v1/responses", body), account, body)
+			require.Error(t, err)
+			require.Equal(t, tt.wantURL, upstream.lastReq.URL.String())
+			require.Equal(t, "hello", gjson.GetBytes(upstream.lastBody, "input").String())
+			require.False(t, gjson.GetBytes(upstream.lastBody, "messages").Exists())
+		})
+	}
+}
+
 func TestAdaptiveProtocolRoutesDeepSeekResponsesToNativeResponses(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	body := []byte(`{"model":"deepseek-v4","input":"hello","max_output_tokens":32,"store":true,"previous_response_id":"resp_old","stream":false}`)

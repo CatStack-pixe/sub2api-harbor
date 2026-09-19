@@ -62,7 +62,7 @@ func cloneGroupForDuplicateTest(group *Group) *Group {
 	cloned.ModelRouting = cloneGroupModelRouting(group.ModelRouting)
 	cloned.SupportedModelScopes = append([]string(nil), group.SupportedModelScopes...)
 	cloned.MessagesDispatchModelConfig = cloneGroupMessagesDispatchModelConfig(group.MessagesDispatchModelConfig)
-	cloned.ModelsListConfig.Models = append([]string(nil), group.ModelsListConfig.Models...)
+	cloned.ModelAllowlist.Models = append([]string(nil), group.ModelAllowlist.Models...)
 	cloned.AccountGroups = append([]AccountGroup(nil), group.AccountGroups...)
 	return &cloned
 }
@@ -187,25 +187,25 @@ func TestCloneGroupForDuplicateDeepCopiesGroupModelPricing(t *testing.T) {
 func TestDuplicateGroupCopiesConfigurationDeeplyAndResetsRuntimeState(t *testing.T) {
 	createdAt := time.Date(2026, time.July, 1, 2, 3, 4, 0, time.UTC)
 	source := &Group{
-		ID:                           41,
-		Name:                         "高级订阅",
-		Description:                  "configuration",
-		Platform:                     PlatformOpenAI,
-		RateMultiplier:               1.75,
-		PeakRateEnabled:              true,
-		PeakStart:                    "09:00",
-		PeakEnd:                      "18:00",
-		PeakRateMultiplier:           1.2,
-		IsExclusive:                  true,
-		Status:                       StatusActive,
-		Hydrated:                     true,
-		SubscriptionType:             SubscriptionTypeSubscription,
-		DailyLimitUSD:                groupDuplicateTestPointer(11.0),
-		WeeklyLimitUSD:               groupDuplicateTestPointer(22.0),
-		MonthlyLimitUSD:              groupDuplicateTestPointer(33.0),
-		LongContextPricingEnabled:    true,
-		GlobalPromptEnabled:          true,
-		GlobalPrompt:                 "Follow the group policy.",
+		ID:                        41,
+		Name:                      "高级订阅",
+		Description:               "configuration",
+		Platform:                  PlatformOpenAI,
+		RateMultiplier:            1.75,
+		PeakRateEnabled:           true,
+		PeakStart:                 "09:00",
+		PeakEnd:                   "18:00",
+		PeakRateMultiplier:        1.2,
+		IsExclusive:               true,
+		Status:                    StatusActive,
+		Hydrated:                  true,
+		SubscriptionType:          SubscriptionTypeSubscription,
+		DailyLimitUSD:             groupDuplicateTestPointer(11.0),
+		WeeklyLimitUSD:            groupDuplicateTestPointer(22.0),
+		MonthlyLimitUSD:           groupDuplicateTestPointer(33.0),
+		LongContextPricingEnabled: true,
+		GlobalPromptEnabled:       true,
+		GlobalPrompt:              "Follow the group policy.",
 		ModelPricing: []ChannelModelPricing{
 			{
 				Platform:    PlatformOpenAI,
@@ -269,17 +269,18 @@ func TestDuplicateGroupCopiesConfigurationDeeplyAndResetsRuntimeState(t *testing
 			ModelMappingEnabled: true,
 			ModelMapping:        map[string]string{"deepseek-v4-pro": "agnes-2.5-pro-alpha"},
 		},
-		RPMLimit:                99,
+		RPMLimit:                    99,
+		ModelAllowlist:              GroupModelAllowlist{Enabled: true, Models: []string{"gpt-5.4", "gpt-5-mini"}},
 		MaxReasoningEffort:          "medium",
 		MaxReasoningEffortOverLimit: ReasoningEffortOverLimitDowngrade,
-		ReasoningEffortMappings: []ReasoningEffortMapping{{From: "max", To: "xhigh"}},
-		CreatedAt:               createdAt,
-		UpdatedAt:               createdAt,
-		AccountCount:            12,
-		ActiveAccountCount:      8,
-		RateLimitedAccountCount: 2,
-		DuplicateOperationID:    "old-operation-must-not-copy",
-		AccountGroups:           []AccountGroup{{AccountID: 13, GroupID: 41, Priority: 37}},
+		ReasoningEffortMappings:     []ReasoningEffortMapping{{From: "max", To: "xhigh"}},
+		CreatedAt:                   createdAt,
+		UpdatedAt:                   createdAt,
+		AccountCount:                12,
+		ActiveAccountCount:          8,
+		RateLimitedAccountCount:     2,
+		DuplicateOperationID:        "old-operation-must-not-copy",
+		AccountGroups:               []AccountGroup{{AccountID: 13, GroupID: 41, Priority: 37}},
 	}
 	repo := newDuplicateGroupRepoStub(source)
 	repo.sourceBindings[source.ID] = []AccountGroup{
@@ -313,6 +314,7 @@ func TestDuplicateGroupCopiesConfigurationDeeplyAndResetsRuntimeState(t *testing
 	require.Equal(t, source.ForceOpenAIFast, duplicate.ForceOpenAIFast)
 	require.Equal(t, source.FreeOpenAIFast, duplicate.FreeOpenAIFast)
 	require.Equal(t, source.ModelsListConfig, duplicate.ModelsListConfig)
+	require.Equal(t, source.ModelAllowlist, duplicate.ModelAllowlist)
 	require.Equal(t, source.RPMLimit, duplicate.RPMLimit)
 	require.Equal(t, source.MaxReasoningEffort, duplicate.MaxReasoningEffort)
 	require.Equal(t, source.MaxReasoningEffortOverLimit, duplicate.MaxReasoningEffortOverLimit)
@@ -332,6 +334,7 @@ func TestDuplicateGroupCopiesConfigurationDeeplyAndResetsRuntimeState(t *testing
 	duplicate.MessagesDispatchModelConfig.ExactModelMappings["claude-special"] = "changed"
 	duplicate.ModelsListConfig.Models[0] = "changed"
 	duplicate.ModelsListConfig.ModelMapping["deepseek-v4-pro"] = "changed"
+	duplicate.ModelAllowlist.Models[0] = "changed"
 	duplicate.ReasoningEffortMappings[0].To = "changed"
 	duplicate.LongContextPricingEnabled = false
 	duplicate.GlobalPrompt = "changed"
@@ -346,6 +349,7 @@ func TestDuplicateGroupCopiesConfigurationDeeplyAndResetsRuntimeState(t *testing
 	require.Equal(t, "gpt-special", source.MessagesDispatchModelConfig.ExactModelMappings["claude-special"])
 	require.Equal(t, "gpt-5.4", source.ModelsListConfig.Models[0])
 	require.Equal(t, "agnes-2.5-pro-alpha", source.ModelsListConfig.ModelMapping["deepseek-v4-pro"])
+	require.Equal(t, "gpt-5.4", source.ModelAllowlist.Models[0])
 	require.Equal(t, "xhigh", source.ReasoningEffortMappings[0].To)
 	require.True(t, source.LongContextPricingEnabled)
 	require.True(t, source.GlobalPromptEnabled)
@@ -355,6 +359,27 @@ func TestDuplicateGroupCopiesConfigurationDeeplyAndResetsRuntimeState(t *testing
 	require.Equal(t, 200000, *source.ModelPricing[0].Intervals[0].MaxTokens)
 	require.Equal(t, 5e-6, *source.ModelPricing[0].Intervals[0].OutputPrice)
 	require.Equal(t, 11.0, *source.DailyLimitUSD)
+}
+
+func TestDuplicateGroupPricingCopiesForkWindowsAndUpstreamMultipliers(t *testing.T) {
+	windowPrice, maxMultiplier := 0.25, 3.0
+	source := []ChannelModelPricing{{
+		Models:                       []string{"claude-fable-5-1"},
+		MaxReasoningEffortMultiplier: &maxMultiplier,
+		TimeWindows: []PricingTimeWindow{{
+			StartMinute: 60,
+			EndMinute:   120,
+			InputPrice:  &windowPrice,
+		}},
+	}}
+	cloned := cloneGroupModelPricing(source)
+	require.Equal(t, source, cloned)
+	cloned[0].TimeWindows[0].StartMinute = 90
+	*cloned[0].TimeWindows[0].InputPrice = 99
+	*cloned[0].MaxReasoningEffortMultiplier = 99
+	require.Equal(t, 60, source[0].TimeWindows[0].StartMinute)
+	require.Equal(t, 0.25, *source[0].TimeWindows[0].InputPrice)
+	require.Equal(t, 3.0, *source[0].MaxReasoningEffortMultiplier)
 }
 
 func TestDuplicateGroupRecoversSameOperationAndScopesByAdmin(t *testing.T) {

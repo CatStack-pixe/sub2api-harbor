@@ -372,6 +372,7 @@ const handleBatchTest = async () => {
     while (index < targets.length) {
       const proxy = targets[index]
       index++
+      if (testingProxyIds.has(proxy.id)) continue
       testingProxyIds.add(proxy.id)
       try {
         const result = await adminAPI.proxies.testProxy(proxy.id)

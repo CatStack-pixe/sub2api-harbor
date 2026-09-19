@@ -54,6 +54,7 @@ const (
 	PlatformMiniMax      = domain.PlatformMiniMax
 	PlatformVolcengine   = domain.PlatformVolcengine
 	PlatformSenseNova    = domain.PlatformSenseNova
+	PlatformOpenCodeGo   = domain.PlatformOpenCodeGo
 )
 
 // AllPlatforms 返回所有支持的平台列表
@@ -77,6 +78,7 @@ func AllPlatforms() []string {
 		PlatformMiniMax,
 		PlatformVolcengine,
 		PlatformSenseNova,
+		PlatformOpenCodeGo,
 	}
 }
 

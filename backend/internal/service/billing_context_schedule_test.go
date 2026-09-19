@@ -358,6 +358,74 @@ func TestResolveContextPricingSchedule_NilResolver(t *testing.T) {
 	require.Nil(t, sched)
 }
 
+func TestPlazaSchedulePreservesCacheWrite1h(t *testing.T) {
+	cp := sonnetChannel(PricingInterval{MinTokens: 272000, CacheWriteMultiplier: testPtrFloat64(2)})
+	cp[0].CacheWritePrice = testPtrFloat64(12.5e-6)
+	cp[0].CacheWrite1hPrice = testPtrFloat64(20e-6)
+	group := enabledGroup(PlatformAnthropic)
+	bs, resolver := newScheduleTestEnv(t, scheduleScenario{channel: cp, groupPlatform: PlatformAnthropic})
+	sched, err := bs.ResolveContextPricingSchedule(context.Background(), resolver, ContextPricingScheduleInput{Model: "claude-sonnet-4", Group: group, Platform: PlatformAnthropic})
+	require.NoError(t, err)
+	display := plazaPricingFromSchedule(&cp[0], sched)
+	requirePrice(t, testPtrFloat64(20e-6), display.CacheWrite1hPrice, "base 1h")
+	require.Len(t, display.Intervals, 2)
+	requirePrice(t, testPtrFloat64(25e-6), display.Intervals[1].CacheWritePrice, "tier 5m")
+	requirePrice(t, testPtrFloat64(40e-6), display.Intervals[1].CacheWrite1hPrice, "tier 1h")
+	a := ContextPricingTier{CacheWrite1h: testPtrFloat64(1)}
+	b := ContextPricingTier{CacheWrite1h: testPtrFloat64(2)}
+	require.Len(t, mergeEqualContextTiers([]ContextPricingTier{a, b}), 2)
+}
+
+func TestPlazaSchedulePreservesIndependent1hOnlyIntervals(t *testing.T) {
+	for _, price1h := range []float64{40e-6, 0} {
+		cp := sonnetChannel(PricingInterval{MinTokens: 272000, CacheWrite1hPrice: testPtrFloat64(price1h)})
+		cp[0].CacheWritePrice = testPtrFloat64(12.5e-6)
+		group := enabledGroup(PlatformAnthropic)
+		bs, resolver := newScheduleTestEnv(t, scheduleScenario{channel: cp, groupPlatform: PlatformAnthropic})
+		sched, err := bs.ResolveContextPricingSchedule(context.Background(), resolver, ContextPricingScheduleInput{
+			Model: "claude-sonnet-4", Group: group, Platform: PlatformAnthropic,
+		})
+		require.NoError(t, err)
+		require.Len(t, sched.Tiers, 2, "a 1h-only interval must remain visible even when configured free")
+		requirePrice(t, testPtrFloat64(12.5e-6), sched.Tiers[0].CacheWrite, "base 5m")
+		requirePrice(t, testPtrFloat64(12.5e-6), sched.Tiers[0].CacheWrite1h, "base 1h fallback")
+		requirePrice(t, testPtrFloat64(12.5e-6), sched.Tiers[1].CacheWrite, "tier 5m unchanged")
+		requirePrice(t, testPtrFloat64(price1h), sched.Tiers[1].CacheWrite1h, "tier explicit 1h")
+	}
+}
+
+func TestIndependentCacheWrite1hPreservesTimeWindowsAndTimePricing(t *testing.T) {
+	cp := sonnetChannel()
+	cp[0].CacheWritePrice = testPtrFloat64(12.5e-6)
+	cp[0].CacheWrite1hPrice = testPtrFloat64(20e-6)
+	cp[0].TimeWindows = []PricingTimeWindow{{
+		StartMinute: 9 * 60, EndMinute: 12 * 60, CacheWritePrice: testPtrFloat64(7e-6),
+	}}
+	cp[0].TimePricing = &ChannelTimePricing{Timezone: "Asia/Shanghai", Periods: []ChannelTimePricingPeriod{
+		{StartTime: "09:00", EndTime: "12:00", Multiplier: 0.5},
+	}}
+	group := enabledGroup(PlatformAnthropic)
+	bs, resolver := newScheduleTestEnv(t, scheduleScenario{channel: cp, groupPlatform: PlatformAnthropic})
+	location, err := time.LoadLocation("Asia/Shanghai")
+	require.NoError(t, err)
+	for _, tc := range []struct {
+		hour       int
+		price5m    float64
+		multiplier float64
+	}{
+		{hour: 10, price5m: 7e-6, multiplier: 0.5},
+		{hour: 12, price5m: 12.5e-6, multiplier: 1},
+	} {
+		cost, err := bs.CalculateTokenCostForRequest(TokenCostRequest{
+			Ctx: context.Background(), Model: "claude-sonnet-4", Group: group,
+			Tokens:         UsageTokens{CacheCreationTokens: 1000, CacheCreation5mTokens: 400, CacheCreation1hTokens: 600},
+			RateMultiplier: 1, PricingAt: time.Date(2026, 9, 21, tc.hour, 0, 0, 0, location), Resolver: resolver,
+		})
+		require.NoError(t, err)
+		require.InDelta(t, (400*tc.price5m+600*20e-6)*tc.multiplier, cost.ActualCost, 1e-12)
+	}
+}
+
 // --- 对账：阶梯表推算的费用必须等于真实计费函数 ---
 
 type tokenKind int

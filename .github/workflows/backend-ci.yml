@@ -9,6 +9,36 @@ permissions:
   contents: read
 
 jobs:
+  generated:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: backend/go.mod
+          check-latest: false
+          cache-dependency-path: backend/go.sum
+      - name: Generate Ent
+        working-directory: backend
+        run: go generate ./ent
+      - name: Format Go sources
+        run: git ls-files -z '*.go' | xargs -0 gofmt -w
+      - name: Generate Wire
+        working-directory: backend
+        run: go generate ./cmd/server
+      - name: Export generated source changes
+        if: always()
+        run: git diff --binary > generated-sources.patch
+      - name: Upload generated source changes
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: generated-sources-${{ github.sha }}
+          path: generated-sources.patch
+          retention-days: 7
+      - name: Verify generated sources are committed
+        run: git diff --exit-code
+
   shell:
     runs-on: macos-15
     steps:
@@ -42,12 +72,29 @@ jobs:
       - name: Unit tests
         working-directory: backend
         run: make test-unit
+
+  integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: backend/go.mod
+          check-latest: false
+          cache: true
+          cache-dependency-path: backend/go.sum
+      - name: Verify Go version
+        run: |
+          go version | grep -q 'go1.27.0'
+      - name: Generate Ent and Wire
+        working-directory: backend
+        run: go generate ./ent ./cmd/server
       - name: Integration tests
         working-directory: backend
         run: make test-integration
 
   proxy-pool-import:
-    needs: [test, golangci-lint]
+    needs: [test, integration, golangci-lint]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
@@ -92,6 +139,12 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Frontend typecheck and critical vitest
         run: make test-frontend
+      - name: Full frontend regression suite
+        working-directory: frontend
+        run: pnpm run test:run
+      - name: Build frontend
+        working-directory: frontend
+        run: pnpm run build
 
   golangci-lint:
     runs-on: ubuntu-latest

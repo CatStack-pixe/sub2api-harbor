@@ -295,12 +295,12 @@ func TestAPIKeyService_SnapshotRoundTrip_PreservesReasoningEffortPolicy(t *testi
 			Concurrency: 3,
 		},
 		Group: &Group{
-			ID:                 groupID,
-			Name:               "composite",
-			Platform:           PlatformComposite,
-			Status:             StatusActive,
-			SubscriptionType:   SubscriptionTypeStandard,
-			RateMultiplier:     1,
+			ID:                          groupID,
+			Name:                        "composite",
+			Platform:                    PlatformComposite,
+			Status:                      StatusActive,
+			SubscriptionType:            SubscriptionTypeStandard,
+			RateMultiplier:              1,
 			MaxReasoningEffort:          "medium",
 			MaxReasoningEffortOverLimit: ReasoningEffortOverLimitDeny,
 			ReasoningEffortMappings: []ReasoningEffortMapping{

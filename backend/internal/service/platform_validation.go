@@ -16,7 +16,7 @@ func ValidateAccountPlatform(platform string) error {
 	case PlatformAnthropic, PlatformOpenAI, PlatformGemini, PlatformAntigravity,
 		PlatformGrok, PlatformAgnes, PlatformDeepSeek, PlatformNvidia, PlatformTokenRhythm,
 		PlatformKimi, PlatformZhipu, PlatformChatAnywhere, PlatformGLM, PlatformModelScope,
-		PlatformDashScope, PlatformMiniMax, PlatformVolcengine, PlatformSenseNova:
+		PlatformDashScope, PlatformMiniMax, PlatformVolcengine, PlatformSenseNova, PlatformOpenCodeGo:
 		return nil
 	default:
 		return infraerrors.BadRequest("UNSUPPORTED_ACCOUNT_PLATFORM", "unsupported account platform")
@@ -28,7 +28,7 @@ func ValidateGroupPlatform(platform string) error {
 	case PlatformAnthropic, PlatformOpenAI, PlatformGemini, PlatformAntigravity,
 		PlatformGrok, PlatformAgnes, PlatformDeepSeek, PlatformNvidia, PlatformTokenRhythm,
 		PlatformKimi, PlatformZhipu, PlatformChatAnywhere, PlatformGLM, PlatformModelScope,
-		PlatformDashScope, PlatformMiniMax, PlatformVolcengine, PlatformSenseNova, PlatformComposite:
+		PlatformDashScope, PlatformMiniMax, PlatformVolcengine, PlatformSenseNova, PlatformOpenCodeGo, PlatformComposite:
 		return nil
 	default:
 		return infraerrors.BadRequest("UNSUPPORTED_GROUP_PLATFORM", "unsupported group platform")
@@ -56,7 +56,7 @@ func validateAccountCredentials(platform, accountType string, credentials map[st
 	if err := ValidateAccountPlatform(platform); err != nil {
 		return err
 	}
-	if platform != PlatformDeepSeek && platform != PlatformNvidia && platform != PlatformTokenRhythm && platform != PlatformKimi && platform != PlatformZhipu && platform != PlatformChatAnywhere && platform != PlatformGLM && platform != PlatformModelScope && platform != PlatformDashScope && platform != PlatformMiniMax && platform != PlatformVolcengine && platform != PlatformSenseNova {
+	if platform != PlatformDeepSeek && platform != PlatformNvidia && platform != PlatformTokenRhythm && platform != PlatformKimi && platform != PlatformZhipu && platform != PlatformChatAnywhere && platform != PlatformGLM && platform != PlatformModelScope && platform != PlatformDashScope && platform != PlatformMiniMax && platform != PlatformVolcengine && platform != PlatformSenseNova && platform != PlatformOpenCodeGo {
 		return nil
 	}
 	platformName := "DeepSeek"
@@ -104,6 +104,10 @@ func validateAccountCredentials(platform, accountType string, credentials map[st
 	if platform == PlatformSenseNova {
 		platformName = "SenseNova"
 		errorPrefix = "SENSENOVA"
+	}
+	if platform == PlatformOpenCodeGo {
+		platformName = "OpenCode"
+		errorPrefix = "OPENCODE"
 	}
 	if accountType != AccountTypeAPIKey {
 		return infraerrors.BadRequest(errorPrefix+"_ACCOUNT_TYPE_UNSUPPORTED", platformName+" accounts must use the apikey account type")

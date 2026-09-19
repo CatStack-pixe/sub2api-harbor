@@ -11,8 +11,8 @@ describe('useModelWhitelist', () => {
     expect(getModelsByPlatform('agnes')).toEqual(['agnes-2.0-flash'])
   })
 
-  it('exposes only the DeepSeek V4 preset models', () => {
-    expect(getModelsByPlatform('deepseek')).toEqual(['deepseek-v4-pro', 'deepseek-v4-flash'])
+  it('preserves DeepSeek V4 presets alongside upstream model additions', () => {
+    expect(getModelsByPlatform('deepseek')).toEqual(expect.arrayContaining(['deepseek-v4-pro', 'deepseek-v4-flash', 'deepseek-v4-flash-vision-exp']))
     expect(getPresetMappingsByPlatform('deepseek')).toEqual([])
   })
 
@@ -41,6 +41,15 @@ describe('useModelWhitelist', () => {
     expect(models).toContain('gpt-5.4-2026-03-05')
     expect(models).toContain('codex-auto-review')
     expect(models).toContain('gpt-5.6')
+    expect(models).toContain('gpt-6')
+    expect(models).toContain('gpt-6-astra')
+  })
+
+  it('openai 预设映射包含 GPT-6 别名和 Astra', () => {
+    expect(getPresetMappingsByPlatform('openai')).toEqual(expect.arrayContaining([
+      expect.objectContaining({ label: 'GPT-6', from: 'gpt-6', to: 'gpt-6' }),
+      expect.objectContaining({ label: 'GPT-6 Astra', from: 'gpt-6-astra', to: 'gpt-6-astra' })
+    ]))
   })
 
   it('openai 模型列表不再暴露已下线的 ChatGPT 登录 Codex 模型', () => {

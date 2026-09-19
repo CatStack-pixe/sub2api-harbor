@@ -62,8 +62,8 @@ func TestValidateTokenRhythmCredentials(t *testing.T) {
 		"tokenrhythm_cookie": "tr_session=session",
 	}))
 	require.Error(t, validateAccountCredentials(PlatformTokenRhythm, AccountTypeAPIKey, map[string]any{
-		"api_key": "tr-api-key",
-		"base_url": "https://relay.example/v1",
+		"api_key":            "tr-api-key",
+		"base_url":           "https://relay.example/v1",
 		"tokenrhythm_cookie": "tr_session=session; tr_csrf=csrf",
 	}))
 }
@@ -122,10 +122,10 @@ func TestParseTokenRhythmBalanceResponseAcceptsQuotedAmounts(t *testing.T) {
 
 func TestFetchTokenRhythmBalanceDoesNotMutateSchedulingState(t *testing.T) {
 	account := &Account{
-		ID:         941,
-		Platform:   PlatformTokenRhythm,
-		Type:       AccountTypeAPIKey,
-		Status:     StatusActive,
+		ID:          941,
+		Platform:    PlatformTokenRhythm,
+		Type:        AccountTypeAPIKey,
+		Status:      StatusActive,
 		Schedulable: true,
 		Credentials: map[string]any{
 			"api_key":    "tr-api-key",
