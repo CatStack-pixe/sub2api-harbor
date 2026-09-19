@@ -70,16 +70,31 @@ jobs:
         working-directory: backend
         run: go generate ./ent ./cmd/server
       - name: Unit tests
-        id: unit
         working-directory: backend
         run: make test-unit
+
+  integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: backend/go.mod
+          check-latest: false
+          cache: true
+          cache-dependency-path: backend/go.sum
+      - name: Verify Go version
+        run: |
+          go version | grep -q 'go1.27.0'
+      - name: Generate Ent and Wire
+        working-directory: backend
+        run: go generate ./ent ./cmd/server
       - name: Integration tests
-        if: ${{ !cancelled() && (steps.unit.outcome == 'success' || steps.unit.outcome == 'failure') }}
         working-directory: backend
         run: make test-integration
 
   proxy-pool-import:
-    needs: [test, golangci-lint]
+    needs: [test, integration, golangci-lint]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:

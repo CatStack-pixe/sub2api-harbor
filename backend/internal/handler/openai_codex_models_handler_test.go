@@ -55,6 +55,13 @@ func (r codexModelsFailoverAccountRepo) ListByGroup(_ context.Context, _ int64) 
 	return append([]service.Account(nil), r.accounts...), nil
 }
 
+func (r codexModelsFailoverAccountRepo) ListModelAvailabilityCandidates(ctx context.Context, groupID *int64, _ []string, _ bool) ([]service.Account, error) {
+	if groupID == nil {
+		return nil, nil
+	}
+	return r.ListByGroup(ctx, *groupID)
+}
+
 type codexModelsFailoverHTTPUpstream struct {
 	service.HTTPUpstream
 	mu          sync.Mutex
