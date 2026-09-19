@@ -431,7 +431,7 @@ func (s *adminServiceImpl) CreateGroup(ctx context.Context, input *CreateGroupIn
 	if err != nil {
 		return nil, err
 	}
-	longContextPricingEnabled := true
+	longContextPricingEnabled := s.cfg == nil || s.cfg.RunMode != config.RunModeSimple
 	if input.LongContextPricingEnabled != nil {
 		longContextPricingEnabled = *input.LongContextPricingEnabled
 	}

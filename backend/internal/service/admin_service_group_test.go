@@ -213,11 +213,12 @@ func TestAdminServiceSimpleModeRejectsCompositeCreateAndConversionDirectly(t *te
 
 func TestAdminServiceSimpleModeNormalizesAllUnsupportedCreateFieldsDirectly(t *testing.T) {
 	one := 1.0
+	truth := true
 	fallbackID := int64(44)
 	input := &CreateGroupInput{
 		Name: "simple", Description: "allowed", Platform: PlatformAnthropic,
 		RateMultiplier: 9, IsExclusive: true, SubscriptionType: SubscriptionTypeSubscription,
-		DailyLimitUSD: &one, LongContextPricingEnabled: true,
+		DailyLimitUSD: &one, LongContextPricingEnabled: &truth,
 		ModelPricing:    []ChannelModelPricing{{Models: []string{"claude"}}},
 		PeakRateEnabled: true, PeakStart: "00:00", PeakEnd: "01:00", PeakRateMultiplier: &one,
 		ImageRateIndependent: true, ImageRateMultiplier: &one, VideoRateIndependent: true, VideoRateMultiplier: &one,
@@ -241,6 +242,7 @@ func TestAdminServiceSimpleModeNormalizesAllUnsupportedCreateFieldsDirectly(t *t
 	require.Equal(t, 1.0, created.RateMultiplier)
 	require.Equal(t, SubscriptionTypeStandard, created.SubscriptionType)
 	require.False(t, created.IsExclusive)
+	require.False(t, created.LongContextPricingEnabled)
 	require.Nil(t, created.FallbackGroupID)
 	require.Empty(t, created.ModelPricing)
 	require.Zero(t, created.RPMLimit)
@@ -593,21 +595,26 @@ func TestAdminService_CreateGroup_DefaultsGrokMediaGenerationEnabled(t *testing.
 	require.True(t, group.AllowImageGeneration)
 }
 
-func TestAdminService_CreateGroup_LongContextPricingDefaultsEnabled(t *testing.T) {
+func TestAdminService_CreateGroup_LongContextPricingHonorsRunModeAndExplicitValue(t *testing.T) {
 	disabled := false
+	enabled := true
 	tests := []struct {
 		name  string
+		cfg   *config.Config
 		value *bool
 		want  bool
 	}{
 		{name: "omitted defaults enabled", want: true},
 		{name: "explicit false remains disabled", value: &disabled, want: false},
+		{name: "explicit true remains enabled", value: &enabled, want: true},
+		{name: "simple omitted defaults disabled", cfg: &config.Config{RunMode: config.RunModeSimple}, want: false},
+		{name: "simple ignores explicit true", cfg: &config.Config{RunMode: config.RunModeSimple}, value: &enabled, want: false},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			repo := &groupRepoStubForAdmin{}
-			svc := &adminServiceImpl{groupRepo: repo}
+			svc := &adminServiceImpl{cfg: tt.cfg, groupRepo: repo}
 
 			group, err := svc.CreateGroup(context.Background(), &CreateGroupInput{
 				Name:                      "long-context",

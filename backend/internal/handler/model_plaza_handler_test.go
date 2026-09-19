@@ -222,16 +222,29 @@ func TestToModelPlazaGroupDTO_TimePricing(t *testing.T) {
 	require.Equal(t, true, weekdaysTP["weekdays_only"])
 }
 
-func TestFilterPlazaVisibleGroups_SubscribedExclusiveGroup(t *testing.T) {
+func TestFilterPlazaVisibleGroups_GrantedExclusiveSubscriptionGroup(t *testing.T) {
 	groups := []service.PlazaGroup{
 		{ID: 42, IsExclusive: true, SubscriptionType: "subscription"},
 		{ID: 43, IsExclusive: true, SubscriptionType: "subscription"},
 		{ID: 44, IsExclusive: true, SubscriptionType: "standard"},
+		{ID: 45, SubscriptionType: "subscription"},
 	}
-	require.Empty(t, filterPlazaVisibleGroups(groups, nil, false))
-	for _, restricted := range []bool{false, true} {
-		visible := filterPlazaVisibleGroups(groups, map[int64]struct{}{42: {}}, restricted)
-		require.Len(t, visible, 1)
-		require.Equal(t, int64(42), visible[0].ID)
+	for _, tt := range []struct {
+		name    string
+		allowed map[int64]struct{}
+		want    []int64
+	}{
+		{name: "anonymous sees public subscriptions", want: []int64{45}},
+		{name: "no grants hides exclusive subscriptions", allowed: map[int64]struct{}{}, want: []int64{45}},
+		{name: "explicit grant exposes only that exclusive subscription", allowed: map[int64]struct{}{42: {}}, want: []int64{42, 45}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			visible := filterPlazaVisibleGroups(groups, tt.allowed)
+			ids := make([]int64, 0, len(visible))
+			for _, group := range visible {
+				ids = append(ids, group.ID)
+			}
+			require.Equal(t, tt.want, ids)
+		})
 	}
 }

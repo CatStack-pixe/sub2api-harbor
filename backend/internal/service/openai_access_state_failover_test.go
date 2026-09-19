@@ -130,7 +130,7 @@ func TestOpenAIProxyFramingErrorFailsOverWithoutCredentialClassification(t *test
 	svc := &OpenAIGatewayService{}
 
 	require.True(t, isOpenAIProxyFramingError(http.StatusBadRequest, string(body), body))
-	require.True(t, svc.shouldFailoverOpenAIUpstreamResponse(http.StatusBadRequest, string(body), body))
+	require.True(t, svc.shouldFailoverOpenAIUpstreamResponse(newOpenAIUpstreamErrorTestAccount(), http.StatusBadRequest, string(body), body))
 	require.True(t, shouldFailoverOpenAIPassthroughResponse(&Account{Type: AccountTypeAPIKey}, http.StatusBadRequest, body))
 
 	err := newOpenAIUpstreamFailoverError(http.StatusBadRequest, nil, body, string(body), false)
