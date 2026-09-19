@@ -7,6 +7,7 @@ package service
 
 import (
 	"context"
+	"net/http"
 	"testing"
 
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
@@ -123,4 +124,41 @@ func TestCNProviderServices_IDEntryAppliesSameValidation(t *testing.T) {
 	_, err := svc.QueryUsage(context.Background(), 2)
 	requireReason(t, err, "CN_QUOTA_NOT_CODING_PLAN")
 	require.Zero(t, upstream.calls)
+}
+
+func TestCNProviderQuotaService_QueryUsageForAccount_TeamMetadata(t *testing.T) {
+	cases := []struct {
+		name         string
+		platform     string
+		organization string
+		project      string
+		wantType     string
+		wantOrg      string
+		wantProject  string
+	}{
+		{name: "personal zhipu", platform: PlatformZhipu},
+		{name: "project without organization", platform: PlatformZhipu, project: "project-1"},
+		{name: "zhipu organization only", platform: PlatformZhipu, organization: " org-1 ", wantType: "2", wantOrg: "org-1"},
+		{name: "zhipu organization and project", platform: PlatformZhipu, organization: " org-1 ", project: " project-1 ", wantType: "2", wantOrg: "org-1", wantProject: "project-1"},
+		{name: "minimax ignores zhipu metadata", platform: PlatformMiniMax, organization: "org-1", project: "project-1"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			account := codingAccount(tc.platform)
+			account.Credentials["zhipu_organization"] = tc.organization
+			account.Credentials["zhipu_project"] = tc.project
+			repo := &senseNovaQuotaTestRepo{account: account}
+			upstream := &senseNovaQuotaTestUpstream{statusCode: http.StatusOK, body: "{}"}
+			svc := NewCNProviderQuotaService(repo, nil, upstream, nil)
+
+			result, err := svc.QueryUsageForAccount(context.Background(), account)
+
+			require.NoError(t, err)
+			require.True(t, result.Success)
+			require.Equal(t, 1, upstream.calls)
+			require.Equal(t, tc.wantType, upstream.lastReq.URL.Query().Get("type"))
+			require.Equal(t, tc.wantOrg, upstream.lastReq.Header.Get("bigmodel-organization"))
+			require.Equal(t, tc.wantProject, upstream.lastReq.Header.Get("bigmodel-project"))
+		})
+	}
 }

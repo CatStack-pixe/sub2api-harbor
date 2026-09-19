@@ -2682,8 +2682,6 @@ func writeCustomModelsList(c *gin.Context, platform string, modelIDs []string) {
 	writeModelsList(c, platform, modelIDs)
 }
 
-
-
 func customModelsListSource(platform string, availableModels, fallbackModels []string) []string {
 	if platform == service.PlatformAnthropic && len(availableModels) > 0 {
 		return mergeModelIDs(availableModels, fallbackModels)

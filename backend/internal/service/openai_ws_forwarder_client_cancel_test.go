@@ -19,6 +19,15 @@ import (
 // reproduces the HTTP/SSE ingress bug: the client cancels after partial output,
 // while the upstream WS still has a terminal event available for usage billing.
 func TestForwardOpenAIWSV2_ClientCancellationDrainsWithoutSyntheticFailure(t *testing.T) {
+	testForwardOpenAIWSV2ClientCancellation(t, true)
+}
+
+func TestForwardOpenAIWSV2_ClientCancellationPreservesImagesWithoutTerminalEvent(t *testing.T) {
+	testForwardOpenAIWSV2ClientCancellation(t, false)
+}
+
+func testForwardOpenAIWSV2ClientCancellation(t *testing.T, terminalEvent bool) {
+	t.Helper()
 	gin.SetMode(gin.TestMode)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -28,12 +37,16 @@ func TestForwardOpenAIWSV2_ClientCancellationDrainsWithoutSyntheticFailure(t *te
 	c.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", nil).WithContext(ctx)
 	c.Request.Header.Set("User-Agent", "unit-test-agent/1.0")
 
+	events := [][]byte{
+		[]byte(`{"type":"response.created","response":{"id":"resp_cancel_1","model":"gpt-5.5"}}`),
+		[]byte(`{"type":"response.output_text.delta","delta":"partial"}`),
+		[]byte(`{"type":"response.output_item.done","item":{"id":"img_cancel_1","type":"image_generation_call","status":"completed","result":"base64-image","size":"1024x1024"}}`),
+	}
+	if terminalEvent {
+		events = append(events, []byte(`{"type":"response.completed","response":{"id":"resp_cancel_1","model":"gpt-5.5","usage":{"input_tokens":3,"output_tokens":5}}}`))
+	}
 	captureConn := &openAIWSCancelSafeConn{openAIWSCaptureConn: &openAIWSCaptureConn{
-		events: [][]byte{
-			[]byte(`{"type":"response.created","response":{"id":"resp_cancel_1","model":"gpt-5.5"}}`),
-			[]byte(`{"type":"response.output_text.delta","delta":"partial"}`),
-			[]byte(`{"type":"response.completed","response":{"id":"resp_cancel_1","model":"gpt-5.5","usage":{"input_tokens":3,"output_tokens":5}}}`),
-		},
+		events:     events,
 		readDelays: []time.Duration{0, 0, 50 * time.Millisecond},
 	}}
 
@@ -77,14 +90,23 @@ func TestForwardOpenAIWSV2_ClientCancellationDrainsWithoutSyntheticFailure(t *te
 		},
 	}
 
-	result, err := svc.Forward(ctx, c, account, []byte(`{"model":"gpt-5.5","stream":true,"input":[{"type":"input_text","text":"hello"}]}`))
+	result, err := svc.Forward(ctx, c, account, []byte(`{"model":"gpt-5.5","stream":true,"tools":[{"type":"image_generation","size":"1024x1024"}],"input":[{"type":"input_text","text":"draw a square"}]}`))
 
-	require.NoError(t, err, "client cancellation must not surface as an upstream failure")
+	if terminalEvent {
+		require.NoError(t, err, "a drained terminal event must not surface as an upstream failure")
+	} else {
+		require.ErrorIs(t, err, context.Canceled)
+	}
 	require.NotNil(t, result)
 	require.True(t, result.ClientDisconnect)
 	require.Equal(t, "resp_cancel_1", result.RequestID)
-	require.Equal(t, 3, result.Usage.InputTokens)
-	require.Equal(t, 5, result.Usage.OutputTokens)
+	if terminalEvent {
+		require.Equal(t, 3, result.Usage.InputTokens)
+		require.Equal(t, 5, result.Usage.OutputTokens)
+	}
+	require.Equal(t, 1, result.ImageCount)
+	require.Equal(t, []string{"1024x1024"}, result.ImageOutputSizes)
+	require.NotEmpty(t, result.BillingModel)
 	require.NotContains(t, writer.body.String(), "response.failed")
 }
 

@@ -758,7 +758,6 @@ func hasMixedToolInvocations(declarations []GeminiToolDeclaration) bool {
 	return hasFunc && hasBuiltin
 }
 
-
 // buildTools 构建 tools
 func buildTools(tools []ClaudeTool) []GeminiToolDeclaration {
 	if len(tools) == 0 {

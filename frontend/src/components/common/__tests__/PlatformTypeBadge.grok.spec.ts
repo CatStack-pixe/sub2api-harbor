@@ -127,6 +127,6 @@ describe('PlatformTypeBadge MiniMax', () => {
     expect(wrapper.text()).toContain('MiniMax')
     expect(wrapper.text()).toContain('Key')
     expect(wrapper.text()).not.toContain('Gemini')
-    expect(wrapper.html()).toContain('bg-rose-100')
+    expect(wrapper.html()).toContain('bg-blue-100')
   })
 })

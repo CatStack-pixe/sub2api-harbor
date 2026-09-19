@@ -538,7 +538,8 @@ streamLoop:
 				break streamLoop
 			}
 			streamErr = s.newOpenAIFirstOutputTimeoutError(
-				requestCtx, c, account, startTime, originalModel, "", firstOutputTimeout, "raw_chat_first_output", resp.Header,
+				requestCtx, c, account, opsUpstreamProxyID(account), opsUpstreamProxyName(account),
+				startTime, originalModel, "", firstOutputTimeout, "raw_chat_first_output", resp.Header,
 			)
 			break streamLoop
 		case <-intervalCh:
@@ -551,7 +552,8 @@ streamLoop:
 			}
 			if !clientOutputStarted {
 				streamErr = s.newOpenAIFirstOutputTimeoutError(
-					requestCtx, c, account, startTime, originalModel, "", streamInterval, "raw_chat_stream_interval", resp.Header,
+					requestCtx, c, account, opsUpstreamProxyID(account), opsUpstreamProxyName(account),
+					startTime, originalModel, "", streamInterval, "raw_chat_stream_interval", resp.Header,
 				)
 				break streamLoop
 			}
