@@ -40,10 +40,10 @@ func TestAPIKeyAuthSnapshotPreservesIndependentModelPolicies(t *testing.T) {
 	apiKey := profitAuthTestAPIKey()
 	apiKey.Group.Platform = PlatformAgnes
 	apiKey.Group.ModelsListConfig = GroupModelsListConfig{
-		Enabled: true,
-		Models: []string{"public-alias"},
+		Enabled:             true,
+		Models:              []string{"public-alias"},
 		ModelMappingEnabled: true,
-		ModelMapping: map[string]string{"public-alias": "agnes-2.5-pro-alpha"},
+		ModelMapping:        map[string]string{"public-alias": "agnes-2.5-pro-alpha"},
 	}
 	apiKey.Group.ModelAllowlist = GroupModelAllowlist{Enabled: true, Models: []string{"other-allowed-model"}}
 	payload, err := json.Marshal(&APIKeyAuthCacheEntry{Snapshot: svc.snapshotFromAPIKey(context.Background(), apiKey)})

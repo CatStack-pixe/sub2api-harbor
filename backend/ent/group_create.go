@@ -816,6 +816,20 @@ func (_c *GroupCreate) SetNillableMessagesDispatchModelConfig(v *domain.OpenAIMe
 	return _c
 }
 
+// SetModelsListConfig sets the "models_list_config" field.
+func (_c *GroupCreate) SetModelsListConfig(v domain.GroupModelsListConfig) *GroupCreate {
+	_c.mutation.SetModelsListConfig(v)
+	return _c
+}
+
+// SetNillableModelsListConfig sets the "models_list_config" field if the given value is not nil.
+func (_c *GroupCreate) SetNillableModelsListConfig(v *domain.GroupModelsListConfig) *GroupCreate {
+	if v != nil {
+		_c.SetModelsListConfig(*v)
+	}
+	return _c
+}
+
 // SetModelAllowlist sets the "model_allowlist" field.
 func (_c *GroupCreate) SetModelAllowlist(v domain.GroupModelAllowlist) *GroupCreate {
 	_c.mutation.SetModelAllowlist(v)
@@ -1211,6 +1225,10 @@ func (_c *GroupCreate) defaults() error {
 		v := group.DefaultMessagesDispatchModelConfig
 		_c.mutation.SetMessagesDispatchModelConfig(v)
 	}
+	if _, ok := _c.mutation.ModelsListConfig(); !ok {
+		v := group.DefaultModelsListConfig
+		_c.mutation.SetModelsListConfig(v)
+	}
 	if _, ok := _c.mutation.ModelAllowlist(); !ok {
 		v := group.DefaultModelAllowlist
 		_c.mutation.SetModelAllowlist(v)
@@ -1427,6 +1445,9 @@ func (_c *GroupCreate) check() error {
 	}
 	if _, ok := _c.mutation.MessagesDispatchModelConfig(); !ok {
 		return &ValidationError{Name: "messages_dispatch_model_config", err: errors.New(`ent: missing required field "Group.messages_dispatch_model_config"`)}
+	}
+	if _, ok := _c.mutation.ModelsListConfig(); !ok {
+		return &ValidationError{Name: "models_list_config", err: errors.New(`ent: missing required field "Group.models_list_config"`)}
 	}
 	if _, ok := _c.mutation.ModelAllowlist(); !ok {
 		return &ValidationError{Name: "model_allowlist", err: errors.New(`ent: missing required field "Group.model_allowlist"`)}
@@ -1727,6 +1748,10 @@ func (_c *GroupCreate) createSpec() (*Group, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.MessagesDispatchModelConfig(); ok {
 		_spec.SetField(group.FieldMessagesDispatchModelConfig, field.TypeJSON, value)
 		_node.MessagesDispatchModelConfig = value
+	}
+	if value, ok := _c.mutation.ModelsListConfig(); ok {
+		_spec.SetField(group.FieldModelsListConfig, field.TypeJSON, value)
+		_node.ModelsListConfig = value
 	}
 	if value, ok := _c.mutation.ModelAllowlist(); ok {
 		_spec.SetField(group.FieldModelAllowlist, field.TypeJSON, value)
@@ -2871,6 +2896,18 @@ func (u *GroupUpsert) SetMessagesDispatchModelConfig(v domain.OpenAIMessagesDisp
 // UpdateMessagesDispatchModelConfig sets the "messages_dispatch_model_config" field to the value that was provided on create.
 func (u *GroupUpsert) UpdateMessagesDispatchModelConfig() *GroupUpsert {
 	u.SetExcluded(group.FieldMessagesDispatchModelConfig)
+	return u
+}
+
+// SetModelsListConfig sets the "models_list_config" field.
+func (u *GroupUpsert) SetModelsListConfig(v domain.GroupModelsListConfig) *GroupUpsert {
+	u.Set(group.FieldModelsListConfig, v)
+	return u
+}
+
+// UpdateModelsListConfig sets the "models_list_config" field to the value that was provided on create.
+func (u *GroupUpsert) UpdateModelsListConfig() *GroupUpsert {
+	u.SetExcluded(group.FieldModelsListConfig)
 	return u
 }
 
@@ -4158,6 +4195,20 @@ func (u *GroupUpsertOne) SetMessagesDispatchModelConfig(v domain.OpenAIMessagesD
 func (u *GroupUpsertOne) UpdateMessagesDispatchModelConfig() *GroupUpsertOne {
 	return u.Update(func(s *GroupUpsert) {
 		s.UpdateMessagesDispatchModelConfig()
+	})
+}
+
+// SetModelsListConfig sets the "models_list_config" field.
+func (u *GroupUpsertOne) SetModelsListConfig(v domain.GroupModelsListConfig) *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.SetModelsListConfig(v)
+	})
+}
+
+// UpdateModelsListConfig sets the "models_list_config" field to the value that was provided on create.
+func (u *GroupUpsertOne) UpdateModelsListConfig() *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.UpdateModelsListConfig()
 	})
 }
 
@@ -5632,6 +5683,20 @@ func (u *GroupUpsertBulk) SetMessagesDispatchModelConfig(v domain.OpenAIMessages
 func (u *GroupUpsertBulk) UpdateMessagesDispatchModelConfig() *GroupUpsertBulk {
 	return u.Update(func(s *GroupUpsert) {
 		s.UpdateMessagesDispatchModelConfig()
+	})
+}
+
+// SetModelsListConfig sets the "models_list_config" field.
+func (u *GroupUpsertBulk) SetModelsListConfig(v domain.GroupModelsListConfig) *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.SetModelsListConfig(v)
+	})
+}
+
+// UpdateModelsListConfig sets the "models_list_config" field to the value that was provided on create.
+func (u *GroupUpsertBulk) UpdateModelsListConfig() *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.UpdateModelsListConfig()
 	})
 }
 

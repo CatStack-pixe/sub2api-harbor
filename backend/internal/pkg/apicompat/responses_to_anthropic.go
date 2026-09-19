@@ -528,11 +528,11 @@ func resToAnthHandleTextDone(evt *ResponsesStreamEvent, state *ResponsesEventToA
 	if state.MessageStopSent {
 		// The message is already terminated; a late payload cannot be delivered
 		// without emitting a content block after message_stop.
-		return resToAnthHandleBlockDone(state)
+		return resToAnthHandleBlockDone(evt, state)
 	}
 
 	events := resToAnthRecoverText(evt.Text, resToAnthTextPartOf(evt), state)
-	return append(events, resToAnthHandleBlockDone(state)...)
+	return append(events, resToAnthHandleBlockDone(evt, state)...)
 }
 
 func resToAnthHandleFuncArgsDelta(evt *ResponsesStreamEvent, state *ResponsesEventToAnthropicState) []AnthropicStreamEvent {

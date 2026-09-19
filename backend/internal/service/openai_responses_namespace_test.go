@@ -78,7 +78,7 @@ func TestShouldKeepOpenAIResponsesToolCallNamespaces(t *testing.T) {
 		transport          OpenAIUpstreamTransport
 		passthroughEnabled bool
 		compactPath        bool
-		body []byte
+		body               []byte
 		want               bool
 	}{
 		// 上游按 namespace 解析历史调用，缺字段会 400 "Missing namespace for function_call"。

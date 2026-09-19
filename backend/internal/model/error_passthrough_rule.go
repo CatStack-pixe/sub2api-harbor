@@ -54,7 +54,7 @@ const (
 	PlatformMiniMax      = domain.PlatformMiniMax
 	PlatformVolcengine   = domain.PlatformVolcengine
 	PlatformSenseNova    = domain.PlatformSenseNova
-	PlatformOpenCodeGo = domain.PlatformOpenCodeGo
+	PlatformOpenCodeGo   = domain.PlatformOpenCodeGo
 )
 
 // AllPlatforms 返回所有支持的平台列表

@@ -103,7 +103,7 @@ func (e ProxyEdges) BackupProxyOrErr() (*Proxy, error) {
 func (e ProxyEdges) ProxyGroupOrErr() (*ProxyGroup, error) {
 	if e.ProxyGroup != nil {
 		return e.ProxyGroup, nil
-	} else if e.loadedTypes[2] {
+	} else if e.loadedTypes[3] {
 		return nil, &NotFoundError{label: proxygroup.Label}
 	}
 	return nil, &NotLoadedError{edge: "proxy_group"}

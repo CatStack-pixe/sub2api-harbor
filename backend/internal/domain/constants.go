@@ -36,7 +36,7 @@ const (
 	PlatformMiniMax      = "minimax"
 	PlatformVolcengine   = "volcengine"
 	PlatformSenseNova    = "sensenova"
-	PlatformOpenCodeGo = "opencode_go"
+	PlatformOpenCodeGo   = "opencode_go"
 	PlatformComposite    = "composite"
 )
 

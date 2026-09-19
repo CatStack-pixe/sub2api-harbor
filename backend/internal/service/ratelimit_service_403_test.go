@@ -93,7 +93,7 @@ func poolModeInsufficientBalanceAccount(customCodes bool) *Account {
 		Platform: PlatformAnthropic,
 		Type:     AccountTypeAPIKey,
 		Credentials: map[string]any{
-			"pool_mode":                   true,
+			"pool_mode":                  true,
 			"custom_error_codes_enabled": customCodes,
 		},
 	}
@@ -146,7 +146,7 @@ func TestRateLimitService_PoolModeInsufficientBalanceNarrowMatching(t *testing.T
 		},
 		{
 			name:       "non pool account unchanged",
-			account: &Account{ID: 304, Platform: PlatformAnthropic, Type: AccountTypeAPIKey},
+			account:    &Account{ID: 304, Platform: PlatformAnthropic, Type: AccountTypeAPIKey},
 			statusCode: http.StatusForbidden,
 			body:       []byte(`insufficient account balance`),
 			wantPolicy: ErrorPolicyNone,

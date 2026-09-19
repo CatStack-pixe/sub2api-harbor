@@ -271,8 +271,8 @@ func (h *ProxyHandler) ImportData(c *gin.Context) {
 			// 新建后同步 status 时，传入完整字段，避免零值覆盖刚创建的有效期/fallback 配置。
 			if _, err := h.adminService.UpdateProxy(ctx, created.ID, &service.UpdateProxyInput{
 				Status:          normalizedStatus,
-				ClearBackupID:  backupProxyID == nil,
-				ClearExpiresAt: expiresAt == nil,
+				ClearBackupID:   backupProxyID == nil,
+				ClearExpiresAt:  expiresAt == nil,
 				ExpiresAt:       expiresAt,
 				FallbackMode:    fallbackMode,
 				BackupProxyID:   backupProxyID,

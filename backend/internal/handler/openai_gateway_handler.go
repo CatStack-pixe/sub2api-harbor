@@ -2225,8 +2225,8 @@ func (h *OpenAIGatewayHandler) acquireOpenAIAccountSlot(
 			if selection.ReleaseFunc != nil {
 				selection.ReleaseFunc()
 			}
-			status, errType, message := concurrencyErrorResponse(err, "account")
-			writeError(status, errType, message)
+			status, errType, code, message := concurrencyErrorResponse(err, "account")
+			writeError(status, errType, code, message)
 			return nil, openAISlotAcquireFailed
 		}
 		if !allowed {
@@ -2277,8 +2277,8 @@ func (h *OpenAIGatewayHandler) acquireOpenAIAccountSlot(
 			if fastReleaseFunc != nil {
 				fastReleaseFunc()
 			}
-			status, errType, message := concurrencyErrorResponse(err, "account")
-			writeError(status, errType, message)
+			status, errType, code, message := concurrencyErrorResponse(err, "account")
+			writeError(status, errType, code, message)
 			return nil, openAISlotAcquireFailed
 		}
 		if !allowed {
@@ -2348,8 +2348,8 @@ func (h *OpenAIGatewayHandler) acquireOpenAIAccountSlot(
 		if accountReleaseFunc != nil {
 			accountReleaseFunc()
 		}
-		status, errType, message := concurrencyErrorResponse(err, "account")
-		writeError(status, errType, message)
+		status, errType, code, message := concurrencyErrorResponse(err, "account")
+		writeError(status, errType, code, message)
 		return nil, openAISlotAcquireFailed
 	}
 	if !allowed {

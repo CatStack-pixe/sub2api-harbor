@@ -1142,7 +1142,7 @@ func (h *GatewayHandler) Models(c *gin.Context) {
 
 	if platform == service.PlatformOpenAI && apiKey != nil && apiKey.Group != nil &&
 		apiKey.Group.Platform == service.PlatformOpenAI && apiKey.Group.CodexModelsManifestConfig.Enabled {
-		h.pinnedOpenAIModels(c, apiKey.Group)
+		h.pinnedOpenAIModels(c, apiKey)
 		return
 	}
 
@@ -2682,18 +2682,7 @@ func writeCustomModelsList(c *gin.Context, platform string, modelIDs []string) {
 	writeModelsList(c, platform, modelIDs)
 }
 
-type grokReasoningEffortOption struct {
-	Value   string `json:"value"`
-	Label   string `json:"label"`
-	Default bool   `json:"default,omitempty"`
-}
 
-type grokModelListItem struct {
-	xai.Model
-	SupportsReasoningEffort bool                        `json:"supportsReasoningEffort,omitempty"`
-	ReasoningEffort         string                      `json:"reasoningEffort,omitempty"`
-	ReasoningEfforts        []grokReasoningEffortOption `json:"reasoningEfforts,omitempty"`
-}
 
 func customModelsListSource(platform string, availableModels, fallbackModels []string) []string {
 	if platform == service.PlatformAnthropic && len(availableModels) > 0 {

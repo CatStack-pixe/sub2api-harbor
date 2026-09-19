@@ -1777,7 +1777,7 @@ func TestAccountRepositoryReserveRequestQuota(t *testing.T) {
 	client := testEntClient(t)
 	repo := newAccountRepositoryWithSQL(client, integrationDB, nil)
 	account := mustCreateAccount(t, client, &service.Account{
-		Name: "request-quota-reservation-" + time.Now().Format("150405.000000000"),
+		Name:  "request-quota-reservation-" + time.Now().Format("150405.000000000"),
 		Extra: map[string]any{"request_quota_limit": 2},
 	})
 	t.Cleanup(func() {

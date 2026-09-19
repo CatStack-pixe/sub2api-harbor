@@ -53,12 +53,12 @@ func TestGroupRepoSuite(t *testing.T) {
 
 func (s *GroupRepoSuite) TestCreate() {
 	group := &service.Group{
-		Name:             "test-create",
-		Platform:         service.PlatformAnthropic,
-		RateMultiplier:   1.0,
-		IsExclusive:      false,
-		Status:           service.StatusActive,
-		SubscriptionType: service.SubscriptionTypeStandard,
+		Name:                "test-create",
+		Platform:            service.PlatformAnthropic,
+		RateMultiplier:      1.0,
+		IsExclusive:         false,
+		Status:              service.StatusActive,
+		SubscriptionType:    service.SubscriptionTypeStandard,
 		GlobalPromptEnabled: true,
 		GlobalPrompt:        "Follow the group policy.",
 	}
@@ -76,12 +76,12 @@ func (s *GroupRepoSuite) TestCreate() {
 
 func (s *GroupRepoSuite) TestCreateFromSourcePreservesPriorityAndFiltersIneligibleAccounts() {
 	source := &service.Group{
-		Name:             "duplicate-source",
-		Platform:         service.PlatformOpenAI,
-		RateMultiplier:   1,
-		Status:           service.StatusActive,
-		SubscriptionType: service.SubscriptionTypeStandard,
-		RequireOAuthOnly: true,
+		Name:                "duplicate-source",
+		Platform:            service.PlatformOpenAI,
+		RateMultiplier:      1,
+		Status:              service.StatusActive,
+		SubscriptionType:    service.SubscriptionTypeStandard,
+		RequireOAuthOnly:    true,
 		GlobalPromptEnabled: true,
 		GlobalPrompt:        "Source policy.",
 	}
@@ -126,8 +126,8 @@ func (s *GroupRepoSuite) TestCreateFromSourcePreservesPriorityAndFiltersIneligib
 		Status:               "inactive",
 		SubscriptionType:     source.SubscriptionType,
 		RequireOAuthOnly:     true,
-		GlobalPromptEnabled: source.GlobalPromptEnabled,
-		GlobalPrompt:        source.GlobalPrompt,
+		GlobalPromptEnabled:  source.GlobalPromptEnabled,
+		GlobalPrompt:         source.GlobalPrompt,
 		DuplicateOperationID: strings.Repeat("a", 64),
 	}
 	s.Require().NoError(s.repo.CreateFromSource(s.ctx, duplicate, source.ID))

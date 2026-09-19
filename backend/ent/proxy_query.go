@@ -29,8 +29,8 @@ type ProxyQuery struct {
 	withAccounts       *AccountQuery
 	withPrimaryProxies *ProxyQuery
 	withBackupProxy    *ProxyQuery
+	withProxyGroup     *ProxyGroupQuery
 	modifiers          []func(*sql.Selector)
-	withProxyGroup  *ProxyGroupQuery
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -350,7 +350,7 @@ func (_q *ProxyQuery) Clone() *ProxyQuery {
 		withAccounts:       _q.withAccounts.Clone(),
 		withPrimaryProxies: _q.withPrimaryProxies.Clone(),
 		withBackupProxy:    _q.withBackupProxy.Clone(),
-		withProxyGroup:  _q.withProxyGroup.Clone(),
+		withProxyGroup:     _q.withProxyGroup.Clone(),
 		// clone intermediate query.
 		sql:  _q.sql.Clone(),
 		path: _q.path,

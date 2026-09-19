@@ -403,7 +403,9 @@ func filterCodexModelsByGroupAllowlist(body []byte, group *Group) ([]byte, error
 	}
 	filtered := make([]json.RawMessage, 0, len(models))
 	for _, raw := range models {
-		var model struct { Slug string `json:"slug"` }
+		var model struct {
+			Slug string `json:"slug"`
+		}
 		if json.Unmarshal(raw, &model) == nil && group.ModelAllowlist.Allows(model.Slug) {
 			filtered = append(filtered, raw)
 		}

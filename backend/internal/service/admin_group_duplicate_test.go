@@ -364,7 +364,7 @@ func TestDuplicateGroupCopiesConfigurationDeeplyAndResetsRuntimeState(t *testing
 func TestDuplicateGroupPricingCopiesForkWindowsAndUpstreamMultipliers(t *testing.T) {
 	windowPrice, maxMultiplier := 0.25, 3.0
 	source := []ChannelModelPricing{{
-		Models:                      []string{"claude-fable-5-1"},
+		Models:                       []string{"claude-fable-5-1"},
 		MaxReasoningEffortMultiplier: &maxMultiplier,
 		TimeWindows: []PricingTimeWindow{{
 			StartMinute: 60,

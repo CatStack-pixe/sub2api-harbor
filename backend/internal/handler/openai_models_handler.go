@@ -11,7 +11,8 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func (h *GatewayHandler) pinnedOpenAIModels(c *gin.Context, group *service.Group) {
+func (h *GatewayHandler) pinnedOpenAIModels(c *gin.Context, apiKey *service.APIKey) {
+	group := apiKey.Group
 	if c.Request.Context().Err() != nil {
 		return
 	}
@@ -20,7 +21,7 @@ func (h *GatewayHandler) pinnedOpenAIModels(c *gin.Context, group *service.Group
 		return
 	}
 	etag := c.GetHeader("If-None-Match")
-	if c.Param("model") != "" {
+	if c.Param("model") != "" || len(apiKey.ModelWhitelist) > 0 {
 		etag = "" // A collection ETag cannot validate a single-model representation.
 	}
 	response, account, err := h.openAIGatewayService.FetchPinnedOpenAIModelsList(
@@ -38,7 +39,45 @@ func (h *GatewayHandler) pinnedOpenAIModels(c *gin.Context, group *service.Group
 		return
 	}
 	setOpsSelectedAccount(c, account.ID, account.Platform)
-	writeOpenAIModelsResponse(c, response)
+	writeAPIKeyFilteredOpenAIModelsResponse(c, response, apiKey, "data", "id")
+}
+
+// Filtering is applied after group/account projection, before conditional
+// validation, so a key cannot reuse a broader catalogue through an old ETag.
+func writeAPIKeyFilteredOpenAIModelsResponse(c *gin.Context, manifest *service.OpenAIModelsResponse, apiKey *service.APIKey, listKey, modelKey string) {
+	if apiKey == nil || len(apiKey.ModelWhitelist) == 0 {
+		writeOpenAIModelsResponse(c, manifest)
+		return
+	}
+	var envelope map[string]json.RawMessage
+	if err := json.Unmarshal(manifest.Body, &envelope); err != nil || envelope == nil {
+		writeOpenAIModelsError(c, http.StatusBadGateway, "upstream_error", "Invalid model catalogue")
+		return
+	}
+	var models []json.RawMessage
+	if raw, exists := envelope[listKey]; !exists || json.Unmarshal(raw, &models) != nil {
+		writeOpenAIModelsError(c, http.StatusBadGateway, "upstream_error", "Invalid model catalogue")
+		return
+	}
+	kept := make([]json.RawMessage, 0, len(models))
+	for _, raw := range models {
+		var model map[string]json.RawMessage
+		var id string
+		if json.Unmarshal(raw, &model) == nil && json.Unmarshal(model[modelKey], &id) == nil && apiKey.AllowsModel(id) {
+			kept = append(kept, raw)
+		}
+	}
+	envelope[listKey], _ = json.Marshal(kept)
+	body, err := json.Marshal(envelope)
+	if err != nil {
+		writeOpenAIModelsError(c, http.StatusInternalServerError, "api_error", "Failed to encode model catalogue")
+		return
+	}
+	filtered := *manifest
+	filtered.Body = body
+	filtered.ETag = service.CodexModelsManifestETag(body)
+	filtered.NotModified = c.Param("model") == "" && service.CodexModelsManifestETagMatches(c.GetHeader("If-None-Match"), filtered.ETag)
+	writeOpenAIModelsResponse(c, &filtered)
 }
 
 func writeOpenAIModelsError(c *gin.Context, status int, errorType, message string) {

@@ -35,6 +35,10 @@ func (h *OpenAIGatewayHandler) CodexModels(c *gin.Context) {
 	}
 
 	ifNoneMatch := c.GetHeader("If-None-Match")
+	if len(apiKey.ModelWhitelist) > 0 {
+		// Fetch the source body before applying key-specific filtering and ETag.
+		ifNoneMatch = ""
+	}
 	// 固定账号分支：开启后只用选定账号拉取 manifest，不经过调度器；
 	// 全部不可用/全部失败时按 FallbackToScheduler 决定回退调度器或返回错误。
 	if apiKey.Group.Platform == service.PlatformOpenAI &&
@@ -67,7 +71,7 @@ func (h *OpenAIGatewayHandler) CodexModels(c *gin.Context) {
 			if c.Request.Context().Err() != nil {
 				return
 			}
-			writeOpenAIModelsResponse(c, pinnedManifest)
+			writeAPIKeyFilteredOpenAIModelsResponse(c, pinnedManifest, apiKey, "models", "slug")
 			return
 		}
 	}
@@ -86,7 +90,7 @@ func (h *OpenAIGatewayHandler) CodexModels(c *gin.Context) {
 			return
 		}
 		if configured {
-			writeOpenAIModelsResponse(c, configuredManifest)
+			writeAPIKeyFilteredOpenAIModelsResponse(c, configuredManifest, apiKey, "models", "slug")
 			return
 		}
 	}
@@ -147,7 +151,7 @@ func (h *OpenAIGatewayHandler) CodexModels(c *gin.Context) {
 			return
 		}
 
-		writeOpenAIModelsResponse(c, manifest)
+		writeAPIKeyFilteredOpenAIModelsResponse(c, manifest, apiKey, "models", "slug")
 		return
 	}
 }
