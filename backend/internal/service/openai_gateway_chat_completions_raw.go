@@ -611,6 +611,7 @@ streamLoop:
 		// A watchdog firing before any client bytes were committed is safe to
 		// retry on another account. Do not manufacture a billable result.
 		if clientDisconnected || requestCanceled {
+			clientDisconnected = true
 			return resultWithUsage(), fmt.Errorf("stream usage incomplete after disconnect: %w", streamErr)
 		}
 		return nil, streamFailoverErr
@@ -618,7 +619,7 @@ streamLoop:
 
 	// A client write failure must never be attributed to the selected proxy.
 	// Keep draining the upstream above so usage accounting remains complete.
-	if clientDisconnected || requestCanceled || errors.Is(streamErr, context.Canceled) || errors.Is(streamErr, context.DeadlineExceeded) {
+	if clientDisconnected || requestCanceled {
 		clientDisconnected = true
 		if terminal.Terminated() {
 			s.clearOpenAIProxyStreamDisconnect(account)
@@ -627,6 +628,11 @@ streamLoop:
 	}
 
 	if streamErr != nil {
+		if errors.Is(streamErr, context.Canceled) || errors.Is(streamErr, context.DeadlineExceeded) {
+			// A live client does not make an upstream-owned cancellation a
+			// successful response, nor does it prove a proxy transport fault.
+			return resultWithUsage(), fmt.Errorf("stream usage incomplete: %w", streamErr)
+		}
 		if strings.Contains(streamErr.Error(), "stream data interval timeout") {
 			if clientOutputStarted && !clientDisconnected {
 				writeStreamHeaders()

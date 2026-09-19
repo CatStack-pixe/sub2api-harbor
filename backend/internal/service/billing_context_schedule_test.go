@@ -418,7 +418,7 @@ func TestIndependentCacheWrite1hPreservesTimeWindowsAndTimePricing(t *testing.T)
 	} {
 		cost, err := bs.CalculateTokenCostForRequest(TokenCostRequest{
 			Ctx: context.Background(), Model: "claude-sonnet-4", Group: group,
-			Tokens: UsageTokens{CacheCreationTokens: 1000, CacheCreation5mTokens: 400, CacheCreation1hTokens: 600},
+			Tokens:         UsageTokens{CacheCreationTokens: 1000, CacheCreation5mTokens: 400, CacheCreation1hTokens: 600},
 			RateMultiplier: 1, PricingAt: time.Date(2026, 9, 21, tc.hour, 0, 0, 0, location), Resolver: resolver,
 		})
 		require.NoError(t, err)

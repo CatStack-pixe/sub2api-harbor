@@ -968,9 +968,11 @@ func TestForwardAsRawChatCompletions_ClientCancelTruncationStillBills(t *testing
 	gin.SetMode(gin.TestMode)
 
 	body := []byte(`{"model":"deepseek-v4-pro","messages":[{"role":"user","content":"hello"}],"stream":true}`)
-	rec := httptest.NewRecorder()
-	c, _ := gin.CreateTestContext(rec)
-	c.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewReader(body))
+	requestCtx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	writer := &cancelOnFirstWriteResponseWriter{cancel: cancel}
+	c, _ := gin.CreateTestContext(writer)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewReader(body)).WithContext(requestCtx)
 	c.Request.Header.Set("Content-Type", "application/json")
 
 	upstream := &httpUpstreamRecorder{resp: &http.Response{
@@ -990,9 +992,45 @@ func TestForwardAsRawChatCompletions_ClientCancelTruncationStillBills(t *testing
 	result, err := svc.forwardAsRawChatCompletions(context.Background(), c, rawChatCompletionsTestAccount(), body, "")
 	require.NoError(t, err)
 	require.NotNil(t, result)
+	require.ErrorIs(t, requestCtx.Err(), context.Canceled)
 	require.True(t, result.ClientDisconnect)
 	_, recorded := c.Get(OpsUpstreamErrorsKey)
 	require.False(t, recorded, "client cancellation must not be recorded as an upstream failure")
+}
+
+func TestStreamRawChatCompletions_UpstreamContextErrorWithLiveClientRemainsIncomplete(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	for _, upstreamErr := range []error{context.Canceled, context.DeadlineExceeded} {
+		t.Run(upstreamErr.Error(), func(t *testing.T) {
+			rec := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(rec)
+			c.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
+			proxyID := int64(31)
+			account := rawChatCompletionsTestAccount()
+			account.ProxyID = &proxyID
+			svc := &OpenAIGatewayService{cfg: rawChatCompletionsTestConfig()}
+			svc.openaiProxyStreamCircuit = newOpenAIProxyStreamCircuit(openAIProxyStreamCircuitSettings{
+				failureThreshold: 1, failureWindow: time.Minute, quarantineTTL: time.Minute, maxEntries: 16,
+			})
+			resp := &http.Response{
+				StatusCode: http.StatusOK,
+				Header:     http.Header{"Content-Type": []string{"text/event-stream"}},
+				Body: &openAIChatStreamReadErrorCloser{
+					payload: []byte(`data: {"choices":[{"index":0,"delta":{"content":"partial"}}]}` + "\n\n"),
+					err:     upstreamErr,
+				},
+			}
+
+			result, err := svc.streamRawChatCompletions(c, resp, account, "gpt-5.4", "gpt-5.4", "gpt-5.4", nil, nil, time.Now(), 0)
+			require.ErrorIs(t, err, upstreamErr)
+			require.Contains(t, err.Error(), "stream usage incomplete")
+			require.NotNil(t, result)
+			require.False(t, result.ClientDisconnect)
+			require.NoError(t, c.Request.Context().Err())
+			require.Contains(t, rec.Body.String(), `"content":"partial"`)
+			require.Zero(t, svc.getOpenAIProxyStreamCircuit().activeBlockCount(time.Now()))
+		})
+	}
 }
 
 func TestOpenAIRawStreamTerminalState(t *testing.T) {
