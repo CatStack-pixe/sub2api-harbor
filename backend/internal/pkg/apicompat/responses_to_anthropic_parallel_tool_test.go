@@ -328,6 +328,100 @@ func TestStreamingInterleavedParallelFunctionCallsKeepIndependentLifecycles(t *t
 	})
 }
 
+func TestStreamingRecoveredTextWaitsForAllParallelToolArguments(t *testing.T) {
+	state := NewResponsesEventToAnthropicState()
+	var events []AnthropicStreamEvent
+	feed := func(event ResponsesStreamEvent) {
+		events = append(events, ResponsesEventToAnthropicEvents(&event, state)...)
+	}
+	feed(ResponsesStreamEvent{Type: "response.created"})
+	feed(ResponsesStreamEvent{
+		Type: "response.output_item.added", OutputIndex: 3,
+		Item: &ResponsesOutput{Type: "function_call", CallID: "call_weather", Name: "get_weather"},
+	})
+	feed(ResponsesStreamEvent{
+		Type: "response.output_item.added", OutputIndex: 7,
+		Item: &ResponsesOutput{Type: "function_call", CallID: "call_time", Name: "get_time"},
+	})
+	feed(ResponsesStreamEvent{Type: "response.function_call_arguments.delta", OutputIndex: 3, Delta: `{"city":"`})
+	feed(ResponsesStreamEvent{Type: "response.output_text.delta", OutputIndex: 8, Delta: "Checking"})
+	feed(ResponsesStreamEvent{Type: "response.output_text.done", OutputIndex: 8, Text: "Checking both tools"})
+	require.Empty(t, collectAnthropicText(events), "text must wait while tools still accept arguments")
+	feed(ResponsesStreamEvent{Type: "response.function_call_arguments.done", OutputIndex: 7, Arguments: `{"zone":"UTC"}`})
+	require.Empty(t, collectAnthropicText(events), "closing one parallel tool must not flush text")
+	feed(ResponsesStreamEvent{Type: "response.function_call_arguments.delta", OutputIndex: 3, Delta: `Paris"}`})
+	feed(ResponsesStreamEvent{
+		Type: "response.output_item.done", OutputIndex: 3,
+		Item: &ResponsesOutput{Type: "function_call", CallID: "call_weather", Name: "get_weather", Arguments: `{"city":"Paris"}`},
+	})
+	require.Equal(t, "Checking both tools", collectAnthropicText(events), "flush when the final tool finishes")
+	feed(ResponsesStreamEvent{Type: "response.completed", Response: &ResponsesResponse{
+		Status: "completed", Output: responsesMessageOutput("Checking both tools"),
+	}})
+
+	assert.Equal(t, "Checking both tools", collectAnthropicText(events), "terminal recovery must not repeat buffered text")
+	assertIndependentToolLifecycles(t, events, map[string]string{
+		"get_weather": `{"city":"Paris"}`,
+		"get_time":    `{"zone":"UTC"}`,
+	})
+	openTools := make(map[int]bool)
+	textStarts, textStops := 0, 0
+	for _, event := range events {
+		switch event.Type {
+		case "content_block_start":
+			if event.ContentBlock.Type == "tool_use" {
+				openTools[*event.Index] = true
+			} else if event.ContentBlock.Type == "text" {
+				require.Empty(t, openTools, "text must start after both tool blocks close")
+				require.Equal(t, 2, *event.Index)
+				textStarts++
+			}
+		case "content_block_stop":
+			delete(openTools, *event.Index)
+			if *event.Index == 2 {
+				textStops++
+			}
+		}
+	}
+	require.Equal(t, 1, textStarts)
+	require.Equal(t, 1, textStops)
+}
+
+func TestStreamingQueuedTextSurvivesTerminalAndSyntheticFinalization(t *testing.T) {
+	for _, synthetic := range []bool{false, true} {
+		name := "completed"
+		if synthetic {
+			name = "synthetic"
+		}
+		t.Run(name, func(t *testing.T) {
+			state := NewResponsesEventToAnthropicState()
+			var events []AnthropicStreamEvent
+			for _, event := range []ResponsesStreamEvent{
+				{Type: "response.created"},
+				{Type: "response.output_item.added", OutputIndex: 0, Item: &ResponsesOutput{Type: "function_call", CallID: "call_1", Name: "lookup"}},
+				{Type: "response.function_call_arguments.delta", OutputIndex: 0, Delta: `{"id":1}`},
+				{Type: "response.output_text.delta", OutputIndex: 1, Delta: "Waiting for lookup"},
+			} {
+				events = append(events, ResponsesEventToAnthropicEvents(&event, state)...)
+			}
+			require.Empty(t, collectAnthropicText(events))
+			if synthetic {
+				events = append(events, FinalizeResponsesAnthropicStream(state)...)
+			} else {
+				event := &ResponsesStreamEvent{Type: "response.completed", Response: &ResponsesResponse{
+					Status: "completed", Output: responsesMessageOutput("Waiting for lookup"),
+				}}
+				events = append(events, ResponsesEventToAnthropicEvents(event, state)...)
+			}
+			require.Equal(t, "Waiting for lookup", collectAnthropicText(events))
+			requireAnthropicBlockLifecycle(t, events)
+			assertIndependentToolLifecycles(t, events, map[string]string{"lookup": `{"id":1}`})
+			require.Equal(t, "message_stop", events[len(events)-1].Type)
+			require.Empty(t, FinalizeResponsesAnthropicStream(state), "finalization must remain idempotent")
+		})
+	}
+}
+
 func TestStreamingInterleavedParallelReadSanitizationIsPerCall(t *testing.T) {
 	state := NewResponsesEventToAnthropicState()
 	var events []AnthropicStreamEvent

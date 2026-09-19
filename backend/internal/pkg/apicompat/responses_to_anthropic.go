@@ -221,6 +221,9 @@ type ResponsesEventToAnthropicState struct {
 	textByPart map[responsesTextPart]*strings.Builder
 	// textDelivered records whether any assistant text reached the client.
 	textDelivered bool
+	// Text waits for active tools to finish so recovery never closes a tool
+	// before its remaining arguments arrive or overlaps text with tool blocks.
+	pendingTextEvents []ResponsesStreamEvent
 
 	InputTokens              int
 	OutputTokens             int
@@ -254,18 +257,18 @@ func ResponsesEventToAnthropicEvents(
 		return resToAnthHandleCreated(evt, state)
 	case "response.output_item.added":
 		return resToAnthHandleOutputItemAdded(evt, state)
-	case "response.output_text.delta":
-		return resToAnthHandleTextDelta(evt, state)
-	case "response.output_text.done":
-		return resToAnthHandleTextDone(evt, state)
+	case "response.output_text.delta", "response.output_text.done":
+		return resToAnthHandleTextEvent(evt, state)
 	case "response.function_call_arguments.delta",
 		// custom/freeform 工具的输入增量与 function_call 参数增量同形。
 		"response.custom_tool_call_input.delta":
 		return resToAnthHandleFuncArgsDelta(evt, state)
 	case "response.function_call_arguments.done", "response.custom_tool_call_input.done":
-		return resToAnthHandleFuncArgsDone(evt, state)
+		events := resToAnthHandleFuncArgsDone(evt, state)
+		return append(events, resToAnthFlushPendingText(state)...)
 	case "response.output_item.done":
-		return resToAnthHandleOutputItemDone(evt, state)
+		events := resToAnthHandleOutputItemDone(evt, state)
+		return append(events, resToAnthFlushPendingText(state)...)
 	case "response.reasoning_summary_text.delta",
 		// 原始推理文本增量，与 reasoning summary 一样映射为 thinking。
 		"response.reasoning_text.delta":
@@ -293,6 +296,8 @@ func FinalizeResponsesAnthropicStream(state *ResponsesEventToAnthropicState) []A
 
 	var events []AnthropicStreamEvent
 	events = append(events, closeAllOpenBlocks(state)...)
+	events = append(events, resToAnthFlushPendingText(state)...)
+	events = append(events, closeCurrentNonToolBlock(state)...)
 
 	stopReason := "end_turn"
 	if state.HasToolCall {
@@ -438,6 +443,45 @@ func resToAnthHandleOutputItemAdded(evt *ResponsesStreamEvent, state *ResponsesE
 	}
 
 	return nil
+}
+
+func resToAnthHandleTextEvent(evt *ResponsesStreamEvent, state *ResponsesEventToAnthropicState) []AnthropicStreamEvent {
+	if state.MessageStopSent {
+		return nil
+	}
+	if state.hasOpenToolBlocks() {
+		state.pendingTextEvents = append(state.pendingTextEvents, *evt)
+		return nil
+	}
+	if evt.Type == "response.output_text.done" {
+		return resToAnthHandleTextDone(evt, state)
+	}
+	return resToAnthHandleTextDelta(evt, state)
+}
+
+func (state *ResponsesEventToAnthropicState) hasOpenToolBlocks() bool {
+	if state.ContentBlockOpen && state.CurrentBlockType == "tool_use" {
+		return true
+	}
+	for _, tool := range state.toolBlocksByOutput {
+		if tool != nil && tool.Open && !tool.StopSent {
+			return true
+		}
+	}
+	return false
+}
+
+func resToAnthFlushPendingText(state *ResponsesEventToAnthropicState) []AnthropicStreamEvent {
+	if len(state.pendingTextEvents) == 0 || state.hasOpenToolBlocks() {
+		return nil
+	}
+	pending := state.pendingTextEvents
+	state.pendingTextEvents = nil
+	var events []AnthropicStreamEvent
+	for i := range pending {
+		events = append(events, resToAnthHandleTextEvent(&pending[i], state)...)
+	}
+	return events
 }
 
 func resToAnthHandleTextDelta(evt *ResponsesStreamEvent, state *ResponsesEventToAnthropicState) []AnthropicStreamEvent {
@@ -754,6 +798,8 @@ func resToAnthHandleCompleted(evt *ResponsesStreamEvent, state *ResponsesEventTo
 
 	var events []AnthropicStreamEvent
 	events = append(events, closeAllOpenBlocks(state)...)
+	events = append(events, resToAnthFlushPendingText(state)...)
+	events = append(events, closeCurrentNonToolBlock(state)...)
 	events = append(events, resToAnthRecoverTerminalText(evt, state)...)
 
 	stopReason := "end_turn"
