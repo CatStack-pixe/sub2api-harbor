@@ -758,9 +758,6 @@ func hasMixedToolInvocations(declarations []GeminiToolDeclaration) bool {
 	return hasFunc && hasBuiltin
 }
 
-func isCodeExecutionTool(tool ClaudeTool) bool {
-	return strings.TrimSpace(tool.Type) == "code_execution"
-}
 
 // buildTools 构建 tools
 func buildTools(tools []ClaudeTool) []GeminiToolDeclaration {

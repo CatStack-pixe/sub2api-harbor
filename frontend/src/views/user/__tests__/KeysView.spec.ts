@@ -12,6 +12,7 @@ const {
   getPublicSettings,
   getDashboardApiKeysUsage,
   getAvailableGroups,
+  getAvailableModels,
   getUserGroupRates,
   showError,
   showSuccess,
@@ -24,6 +25,7 @@ const {
   getPublicSettings: vi.fn(),
   getDashboardApiKeysUsage: vi.fn(),
   getAvailableGroups: vi.fn(),
+  getAvailableModels: vi.fn(),
   getUserGroupRates: vi.fn(),
   showError: vi.fn(),
   showSuccess: vi.fn(),
@@ -74,6 +76,7 @@ vi.mock('@/api', () => ({
   },
   userGroupsAPI: {
     getAvailable: getAvailableGroups,
+    getAvailableModels,
     getUserGroupRates,
   },
 }))
@@ -275,6 +278,7 @@ describe('user KeysView column settings', () => {
     getPublicSettings.mockReset()
     getDashboardApiKeysUsage.mockReset()
     getAvailableGroups.mockReset()
+    getAvailableModels.mockReset()
     getUserGroupRates.mockReset()
     showError.mockReset()
     showSuccess.mockReset()
@@ -292,6 +296,7 @@ describe('user KeysView column settings', () => {
     getPublicSettings.mockResolvedValue({})
     getDashboardApiKeysUsage.mockResolvedValue({ stats: {} })
     getAvailableGroups.mockResolvedValue([])
+    getAvailableModels.mockResolvedValue(['test-model'])
     getUserGroupRates.mockResolvedValue({})
     isCurrentStep.mockReturnValue(false)
   })
@@ -594,11 +599,57 @@ describe('user KeysView column settings', () => {
       expect(showError).toHaveBeenCalledWith('keys.groupRequired')
 
       await groupSelect(wrapper).vm.$emit('update:modelValue', 5)
+      await flushPromises()
+      expect(getAvailableModels).toHaveBeenLastCalledWith(5)
+      await wrapper.findComponent({ name: 'GroupModelSelector' }).get('input[type="checkbox"]').setValue(true)
       vi.mocked(keysAPI.create).mockResolvedValue({ ...createApiKey(), group_id: 5 })
       await wrapper.get('#key-form').trigger('submit')
       await flushPromises()
       expect(keysAPI.create).toHaveBeenCalledOnce()
       expect(vi.mocked(keysAPI.create).mock.calls[0].slice(0, 2)).toEqual(['My key', 5])
+      expect(vi.mocked(keysAPI.create).mock.calls[0][7]).toEqual(['test-model'])
+      wrapper.unmount()
+    })
+
+    it('blocks submission until the selected group model catalogue has loaded', async () => {
+      let resolveModels!: (models: string[]) => void
+      getAvailableModels.mockReturnValueOnce(new Promise<string[]>((resolve) => { resolveModels = resolve }))
+      const wrapper = await openCreate()
+      await wrapper.get('[data-tour="key-form-name"]').setValue('Restricted key')
+      await groupSelect(wrapper).vm.$emit('update:modelValue', 1)
+      await nextTick()
+
+      await wrapper.get('#key-form').trigger('submit')
+      expect(keysAPI.create).not.toHaveBeenCalled()
+      expect(showError).toHaveBeenLastCalledWith('keys.modelRestrictionLoadFailed')
+
+      resolveModels(['claude-test-model'])
+      await flushPromises()
+      await wrapper.findComponent({ name: 'GroupModelSelector' }).get('input[type="checkbox"]').setValue(true)
+      vi.mocked(keysAPI.create).mockResolvedValue({ ...createApiKey(), group_id: 1 })
+      await wrapper.get('#key-form').trigger('submit')
+      await flushPromises()
+      expect(keysAPI.create).toHaveBeenCalledOnce()
+      expect(vi.mocked(keysAPI.create).mock.calls[0][7]).toEqual(['claude-test-model'])
+      wrapper.unmount()
+    })
+
+    it('blocks submission when the selected group model catalogue fails to load', async () => {
+      getAvailableModels.mockRejectedValueOnce(new Error('model catalogue unavailable'))
+      const errorLog = vi.spyOn(console, 'error').mockImplementation(() => {})
+      const wrapper = await openCreate()
+      try {
+        await wrapper.get('[data-tour="key-form-name"]').setValue('Restricted key')
+        await groupSelect(wrapper).vm.$emit('update:modelValue', 1)
+        await flushPromises()
+
+        await wrapper.get('#key-form').trigger('submit')
+        expect(keysAPI.create).not.toHaveBeenCalled()
+        expect(showError).toHaveBeenLastCalledWith('keys.modelRestrictionLoadFailed')
+      } finally {
+        wrapper.unmount()
+        errorLog.mockRestore()
+      }
     })
 
     it('defaults to a provider with available groups and disables empty categories', async () => {

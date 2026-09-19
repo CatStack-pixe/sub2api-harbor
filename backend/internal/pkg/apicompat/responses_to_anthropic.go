@@ -462,10 +462,10 @@ func resToAnthEmitText(text string, part responsesTextPart, state *ResponsesEven
 		events = append(events, closeCurrentNonToolBlock(state)...)
 
 		idx := allocateAnthropicContentBlockIndex(state)
-		state.OutputIndexToBlockIdx[evt.OutputIndex] = idx
+		state.OutputIndexToBlockIdx[part.OutputIndex] = idx
 		state.ContentBlockOpen = true
 		state.CurrentBlockIndex = idx
-		state.CurrentOutputIndex = evt.OutputIndex
+		state.CurrentOutputIndex = part.OutputIndex
 		state.CurrentBlockType = "text"
 
 		events = append(events, AnthropicStreamEvent{
