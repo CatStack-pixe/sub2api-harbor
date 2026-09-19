@@ -141,6 +141,9 @@ func (h *BatchImageHandler) Models(c *gin.Context) {
 	}
 	if apiKey, ok := middleware.GetAPIKeyFromContext(c); ok {
 		got.Data = filterBatchImageModels(apiKey, got.Data)
+		if apiKey != nil && apiKey.Group != nil {
+			got.Data = filterBatchImageModelsByAllowlist(got.Data, apiKey.Group.ModelAllowlist)
+		}
 	}
 	c.JSON(http.StatusOK, got)
 }
@@ -329,4 +332,17 @@ func batchImageError(c *gin.Context, err error) {
 			"message": message,
 		},
 	})
+}
+
+func filterBatchImageModelsByAllowlist(models []service.BatchImagePublicModel, allowlist service.GroupModelAllowlist) []service.BatchImagePublicModel {
+	if !allowlist.Enabled {
+		return models
+	}
+	filtered := make([]service.BatchImagePublicModel, 0, len(models))
+	for _, model := range models {
+		if allowlist.Allows(model.ID) {
+			filtered = append(filtered, model)
+		}
+	}
+	return filtered
 }

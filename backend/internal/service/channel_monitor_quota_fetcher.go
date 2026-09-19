@@ -216,11 +216,13 @@ func (f *ChannelMonitorQuotaFetcher) fetchUncached(ctx context.Context, accountI
 	switch account.Platform {
 	case domain.PlatformSenseNova:
 		return f.fetchSenseNovaQuota(ctx, account, now)
-	case domain.PlatformKimi, domain.PlatformZhipu, domain.PlatformDeepseek:
+	case domain.PlatformKimi, domain.PlatformZhipu, domain.PlatformDeepseek, domain.PlatformMiniMax:
 		if account.IsCodingPlan() {
 			return f.fetchCNQuota(ctx, account, now)
 		}
 		return f.fetchCNBalance(ctx, account, now)
+	case domain.PlatformOpenCodeGo:
+		return f.fetchCNQuota(ctx, account, now)
 	default:
 		return f.fetchUsage(ctx, account, now)
 	}

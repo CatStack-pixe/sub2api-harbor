@@ -103,10 +103,20 @@ func cloneGroupModelPricing(value []ChannelModelPricing) []ChannelModelPricing {
 		cloned[i].InputPrice = cloneGroupValuePointer(value[i].InputPrice)
 		cloned[i].OutputPrice = cloneGroupValuePointer(value[i].OutputPrice)
 		cloned[i].CacheWritePrice = cloneGroupValuePointer(value[i].CacheWritePrice)
+		cloned[i].CacheWrite1hPrice = cloneGroupValuePointer(value[i].CacheWrite1hPrice)
 		cloned[i].CacheReadPrice = cloneGroupValuePointer(value[i].CacheReadPrice)
+		cloned[i].FastMultiplier = cloneGroupValuePointer(value[i].FastMultiplier)
+		cloned[i].FlexMultiplier = cloneGroupValuePointer(value[i].FlexMultiplier)
+		cloned[i].MaxReasoningEffortMultiplier = cloneGroupValuePointer(value[i].MaxReasoningEffortMultiplier)
 		cloned[i].ImageInputPrice = cloneGroupValuePointer(value[i].ImageInputPrice)
 		cloned[i].ImageOutputPrice = cloneGroupValuePointer(value[i].ImageOutputPrice)
 		cloned[i].PerRequestPrice = cloneGroupValuePointer(value[i].PerRequestPrice)
+		for j := range value[i].TimeWindows {
+			cloned[i].TimeWindows[j].InputPrice = cloneGroupValuePointer(value[i].TimeWindows[j].InputPrice)
+			cloned[i].TimeWindows[j].OutputPrice = cloneGroupValuePointer(value[i].TimeWindows[j].OutputPrice)
+			cloned[i].TimeWindows[j].CacheWritePrice = cloneGroupValuePointer(value[i].TimeWindows[j].CacheWritePrice)
+			cloned[i].TimeWindows[j].CacheReadPrice = cloneGroupValuePointer(value[i].TimeWindows[j].CacheReadPrice)
+		}
 		for j := range value[i].Intervals {
 			cloned[i].Intervals[j].MaxTokens = cloneGroupValuePointer(value[i].Intervals[j].MaxTokens)
 			cloned[i].Intervals[j].InputPrice = cloneGroupValuePointer(value[i].Intervals[j].InputPrice)
@@ -186,6 +196,12 @@ func cloneGroupForDuplicate(source *Group, operationID string) *Group {
 			ModelMappingEnabled: source.ModelsListConfig.ModelMappingEnabled,
 			ModelMapping:        cloneGroupStringMap(source.ModelsListConfig.ModelMapping),
 		},
+		ModelAllowlist: GroupModelAllowlist{
+			Enabled: source.ModelAllowlist.Enabled,
+			Models:  append([]string(nil), source.ModelAllowlist.Models...),
+		},
+		// 固定账号 manifest 配置指向源分组的账号 ID，复制后成员关系可能变化，重置为关闭且列表为空。
+		CodexModelsManifestConfig:   GroupCodexModelsManifestConfig{},
 		RPMLimit:                    source.RPMLimit,
 		MaxReasoningEffort:          source.MaxReasoningEffort,
 		MaxReasoningEffortOverLimit: source.MaxReasoningEffortOverLimit,
@@ -207,6 +223,9 @@ func cloneGroupStringMap(source map[string]string) map[string]string {
 // RecoverDuplicateGroup performs a read-only lookup for a copy that was already
 // committed for the same actor, source group, and idempotency key.
 func (s *adminServiceImpl) RecoverDuplicateGroup(ctx context.Context, id int64, actorScope, operationKey string) (*Group, error) {
+	if err := s.ValidateSimpleModeGroupOperation(AdminGroupOperationDuplicate); err != nil {
+		return nil, err
+	}
 	operationID := duplicateGroupOperationID(id, actorScope, operationKey)
 	if operationID == "" {
 		return nil, nil
@@ -232,6 +251,9 @@ func (s *adminServiceImpl) RecoverDuplicateGroup(ctx context.Context, id int64, 
 // account priorities. The repository commits the group, bindings, and outbox
 // event atomically so a failed binding never leaves an orphan group.
 func (s *adminServiceImpl) DuplicateGroup(ctx context.Context, id int64, actorScope, operationKey string) (*Group, error) {
+	if err := s.ValidateSimpleModeGroupOperation(AdminGroupOperationDuplicate); err != nil {
+		return nil, err
+	}
 	existing, err := s.RecoverDuplicateGroup(ctx, id, actorScope, operationKey)
 	if err != nil {
 		return nil, err

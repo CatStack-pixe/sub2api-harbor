@@ -182,7 +182,7 @@ func DetectModelPlatform(model string) (string, bool) {
 		return PlatformGLM, true
 	case strings.HasPrefix(normalized, "qwen-"):
 		return PlatformDashScope, true
-	case strings.HasPrefix(normalized, "minimax-"):
+	case strings.HasPrefix(normalized, "minimax-"), strings.HasPrefix(normalized, "abab5"), strings.HasPrefix(normalized, "abab6"), strings.HasPrefix(normalized, "abab7"):
 		return PlatformMiniMax, true
 	case strings.HasPrefix(normalized, "doubao-"):
 		return PlatformVolcengine, true
@@ -238,7 +238,7 @@ func isConcreteRequestPlatform(platform string) bool {
 	case PlatformAnthropic, PlatformOpenAI, PlatformGemini, PlatformAntigravity, PlatformGrok,
 		PlatformAgnes, PlatformDeepSeek, PlatformNvidia, PlatformTokenRhythm, PlatformKimi,
 		PlatformZhipu, PlatformChatAnywhere, PlatformGLM, PlatformModelScope, PlatformDashScope,
-		PlatformMiniMax, PlatformVolcengine, PlatformSenseNova:
+		PlatformMiniMax, PlatformVolcengine, PlatformSenseNova, PlatformOpenCodeGo:
 		return true
 	default:
 		return false

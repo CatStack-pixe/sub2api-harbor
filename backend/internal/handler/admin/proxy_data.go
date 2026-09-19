@@ -184,16 +184,18 @@ func (h *ProxyHandler) ImportData(c *gin.Context) {
 				updateInput := &service.UpdateProxyInput{
 					Status:         normalizedStatus,
 					ExpiresAt:      existingExpiresAt,
+					ClearExpiresAt: existingExpiresAt == nil,
 					FallbackMode:   existingFallbackMode,
 					BackupProxyID:  existingBackupProxyID,
-					ExpiryWarnDays: item.ExpiryWarnDays,
+					ClearBackupID:  existingBackupProxyID == nil,
+					ExpiryWarnDays: &item.ExpiryWarnDays,
 					// 保留已存在代理的网络配置字段
 					Name:            existing.Name,
 					Protocol:        existing.Protocol,
 					Host:            existing.Host,
 					Port:            existing.Port,
-					Username:        existing.Username,
-					Password:        existing.Password,
+					Username:        &existing.Username,
+					Password:        &existing.Password,
 					ProxyGroupID:    proxyGroupID,
 					ProxyGroupIDSet: true,
 				}
@@ -269,16 +271,18 @@ func (h *ProxyHandler) ImportData(c *gin.Context) {
 			// 新建后同步 status 时，传入完整字段，避免零值覆盖刚创建的有效期/fallback 配置。
 			if _, err := h.adminService.UpdateProxy(ctx, created.ID, &service.UpdateProxyInput{
 				Status:          normalizedStatus,
+				ClearBackupID:  backupProxyID == nil,
+				ClearExpiresAt: expiresAt == nil,
 				ExpiresAt:       expiresAt,
 				FallbackMode:    fallbackMode,
 				BackupProxyID:   backupProxyID,
-				ExpiryWarnDays:  item.ExpiryWarnDays,
+				ExpiryWarnDays:  &item.ExpiryWarnDays,
 				Name:            created.Name,
 				Protocol:        created.Protocol,
 				Host:            created.Host,
 				Port:            created.Port,
-				Username:        created.Username,
-				Password:        created.Password,
+				Username:        &created.Username,
+				Password:        &created.Password,
 				ProxyGroupID:    proxyGroupID,
 				ProxyGroupIDSet: true,
 			}); err != nil {

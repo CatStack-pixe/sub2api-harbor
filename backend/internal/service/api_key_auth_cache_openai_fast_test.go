@@ -33,5 +33,36 @@ func TestAPIKeyAuthSnapshotGroupForceOpenAIFastRoundtrip(t *testing.T) {
 	require.True(t, materialized.Group.ForceOpenAIFast)
 	require.True(t, materialized.Group.FreeOpenAIFast)
 	require.Equal(t, apiKeyAuthSnapshotVersion, cached.Snapshot.Version)
-	require.Equal(t, 23, cached.Snapshot.Version)
+}
+
+func TestAPIKeyAuthSnapshotPreservesIndependentModelPolicies(t *testing.T) {
+	svc := &APIKeyService{}
+	apiKey := profitAuthTestAPIKey()
+	apiKey.Group.Platform = PlatformAgnes
+	apiKey.Group.ModelsListConfig = GroupModelsListConfig{
+		Enabled: true,
+		Models: []string{"public-alias"},
+		ModelMappingEnabled: true,
+		ModelMapping: map[string]string{"public-alias": "agnes-2.5-pro-alpha"},
+	}
+	apiKey.Group.ModelAllowlist = GroupModelAllowlist{Enabled: true, Models: []string{"other-allowed-model"}}
+	payload, err := json.Marshal(&APIKeyAuthCacheEntry{Snapshot: svc.snapshotFromAPIKey(context.Background(), apiKey)})
+	require.NoError(t, err)
+	var cached APIKeyAuthCacheEntry
+	require.NoError(t, json.Unmarshal(payload, &cached))
+	materialized, used, err := svc.applyAuthCacheEntry(apiKey.Key, &cached)
+	require.NoError(t, err)
+	require.True(t, used)
+	require.Equal(t, apiKey.Group.ModelsListConfig, materialized.Group.ModelsListConfig)
+	require.Equal(t, apiKey.Group.ModelAllowlist, materialized.Group.ModelAllowlist)
+	mapped, ok := materialized.Group.ResolveRequestModel("public-alias")
+	require.True(t, ok)
+	require.Equal(t, "agnes-2.5-pro-alpha", mapped)
+
+	// A snapshot created before the fork listing fields were restored must reload.
+	cached.Snapshot.Version = 24
+	materialized, used, err = svc.applyAuthCacheEntry(apiKey.Key, &cached)
+	require.NoError(t, err)
+	require.False(t, used)
+	require.Nil(t, materialized)
 }

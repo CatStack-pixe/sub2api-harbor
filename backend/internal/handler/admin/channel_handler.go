@@ -67,6 +67,7 @@ type channelModelPricingRequest struct {
 	CacheReadPrice    *float64                   `json:"cache_read_price" binding:"omitempty,min=0"`
 	FastMultiplier    *float64                   `json:"fast_multiplier" binding:"omitempty,gt=0"`
 	FlexMultiplier    *float64                   `json:"flex_multiplier" binding:"omitempty,gt=0"`
+	MaxReasoningEffortMultiplier *float64                   `json:"max_reasoning_effort_multiplier" binding:"omitempty,gt=0"`
 	ImageInputPrice   *float64                   `json:"image_input_price" binding:"omitempty,min=0"`
 	ImageOutputPrice  *float64                   `json:"image_output_price" binding:"omitempty,min=0"`
 	PerRequestPrice   *float64                   `json:"per_request_price" binding:"omitempty,min=0"`
@@ -151,6 +152,7 @@ type channelModelPricingResponse struct {
 	CacheReadPrice    *float64                    `json:"cache_read_price"`
 	FastMultiplier    *float64                    `json:"fast_multiplier"`
 	FlexMultiplier    *float64                    `json:"flex_multiplier"`
+	MaxReasoningEffortMultiplier *float64                    `json:"max_reasoning_effort_multiplier"`
 	ImageInputPrice   *float64                    `json:"image_input_price"`
 	ImageOutputPrice  *float64                    `json:"image_output_price"`
 	PerRequestPrice   *float64                    `json:"per_request_price"`
@@ -300,6 +302,7 @@ func pricingToResponse(p *service.ChannelModelPricing) channelModelPricingRespon
 		CacheReadPrice:    p.CacheReadPrice,
 		FastMultiplier:    p.FastMultiplier,
 		FlexMultiplier:    p.FlexMultiplier,
+		MaxReasoningEffortMultiplier: p.MaxReasoningEffortMultiplier,
 		ImageInputPrice:   p.ImageInputPrice,
 		ImageOutputPrice:  p.ImageOutputPrice,
 		PerRequestPrice:   p.PerRequestPrice,
@@ -397,10 +400,11 @@ func pricingRequestToService(reqs []channelModelPricingRequest, allowChannelMult
 				CacheWritePrice: window.CacheWritePrice, CacheReadPrice: window.CacheReadPrice, SortOrder: window.SortOrder,
 			})
 		}
-		var fastMultiplier, flexMultiplier *float64
+		var fastMultiplier, flexMultiplier, maxReasoningEffortMultiplier *float64
 		if allowChannelMultipliers {
 			fastMultiplier = r.FastMultiplier
 			flexMultiplier = r.FlexMultiplier
+			maxReasoningEffortMultiplier = r.MaxReasoningEffortMultiplier
 		}
 		result = append(result, service.ChannelModelPricing{
 			Platform:          platform,
@@ -413,6 +417,7 @@ func pricingRequestToService(reqs []channelModelPricingRequest, allowChannelMult
 			CacheReadPrice:    r.CacheReadPrice,
 			FastMultiplier:    fastMultiplier,
 			FlexMultiplier:    flexMultiplier,
+			MaxReasoningEffortMultiplier: maxReasoningEffortMultiplier,
 			ImageInputPrice:   r.ImageInputPrice,
 			ImageOutputPrice:  r.ImageOutputPrice,
 			PerRequestPrice:   r.PerRequestPrice,
@@ -680,14 +685,15 @@ func (h *ChannelHandler) GetModelDefaultPricing(c *gin.Context) {
 	}
 
 	response.Success(c, gin.H{
-		"found":                true,
-		"input_price":          pricing.InputPricePerToken,
-		"output_price":         pricing.OutputPricePerToken,
-		"cache_write_price":    cacheWritePrice,
-		"cache_write_1h_price": cacheWrite1hPrice,
-		"cache_read_price":     pricing.CacheReadPricePerToken,
-		"image_input_price":    pricing.ImageInputPricePerToken,
-		"image_output_price":   pricing.ImageOutputPricePerToken,
+		"found":                           true,
+		"input_price":                     pricing.InputPricePerToken,
+		"output_price":                    pricing.OutputPricePerToken,
+		"cache_write_price":               cacheWritePrice,
+		"cache_write_1h_price":            cacheWrite1hPrice,
+		"cache_read_price":                pricing.CacheReadPricePerToken,
+		"max_reasoning_effort_multiplier": pricing.MaxReasoningEffortMultiplier,
+		"image_input_price":               pricing.ImageInputPricePerToken,
+		"image_output_price":              pricing.ImageOutputPricePerToken,
 	})
 }
 
@@ -712,6 +718,7 @@ var platformToLiteLLMProvider = map[string]string{
 	service.PlatformMiniMax:      "minimax",
 	service.PlatformVolcengine:   "volcengine",
 	service.PlatformSenseNova:    "sensenova",
+	service.PlatformOpenCodeGo: "opencode-go",
 }
 
 // SyncPricingModels 返回 LiteLLM 定价目录中指定平台的最新模型列表
