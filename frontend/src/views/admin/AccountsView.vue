@@ -2281,8 +2281,14 @@ const handleAccountEdited = (updatedAccount: Account) => {
   // Console credential edits invalidate both desktop batch and mobile cell
   // caches. Only the explicit editor event advances this token; background
   // balance snapshots also update updated_at and must not trigger a probe loop.
+  // Invalidate in-flight batches even when the usage cell is hidden or mobile.
+  usageBatchRequestTokenByAccountId.value = {
+    ...usageBatchRequestTokenByAccountId.value,
+    [String(updatedAccount.id)]: ++usageBatchRequestToken
+  }
   usageBatchCache.delete(updatedAccount.id)
   setUsageBatchState(updatedAccount.id, null, null)
+  setUsageBatchLoading(updatedAccount.id, false)
   usageAccountEditRefreshTokens.value[updatedAccount.id] =
     (usageAccountEditRefreshTokens.value[updatedAccount.id] ?? 0) + 1
 }

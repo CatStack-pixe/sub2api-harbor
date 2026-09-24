@@ -69,8 +69,10 @@ vi.mock('vue-i18n', async () => {
 // Render the per-column header slots so we can assert the usage-window header hint.
 const DataTableStub = {
   props: ['columns', 'data'],
+  data: () => ({ usageVisible: true }),
   template: `
     <div data-test="data-table">
+      <button data-test="toggle-usage-cells" @click="usageVisible = !usageVisible" />
       <template v-for="column in columns" :key="column.key">
         <div v-if="column.key === 'usage'" data-test="usage-header">
           <slot :name="'header-' + column.key" :column="column" />
@@ -82,9 +84,11 @@ const DataTableStub = {
       <div v-for="row in data" :key="row.id" data-test="account-rate">
         <slot name="cell-rate_multiplier" :row="row" />
       </div>
-      <div v-for="row in data" :key="'usage-' + row.id" :data-test="'account-usage-' + row.id">
-        <slot name="cell-usage" :row="row" />
-      </div>
+      <template v-if="usageVisible">
+        <div v-for="row in data" :key="'usage-' + row.id" :data-test="'account-usage-' + row.id">
+          <slot name="cell-usage" :row="row" />
+        </div>
+      </template>
     </div>
   `
 }
@@ -343,6 +347,64 @@ describe('admin AccountsView usage windows hint', () => {
     await new Promise(resolve => setTimeout(resolve, 0))
     await flushPromises()
     expect(getBatchUsage).toHaveBeenCalledTimes(2)
+    wrapper.unmount()
+  })
+
+  it('discards a pre-edit batch response while the Tierflow usage cell is unmounted', async () => {
+    const account = {
+      id: 45,
+      name: 'tierflow-hidden-wallet',
+      platform: 'tierflow',
+      type: 'apikey',
+      status: 'active',
+      schedulable: true,
+      created_at: '2026-09-24T00:00:00Z',
+      updated_at: '2026-09-24T00:00:00Z'
+    }
+    listAccounts.mockResolvedValueOnce({
+      items: [account], total: 1, page: 1, page_size: 20, pages: 1
+    })
+    let resolveOldBatch!: (value: unknown) => void
+    getBatchUsage.mockReturnValueOnce(new Promise(resolve => {
+      resolveOldBatch = resolve
+    }))
+    getBatchUsage.mockResolvedValueOnce({
+      usage: {
+        45: {
+          tierflow_balance: {
+            is_available: true,
+            remaining_balance: 42.5,
+            total_usage: 7.5,
+            currency: 'CNY',
+            quota_per_unit: 500000,
+            request_count: 2,
+            fetched_at: 1790208000
+          }
+        }
+      },
+      errors: {}
+    })
+    const wrapper = mountView(true)
+    await flushPromises()
+    await new Promise(resolve => setTimeout(resolve, 0))
+    await flushPromises()
+    expect(getBatchUsage).toHaveBeenCalledTimes(1)
+
+    await wrapper.get('[data-test="toggle-usage-cells"]').trigger('click')
+    expect(wrapper.findComponent(AccountUsageCell).exists()).toBe(false)
+    wrapper.getComponent({ name: 'EditAccountModal' }).vm.$emit('updated', {
+      ...account, updated_at: '2026-09-24T00:01:00Z'
+    })
+    await flushPromises()
+    resolveOldBatch({ usage: { 45: { error: 'obsolete_session' } }, errors: {} })
+    await flushPromises()
+
+    await wrapper.get('[data-test="toggle-usage-cells"]').trigger('click')
+    await new Promise(resolve => setTimeout(resolve, 0))
+    await flushPromises()
+    expect(getBatchUsage).toHaveBeenCalledTimes(2)
+    expect(wrapper.get('[data-test="account-usage-45"]').text()).toContain('CNY 42.50')
+    expect(wrapper.get('[data-test="account-usage-45"]').text()).not.toContain('obsolete_session')
     wrapper.unmount()
   })
 })
