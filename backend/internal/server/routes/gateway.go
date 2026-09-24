@@ -26,7 +26,7 @@ func isOpenAIMessagesCompatiblePlatform(platform string) bool {
 		service.PlatformDeepSeek, service.PlatformNvidia, service.PlatformTokenRhythm,
 		service.PlatformKimi, service.PlatformZhipu, service.PlatformChatAnywhere,
 		service.PlatformGLM, service.PlatformModelScope, service.PlatformDashScope,
-		service.PlatformMiniMax, service.PlatformVolcengine, service.PlatformSenseNova:
+		service.PlatformMiniMax, service.PlatformVolcengine, service.PlatformSenseNova, service.PlatformTierflow:
 		return true
 	default:
 		return false
@@ -67,7 +67,7 @@ func RegisterGatewayRoutes(
 			service.PlatformDeepSeek, service.PlatformNvidia, service.PlatformTokenRhythm,
 			service.PlatformKimi, service.PlatformZhipu, service.PlatformChatAnywhere,
 			service.PlatformGLM, service.PlatformModelScope, service.PlatformDashScope,
-			service.PlatformMiniMax, service.PlatformVolcengine, service.PlatformSenseNova, service.PlatformOpenCodeGo:
+			service.PlatformMiniMax, service.PlatformVolcengine, service.PlatformSenseNova, service.PlatformTierflow, service.PlatformOpenCodeGo:
 			return true
 		default:
 			return false
@@ -86,7 +86,7 @@ func RegisterGatewayRoutes(
 		switch getGroupPlatform(c) {
 		case service.PlatformOpenAI, service.PlatformKimi, service.PlatformZhipu, service.PlatformDeepseek, service.PlatformMiniMax, service.PlatformOpenCodeGo:
 			h.OpenAIGateway.CountTokens(c)
-		case service.PlatformGrok, service.PlatformAgnes, service.PlatformNvidia, service.PlatformChatAnywhere, service.PlatformGLM, service.PlatformModelScope, service.PlatformDashScope, service.PlatformVolcengine, service.PlatformSenseNova:
+		case service.PlatformGrok, service.PlatformAgnes, service.PlatformNvidia, service.PlatformChatAnywhere, service.PlatformGLM, service.PlatformModelScope, service.PlatformDashScope, service.PlatformVolcengine, service.PlatformSenseNova, service.PlatformTierflow:
 			h.OpenAIGateway.GrokCountTokens(c)
 		default:
 			h.Gateway.CountTokens(c)

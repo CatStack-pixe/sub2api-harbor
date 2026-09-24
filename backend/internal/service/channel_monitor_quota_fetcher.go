@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"math"
 	"sort"
 	"strconv"
 	"strings"
@@ -267,6 +268,18 @@ func (f *ChannelMonitorQuotaFetcher) fetchUsage(ctx context.Context, account *Ac
 	}
 	if snapshot.PlanLevel == "" {
 		snapshot.PlanLevel = usage.SubscriptionTierRaw
+	}
+	if account.IsTierflow() {
+		wallet := usage.TierflowBalance
+		if wallet == nil || !wallet.IsAvailable || math.IsNaN(wallet.RemainingBalance) || math.IsInf(wallet.RemainingBalance, 0) {
+			return quotaErrorSnapshot("usage", "Tierflow balance is unavailable", now)
+		}
+		// A wallet has no fixed allowance or reset window. Use the existing
+		// balance fields instead of deriving a quota limit from lifetime spend.
+		balance := wallet.RemainingBalance
+		snapshot.Balance = &balance
+		snapshot.Currency = wallet.Currency
+		snapshot.BalanceLow = balance <= 0
 	}
 	return snapshot
 }

@@ -170,6 +170,25 @@ describe('MonitorFormDialog linked account selector', () => {
     monitorUpdate.mockReset().mockResolvedValue({})
   })
 
+  it('creates Tierflow monitors with the relay endpoint and Chat Completions mode', async () => {
+    const wrapper = mountDialog()
+    await flushPromises()
+    await wrapper.get('[data-testid="monitor-provider-tierflow"]').trigger('click')
+    expect(wrapper.get<HTMLInputElement>('[data-testid="monitor-endpoint"]').element.value).toBe('https://tierflow.cn/v1')
+    await wrapper.get('form input[type="text"]').setValue('Tierflow health')
+    await wrapper.get('form input[type="password"]').setValue('test-api-key')
+    await wrapper.get('[data-testid="monitor-primary-model"]').setValue('upstream-model')
+    await wrapper.get('form#channel-monitor-form').trigger('submit.prevent')
+    await flushPromises()
+
+    expect(monitorCreate).toHaveBeenCalledWith(expect.objectContaining({
+      provider: 'tierflow',
+      endpoint: 'https://tierflow.cn/v1',
+      api_mode: 'chat_completions',
+      primary_model: 'upstream-model'
+    }))
+  })
+
   it('loads the first page of provider accounts when quota mode is enabled', async () => {
     accountsList.mockResolvedValue({ items: [{ id: 1, name: 'a', platform: 'anthropic' }] })
     const wrapper = mountDialog()

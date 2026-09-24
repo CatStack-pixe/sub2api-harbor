@@ -24,6 +24,7 @@ var monitorProviders = map[string]struct{}{
 	MonitorProviderDeepseek:    {},
 	MonitorProviderSenseNova:   {},
 	MonitorProviderMiniMax:     {},
+	MonitorProviderTierflow:    {},
 }
 
 // probeCapableProviders 支持探活（probe / quota_probe）的 provider。
@@ -40,6 +41,7 @@ var probeCapableProviders = map[string]struct{}{
 	MonitorProviderDeepseek:  {},
 	MonitorProviderSenseNova: {},
 	MonitorProviderMiniMax:   {},
+	MonitorProviderTierflow:  {},
 }
 
 // validateProvider 校验 provider 字符串。

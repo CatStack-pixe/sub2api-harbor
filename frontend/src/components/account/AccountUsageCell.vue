@@ -193,7 +193,34 @@
       </div>
     </template>
 
-    <!-- SenseNova API key accounts: local rolling point windows -->
+    <!-- Tierflow API key accounts: console wallet balance -->
+    <template v-else-if="account.platform === 'tierflow'">
+      <div class="space-y-1" data-testid="tierflow-balance">
+        <div v-if="loading" class="h-3 w-24 animate-pulse rounded bg-gray-200 dark:bg-gray-700"></div>
+        <div v-else-if="error || usageInfo?.error" class="max-w-[200px] truncate text-xs text-red-500" :title="error || usageInfo?.error || undefined">
+          {{ error || usageInfo?.error }}
+        </div>
+        <template v-else-if="tierflowBalance?.is_available">
+          <div class="text-xs font-medium text-cyan-700 dark:text-cyan-300">
+            {{ t('admin.accounts.tierflow.remainingBalance') }}: {{ formatTierflowAmount(tierflowBalance.remaining_balance) }}
+          </div>
+          <div class="text-[10px] text-gray-500 dark:text-gray-400">
+            {{ t('admin.accounts.tierflow.usedBalance') }}: {{ formatTierflowAmount(tierflowBalance.total_usage) }}
+          </div>
+        </template>
+        <div v-else class="text-xs text-gray-400">{{ t('admin.accounts.tierflow.noBalance') }}</div>
+        <button
+          type="button"
+          class="rounded px-1.5 py-0.5 text-[10px] text-cyan-700 hover:bg-cyan-50 disabled:opacity-50 dark:text-cyan-300 dark:hover:bg-cyan-900/30"
+          data-testid="tierflow-balance-refresh"
+          :disabled="loading"
+          @click="loadUsage({ source: 'active', bypassCache: true })"
+        >
+          {{ t('admin.accounts.tierflow.refreshBalance') }}
+        </button>
+      </div>
+    </template>
+
     <template v-else-if="account.platform === 'sensenova'">
       <div v-if="loading" class="space-y-1.5">
         <div class="flex items-center gap-1">
@@ -838,6 +865,7 @@ const showUsageWindows = computed(() => {
     return true
   }
   if (props.account.platform === 'sensenova') return true
+  if (props.account.platform === 'tierflow') return true
   return props.account.type === 'oauth' || props.account.type === 'setup-token'
 })
 
@@ -850,6 +878,9 @@ const shouldFetchUsage = computed(() => {
   }
   if (props.account.platform === 'sensenova') {
     return true
+  }
+  if (props.account.platform === 'tierflow') {
+    return props.account.type === 'apikey'
   }
   if (props.account.platform === 'chatanywhere') {
     return true
@@ -874,6 +905,13 @@ const cnAccountMode = computed(() => {
 })
 const cnQuotaCellVisible = computed(() => cnQuotaCellVisibleFn(props.account.platform, cnAccountMode.value))
 const cnBalanceCellVisible = computed(() => cnBalanceCellVisibleFn(props.account.platform, cnAccountMode.value))
+
+const tierflowBalance = computed(() => usageInfo.value?.tierflow_balance)
+const formatTierflowAmount = (value: number | undefined): string => {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return '-'
+  const currency = tierflowBalance.value?.currency || ''
+  return `${currency} ${value.toFixed(2)}`.trim()
+}
 
 const isBatchManaged = computed(() => typeof props.requestBatchedUsage === 'function')
 
@@ -1520,12 +1558,14 @@ const syncManagedUsageState = () => {
   loading.value = props.batchedUsageLoading === true
 }
 
+let usageRequestGeneration = 0
 const loadUsage = async (options?: { source?: 'passive' | 'active'; bypassCache?: boolean }) => {
   if (!shouldFetchUsage.value) return
   if (isBatchManaged.value) {
     requestParentBatchUsage({ force: options?.bypassCache === true })
     return
   }
+  const generation = ++usageRequestGeneration
 
   // Check cache
   if (!options?.bypassCache) {
@@ -1545,17 +1585,17 @@ const loadUsage = async (options?: { source?: 'passive' | 'active'; bypassCache?
 			? adminAPI.accounts.getUsage(props.account.id, options.source, options.bypassCache === true)
 			: adminAPI.accounts.getUsage(props.account.id)
     const result = await enqueueUsageRequest(props.account, fetchFn)
-    if (!unmounted.value) {
+    if (!unmounted.value && generation === usageRequestGeneration) {
       usageInfo.value = result
       _usageCache.set(props.account.id, { data: result, ts: Date.now() })
     }
   } catch (e: any) {
-    if (!unmounted.value) {
+    if (!unmounted.value && generation === usageRequestGeneration) {
       error.value = t('common.error')
       console.error('Failed to load usage:', e)
     }
   } finally {
-    if (!unmounted.value) loading.value = false
+    if (!unmounted.value && generation === usageRequestGeneration) loading.value = false
   }
 }
 
@@ -1828,13 +1868,16 @@ watch(
     if (nextToken === prevToken) return
     if (!shouldFetchUsage.value) return
 
+    ++usageRequestGeneration
+    _usageCache.delete(props.account.id)
     if (isBatchManaged.value) {
       requestParentBatchUsage({ force: true })
       return
     }
 
-    const source = isAnthropicOAuthOrSetupToken.value ? 'passive' : undefined
-    _usageCache.delete(props.account.id)
+    const source = isAnthropicOAuthOrSetupToken.value
+      ? 'passive'
+      : props.account.platform === 'tierflow' ? 'active' : undefined
     loadUsage({ source, bypassCache: true }).catch((e) => {
       console.error('Failed to refresh usage after manual refresh:', e)
     })

@@ -384,6 +384,10 @@ func (s *AccountTestService) TestAccountConnection(c *gin.Context, accountID int
 		return s.testChatAnywhereAccountConnection(c, account, modelID, prompt)
 	}
 
+	if account.IsTierflow() {
+		return s.testTierflowAccountConnection(c, account, modelID, prompt)
+	}
+
 	if account.IsOpenAI() || account.IsAgnes() || account.IsGLM() ||
 		(account.IsDeepSeek() && account.GetAPIProtocol() == APIProtocolResponses) {
 		return s.testOpenAIAccountConnection(c, account, modelID, prompt, normalizeAccountTestMode(mode))

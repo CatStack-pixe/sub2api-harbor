@@ -718,6 +718,7 @@ var platformToLiteLLMProvider = map[string]string{
 	service.PlatformMiniMax:      "minimax",
 	service.PlatformVolcengine:   "volcengine",
 	service.PlatformSenseNova:    "sensenova",
+	service.PlatformTierflow:     "tierflow",
 	service.PlatformOpenCodeGo:   "opencode-go",
 }
 

@@ -214,6 +214,51 @@ describe('CreateAccountModal OpenAI long-context billing', () => {
 
   afterEach(() => vi.useRealTimers())
 
+  it('creates a Tierflow API-key account with optional independent console credentials', async () => {
+    const wrapper = mountModal()
+    await wrapper.get('[data-testid="tierflow-platform"]').trigger('click')
+    await wrapper.get('form#create-account-form input[type="text"]').setValue('Tierflow account')
+    await wrapper.get('form#create-account-form input[type="password"]').setValue('test-api-key')
+    await wrapper.get('[data-testid="tierflow-cookie"]').setValue(' session=test-cookie ')
+    await wrapper.get('[data-testid="tierflow-user-id"]').setValue(' 12345 ')
+    await wrapper.get('form#create-account-form').trigger('submit.prevent')
+    await flushPromises()
+
+    expect(createAccountMock).toHaveBeenCalledTimes(1)
+    const payload = createAccountMock.mock.calls[0]?.[0]
+    expect(payload).toMatchObject({
+      platform: 'tierflow',
+      type: 'apikey',
+      credentials: {
+        base_url: 'https://tierflow.cn/v1',
+        api_key: 'test-api-key',
+        tierflow_cookie: 'session=test-cookie',
+        tierflow_user_id: '12345'
+      }
+    })
+    expect(payload.credentials).not.toHaveProperty('api_protocol')
+    expect(payload.credentials).not.toHaveProperty('model_mapping')
+    expect(payload.upstream_billing_probe_enabled).toBeUndefined()
+    expect(wrapper.find('[data-testid="upstream-billing-auto-probe"]').exists()).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('creates a Tierflow API-key account without requiring console credentials', async () => {
+    const wrapper = mountModal()
+    await wrapper.get('[data-testid="tierflow-platform"]').trigger('click')
+    await wrapper.get('form#create-account-form input[type="text"]').setValue('Tierflow API only')
+    await wrapper.get('form#create-account-form input[type="password"]').setValue('test-api-key')
+    await wrapper.get('form#create-account-form').trigger('submit.prevent')
+    await flushPromises()
+    expect(createAccountMock).toHaveBeenCalledTimes(1)
+    const credentials = createAccountMock.mock.calls[0]?.[0]?.credentials
+    expect(credentials.base_url).toBe('https://tierflow.cn/v1')
+    expect(credentials).not.toHaveProperty('tierflow_cookie')
+    expect(credentials).not.toHaveProperty('tierflow_user_id')
+    expect(createAccountMock.mock.calls[0]?.[0]?.upstream_billing_probe_enabled).toBeUndefined()
+    wrapper.unmount()
+  })
+
   it('sets month and year expiry presets without submitting the account form', async () => {
     vi.useFakeTimers({ toFake: ['Date'] })
     vi.setSystemTime(new Date('2026-01-31T12:34:00'))

@@ -178,6 +178,108 @@ func TestCreateTokenRhythmAccountEnablesBalanceProbeByDefault(t *testing.T) {
 	require.Equal(t, true, created.Extra[UpstreamBillingProbeEnabledExtraKey])
 }
 
+func TestCreateTierflowAccountOnlyEnablesBalanceProbeWithConsoleCredentials(t *testing.T) {
+	for _, withConsole := range []bool{false, true} {
+		credentials := map[string]any{"api_key": "test-key"}
+		if withConsole {
+			credentials["tierflow_cookie"] = "test-session"
+			credentials["tierflow_user_id"] = "123"
+		}
+		repo := &upstreamBillingProbeAccountRepo{}
+		created, err := (&adminServiceImpl{accountRepo: repo}).CreateAccount(context.Background(), &CreateAccountInput{
+			Name: "tierflow-default-probe", Platform: PlatformTierflow, Type: AccountTypeAPIKey,
+			Credentials: credentials, SkipDefaultGroupBind: true,
+		})
+		require.NoError(t, err)
+		require.Equal(t, withConsole, upstreamBillingProbeEnabled(created))
+	}
+}
+
+func TestUpdateTierflowConsoleCredentialsPreservesExplicitProbeChoice(t *testing.T) {
+	for _, test := range []struct {
+		name      string
+		extra     map[string]any
+		explicit  *bool
+		wantProbe bool
+	}{
+		{name: "first console credentials default on", wantProbe: true},
+		{name: "existing opt out preserved", extra: map[string]any{UpstreamBillingProbeEnabledExtraKey: false}},
+		{name: "explicit update opt out preserved", explicit: func() *bool { value := false; return &value }()},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			repo := &upstreamBillingProbeAccountRepo{accounts: map[int64]*Account{42: {
+				ID: 42, Platform: PlatformTierflow, Type: AccountTypeAPIKey, Status: StatusActive,
+				Credentials: map[string]any{"api_key": "test-key"}, Extra: test.extra,
+			}}}
+			updated, err := (&adminServiceImpl{accountRepo: repo}).UpdateAccount(context.Background(), 42, &UpdateAccountInput{
+				Credentials:  map[string]any{"tierflow_cookie": "new-test-session", "tierflow_user_id": "123"},
+				ProbeEnabled: test.explicit,
+			})
+			require.NoError(t, err)
+			require.Equal(t, test.wantProbe, upstreamBillingProbeEnabled(updated))
+		})
+	}
+}
+
+func TestUpdateTierflowConsoleCredentialsInvalidatesOnlyChangedWalletIdentity(t *testing.T) {
+	for _, probeEnabled := range []bool{false, true} {
+		for _, test := range []struct {
+			name         string
+			credentials  map[string]any
+			wantSnapshot bool
+		}{
+			{name: "rotate Cookie", credentials: map[string]any{"tierflow_cookie": "new-test-session", "tierflow_user_id": "123"}},
+			{name: "rotate user ID", credentials: map[string]any{"tierflow_user_id": "456"}},
+			{name: "keep redacted Cookie", credentials: map[string]any{"tierflow_user_id": "123"}, wantSnapshot: true},
+			{name: "normalize unchanged credentials", credentials: map[string]any{"tierflow_cookie": "session=test-session; unrelated=discard", "tierflow_user_id": "00123"}, wantSnapshot: true},
+		} {
+			t.Run(test.name, func(t *testing.T) {
+				repo := &upstreamBillingProbeAccountRepo{accounts: map[int64]*Account{42: {
+					ID: 42, Platform: PlatformTierflow, Type: AccountTypeAPIKey, Status: StatusActive,
+					Credentials: map[string]any{"api_key": "test-key", "tierflow_cookie": "test-session", "tierflow_user_id": "123"},
+					Extra: map[string]any{
+						UpstreamBillingProbeEnabledExtraKey: probeEnabled,
+						UpstreamBillingProbeExtraKey:        map[string]any{"status": "failed", "next_probe_at": "2099-01-01T00:00:00Z"},
+					},
+				}}}
+				updated, err := (&adminServiceImpl{accountRepo: repo}).UpdateAccount(context.Background(), 42, &UpdateAccountInput{
+					Credentials: mergeMap(nil, test.credentials),
+				})
+				require.NoError(t, err)
+				require.Equal(t, probeEnabled, upstreamBillingProbeEnabled(updated))
+				_, hasSnapshot := updated.Extra[UpstreamBillingProbeExtraKey]
+				require.Equal(t, test.wantSnapshot, hasSnapshot)
+			})
+		}
+	}
+}
+
+func TestUpdateTierflowRejectsInvalidCredentialsBeforeWrite(t *testing.T) {
+	for _, test := range []struct {
+		name        string
+		accountType string
+		credentials map[string]any
+	}{
+		{name: "invalid user ID", credentials: map[string]any{"tierflow_user_id": "not-a-number"}},
+		{name: "incomplete console pair", credentials: map[string]any{"tierflow_cookie": "new-session"}},
+		{name: "header injection", credentials: map[string]any{"tierflow_cookie": "session\r\ninjected", "tierflow_user_id": "123"}},
+		{name: "unsupported account type", accountType: AccountTypeOAuth},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			credentials := map[string]any{"api_key": "test-key", "tierflow_cookie": "test-session", "tierflow_user_id": "123"}
+			repo := &upstreamBillingProbeAccountRepo{accounts: map[int64]*Account{42: {
+				ID: 42, Platform: PlatformTierflow, Type: AccountTypeAPIKey, Credentials: mergeMap(nil, credentials),
+			}}}
+			_, err := (&adminServiceImpl{accountRepo: repo}).UpdateAccount(context.Background(), 42, &UpdateAccountInput{
+				Credentials: test.credentials, Type: test.accountType,
+			})
+			require.Error(t, err)
+			require.Equal(t, credentials, repo.accounts[42].Credentials)
+			require.Equal(t, AccountTypeAPIKey, repo.accounts[42].Type)
+		})
+	}
+}
+
 func TestUpdateAccountPreservesManagedUpstreamBillingProbeStateForUnrelatedEdit(t *testing.T) {
 	accountID := int64(110)
 	repo := &upstreamBillingProbeAccountRepo{accounts: map[int64]*Account{
@@ -734,6 +836,66 @@ func TestBulkUpdateAccountsInvalidatesProbeSnapshotForIdentityCredentials(t *tes
 	require.Len(t, repo.bulkUpdates, 1)
 	require.Contains(t, repo.bulkUpdates[0].Extra, UpstreamBillingProbeExtraKey)
 	require.Nil(t, repo.bulkUpdates[0].Extra[UpstreamBillingProbeExtraKey])
+}
+
+func TestBulkUpdateTierflowConsoleCredentialsInvalidatesWalletWithoutChangingProbeChoice(t *testing.T) {
+	for _, test := range []struct {
+		name        string
+		credentials map[string]any
+		want        map[string]any
+	}{
+		{name: "Cookie only", credentials: map[string]any{"tierflow_cookie": "session=new-test-session; unrelated=discard"}, want: map[string]any{"tierflow_cookie": "new-test-session"}},
+		{name: "user ID only", credentials: map[string]any{"tierflow_user_id": "00456"}, want: map[string]any{"tierflow_user_id": "456"}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			repo := &upstreamBillingProbeAccountRepo{accounts: map[int64]*Account{
+				1: {ID: 1, Platform: PlatformTierflow, Type: AccountTypeAPIKey,
+					Credentials: map[string]any{"api_key": "test-key-a", "tierflow_cookie": "session-a", "tierflow_user_id": "123"},
+					Extra:       map[string]any{UpstreamBillingProbeEnabledExtraKey: true}},
+				2: {ID: 2, Platform: PlatformTierflow, Type: AccountTypeAPIKey,
+					Credentials: map[string]any{"api_key": "test-key-b", "tierflow_cookie": "session-b", "tierflow_user_id": "321"},
+					Extra:       map[string]any{UpstreamBillingProbeEnabledExtraKey: false}},
+			}}
+			result, err := (&adminServiceImpl{accountRepo: repo}).BulkUpdateAccounts(context.Background(), &BulkUpdateAccountsInput{
+				AccountIDs: []int64{1, 2}, Credentials: mergeMap(nil, test.credentials),
+			})
+			require.NoError(t, err)
+			require.Equal(t, 2, result.Success)
+			require.Len(t, repo.bulkUpdates, 1)
+			update := repo.bulkUpdates[0]
+			require.Equal(t, test.want, update.Credentials)
+			require.Contains(t, update.Extra, UpstreamBillingProbeExtraKey)
+			require.Nil(t, update.Extra[UpstreamBillingProbeExtraKey])
+			require.NotContains(t, update.Extra, UpstreamBillingProbeEnabledExtraKey)
+			require.NotContains(t, update.Extra, UpstreamBillingRateSyncEnabledExtraKey)
+			require.Nil(t, update.ProbeEnabled)
+		})
+	}
+}
+
+func TestBulkUpdateTierflowConsoleCredentialsRejectsInvalidTargetsBeforeWrite(t *testing.T) {
+	for _, test := range []struct {
+		name        string
+		platform    string
+		credentials map[string]any
+		updates     map[string]any
+	}{
+		{name: "mixed platform", platform: PlatformOpenAI, updates: map[string]any{"tierflow_cookie": "new-session", "tierflow_user_id": "123"}},
+		{name: "missing user ID", platform: PlatformTierflow, updates: map[string]any{"tierflow_cookie": "new-session"}},
+		{name: "invalid Cookie", platform: PlatformTierflow, credentials: map[string]any{"tierflow_user_id": "123"}, updates: map[string]any{"tierflow_cookie": "session\r\ninjected"}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			repo := &upstreamBillingProbeAccountRepo{accounts: map[int64]*Account{
+				1: {ID: 1, Platform: PlatformTierflow, Type: AccountTypeAPIKey, Credentials: map[string]any{"tierflow_cookie": "session-a", "tierflow_user_id": "123"}},
+				2: {ID: 2, Platform: test.platform, Type: AccountTypeAPIKey, Credentials: test.credentials},
+			}}
+			_, err := (&adminServiceImpl{accountRepo: repo}).BulkUpdateAccounts(context.Background(), &BulkUpdateAccountsInput{
+				AccountIDs: []int64{1, 2}, Credentials: mergeMap(nil, test.updates),
+			})
+			require.Error(t, err)
+			require.Empty(t, repo.bulkUpdates)
+		})
+	}
 }
 
 func TestBulkUpdateAccountsInvalidatesProbeSnapshotForProxyUpdate(t *testing.T) {

@@ -60,6 +60,8 @@
                         ? 'https://apihub.agnes-ai.com/v1'
                           : account.platform === 'tokenrhythm'
                             ? 'https://tokenrhythm.studio/v1'
+                          : account.platform === 'tierflow'
+                            ? 'https://tierflow.cn/v1'
                           : account.platform === 'nvidia'
                             ? 'https://integrate.api.nvidia.com/v1'
                           : account.platform === 'deepseek'
@@ -263,6 +265,8 @@
                           : account.platform === 'deepseek'
                           ? 'sk-...'
                           : account.platform === 'kimi'
+                             ? 'sk-...'
+                          : account.platform === 'tierflow'
                             ? 'sk-...'
                           : account.platform === 'chatanywhere'
                             ? 'sk-...'
@@ -283,6 +287,13 @@
           />
           <p class="input-hint">{{ t('admin.accounts.leaveEmptyToKeep') }}</p>
         </div>
+
+        <TierflowCredentialsFields
+          v-if="account.platform === 'tierflow'"
+          v-model:cookie="tierflowCookie"
+          v-model:user-id="tierflowUserId"
+          editing
+        />
 
         <div v-if="account.platform === 'sensenova'">
           <label class="input-label">{{ t('admin.accounts.sensenova.quotaAccessToken') }}</label>
@@ -3137,6 +3148,8 @@ import HelpTooltip from '@/components/common/HelpTooltip.vue'
 import UpstreamRequestIdHeaderField from '@/components/account/UpstreamRequestIdHeaderField.vue'
 import Toggle from '@/components/common/Toggle.vue'
 import TokenRhythmSessionResolver from '@/components/account/TokenRhythmSessionResolver.vue'
+import TierflowCredentialsFields from '@/components/account/TierflowCredentialsFields.vue'
+import { applyTierflowConsoleCredentials } from '@/components/account/tierflowCredentials'
 import Icon from '@/components/icons/Icon.vue'
 import ProxySelector from '@/components/common/ProxySelector.vue'
 import ProxyAdBanner from '@/components/common/ProxyAdBanner.vue'
@@ -3256,6 +3269,7 @@ const baseUrlHint = computed(() => {
   if (props.account.platform === 'deepseek') return t('admin.accounts.deepseek.baseUrlHint')
   if (props.account.platform === 'kimi') return t('admin.accounts.kimi.baseUrlHint')
   if (props.account.platform === 'tokenrhythm') return t('admin.accounts.tokenrhythm.baseUrlHint')
+  if (props.account.platform === 'tierflow') return t('admin.accounts.tierflow.baseUrlHint')
   if (props.account.platform === 'chatanywhere') return t('admin.accounts.chatanywhere.baseUrlHint')
   if (props.account.platform === 'glm') return t('admin.accounts.glm.baseUrlHint')
   if (props.account.platform === 'nvidia') return t('admin.accounts.nvidia.baseUrlHint')
@@ -3289,6 +3303,8 @@ const editBaseUrl = ref('https://api.anthropic.com')
 const editApiKey = ref('')
 const editSenseNovaAccessToken = ref('')
 const tokenRhythmCookie = ref('')
+const tierflowCookie = ref('')
+const tierflowUserId = ref('')
 
 // ── 国产供应商（Kimi / Zhipu / DeepSeek）account_mode / api_protocol 编辑 ──
 // account_mode 决定额度/余额监控路径，api_protocol 决定转发端点与格式；
@@ -3567,7 +3583,8 @@ const genericUpstreamBillingProbeExcludedPlatforms = new Set([
   'dashscope',
   'minimax',
   'volcengine',
-  'sensenova'
+  'sensenova',
+  'tierflow'
 ])
 const supportsGenericUpstreamBillingProbe = computed(() => {
   const platform = props.account?.platform
@@ -3948,6 +3965,7 @@ const defaultBaseUrl = computed(() => {
   if (props.account?.platform === 'agnes') return 'https://apihub.agnes-ai.com/v1'
   if (props.account?.platform === 'nvidia') return 'https://integrate.api.nvidia.com/v1'
   if (props.account?.platform === 'tokenrhythm') return 'https://tokenrhythm.studio/v1'
+  if (props.account?.platform === 'tierflow') return 'https://tierflow.cn/v1'
   if (props.account?.platform === 'chatanywhere') return 'https://api.chatanywhere.tech/v1'
   if (props.account?.platform === 'glm') return 'https://open.bigmodel.cn/api/paas/v4'
   if (props.account?.platform === 'modelscope') return 'https://api-inference.modelscope.cn/v1'
@@ -4410,6 +4428,7 @@ const syncFormFromAccount = (newAccount: Account | null) => {
       grok: 'https://api.x.ai/v1',
       agnes: 'https://apihub.agnes-ai.com/v1',
       tokenrhythm: 'https://tokenrhythm.studio/v1',
+      tierflow: 'https://tierflow.cn/v1',
       chatanywhere: 'https://api.chatanywhere.tech/v1',
       glm: 'https://open.bigmodel.cn/api/paas/v4',
       nvidia: 'https://integrate.api.nvidia.com/v1',
@@ -4498,6 +4517,8 @@ const syncFormFromAccount = (newAccount: Account | null) => {
               ? 'https://apihub.agnes-ai.com/v1'
               : newAccount.platform === 'tokenrhythm'
                 ? 'https://tokenrhythm.studio/v1'
+              : newAccount.platform === 'tierflow'
+                ? 'https://tierflow.cn/v1'
               : newAccount.platform === 'chatanywhere'
                 ? 'https://api.chatanywhere.tech/v1'
               : newAccount.platform === 'glm'
@@ -4539,6 +4560,8 @@ const syncFormFromAccount = (newAccount: Account | null) => {
   editApiKey.value = ''
   editSenseNovaAccessToken.value = ''
   tokenRhythmCookie.value = ''
+  tierflowCookie.value = ''
+  tierflowUserId.value = ''
 }
 
 async function loadTLSProfiles() {
@@ -5165,6 +5188,11 @@ const handleSubmit = async () => {
       }
     }
 
+    if (props.account.platform === 'tierflow') {
+      // Console balance probes do not provide a model-price multiplier.
+      updatePayload.upstream_billing_rate_sync_enabled = false
+    }
+
     // For apikey type, handle credentials update
     if (props.account.type === 'apikey') {
       const currentCredentials = (props.account.credentials as Record<string, unknown>) || {}
@@ -5222,6 +5250,10 @@ const handleSubmit = async () => {
       } else if (!hasExistingApiKey) {
         appStore.showError(t('admin.accounts.apiKeyIsRequired'))
         return
+      }
+
+      if (props.account.platform === 'tierflow') {
+        applyTierflowConsoleCredentials(newCredentials, tierflowCookie.value, tierflowUserId.value)
       }
 
       if (props.account.platform === 'sensenova' && editSenseNovaAccessToken.value.trim()) {
@@ -5798,7 +5830,7 @@ const handleSubmit = async () => {
       // 上游倍率自动探测对全部 API-key 平台开放（sub2api 上游即可应答），
       // Bedrock 凭证无静态 Key 不参与。
       if (props.account.type === 'apikey') {
-        delete newExtra.upstream_billing_probe_enabled
+        if (props.account.platform !== 'tierflow') delete newExtra.upstream_billing_probe_enabled
         delete newExtra.upstream_billing_rate_sync_enabled
       }
       // Total quota

@@ -84,6 +84,7 @@ func TestForkPlatformUpgradePreservesExistingRows(t *testing.T) {
 		"236_channel_monitor_sensenova.sql",
 		"237_add_minimax_platform.sql",
 		"238_opencode_go_platform.sql",
+		"239_tierflow_platform.sql",
 	} {
 		content, err := FS.ReadFile(name)
 		require.NoError(t, err)
@@ -95,7 +96,7 @@ func TestForkPlatformUpgradePreservesExistingRows(t *testing.T) {
 		err := db.QueryRowContext(ctx, "SELECT COUNT(*) FROM "+table.name).Scan(&count)
 		require.NoError(t, err)
 		require.Equal(t, len(table.values), count, "existing rows in %s must survive", table.name)
-		for _, value := range []string{"minimax", "opencode_go"} {
+		for _, value := range []string{"minimax", "opencode_go", "tierflow"} {
 			_, err := db.ExecContext(ctx, fmt.Sprintf("INSERT INTO %s (%s) VALUES ($1)", table.name, table.column), value)
 			require.NoError(t, err, "new platform %s in %s", value, table.name)
 		}
@@ -104,7 +105,7 @@ func TestForkPlatformUpgradePreservesExistingRows(t *testing.T) {
 	}
 
 	// Replaying the final migration must preserve both old and new platform rows.
-	content, err := FS.ReadFile("238_opencode_go_platform.sql")
+	content, err := FS.ReadFile("239_tierflow_platform.sql")
 	require.NoError(t, err)
 	_, err = db.ExecContext(ctx, string(content))
 	require.NoError(t, err)

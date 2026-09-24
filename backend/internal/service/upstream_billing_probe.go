@@ -619,6 +619,35 @@ func (s *UpstreamBillingProbeService) probeLoadedAccount(ctx context.Context, ac
 	if s.accountTestService == nil || s.accountTestService.httpUpstream == nil {
 		return s.persistProbeFailure(ctx, account, intervalMinutes, now, 0, "transport_unavailable", 0)
 	}
+	if account.IsTierflow() {
+		result, err := s.accountTestService.FetchTierflowBalance(ctx, account.ID)
+		if err != nil {
+			return s.persistProbeFailure(ctx, account, intervalMinutes, now, infraerrors.Code(err), "tierflow_balance_failed", 0)
+		}
+		snapshot := &UpstreamBillingProbeSnapshot{
+			Status: UpstreamBillingProbeStatusOK,
+			Data: map[string]any{
+				"provider":          PlatformTierflow,
+				"is_available":      result.IsAvailable,
+				"remaining_balance": result.RemainingBalance,
+				"total_usage":       result.TotalUsage,
+				"currency":          result.Currency,
+				"quota_per_unit":    result.QuotaPerUnit,
+				"request_count":     result.RequestCount,
+				"fetched_at":        result.FetchedAt,
+			},
+			ReceivedAt:    probeTimePtr(now),
+			FreshUntil:    probeTimePtr(now.Add(2 * time.Duration(intervalMinutes) * time.Minute)),
+			LastAttemptAt: now,
+			NextProbeAt:   now.Add(nextProbeDelay(intervalMinutes, 0)),
+			HTTPStatus:    result.StatusCode,
+		}
+		// Wallet observations never declare or synthesize a billing multiplier.
+		if err := s.updateSnapshot(ctx, account, snapshot, nil); err != nil {
+			return nil, err
+		}
+		return snapshot, nil
+	}
 	if account.IsTokenRhythm() {
 		result, err := s.accountTestService.FetchTokenRhythmBalance(ctx, account.ID)
 		if err != nil {
@@ -1051,7 +1080,7 @@ func IsUpstreamBillingProbeIdentity(platform, accountType string) bool {
 	}
 	switch platform {
 	case PlatformOpenAI, PlatformAnthropic, PlatformGemini, PlatformAntigravity, PlatformGrok,
-		PlatformNvidia, PlatformTokenRhythm, PlatformKimi, PlatformZhipu, PlatformDeepSeek, PlatformMiniMax, PlatformOpenCodeGo:
+		PlatformNvidia, PlatformTokenRhythm, PlatformTierflow, PlatformKimi, PlatformZhipu, PlatformDeepSeek, PlatformMiniMax, PlatformOpenCodeGo:
 		return true
 	default:
 		return false
@@ -1137,6 +1166,20 @@ func tokenRhythmBalanceProbeAllowsScheduling(account *Account, now time.Time) bo
 	}
 	available, ok := resolveAccountExtraNumber(snapshot.Data, "available_balance_cny")
 	return ok && available > 0
+}
+
+// Tierflow API-key-only accounts retain their ordinary scheduling behavior.
+// Console-backed accounts with the probe enabled require a fresh positive wallet.
+func tierflowBalanceProbeAllowsScheduling(account *Account, now time.Time) bool {
+	if account == nil || !account.IsTierflow() || !upstreamBillingProbeEnabled(account) {
+		return true
+	}
+	snapshot := decodeUpstreamBillingProbeSnapshot(account.Extra)
+	if snapshot == nil || snapshot.Status != UpstreamBillingProbeStatusOK || snapshot.FreshUntil == nil || !snapshot.FreshUntil.After(now) {
+		return false
+	}
+	available, ok := resolveAccountExtraNumber(snapshot.Data, "remaining_balance")
+	return ok && available > 0 && !math.IsInf(available, 0) && !math.IsNaN(available)
 }
 
 // upstreamBillingRateSyncEnabled is the probe-side pre-filter deciding whether

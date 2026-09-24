@@ -116,6 +116,8 @@ func DetectModelPlatform(model string) (string, bool) {
 			return PlatformTokenRhythm, true
 		case "kimi", "moonshot":
 			return PlatformKimi, true
+		case "tierflow":
+			return PlatformTierflow, true
 		case "chatanywhere":
 			return PlatformChatAnywhere, true
 		case "glm":
@@ -176,6 +178,8 @@ func DetectModelPlatform(model string) (string, bool) {
 		return PlatformNvidia, true
 	case strings.HasPrefix(normalized, "tokenrhythm-"):
 		return PlatformTokenRhythm, true
+	case normalized == "tierflow", strings.HasPrefix(normalized, "tierflow-"), strings.HasPrefix(normalized, "tierflow_"):
+		return PlatformTierflow, true
 	case strings.HasPrefix(normalized, "chatanywhere-"):
 		return PlatformChatAnywhere, true
 	case strings.HasPrefix(normalized, "glm-"):
@@ -238,7 +242,7 @@ func isConcreteRequestPlatform(platform string) bool {
 	case PlatformAnthropic, PlatformOpenAI, PlatformGemini, PlatformAntigravity, PlatformGrok,
 		PlatformAgnes, PlatformDeepSeek, PlatformNvidia, PlatformTokenRhythm, PlatformKimi,
 		PlatformZhipu, PlatformChatAnywhere, PlatformGLM, PlatformModelScope, PlatformDashScope,
-		PlatformMiniMax, PlatformVolcengine, PlatformSenseNova, PlatformOpenCodeGo:
+		PlatformMiniMax, PlatformVolcengine, PlatformSenseNova, PlatformTierflow, PlatformOpenCodeGo:
 		return true
 	default:
 		return false

@@ -57,6 +57,7 @@ const (
 	PlatformMiniMax           = domain.PlatformMiniMax
 	PlatformVolcengine        = domain.PlatformVolcengine
 	PlatformSenseNova         = domain.PlatformSenseNova
+	PlatformTierflow          = domain.PlatformTierflow
 	PlatformComposite         = domain.PlatformComposite
 	PlatformKiro              = "kiro"
 	AgnesDefaultBaseURL       = domain.AgnesDefaultBaseURL
@@ -75,6 +76,7 @@ const (
 	MiniMaxDefaultBaseURL     = domain.MiniMaxDefaultBaseURL
 	VolcengineDefaultBaseURL  = domain.VolcengineDefaultBaseURL
 	SenseNovaDefaultBaseURL   = domain.SenseNovaDefaultBaseURL
+	TierflowDefaultBaseURL    = domain.TierflowDefaultBaseURL
 	PlatformOpenCodeGo        = domain.PlatformOpenCodeGo
 )
 
@@ -166,6 +168,7 @@ var AllowedQuotaPlatforms = []string{
 	PlatformMiniMax,
 	PlatformVolcengine,
 	PlatformSenseNova,
+	PlatformTierflow,
 	PlatformOpenCodeGo,
 }
 

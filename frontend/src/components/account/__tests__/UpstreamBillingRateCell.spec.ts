@@ -68,6 +68,17 @@ describe('UpstreamBillingRateCell', () => {
     vi.useRealTimers()
   })
 
+  it('does not display a model-price multiplier for Tierflow wallet balances', () => {
+    const wrapper = mount(UpstreamBillingRateCell, {
+      props: {
+        account: makeAccount({ platform: 'tierflow', extra: { upstream_billing_probe_enabled: true } }),
+        now: Date.now()
+      }
+    })
+    expect(wrapper.text()).toBe('-')
+    expect(wrapper.find('[data-testid="upstream-billing-probe"]').exists()).toBe(false)
+  })
+
   it('recomputes the current effective rate and keeps the icon-only probe action', async () => {
     const wrapper = mount(UpstreamBillingRateCell, {
       props: {

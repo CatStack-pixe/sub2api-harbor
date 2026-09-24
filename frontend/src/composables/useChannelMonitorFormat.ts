@@ -22,6 +22,7 @@ import {
   PROVIDER_ZHIPU,
   PROVIDER_DEEPSEEK,
   PROVIDER_SENSENOVA,
+  PROVIDER_TIERFLOW,
   PROVIDER_MINIMAX,
   PROVIDER_OPENCODE_GO,
   PROVIDERS,
@@ -118,6 +119,7 @@ export function useChannelMonitorFormat() {
       case PROVIDER_DEEPSEEK:
         return 'bg-teal-100 text-teal-700 dark:bg-teal-500/15 dark:text-teal-300'
       case PROVIDER_SENSENOVA:
+      case PROVIDER_TIERFLOW:
         return 'bg-cyan-100 text-cyan-700 dark:bg-cyan-500/15 dark:text-cyan-300'
       case PROVIDER_MINIMAX:
         return 'bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300'
@@ -184,6 +186,7 @@ export function useChannelMonitorFormat() {
           ? 'border-teal-500 bg-teal-50 text-teal-700 dark:bg-teal-500/15 dark:text-teal-300 dark:border-teal-400'
           : 'border-gray-200 bg-white text-gray-600 hover:border-teal-300 hover:text-teal-700 dark:border-dark-700 dark:bg-dark-800 dark:text-gray-400 dark:hover:border-teal-500/50'
       case PROVIDER_SENSENOVA:
+      case PROVIDER_TIERFLOW:
         return active
           ? 'border-cyan-500 bg-cyan-50 text-cyan-700 dark:bg-cyan-500/15 dark:text-cyan-300 dark:border-cyan-400'
           : 'border-gray-200 bg-white text-gray-600 hover:border-cyan-300 hover:text-cyan-700 dark:border-dark-700 dark:bg-dark-800 dark:text-gray-400 dark:hover:border-cyan-500/50'
@@ -280,6 +283,7 @@ export function providerGradient(provider: string): string {
     case PROVIDER_DEEPSEEK:
       return 'bg-gradient-to-br from-teal-50 to-teal-100 dark:from-teal-500/10 dark:to-teal-500/20'
     case PROVIDER_SENSENOVA:
+    case PROVIDER_TIERFLOW:
       return 'bg-gradient-to-br from-cyan-50 to-cyan-100 dark:from-cyan-500/10 dark:to-cyan-500/20'
     case PROVIDER_MINIMAX:
       return 'bg-gradient-to-br from-rose-50 to-rose-100 dark:from-rose-500/10 dark:to-rose-500/20'

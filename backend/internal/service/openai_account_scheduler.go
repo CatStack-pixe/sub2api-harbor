@@ -1886,6 +1886,9 @@ func (s *defaultOpenAIAccountScheduler) isAccountRequestCompatibleReason(ctx con
 	if !tokenRhythmBalanceProbeAllowsScheduling(account, time.Now()) {
 		return false, "tokenrhythm_balance_unavailable"
 	}
+	if !tierflowBalanceProbeAllowsScheduling(account, time.Now()) {
+		return false, "tierflow_balance_unavailable"
+	}
 	// Quota auto-pause must be evaluated during the initial filter too. Without it the
 	// TopK candidate pool can be filled with paused accounts and the later fresh/DB
 	// rechecks won't reach healthy accounts that fell outside TopK — manifesting as

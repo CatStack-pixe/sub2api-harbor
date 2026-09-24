@@ -152,6 +152,9 @@ func TestDeriveUpstreamEndpoint(t *testing.T) {
 		{"minimax messages bridges to chat", EndpointMessages, "/v1/messages", service.PlatformMiniMax, EndpointChatCompletions},
 		{"volcengine chat", EndpointChatCompletions, "/v1/chat/completions", service.PlatformVolcengine, EndpointChatCompletions},
 		{"sensenova chat", EndpointChatCompletions, "/v1/chat/completions", service.PlatformSenseNova, EndpointChatCompletions},
+		{"tierflow chat", EndpointChatCompletions, "/v1/chat/completions", service.PlatformTierflow, EndpointChatCompletions},
+		{"tierflow responses bridge", EndpointResponses, "/v1/responses", service.PlatformTierflow, EndpointChatCompletions},
+		{"tierflow messages bridge", EndpointMessages, "/v1/messages", service.PlatformTierflow, EndpointChatCompletions},
 
 		// Antigravity — uses inbound to pick Claude vs Gemini upstream.
 		{"antigravity claude", EndpointMessages, "/antigravity/v1/messages", service.PlatformAntigravity, EndpointMessages},

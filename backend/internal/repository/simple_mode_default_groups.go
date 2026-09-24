@@ -33,6 +33,7 @@ func ensureSimpleModeDefaultGroups(ctx context.Context, client *dbent.Client) er
 		service.PlatformKimi:         1,
 		service.PlatformZhipu:        1,
 		service.PlatformChatAnywhere: 1,
+		service.PlatformTierflow:     1,
 		service.PlatformGLM:          1,
 	}
 

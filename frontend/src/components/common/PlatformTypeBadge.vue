@@ -191,6 +191,7 @@ const platformClass = computed(() => {
   if (props.platform === 'agnes') return 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300'
   if (props.platform === 'nvidia') return 'bg-lime-100 text-lime-700 dark:bg-lime-900/30 dark:text-lime-300'
   if (props.platform === 'tokenrhythm') return 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300'
+  if (props.platform === 'tierflow') return 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300'
   if (props.platform === 'kimi') {
     return 'bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-400'
   }
@@ -226,6 +227,7 @@ const typeClass = computed(() => {
   if (props.platform === 'agnes') return 'bg-cyan-100 text-cyan-600 dark:bg-cyan-900/30 dark:text-cyan-300'
   if (props.platform === 'nvidia') return 'bg-lime-100 text-lime-600 dark:bg-lime-900/30 dark:text-lime-300'
   if (props.platform === 'tokenrhythm') return 'bg-teal-100 text-teal-600 dark:bg-teal-900/30 dark:text-teal-300'
+  if (props.platform === 'tierflow') return 'bg-cyan-100 text-cyan-600 dark:bg-cyan-900/30 dark:text-cyan-300'
   if (props.platform === 'kimi') {
     return 'bg-pink-100 text-pink-600 dark:bg-pink-900/30 dark:text-pink-400'
   }

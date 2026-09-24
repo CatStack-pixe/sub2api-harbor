@@ -283,6 +283,7 @@ function platformAccentDotClass(p: string): string {
     case 'minimax': return 'bg-blue-500'
     case 'volcengine': return 'bg-red-500'
     case 'sensenova': return 'bg-fuchsia-500'
+    case 'tierflow': return 'bg-cyan-500'
     default: return 'bg-gray-400'
   }
 }

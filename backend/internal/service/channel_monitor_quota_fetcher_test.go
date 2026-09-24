@@ -157,6 +157,44 @@ func TestQuotaFetcher_OverseasAccountUsesUsageService(t *testing.T) {
 	require.Equal(t, 0, cnQuota.calls)
 }
 
+func TestQuotaFetcherTierflowUsesWalletAvailabilityWithoutInventingQuota(t *testing.T) {
+	for _, test := range []struct {
+		name       string
+		balance    float64
+		wantStatus string
+	}{
+		{name: "positive", balance: 0.01, wantStatus: MonitorStatusOperational},
+		{name: "empty", balance: 0, wantStatus: MonitorStatusDegraded},
+		{name: "overdrawn", balance: -1, wantStatus: MonitorStatusDegraded},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			fetcher, usage, _, _, accounts := newQuotaFetcherTestSetup(t)
+			accounts.accounts[27] = &Account{ID: 27, Platform: PlatformTierflow}
+			usage.usage = &UsageInfo{TierflowBalance: &TierflowBalanceResult{
+				IsAvailable: true, RemainingBalance: test.balance, TotalUsage: 100, Currency: "CNY",
+			}}
+			snapshot := fetcher.Fetch(context.Background(), 27)
+			require.True(t, snapshot.Success)
+			require.NotNil(t, snapshot.Balance)
+			require.Equal(t, test.balance, *snapshot.Balance)
+			require.Equal(t, "CNY", snapshot.Currency)
+			require.Empty(t, snapshot.Tiers)
+			require.Equal(t, test.wantStatus, deriveQuotaCheckResult(snapshot, "wallet", time.Now()).Status)
+		})
+	}
+}
+
+func TestQuotaFetcherTierflowMissingWalletDoesNotReportHealthy(t *testing.T) {
+	for _, wallet := range []*TierflowBalanceResult{nil, {IsAvailable: false, RemainingBalance: 50}} {
+		fetcher, usage, _, _, accounts := newQuotaFetcherTestSetup(t)
+		accounts.accounts[27] = &Account{ID: 27, Platform: PlatformTierflow}
+		usage.usage = &UsageInfo{TierflowBalance: wallet}
+		snapshot := fetcher.Fetch(context.Background(), 27)
+		require.False(t, snapshot.Success)
+		require.Equal(t, MonitorStatusError, deriveQuotaCheckResult(snapshot, "wallet", time.Now()).Status)
+	}
+}
+
 func TestQuotaFetcher_CodingPlanAccountUsesCNQuota(t *testing.T) {
 	fetcher, _, cnQuota, cnBalance, accounts := newQuotaFetcherTestSetup(t)
 	accounts.accounts[9] = &Account{

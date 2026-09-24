@@ -323,6 +323,9 @@ func defaultModelsListCandidateIDs(platform string) []string {
 		return VolcengineDefaultModelIDs()
 	case PlatformSenseNova:
 		return SenseNovaDefaultModelIDs()
+	case PlatformTierflow:
+		// Relay catalogs are account-specific; never advertise invented model IDs.
+		return nil
 	case PlatformOpenCodeGo:
 		return DefaultOpenCodeGoModelIDs()
 	case PlatformComposite:
@@ -348,7 +351,7 @@ func compositeDefaultModelsListCandidateIDs() []string {
 	for _, platform := range []string{PlatformAnthropic, PlatformGemini, PlatformOpenAI, PlatformAntigravity,
 		PlatformGrok, PlatformAgnes, PlatformDeepSeek, PlatformNvidia, PlatformTokenRhythm,
 		PlatformKimi, PlatformZhipu, PlatformChatAnywhere, PlatformGLM, PlatformModelScope,
-		PlatformDashScope, PlatformMiniMax, PlatformVolcengine, PlatformSenseNova, PlatformOpenCodeGo} {
+		PlatformDashScope, PlatformMiniMax, PlatformVolcengine, PlatformSenseNova, PlatformTierflow, PlatformOpenCodeGo} {
 		for _, id := range defaultModelsListCandidateIDs(platform) {
 			if _, ok := seen[id]; ok {
 				continue

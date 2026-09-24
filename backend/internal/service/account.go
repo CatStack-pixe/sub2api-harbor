@@ -312,6 +312,10 @@ func (a *Account) IsVolcengine() bool {
 	return a != nil && a.Platform == PlatformVolcengine
 }
 
+func (a *Account) IsTierflow() bool {
+	return a != nil && a.Platform == PlatformTierflow
+}
+
 func (a *Account) IsSenseNova() bool {
 	return a != nil && a.Platform == PlatformSenseNova
 }
@@ -342,7 +346,7 @@ func (a *Account) IsOpenAICompatible() bool {
 		a.Platform == PlatformTokenRhythm || a.Platform == PlatformKimi || a.Platform == PlatformZhipu ||
 		a.Platform == PlatformChatAnywhere || a.Platform == PlatformGLM || a.Platform == PlatformModelScope ||
 		a.Platform == PlatformDashScope || a.Platform == PlatformMiniMax || a.Platform == PlatformVolcengine ||
-		a.Platform == PlatformSenseNova || a.IsOpenCodeGo())
+		a.Platform == PlatformSenseNova || a.Platform == PlatformTierflow || a.IsOpenCodeGo())
 }
 
 // ShouldUseOpenAIResponsesAPI reports whether this OpenAI-compatible account
@@ -357,7 +361,7 @@ func (a *Account) ShouldUseOpenAIResponsesAPI() bool {
 	}
 	return !a.IsAgnes() && !a.IsDeepSeek() && !a.IsNvidia() && !a.IsTokenRhythm() &&
 		!a.IsKimi() && !a.IsChatAnywhere() && !a.IsGLM() && !a.IsModelScope() &&
-		!a.IsDashScope() && !a.IsMiniMax() && !a.IsVolcengine() && !a.IsSenseNova() &&
+		!a.IsDashScope() && !a.IsMiniMax() && !a.IsVolcengine() && !a.IsSenseNova() && !a.IsTierflow() &&
 		openai_compat.ShouldUseResponsesAPI(a.Extra)
 }
 
@@ -1429,7 +1433,7 @@ func (a *Account) IsOpenAIApiKey() bool {
 func (a *Account) GetOpenAIBaseURL() string {
 	if a == nil || (!a.IsOpenAI() && !a.IsAgnes() && !a.IsDeepSeek() && !a.IsNvidia() &&
 		!a.IsTokenRhythm() && !a.IsKimi() && !a.IsZhipu() && !a.IsChatAnywhere() &&
-		!a.IsGLM() && !a.IsModelScope() && !a.IsDashScope() && !a.IsMiniMax() && !a.IsVolcengine() && !a.IsSenseNova() && !a.IsOpenCodeGo()) {
+		!a.IsGLM() && !a.IsModelScope() && !a.IsDashScope() && !a.IsMiniMax() && !a.IsVolcengine() && !a.IsSenseNova() && !a.IsTierflow() && !a.IsOpenCodeGo()) {
 		return ""
 	}
 	if a.IsChatAnywhere() {
@@ -1512,6 +1516,8 @@ func (a *Account) GetOpenAIBaseURL() string {
 		return VolcengineDefaultBaseURL
 	case PlatformSenseNova:
 		return SenseNovaDefaultBaseURL
+	case PlatformTierflow:
+		return TierflowDefaultBaseURL
 	case PlatformOpenCodeGo:
 		return a.openCodeDefaultChatBaseURL()
 	default:
@@ -1896,7 +1902,7 @@ func (a *Account) GetOpenAIIDToken() string {
 }
 
 func (a *Account) GetOpenAIApiKey() string {
-	if a == nil || a.Type != AccountTypeAPIKey || (!a.IsOpenAI() && !a.IsAgnes() && !a.IsDeepSeek() && !a.IsNvidia() && !a.IsTokenRhythm() && !a.IsKimi() && !a.IsChatAnywhere() && !a.IsGLM() && !a.IsSenseNova()) {
+	if a == nil || a.Type != AccountTypeAPIKey || (!a.IsOpenAI() && !a.IsAgnes() && !a.IsDeepSeek() && !a.IsNvidia() && !a.IsTokenRhythm() && !a.IsKimi() && !a.IsChatAnywhere() && !a.IsGLM() && !a.IsSenseNova() && !a.IsTierflow()) {
 		return ""
 	}
 	return a.GetCredential("api_key")
@@ -1921,7 +1927,7 @@ func (a *Account) GetOpenAIProtocolAPIKey() string {
 }
 
 func (a *Account) GetOpenAIUserAgent() string {
-	if !a.IsOpenAI() && !a.IsAgnes() && !a.IsDeepSeek() && !a.IsNvidia() {
+	if !a.IsOpenAI() && !a.IsAgnes() && !a.IsDeepSeek() && !a.IsNvidia() && !a.IsTierflow() {
 		return ""
 	}
 	return a.GetCredential("user_agent")
@@ -2006,7 +2012,7 @@ func (a *Account) SupportsOpenAIEndpointCapability(capability OpenAIEndpointCapa
 			return false
 		}
 	}
-	if a.IsAgnes() {
+	if a.IsAgnes() || a.IsTierflow() {
 		return capability == OpenAIEndpointCapabilityChatCompletions
 	}
 	if a.IsDeepSeek() && a.GetAPIProtocol() != APIProtocolResponses && !a.IsAdaptiveAPIProtocol() {

@@ -538,7 +538,7 @@ export interface PaginationConfig {
 
 // ==================== API Key & Group Types ====================
 
-export type GroupPlatform = 'anthropic' | 'openai' | 'gemini' | 'antigravity' | 'grok' | 'agnes' | 'deepseek' | 'kimi' | 'nvidia' | 'tokenrhythm' | 'zhipu' | 'chatanywhere' | 'glm' | 'modelscope' | 'dashscope' | 'minimax' | 'volcengine' | 'sensenova' | 'opencode_go' | 'composite'
+export type GroupPlatform = 'anthropic' | 'openai' | 'gemini' | 'antigravity' | 'grok' | 'agnes' | 'deepseek' | 'kimi' | 'nvidia' | 'tokenrhythm' | 'tierflow' | 'zhipu' | 'chatanywhere' | 'glm' | 'modelscope' | 'dashscope' | 'minimax' | 'volcengine' | 'sensenova' | 'opencode_go' | 'composite'
 
 export type VideoModelPrices = Record<string, Record<string, number>>
 
@@ -931,7 +931,7 @@ export interface UpdateGroupRequest {
 
 // ==================== Account & Proxy Types ====================
 
-export type AccountPlatform = 'anthropic' | 'openai' | 'gemini' | 'antigravity' | 'grok' | 'agnes' | 'deepseek' | 'kimi' | 'nvidia' | 'tokenrhythm' | 'zhipu' | 'chatanywhere' | 'glm' | 'modelscope' | 'dashscope' | 'minimax' | 'volcengine' | 'sensenova' | 'opencode_go'
+export type AccountPlatform = 'anthropic' | 'openai' | 'gemini' | 'antigravity' | 'grok' | 'agnes' | 'deepseek' | 'kimi' | 'nvidia' | 'tokenrhythm' | 'tierflow' | 'zhipu' | 'chatanywhere' | 'glm' | 'modelscope' | 'dashscope' | 'minimax' | 'volcengine' | 'sensenova' | 'opencode_go'
 export type AccountType = 'oauth' | 'setup-token' | 'apikey' | 'upstream' | 'bedrock' | 'service_account'
 export type OAuthAddMethod = 'oauth' | 'setup-token'
 export type ProxyProtocol = 'http' | 'https' | 'socks5' | 'socks5h'
@@ -1412,6 +1412,17 @@ export interface GrokBillingSummary {
   failed_windows?: string[]
 }
 
+export interface TierflowBalance {
+  is_available: boolean
+  remaining_balance: number
+  total_usage: number
+  currency: string
+  quota_per_unit: number
+  request_count: number
+  status_code?: number
+  fetched_at: number
+}
+
 export interface AccountUsageInfo {
   source?: 'passive' | 'active' | 'local'
   updated_at: string | null
@@ -1428,6 +1439,7 @@ export interface AccountUsageInfo {
   gemini_flash_minute?: UsageProgress | null
   sensenova_five_hour?: UsageProgress | null
   sensenova_seven_day?: UsageProgress | null
+  tierflow_balance?: TierflowBalance | null
   chatanywhere_daily?: UsageProgress | null
   chatanywhere_weekly?: UsageProgress | null
   chatanywhere_quota_status?: 'weekly_exhausted' | 'error' | string
