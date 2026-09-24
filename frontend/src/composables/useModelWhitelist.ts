@@ -537,6 +537,7 @@ export function getModelsByPlatform(platform: string): string[] {
     case 'tokenrhythm': return tokenRhythmModels
     // Relay catalogs vary by account; synchronize /models instead of guessing support.
     case 'tierflow': return []
+    case 'senseaudio': return []
     case 'chatanywhere': return chatAnywhereModels
     case 'glm': return glmModels
     case 'cohere': return cohereModels
@@ -568,7 +569,7 @@ export function getModelsByPlatform(platform: string): string[] {
 
 // 按平台获取预设映射
 export function getPresetMappingsByPlatform(platform: string) {
-  if (platform === 'agnes' || platform === 'deepseek' || platform === 'kimi' || platform === 'zhipu' || platform === 'nvidia' || platform === 'tokenrhythm' || platform === 'tierflow' || platform === 'chatanywhere' || platform === 'glm' || platform === 'modelscope' || platform === 'dashscope' || platform === 'minimax' || platform === 'volcengine' || platform === 'sensenova') return []
+  if (platform === 'agnes' || platform === 'deepseek' || platform === 'kimi' || platform === 'zhipu' || platform === 'nvidia' || platform === 'tokenrhythm' || platform === 'tierflow' || platform === 'senseaudio' || platform === 'chatanywhere' || platform === 'glm' || platform === 'modelscope' || platform === 'dashscope' || platform === 'minimax' || platform === 'volcengine' || platform === 'sensenova') return []
   if (platform === 'openai') return openaiPresetMappings
   if (platform === 'gemini') return geminiPresetMappings
   if (platform === 'grok' || platform === 'xai') return grokPresetMappings

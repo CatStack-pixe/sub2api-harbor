@@ -291,7 +291,7 @@ func loadCodexGroupCatalogAccounts(ctx context.Context, repo AccountRepository, 
 			PlatformMiniMax,
 			PlatformAgnes, PlatformNvidia, PlatformTokenRhythm, PlatformChatAnywhere,
 			PlatformGLM, PlatformModelScope, PlatformDashScope, PlatformVolcengine,
-			PlatformSenseNova, PlatformTierflow, PlatformOpenCodeGo,
+			PlatformSenseNova, PlatformSenseAudio, PlatformTierflow, PlatformOpenCodeGo,
 		},
 		false,
 	)

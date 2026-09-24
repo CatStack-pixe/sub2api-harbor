@@ -21,6 +21,7 @@ export const CONCRETE_PLATFORM_OPTIONS = [
   { value: 'nvidia', label: 'NVIDIA' },
   { value: 'tokenrhythm', label: 'TokenRhythm' },
   { value: 'tierflow', label: 'Tierflow / 清枢智汇' },
+  { value: 'senseaudio', label: 'SenseAudio' },
   { value: 'kimi', label: 'Kimi' },
   { value: 'zhipu', label: 'Zhipu GLM' },
   { value: 'chatanywhere', label: 'ChatAnywhere' },

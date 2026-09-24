@@ -993,6 +993,7 @@ export default {
         nvidia: 'NVIDIA',
         tokenrhythm: 'TokenRhythm',
         tierflow: 'Tierflow',
+        senseaudio: 'SenseAudio',
         chatanywhere: 'ChatAnywhere',
         glm: 'GLM',
         zhipu: 'Zhipu GLM',

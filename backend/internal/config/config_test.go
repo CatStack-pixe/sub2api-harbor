@@ -878,6 +878,7 @@ func TestLoadDefaultSecurityToggles(t *testing.T) {
 		"api.chatanywhere.tech",
 		"api.chatanywhere.org",
 		"platform.sensenova.cn",
+		"api.senseaudio.cn",
 	}
 	hostSet := make(map[string]struct{}, len(cfg.Security.URLAllowlist.UpstreamHosts))
 	for _, h := range cfg.Security.URLAllowlist.UpstreamHosts {

@@ -524,6 +524,7 @@ export default {
       nvidia: 'NVIDIA',
       tokenrhythm: 'TokenRhythm',
       tierflow: 'Tierflow / 清枢智汇',
+      senseaudio: 'SenseAudio',
       chatanywhere: 'ChatAnywhere',
       glm: 'GLM',
       modelscope: 'ModelScope',

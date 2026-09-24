@@ -134,6 +134,8 @@ func DetectModelPlatform(model string) (string, bool) {
 			return PlatformVolcengine, true
 		case "sensenova", "sensecore", "sensechat":
 			return PlatformSenseNova, true
+		case "senseaudio":
+			return PlatformSenseAudio, true
 		case "z-ai", "zai":
 			// NVIDIA NIM also publishes models under these namespaces. Leave
 			// ambiguous names unresolved unless a composite route is explicit.
@@ -193,6 +195,8 @@ func DetectModelPlatform(model string) (string, bool) {
 	case strings.HasPrefix(normalized, "sensenova-"),
 		strings.HasPrefix(normalized, "sensechat-"):
 		return PlatformSenseNova, true
+	case strings.HasPrefix(normalized, "senseaudio-"):
+		return PlatformSenseAudio, true
 	default:
 		return "", false
 	}
@@ -242,7 +246,7 @@ func isConcreteRequestPlatform(platform string) bool {
 	case PlatformAnthropic, PlatformOpenAI, PlatformGemini, PlatformAntigravity, PlatformGrok,
 		PlatformAgnes, PlatformDeepSeek, PlatformNvidia, PlatformTokenRhythm, PlatformKimi,
 		PlatformZhipu, PlatformChatAnywhere, PlatformGLM, PlatformModelScope, PlatformDashScope,
-		PlatformMiniMax, PlatformVolcengine, PlatformSenseNova, PlatformTierflow, PlatformOpenCodeGo:
+		PlatformMiniMax, PlatformVolcengine, PlatformSenseNova, PlatformSenseAudio, PlatformTierflow, PlatformOpenCodeGo:
 		return true
 	default:
 		return false

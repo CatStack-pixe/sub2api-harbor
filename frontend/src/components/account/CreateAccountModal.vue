@@ -263,6 +263,20 @@
           </button>
           <button
             type="button"
+            data-testid="senseaudio-platform"
+            @click="form.platform = 'senseaudio'"
+            :class="[
+              'flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium transition-all',
+              form.platform === 'senseaudio'
+                ? 'bg-white text-emerald-700 shadow-sm dark:bg-dark-600 dark:text-emerald-300'
+                : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200'
+            ]"
+          >
+            <PlatformIcon platform="senseaudio" size="sm" />
+            SenseAudio
+          </button>
+          <button
+            type="button"
             data-testid="chatanywhere-platform"
             @click="form.platform = 'chatanywhere'"
             :class="[
@@ -699,6 +713,26 @@
             <div>
               <span class="block text-sm font-medium text-gray-900 dark:text-white">API Key</span>
               <span class="text-xs text-gray-500 dark:text-gray-400">Tierflow API</span>
+            </div>
+          </button>
+        </div>
+      </div>
+
+      <div v-if="form.platform === 'senseaudio'">
+        <label class="input-label">{{ t('admin.accounts.accountType') }}</label>
+        <div class="mt-2 grid grid-cols-1 gap-3" data-tour="account-form-type">
+          <button
+            type="button"
+            data-testid="senseaudio-account-type-api-key"
+            @click="accountCategory = 'apikey'"
+            class="flex items-center gap-3 rounded-lg border-2 border-emerald-500 bg-emerald-50 p-3 text-left dark:bg-emerald-900/20"
+          >
+            <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-600 text-white">
+              <Icon name="key" size="sm" />
+            </div>
+            <div>
+              <span class="block text-sm font-medium text-gray-900 dark:text-white">API Key</span>
+              <span class="text-xs text-gray-500 dark:text-gray-400">SenseAudio API</span>
             </div>
           </button>
         </div>
@@ -1810,7 +1844,7 @@
 
         <!-- 上游倍率自动探测：全部 API-key 平台可用（所在区块已限定 apikey 类型） -->
         <div
-          v-if="form.platform !== 'deepseek' && form.platform !== 'kimi' && form.platform !== 'tokenrhythm' && form.platform !== 'chatanywhere' && form.platform !== 'glm' && form.platform !== 'modelscope' && form.platform !== 'dashscope' && form.platform !== 'minimax' && form.platform !== 'volcengine' && form.platform !== 'sensenova' && form.platform !== 'tierflow'"
+          v-if="form.platform !== 'deepseek' && form.platform !== 'kimi' && form.platform !== 'tokenrhythm' && form.platform !== 'chatanywhere' && form.platform !== 'glm' && form.platform !== 'modelscope' && form.platform !== 'dashscope' && form.platform !== 'minimax' && form.platform !== 'volcengine' && form.platform !== 'sensenova' && form.platform !== 'tierflow' && form.platform !== 'senseaudio'"
           class="flex items-center justify-between gap-4 border-t border-gray-200 pt-4 dark:border-dark-600"
         >
           <div>
@@ -4418,6 +4452,7 @@ const baseUrlHint = computed(() => {
   if (form.platform === 'kimi') return t('admin.accounts.kimi.baseUrlHint')
   if (form.platform === 'tokenrhythm') return t('admin.accounts.tokenrhythm.baseUrlHint')
   if (form.platform === 'tierflow') return t('admin.accounts.tierflow.baseUrlHint')
+  if (form.platform === 'senseaudio') return t('admin.accounts.senseaudio.baseUrlHint')
   if (form.platform === 'chatanywhere') return t('admin.accounts.chatanywhere.baseUrlHint')
   if (form.platform === 'glm') return t('admin.accounts.glm.baseUrlHint')
   if (form.platform === 'nvidia') return t('admin.accounts.nvidia.baseUrlHint')
@@ -4438,6 +4473,7 @@ const apiKeyHint = computed(() => {
   if (form.platform === 'kimi') return t('admin.accounts.kimi.apiKeyHint')
   if (form.platform === 'tokenrhythm') return t('admin.accounts.tokenrhythm.apiKeyHint')
   if (form.platform === 'tierflow') return t('admin.accounts.tierflow.apiKeyHint')
+  if (form.platform === 'senseaudio') return t('admin.accounts.senseaudio.apiKeyHint')
   if (form.platform === 'chatanywhere') return t('admin.accounts.chatanywhere.apiKeyHint')
   if (form.platform === 'glm') return t('admin.accounts.glm.apiKeyHint')
   if (form.platform === 'nvidia') return t('admin.accounts.nvidia.apiKeyHint')
@@ -4468,6 +4504,8 @@ const apiKeyBaseUrlPlaceholder = computed(() => {
       return 'https://integrate.api.nvidia.com/v1'
     case 'tierflow':
       return 'https://tierflow.cn/v1'
+    case 'senseaudio':
+      return 'https://api.senseaudio.cn/v1'
     case 'tokenrhythm':
       return 'https://tokenrhythm.studio/v1'
     case 'chatanywhere':
@@ -4507,6 +4545,7 @@ const apiKeyValuePlaceholder = computed(() => {
       return 'nvapi-...'
     case 'agnes':
     case 'tierflow':
+    case 'senseaudio':
     case 'tokenrhythm':
     case 'chatanywhere':
       return 'sk-...'
@@ -5306,6 +5345,7 @@ watch(
         nvidia: 'https://integrate.api.nvidia.com/v1',
         tokenrhythm: 'https://tokenrhythm.studio/v1',
         tierflow: 'https://tierflow.cn/v1',
+        senseaudio: 'https://api.senseaudio.cn/v1',
         chatanywhere: 'https://api.chatanywhere.tech/v1',
         glm: 'https://open.bigmodel.cn/api/paas/v4',
         modelscope: 'https://api-inference.modelscope.cn/v1',
@@ -5379,6 +5419,13 @@ watch(
       form.load_factor = null
     }
     if (newPlatform === 'tierflow') {
+      accountCategory.value = 'apikey'
+      modelRestrictionMode.value = 'whitelist'
+      allowedModels.value = []
+      form.concurrency = 10
+      form.load_factor = null
+    }
+    if (newPlatform === 'senseaudio') {
       accountCategory.value = 'apikey'
       modelRestrictionMode.value = 'whitelist'
       allowedModels.value = []
@@ -6314,6 +6361,8 @@ const handleSubmit = async () => {
                   ? 'https://tokenrhythm.studio/v1'
                 : form.platform === 'tierflow'
                   ? 'https://tierflow.cn/v1'
+                : form.platform === 'senseaudio'
+                  ? 'https://api.senseaudio.cn/v1'
                 : form.platform === 'chatanywhere'
                   ? 'https://api.chatanywhere.tech/v1'
                 : form.platform === 'glm'
@@ -6447,7 +6496,7 @@ const handleSubmit = async () => {
     group_ids: form.group_ids,
     extra: withUpstreamRequestIdHeader(extra),
     upstream_billing_probe_enabled:
-      form.platform === 'deepseek' || form.platform === 'kimi' || form.platform === 'chatanywhere' || form.platform === 'glm' || form.platform === 'modelscope' || form.platform === 'dashscope' || form.platform === 'minimax' || form.platform === 'volcengine' || form.platform === 'sensenova' || form.platform === 'tierflow'
+      form.platform === 'deepseek' || form.platform === 'kimi' || form.platform === 'chatanywhere' || form.platform === 'glm' || form.platform === 'modelscope' || form.platform === 'dashscope' || form.platform === 'minimax' || form.platform === 'volcengine' || form.platform === 'sensenova' || form.platform === 'tierflow' || form.platform === 'senseaudio'
         ? undefined
         : form.platform === 'tokenrhythm'
           ? true
@@ -6586,7 +6635,7 @@ const createAccountAndFinish = async (
       type === 'apikey'
         ? form.platform === 'tokenrhythm'
           ? true
-          : form.platform !== 'deepseek' && form.platform !== 'kimi' && form.platform !== 'chatanywhere' && form.platform !== 'glm' && form.platform !== 'modelscope' && form.platform !== 'dashscope' && form.platform !== 'minimax' && form.platform !== 'volcengine' && form.platform !== 'sensenova' && form.platform !== 'tierflow'
+          : form.platform !== 'deepseek' && form.platform !== 'kimi' && form.platform !== 'chatanywhere' && form.platform !== 'glm' && form.platform !== 'modelscope' && form.platform !== 'dashscope' && form.platform !== 'minimax' && form.platform !== 'volcengine' && form.platform !== 'sensenova' && form.platform !== 'tierflow' && form.platform !== 'senseaudio'
             ? upstreamBillingAutoProbeEnabled.value
             : undefined
         : undefined,

@@ -295,7 +295,7 @@ func openAIMessagesDispatchBypassPlatform(platform string) bool {
 	switch platform {
 	case service.PlatformGrok, service.PlatformAgnes, service.PlatformNvidia,
 		service.PlatformTokenRhythm, service.PlatformChatAnywhere, service.PlatformGLM,
-		service.PlatformModelScope, service.PlatformDashScope, service.PlatformMiniMax, service.PlatformVolcengine, service.PlatformSenseNova, service.PlatformTierflow:
+		service.PlatformModelScope, service.PlatformDashScope, service.PlatformMiniMax, service.PlatformVolcengine, service.PlatformSenseNova, service.PlatformSenseAudio, service.PlatformTierflow:
 		return true
 	default:
 		return false
@@ -308,7 +308,7 @@ func openAICompatibleTextTargetAllowed(c *gin.Context, apiKey *service.APIKey, m
 		service.PlatformDeepSeek, service.PlatformNvidia, service.PlatformTokenRhythm,
 		service.PlatformKimi, service.PlatformZhipu, service.PlatformChatAnywhere,
 		service.PlatformGLM, service.PlatformModelScope, service.PlatformDashScope,
-		service.PlatformMiniMax, service.PlatformVolcengine, service.PlatformSenseNova, service.PlatformTierflow, service.PlatformOpenCodeGo)
+		service.PlatformMiniMax, service.PlatformVolcengine, service.PlatformSenseNova, service.PlatformSenseAudio, service.PlatformTierflow, service.PlatformOpenCodeGo)
 }
 
 // isResponsesWebSocketCompositePlatform 限定 composite 分组在 Responses WebSocket

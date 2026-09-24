@@ -97,6 +97,7 @@ const PLATFORM_LABELS: Record<string, string> = {
   antigravity: 'Antigravity',
   chatanywhere: 'ChatAnywhere',
   tierflow: 'Tierflow / 清枢智汇',
+  senseaudio: 'SenseAudio',
   glm: 'GLM',
   grok: 'Grok',
   kimi: 'Kimi',

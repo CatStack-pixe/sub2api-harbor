@@ -16,7 +16,7 @@ func ValidateAccountPlatform(platform string) error {
 	case PlatformAnthropic, PlatformOpenAI, PlatformGemini, PlatformAntigravity,
 		PlatformGrok, PlatformAgnes, PlatformDeepSeek, PlatformNvidia, PlatformTokenRhythm,
 		PlatformKimi, PlatformZhipu, PlatformChatAnywhere, PlatformGLM, PlatformModelScope,
-		PlatformDashScope, PlatformMiniMax, PlatformVolcengine, PlatformSenseNova, PlatformTierflow, PlatformOpenCodeGo:
+		PlatformDashScope, PlatformMiniMax, PlatformVolcengine, PlatformSenseNova, PlatformSenseAudio, PlatformTierflow, PlatformOpenCodeGo:
 		return nil
 	default:
 		return infraerrors.BadRequest("UNSUPPORTED_ACCOUNT_PLATFORM", "unsupported account platform")
@@ -28,7 +28,7 @@ func ValidateGroupPlatform(platform string) error {
 	case PlatformAnthropic, PlatformOpenAI, PlatformGemini, PlatformAntigravity,
 		PlatformGrok, PlatformAgnes, PlatformDeepSeek, PlatformNvidia, PlatformTokenRhythm,
 		PlatformKimi, PlatformZhipu, PlatformChatAnywhere, PlatformGLM, PlatformModelScope,
-		PlatformDashScope, PlatformMiniMax, PlatformVolcengine, PlatformSenseNova, PlatformTierflow, PlatformOpenCodeGo, PlatformComposite:
+		PlatformDashScope, PlatformMiniMax, PlatformVolcengine, PlatformSenseNova, PlatformSenseAudio, PlatformTierflow, PlatformOpenCodeGo, PlatformComposite:
 		return nil
 	default:
 		return infraerrors.BadRequest("UNSUPPORTED_GROUP_PLATFORM", "unsupported group platform")
@@ -56,7 +56,7 @@ func validateAccountCredentials(platform, accountType string, credentials map[st
 	if err := ValidateAccountPlatform(platform); err != nil {
 		return err
 	}
-	if platform != PlatformDeepSeek && platform != PlatformNvidia && platform != PlatformTokenRhythm && platform != PlatformKimi && platform != PlatformZhipu && platform != PlatformChatAnywhere && platform != PlatformGLM && platform != PlatformModelScope && platform != PlatformDashScope && platform != PlatformMiniMax && platform != PlatformVolcengine && platform != PlatformSenseNova && platform != PlatformTierflow && platform != PlatformOpenCodeGo {
+	if platform != PlatformDeepSeek && platform != PlatformNvidia && platform != PlatformTokenRhythm && platform != PlatformKimi && platform != PlatformZhipu && platform != PlatformChatAnywhere && platform != PlatformGLM && platform != PlatformModelScope && platform != PlatformDashScope && platform != PlatformMiniMax && platform != PlatformVolcengine && platform != PlatformSenseNova && platform != PlatformSenseAudio && platform != PlatformTierflow && platform != PlatformOpenCodeGo {
 		return nil
 	}
 	platformName := "DeepSeek"
@@ -105,6 +105,10 @@ func validateAccountCredentials(platform, accountType string, credentials map[st
 		platformName = "SenseNova"
 		errorPrefix = "SENSENOVA"
 	}
+	if platform == PlatformSenseAudio {
+		platformName = "SenseAudio"
+		errorPrefix = "SENSEAUDIO"
+	}
 	if platform == PlatformTierflow {
 		platformName = "Tierflow"
 		errorPrefix = "TIERFLOW"
@@ -145,7 +149,7 @@ func validateAccountCredentials(platform, accountType string, credentials map[st
 		}
 		return nil
 	}
-	if platform == PlatformModelScope || platform == PlatformDashScope || platform == PlatformMiniMax || platform == PlatformVolcengine || platform == PlatformSenseNova || platform == PlatformTierflow {
+	if platform == PlatformModelScope || platform == PlatformDashScope || platform == PlatformMiniMax || platform == PlatformVolcengine || platform == PlatformSenseNova || platform == PlatformSenseAudio || platform == PlatformTierflow {
 		if rawBaseURL, exists := credentials["base_url"]; exists && rawBaseURL != nil {
 			baseURL, ok := rawBaseURL.(string)
 			if !ok {

@@ -221,6 +221,19 @@
       </div>
     </template>
 
+    <template v-else-if="account.platform === 'senseaudio'">
+      <div class="space-y-1" data-testid="senseaudio-initial-balance">
+        <div v-if="senseAudioInitialBalance" class="text-xs font-medium text-emerald-700 dark:text-emerald-300" :title="senseAudioInitialBalance.capturedAt">
+          {{ t('admin.accounts.senseaudio.initialBalance') }}:
+          {{ senseAudioInitialBalance.currency ? `${senseAudioInitialBalance.currency} ` : '' }}{{ senseAudioInitialBalance.amount.toFixed(2) }}
+        </div>
+        <div v-else class="text-xs text-gray-400">{{ t('admin.accounts.senseaudio.noInitialBalance') }}</div>
+        <div v-if="senseAudioInitialBalance" class="text-[10px] text-gray-500 dark:text-gray-400">
+          {{ t('admin.accounts.senseaudio.initialBalanceHint') }}
+        </div>
+      </div>
+    </template>
+
     <template v-else-if="account.platform === 'sensenova'">
       <div v-if="loading" class="space-y-1.5">
         <div class="flex items-center gap-1">
@@ -866,6 +879,7 @@ const showUsageWindows = computed(() => {
   }
   if (props.account.platform === 'sensenova') return true
   if (props.account.platform === 'tierflow') return true
+  if (props.account.platform === 'senseaudio') return true
   return props.account.type === 'oauth' || props.account.type === 'setup-token'
 })
 
@@ -907,6 +921,17 @@ const cnQuotaCellVisible = computed(() => cnQuotaCellVisibleFn(props.account.pla
 const cnBalanceCellVisible = computed(() => cnBalanceCellVisibleFn(props.account.platform, cnAccountMode.value))
 
 const tierflowBalance = computed(() => usageInfo.value?.tierflow_balance)
+const senseAudioInitialBalance = computed(() => {
+  const raw = props.account.extra?.senseaudio_initial_balance
+  if (!raw || typeof raw !== 'object') return null
+  const value = raw as Record<string, unknown>
+  if (typeof value.amount !== 'number' || !Number.isFinite(value.amount)) return null
+  return {
+    amount: value.amount,
+    currency: typeof value.currency === 'string' ? value.currency : '',
+    capturedAt: typeof value.captured_at === 'string' ? value.captured_at : ''
+  }
+})
 const formatTierflowAmount = (value: number | undefined): string => {
   if (typeof value !== 'number' || !Number.isFinite(value)) return '-'
   const currency = tierflowBalance.value?.currency || ''

@@ -77,6 +77,7 @@ var heartbeatProviderRegistry = []heartbeatProviderSpec{
 	{ID: PlatformMiniMax, Platform: PlatformMiniMax, Aliases: []string{"minimax"}},
 	{ID: PlatformVolcengine, Platform: PlatformVolcengine, Aliases: []string{"volcengine", "ark", "doubao"}},
 	{ID: PlatformSenseNova, Platform: PlatformSenseNova, Aliases: []string{"sensenova", "sensecore", "sensechat"}},
+	{ID: PlatformSenseAudio, Platform: PlatformSenseAudio, Aliases: []string{"senseaudio"}},
 	{ID: PlatformTierflow, Platform: PlatformTierflow, Aliases: []string{"tierflow"}},
 }
 

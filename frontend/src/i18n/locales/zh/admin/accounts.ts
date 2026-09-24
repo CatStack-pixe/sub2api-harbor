@@ -314,6 +314,7 @@ export default {
         nvidia: 'NVIDIA',
         tokenrhythm: 'TokenRhythm',
         tierflow: 'Tierflow / 清枢智汇',
+        senseaudio: 'SenseAudio',
         chatanywhere: 'ChatAnywhere',
         glm: 'GLM',
         modelscope: 'ModelScope',
@@ -828,6 +829,13 @@ export default {
         userId: '控制台用户 ID / TF-User（可选）',
         userIdPlaceholder: '控制台数字用户 ID',
         userIdHint: '填写控制台请求头 TF-User 中的数字用户 ID，与 Session Cookie 配合查询余额。'
+      },
+      senseaudio: {
+        baseUrlHint: 'SenseAudio OpenAI 兼容接口，默认地址为 https://api.senseaudio.cn/v1。模型列表请从上游同步。',
+        apiKeyHint: 'SenseAudio API Key。',
+        initialBalance: '导入时余额',
+        noInitialBalance: '暂无导入时余额',
+        initialBalanceHint: '仅为导入时记录，不是实时余额。'
       },
       tokenrhythm: {
         baseUrlHint: 'TokenRhythm 使用固定的官方 OpenAI 兼容接口。',
