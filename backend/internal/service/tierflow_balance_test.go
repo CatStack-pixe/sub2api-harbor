@@ -20,15 +20,15 @@ const tierflowTestBalance = `{"success":true,"data":{"quota":15000000,"used_quot
 
 func newTierflowBalanceTestAccount() *Account {
 	return &Account{
-		ID: 941,
-		Platform: PlatformTierflow,
-		Type: AccountTypeAPIKey,
-		Status: StatusActive,
+		ID:          941,
+		Platform:    PlatformTierflow,
+		Type:        AccountTypeAPIKey,
+		Status:      StatusActive,
 		Schedulable: true,
 		Concurrency: 3,
 		Credentials: map[string]any{
-			"api_key": "test-api-key",
-			"tierflow_cookie": "test-session",
+			"api_key":          "test-api-key",
+			"tierflow_cookie":  "test-session",
 			"tierflow_user_id": "123",
 		},
 	}
@@ -59,10 +59,10 @@ func TestTierflowCookieCredentialsNormalizeAndRejectHeaderInjection(t *testing.T
 
 func TestSanitizeTierflowCredentialsAndKeepSessionOnPartialEdit(t *testing.T) {
 	credentials := SanitizeStoredCredentials(PlatformTierflow, map[string]any{
-		"api_key": "test-api-key",
-		"tierflow_cookie": "other=ignored; session=test-session",
+		"api_key":          "test-api-key",
+		"tierflow_cookie":  "other=ignored; session=test-session",
 		"tierflow_user_id": "00123",
-		"password": "must-not-persist",
+		"password":         "must-not-persist",
 	})
 	require.Equal(t, "test-session", credentials["tierflow_cookie"])
 	require.Equal(t, "123", credentials["tierflow_user_id"])

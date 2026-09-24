@@ -16,23 +16,23 @@ import (
 )
 
 const (
-	tierflowBalanceURL = "https://tierflow.cn/api/user/self"
-	tierflowStatusURL = "https://tierflow.cn/api/status"
-	tierflowBalanceBodyLimit = 1 << 20
+	tierflowBalanceURL            = "https://tierflow.cn/api/user/self"
+	tierflowStatusURL             = "https://tierflow.cn/api/status"
+	tierflowBalanceBodyLimit      = 1 << 20
 	tierflowBalanceRequestTimeout = 20 * time.Second
 )
 
 // TierflowBalanceResult contains only observed wallet values. It excludes
 // console credentials and the provider's unrelated dashboard billing limits.
 type TierflowBalanceResult struct {
-	IsAvailable bool `json:"is_available"`
+	IsAvailable      bool    `json:"is_available"`
 	RemainingBalance float64 `json:"remaining_balance"`
-	TotalUsage float64 `json:"total_usage"`
-	Currency string `json:"currency"`
-	QuotaPerUnit float64 `json:"quota_per_unit"`
-	RequestCount int64 `json:"request_count"`
-	StatusCode int `json:"status_code,omitempty"`
-	FetchedAt int64 `json:"fetched_at"`
+	TotalUsage       float64 `json:"total_usage"`
+	Currency         string  `json:"currency"`
+	QuotaPerUnit     float64 `json:"quota_per_unit"`
+	RequestCount     int64   `json:"request_count"`
+	StatusCode       int     `json:"status_code,omitempty"`
+	FetchedAt        int64   `json:"fetched_at"`
 }
 
 func tierflowQuotaNumber(raw json.RawMessage) (float64, error) {
@@ -50,15 +50,15 @@ func tierflowQuotaNumber(raw json.RawMessage) (float64, error) {
 func ParseTierflowBalanceResponse(balanceBody, statusBody []byte) (*TierflowBalanceResult, error) {
 	var balance struct {
 		Success bool `json:"success"`
-		Data struct {
-			Quota json.RawMessage `json:"quota"`
-			UsedQuota json.RawMessage `json:"used_quota"`
-			RequestCount *int64 `json:"request_count"`
+		Data    struct {
+			Quota        json.RawMessage `json:"quota"`
+			UsedQuota    json.RawMessage `json:"used_quota"`
+			RequestCount *int64          `json:"request_count"`
 		} `json:"data"`
 	}
 	var status struct {
 		Success bool `json:"success"`
-		Data struct {
+		Data    struct {
 			QuotaPerUnit json.RawMessage `json:"quota_per_unit"`
 		} `json:"data"`
 	}
@@ -79,12 +79,12 @@ func ParseTierflowBalanceResponse(balanceBody, statusBody []byte) (*TierflowBala
 		return nil, fmt.Errorf("Tierflow balance response contains an invalid quota value")
 	}
 	return &TierflowBalanceResult{
-		IsAvailable: true,
+		IsAvailable:      true,
 		RemainingBalance: remaining,
-		TotalUsage: used,
-		Currency: "CNY",
-		QuotaPerUnit: quotaPerUnit,
-		RequestCount: *balance.Data.RequestCount,
+		TotalUsage:       used,
+		Currency:         "CNY",
+		QuotaPerUnit:     quotaPerUnit,
+		RequestCount:     *balance.Data.RequestCount,
 	}, nil
 }
 

@@ -203,24 +203,24 @@ type AICredit struct {
 
 // UsageInfo 账号使用量信息
 type UsageInfo struct {
-	Source                  string         `json:"source,omitempty"`               // "passive", "active", or "local"
-	UpdatedAt               *time.Time     `json:"updated_at,omitempty"`           // 更新时间
-	FiveHour                *UsageProgress `json:"five_hour"`                      // 5小时窗口
-	SevenDay                *UsageProgress `json:"seven_day,omitempty"`            // 7天窗口
-	SevenDaySonnet          *UsageProgress `json:"seven_day_sonnet,omitempty"`     // 7天Sonnet窗口
-	SevenDayFable           *UsageProgress `json:"seven_day_fable,omitempty"`      // 7天Fable窗口（响应头 7d_oi）
-	GeminiSharedDaily       *UsageProgress `json:"gemini_shared_daily,omitempty"`  // Gemini shared pool RPD (Google One / Code Assist)
-	GeminiProDaily          *UsageProgress `json:"gemini_pro_daily,omitempty"`     // Gemini Pro 日配额
-	GeminiFlashDaily        *UsageProgress `json:"gemini_flash_daily,omitempty"`   // Gemini Flash 日配额
-	GeminiSharedMinute      *UsageProgress `json:"gemini_shared_minute,omitempty"` // Gemini shared pool RPM (Google One / Code Assist)
-	GeminiProMinute         *UsageProgress `json:"gemini_pro_minute,omitempty"`    // Gemini Pro RPM
-	GeminiFlashMinute       *UsageProgress `json:"gemini_flash_minute,omitempty"`  // Gemini Flash RPM
-	SenseNovaFiveHour       *UsageProgress `json:"sensenova_five_hour,omitempty"`  // SenseNova rolling 5-hour point window
-	SenseNovaSevenDay       *UsageProgress `json:"sensenova_seven_day,omitempty"`  // SenseNova rolling 7-day point window
-	ChatAnywhereDaily       *UsageProgress `json:"chatanywhere_daily,omitempty"`   // Local rolling 24h request observation
-	ChatAnywhereWeekly      *UsageProgress `json:"chatanywhere_weekly,omitempty"`  // Local rolling 7d token observation
-	ChatAnywhereQuotaStatus string         `json:"chatanywhere_quota_status,omitempty"`
-	TierflowBalance        *TierflowBalanceResult `json:"tierflow_balance,omitempty"`
+	Source                  string                 `json:"source,omitempty"`               // "passive", "active", or "local"
+	UpdatedAt               *time.Time             `json:"updated_at,omitempty"`           // 更新时间
+	FiveHour                *UsageProgress         `json:"five_hour"`                      // 5小时窗口
+	SevenDay                *UsageProgress         `json:"seven_day,omitempty"`            // 7天窗口
+	SevenDaySonnet          *UsageProgress         `json:"seven_day_sonnet,omitempty"`     // 7天Sonnet窗口
+	SevenDayFable           *UsageProgress         `json:"seven_day_fable,omitempty"`      // 7天Fable窗口（响应头 7d_oi）
+	GeminiSharedDaily       *UsageProgress         `json:"gemini_shared_daily,omitempty"`  // Gemini shared pool RPD (Google One / Code Assist)
+	GeminiProDaily          *UsageProgress         `json:"gemini_pro_daily,omitempty"`     // Gemini Pro 日配额
+	GeminiFlashDaily        *UsageProgress         `json:"gemini_flash_daily,omitempty"`   // Gemini Flash 日配额
+	GeminiSharedMinute      *UsageProgress         `json:"gemini_shared_minute,omitempty"` // Gemini shared pool RPM (Google One / Code Assist)
+	GeminiProMinute         *UsageProgress         `json:"gemini_pro_minute,omitempty"`    // Gemini Pro RPM
+	GeminiFlashMinute       *UsageProgress         `json:"gemini_flash_minute,omitempty"`  // Gemini Flash RPM
+	SenseNovaFiveHour       *UsageProgress         `json:"sensenova_five_hour,omitempty"`  // SenseNova rolling 5-hour point window
+	SenseNovaSevenDay       *UsageProgress         `json:"sensenova_seven_day,omitempty"`  // SenseNova rolling 7-day point window
+	ChatAnywhereDaily       *UsageProgress         `json:"chatanywhere_daily,omitempty"`   // Local rolling 24h request observation
+	ChatAnywhereWeekly      *UsageProgress         `json:"chatanywhere_weekly,omitempty"`  // Local rolling 7d token observation
+	ChatAnywhereQuotaStatus string                 `json:"chatanywhere_quota_status,omitempty"`
+	TierflowBalance         *TierflowBalanceResult `json:"tierflow_balance,omitempty"`
 
 	// Antigravity 多模型配额
 	AntigravityQuota map[string]*AntigravityModelQuota `json:"antigravity_quota,omitempty"`
@@ -318,20 +318,20 @@ type ClaudeUsageFetcher interface {
 
 // AccountUsageService 账号使用量查询服务
 type AccountUsageService struct {
-	accountRepo             AccountRepository
-	usageLogRepo            UsageLogRepository
-	usageFetcher            ClaudeUsageFetcher
-	geminiQuotaService      *GeminiQuotaService
-	antigravityQuotaFetcher *AntigravityQuotaFetcher
-	grokQuotaFetcher        *GrokQuotaFetcher
-	grokQuotaService        *GrokQuotaService
-	openAIQuotaService      *OpenAIQuotaService
+	accountRepo                 AccountRepository
+	usageLogRepo                UsageLogRepository
+	usageFetcher                ClaudeUsageFetcher
+	geminiQuotaService          *GeminiQuotaService
+	antigravityQuotaFetcher     *AntigravityQuotaFetcher
+	grokQuotaFetcher            *GrokQuotaFetcher
+	grokQuotaService            *GrokQuotaService
+	openAIQuotaService          *OpenAIQuotaService
 	upstreamBillingProbeService *UpstreamBillingProbeService
-	cache                   *UsageCache
-	identityCache           IdentityCache
-	tlsFPProfileService     *TLSFingerprintProfileService
-	agentIdentityTaskMu     sync.Mutex
-	agentIdentityWS         agentIdentityWSConnectionInvalidator
+	cache                       *UsageCache
+	identityCache               IdentityCache
+	tlsFPProfileService         *TLSFingerprintProfileService
+	agentIdentityTaskMu         sync.Mutex
+	agentIdentityWS             agentIdentityWSConnectionInvalidator
 }
 
 // NewAccountUsageService 创建AccountUsageService实例

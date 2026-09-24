@@ -197,10 +197,10 @@ func TestCreateTierflowAccountOnlyEnablesBalanceProbeWithConsoleCredentials(t *t
 
 func TestUpdateTierflowConsoleCredentialsPreservesExplicitProbeChoice(t *testing.T) {
 	for _, test := range []struct {
-		name       string
-		extra      map[string]any
-		explicit   *bool
-		wantProbe  bool
+		name      string
+		extra     map[string]any
+		explicit  *bool
+		wantProbe bool
 	}{
 		{name: "first console credentials default on", wantProbe: true},
 		{name: "existing opt out preserved", extra: map[string]any{UpstreamBillingProbeEnabledExtraKey: false}},
@@ -212,7 +212,7 @@ func TestUpdateTierflowConsoleCredentialsPreservesExplicitProbeChoice(t *testing
 				Credentials: map[string]any{"api_key": "test-key"}, Extra: test.extra,
 			}}}
 			updated, err := (&adminServiceImpl{accountRepo: repo}).UpdateAccount(context.Background(), 42, &UpdateAccountInput{
-				Credentials: map[string]any{"tierflow_cookie": "new-test-session", "tierflow_user_id": "123"},
+				Credentials:  map[string]any{"tierflow_cookie": "new-test-session", "tierflow_user_id": "123"},
 				ProbeEnabled: test.explicit,
 			})
 			require.NoError(t, err)

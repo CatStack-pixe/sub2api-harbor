@@ -627,20 +627,20 @@ func (s *UpstreamBillingProbeService) probeLoadedAccount(ctx context.Context, ac
 		snapshot := &UpstreamBillingProbeSnapshot{
 			Status: UpstreamBillingProbeStatusOK,
 			Data: map[string]any{
-				"provider": PlatformTierflow,
-				"is_available": result.IsAvailable,
+				"provider":          PlatformTierflow,
+				"is_available":      result.IsAvailable,
 				"remaining_balance": result.RemainingBalance,
-				"total_usage": result.TotalUsage,
-				"currency": result.Currency,
-				"quota_per_unit": result.QuotaPerUnit,
-				"request_count": result.RequestCount,
-				"fetched_at": result.FetchedAt,
+				"total_usage":       result.TotalUsage,
+				"currency":          result.Currency,
+				"quota_per_unit":    result.QuotaPerUnit,
+				"request_count":     result.RequestCount,
+				"fetched_at":        result.FetchedAt,
 			},
-			ReceivedAt: probeTimePtr(now),
-			FreshUntil: probeTimePtr(now.Add(2 * time.Duration(intervalMinutes) * time.Minute)),
+			ReceivedAt:    probeTimePtr(now),
+			FreshUntil:    probeTimePtr(now.Add(2 * time.Duration(intervalMinutes) * time.Minute)),
 			LastAttemptAt: now,
-			NextProbeAt: now.Add(nextProbeDelay(intervalMinutes, 0)),
-			HTTPStatus: result.StatusCode,
+			NextProbeAt:   now.Add(nextProbeDelay(intervalMinutes, 0)),
+			HTTPStatus:    result.StatusCode,
 		}
 		// Wallet observations never declare or synthesize a billing multiplier.
 		if err := s.updateSnapshot(ctx, account, snapshot, nil); err != nil {

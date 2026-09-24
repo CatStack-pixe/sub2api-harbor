@@ -159,8 +159,8 @@ func TestQuotaFetcher_OverseasAccountUsesUsageService(t *testing.T) {
 
 func TestQuotaFetcherTierflowUsesWalletAvailabilityWithoutInventingQuota(t *testing.T) {
 	for _, test := range []struct {
-		name string
-		balance float64
+		name       string
+		balance    float64
 		wantStatus string
 	}{
 		{name: "positive", balance: 0.01, wantStatus: MonitorStatusOperational},
