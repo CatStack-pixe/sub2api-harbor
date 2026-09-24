@@ -1081,6 +1081,7 @@ func filterSchedulerUpstreamBillingProbe(value any) map[string]any {
 		"provider",
 		"balance_cny",
 		"available_balance_cny",
+		"remaining_balance",
 		"frozen_balance_cny",
 		"expiring_balance_cny",
 		"currency",

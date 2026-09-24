@@ -1,8 +1,10 @@
 package repository
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/stretchr/testify/require"
@@ -106,5 +108,49 @@ func TestSchedulerMetadataAccountDropsInvalidUpstreamBillingProbe(t *testing.T) 
 		})
 
 		require.NotContains(t, metadata.Extra, service.UpstreamBillingProbeExtraKey)
+	}
+}
+
+func TestSchedulerMetadataAccountPreservesTierflowWalletBalance(t *testing.T) {
+	now := time.Now().UTC()
+	for _, balance := range []float64{50, 0} {
+		account := service.Account{
+			ID:          941,
+			Platform:    service.PlatformTierflow,
+			Type:        service.AccountTypeAPIKey,
+			Status:      service.StatusActive,
+			Schedulable: true,
+			Extra: map[string]any{
+				service.UpstreamBillingProbeEnabledExtraKey: true,
+				service.UpstreamBillingProbeExtraKey: map[string]any{
+					"status":      service.UpstreamBillingProbeStatusOK,
+					"fresh_until": now.Add(time.Hour).Format(time.RFC3339Nano),
+					"data": map[string]any{
+						"provider":          service.PlatformTierflow,
+						"remaining_balance": balance,
+						"currency":          "USD",
+						"request_count":     7,
+					},
+				},
+			},
+		}
+
+		_, payload, err := marshalSchedulerCacheAccount(account)
+		require.NoError(t, err)
+		metadata, err := decodeCachedAccount(string(payload))
+		require.NoError(t, err)
+		require.Equal(t, true, metadata.Extra[service.UpstreamBillingProbeEnabledExtraKey])
+
+		// Decode the same compact snapshot consumed by the balance scheduling gate.
+		probeJSON, err := json.Marshal(metadata.Extra[service.UpstreamBillingProbeExtraKey])
+		require.NoError(t, err)
+		var probe service.UpstreamBillingProbeSnapshot
+		require.NoError(t, json.Unmarshal(probeJSON, &probe))
+		require.Equal(t, service.UpstreamBillingProbeStatusOK, probe.Status)
+		require.NotNil(t, probe.FreshUntil)
+		require.True(t, probe.FreshUntil.After(now))
+		require.Contains(t, probe.Data, "remaining_balance", "zero balances must remain explicit")
+		require.Equal(t, balance, probe.Data["remaining_balance"])
+		require.NotContains(t, probe.Data, "request_count")
 	}
 }
