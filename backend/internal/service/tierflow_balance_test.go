@@ -233,6 +233,37 @@ func TestTierflowWalletGateRejectsStaleFailedAndInvalidBalances(t *testing.T) {
 	require.False(t, tierflowBalanceProbeAllowsScheduling(account, now))
 }
 
+func TestTierflowWalletGateAllowsFreshDecodedMetadata(t *testing.T) {
+	now := time.Now()
+	account := &Account{
+		ID:       941,
+		Platform: PlatformTierflow,
+		Type:     AccountTypeAPIKey,
+		Extra: map[string]any{
+			UpstreamBillingProbeEnabledExtraKey: true,
+			UpstreamBillingProbeExtraKey: map[string]any{
+				"status":      UpstreamBillingProbeStatusOK,
+				"fresh_until": now.Add(time.Hour).Format(time.RFC3339Nano),
+				"data": map[string]any{
+					"remaining_balance": 50.0,
+				},
+			},
+		},
+	}
+	// Candidate metadata only needs the fresh balance, not console credentials
+	// or the display-only fields from the complete wallet response.
+	payload, err := json.Marshal(account)
+	require.NoError(t, err)
+	var decoded Account
+	require.NoError(t, json.Unmarshal(payload, &decoded))
+	require.True(t, tierflowBalanceProbeAllowsScheduling(&decoded, now))
+
+	scheduler := &defaultOpenAIAccountScheduler{service: &OpenAIGatewayService{}}
+	compatible, reason := scheduler.isAccountRequestCompatibleReason(context.Background(), &decoded, OpenAIAccountScheduleRequest{})
+	require.True(t, compatible, reason)
+	require.Empty(t, reason)
+}
+
 func TestTierflowUsageMissingCredentialsAndProbeBackoffDoNotQueryProvider(t *testing.T) {
 	account := newTierflowBalanceTestAccount()
 	delete(account.Credentials, "tierflow_cookie")
