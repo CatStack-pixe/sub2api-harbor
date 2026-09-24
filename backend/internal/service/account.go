@@ -320,6 +320,10 @@ func (a *Account) IsSenseNova() bool {
 	return a != nil && a.Platform == PlatformSenseNova
 }
 
+func (a *Account) IsSenseAudio() bool {
+	return a != nil && a.Platform == PlatformSenseAudio
+}
+
 func (a *Account) IsGrokOAuth() bool {
 	return a.IsGrok() && a.Type == AccountTypeOAuth
 }
@@ -346,7 +350,7 @@ func (a *Account) IsOpenAICompatible() bool {
 		a.Platform == PlatformTokenRhythm || a.Platform == PlatformKimi || a.Platform == PlatformZhipu ||
 		a.Platform == PlatformChatAnywhere || a.Platform == PlatformGLM || a.Platform == PlatformModelScope ||
 		a.Platform == PlatformDashScope || a.Platform == PlatformMiniMax || a.Platform == PlatformVolcengine ||
-		a.Platform == PlatformSenseNova || a.Platform == PlatformTierflow || a.IsOpenCodeGo())
+		a.Platform == PlatformSenseNova || a.Platform == PlatformSenseAudio || a.Platform == PlatformTierflow || a.IsOpenCodeGo())
 }
 
 // ShouldUseOpenAIResponsesAPI reports whether this OpenAI-compatible account
@@ -361,7 +365,7 @@ func (a *Account) ShouldUseOpenAIResponsesAPI() bool {
 	}
 	return !a.IsAgnes() && !a.IsDeepSeek() && !a.IsNvidia() && !a.IsTokenRhythm() &&
 		!a.IsKimi() && !a.IsChatAnywhere() && !a.IsGLM() && !a.IsModelScope() &&
-		!a.IsDashScope() && !a.IsMiniMax() && !a.IsVolcengine() && !a.IsSenseNova() && !a.IsTierflow() &&
+		!a.IsDashScope() && !a.IsMiniMax() && !a.IsVolcengine() && !a.IsSenseNova() && !a.IsSenseAudio() && !a.IsTierflow() &&
 		openai_compat.ShouldUseResponsesAPI(a.Extra)
 }
 
@@ -1433,7 +1437,7 @@ func (a *Account) IsOpenAIApiKey() bool {
 func (a *Account) GetOpenAIBaseURL() string {
 	if a == nil || (!a.IsOpenAI() && !a.IsAgnes() && !a.IsDeepSeek() && !a.IsNvidia() &&
 		!a.IsTokenRhythm() && !a.IsKimi() && !a.IsZhipu() && !a.IsChatAnywhere() &&
-		!a.IsGLM() && !a.IsModelScope() && !a.IsDashScope() && !a.IsMiniMax() && !a.IsVolcengine() && !a.IsSenseNova() && !a.IsTierflow() && !a.IsOpenCodeGo()) {
+		!a.IsGLM() && !a.IsModelScope() && !a.IsDashScope() && !a.IsMiniMax() && !a.IsVolcengine() && !a.IsSenseNova() && !a.IsSenseAudio() && !a.IsTierflow() && !a.IsOpenCodeGo()) {
 		return ""
 	}
 	if a.IsChatAnywhere() {
@@ -1490,6 +1494,8 @@ func (a *Account) GetOpenAIBaseURL() string {
 			return DefaultDeepseekBaseURL
 		case PlatformSenseNova:
 			return SenseNovaDefaultBaseURL
+		case PlatformSenseAudio:
+			return SenseAudioDefaultBaseURL
 		}
 	}
 	if a.Type == AccountTypeAPIKey || a.Type == AccountTypeUpstream {
@@ -1516,6 +1522,8 @@ func (a *Account) GetOpenAIBaseURL() string {
 		return VolcengineDefaultBaseURL
 	case PlatformSenseNova:
 		return SenseNovaDefaultBaseURL
+	case PlatformSenseAudio:
+		return SenseAudioDefaultBaseURL
 	case PlatformTierflow:
 		return TierflowDefaultBaseURL
 	case PlatformOpenCodeGo:
@@ -1577,7 +1585,7 @@ func (a *Account) SupportsNativeCNResponses() bool {
 		return false
 	}
 	switch a.Platform {
-	case PlatformDeepseek, PlatformKimi, PlatformMiniMax, PlatformOpenCodeGo:
+	case PlatformDeepseek, PlatformKimi, PlatformMiniMax, PlatformSenseAudio, PlatformOpenCodeGo:
 		return true
 	default:
 		return false
@@ -1651,6 +1659,8 @@ func (a *Account) defaultCNProtocolBaseURL(protocol string) string {
 			return DefaultZhipuAnthropicBaseURL
 		case PlatformDeepSeek:
 			return DefaultDeepseekAnthropicBaseURL
+		case PlatformSenseAudio:
+			return SenseAudioDefaultBaseURL
 		case PlatformMiniMax:
 			return DefaultMiniMaxAnthropicBaseURL
 		case PlatformOpenCodeGo:
@@ -1672,6 +1682,8 @@ func (a *Account) defaultCNProtocolBaseURL(protocol string) string {
 			return DefaultDeepseekBaseURL
 		case PlatformSenseNova:
 			return SenseNovaDefaultBaseURL
+		case PlatformSenseAudio:
+			return SenseAudioDefaultBaseURL
 		case PlatformMiniMax:
 			return DefaultMiniMaxBaseURL
 		case PlatformOpenCodeGo:
@@ -1712,6 +1724,8 @@ func (a *Account) GetAnthropicProtocolBaseURL() string {
 		return DefaultZhipuAnthropicBaseURL
 	case PlatformDeepSeek:
 		return DefaultDeepseekAnthropicBaseURL
+	case PlatformSenseAudio:
+		return SenseAudioDefaultBaseURL
 	case PlatformMiniMax:
 		return DefaultMiniMaxAnthropicBaseURL
 	case PlatformOpenCodeGo:
@@ -1743,6 +1757,8 @@ func (a *Account) GetOpenAIFormatBaseURL() string {
 		return DefaultZhipuPayGBaseURL
 	case PlatformDeepSeek:
 		return DefaultDeepseekBaseURL
+	case PlatformSenseAudio:
+		return SenseAudioDefaultBaseURL
 	case PlatformMiniMax:
 		return DefaultMiniMaxBaseURL
 	case PlatformOpenCodeGo:
@@ -1902,7 +1918,7 @@ func (a *Account) GetOpenAIIDToken() string {
 }
 
 func (a *Account) GetOpenAIApiKey() string {
-	if a == nil || a.Type != AccountTypeAPIKey || (!a.IsOpenAI() && !a.IsAgnes() && !a.IsDeepSeek() && !a.IsNvidia() && !a.IsTokenRhythm() && !a.IsKimi() && !a.IsChatAnywhere() && !a.IsGLM() && !a.IsSenseNova() && !a.IsTierflow()) {
+	if a == nil || a.Type != AccountTypeAPIKey || (!a.IsOpenAI() && !a.IsAgnes() && !a.IsDeepSeek() && !a.IsNvidia() && !a.IsTokenRhythm() && !a.IsKimi() && !a.IsChatAnywhere() && !a.IsGLM() && !a.IsSenseNova() && !a.IsSenseAudio() && !a.IsTierflow()) {
 		return ""
 	}
 	return a.GetCredential("api_key")

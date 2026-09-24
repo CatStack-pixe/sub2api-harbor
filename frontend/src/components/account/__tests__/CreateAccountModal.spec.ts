@@ -259,6 +259,26 @@ describe('CreateAccountModal OpenAI long-context billing', () => {
     wrapper.unmount()
   })
 
+  it('creates a SenseAudio API-key account without offering an unsupported balance probe', async () => {
+    const wrapper = mountModal()
+    await wrapper.get('[data-testid="senseaudio-platform"]').trigger('click')
+    await wrapper.get('form#create-account-form input[type="text"]').setValue('SenseAudio account')
+    await wrapper.get('form#create-account-form input[type="password"]').setValue('test-api-key')
+    expect(wrapper.find('[data-testid="upstream-billing-auto-probe"]').exists()).toBe(false)
+    await wrapper.get('form#create-account-form').trigger('submit.prevent')
+    await flushPromises()
+
+    expect(createAccountMock).toHaveBeenCalledTimes(1)
+    const payload = createAccountMock.mock.calls[0]?.[0]
+    expect(payload).toMatchObject({
+      platform: 'senseaudio',
+      type: 'apikey',
+      credentials: { base_url: 'https://api.senseaudio.cn/v1', api_key: 'test-api-key' }
+    })
+    expect(payload.upstream_billing_probe_enabled).toBeUndefined()
+    wrapper.unmount()
+  })
+
   it('sets month and year expiry presets without submitting the account form', async () => {
     vi.useFakeTimers({ toFake: ['Date'] })
     vi.setSystemTime(new Date('2026-01-31T12:34:00'))

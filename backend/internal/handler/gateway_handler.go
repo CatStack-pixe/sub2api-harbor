@@ -1339,7 +1339,7 @@ func (h *GatewayHandler) compositeAvailableModels(ctx context.Context, groupID *
 		service.PlatformAntigravity, service.PlatformGrok, service.PlatformAgnes, service.PlatformDeepSeek,
 		service.PlatformNvidia, service.PlatformTokenRhythm, service.PlatformKimi, service.PlatformZhipu,
 		service.PlatformChatAnywhere, service.PlatformGLM, service.PlatformModelScope, service.PlatformDashScope,
-		service.PlatformMiniMax, service.PlatformVolcengine, service.PlatformSenseNova, service.PlatformTierflow, service.PlatformOpenCodeGo} {
+		service.PlatformMiniMax, service.PlatformVolcengine, service.PlatformSenseNova, service.PlatformSenseAudio, service.PlatformTierflow, service.PlatformOpenCodeGo} {
 		platformModels := h.gatewayService.GetAvailableModelsForExactPlatform(ctx, groupID, platform)
 		if len(platformModels) == 0 {
 			// CN 供应商没有静态默认模型列表（defaultModelIDsForPlatform 的
@@ -1547,6 +1547,8 @@ func defaultModelIDsForPlatform(platform string) []string {
 		return service.VolcengineDefaultModelIDs()
 	case service.PlatformSenseNova:
 		return service.SenseNovaDefaultModelIDs()
+	case service.PlatformSenseAudio:
+		return nil // The account-specific /v1/models catalog is authoritative.
 	case service.PlatformTierflow:
 		return nil // Use synced account mappings instead of an invented relay catalog.
 	case service.PlatformOpenCodeGo:
@@ -1558,7 +1560,7 @@ func defaultModelIDsForPlatform(platform string) []string {
 			service.PlatformAntigravity, service.PlatformGrok, service.PlatformAgnes, service.PlatformDeepSeek,
 			service.PlatformNvidia, service.PlatformTokenRhythm, service.PlatformKimi, service.PlatformZhipu,
 			service.PlatformChatAnywhere, service.PlatformGLM, service.PlatformModelScope, service.PlatformDashScope,
-			service.PlatformMiniMax, service.PlatformVolcengine, service.PlatformSenseNova, service.PlatformTierflow, service.PlatformOpenCodeGo} {
+			service.PlatformMiniMax, service.PlatformVolcengine, service.PlatformSenseNova, service.PlatformSenseAudio, service.PlatformTierflow, service.PlatformOpenCodeGo} {
 			for _, id := range defaultModelIDsForPlatform(concretePlatform) {
 				if _, ok := seen[id]; ok {
 					continue

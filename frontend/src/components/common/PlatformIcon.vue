@@ -42,6 +42,9 @@
     <path d="M4 6h16M8 12h12M12 18h8M4 6v12h4" />
     <path d="m17 3 3 3-3 3m0 6 3 3-3 3" />
   </svg>
+  <svg v-else-if="platform === 'senseaudio'" :class="sizeClass" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M3 12h2l2-5 3 10 4-13 3 8h4" />
+  </svg>
   <!-- ChatAnywhere connected nodes mark -->
   <svg v-else-if="platform === 'chatanywhere'" :class="sizeClass" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <circle cx="6" cy="12" r="2.5" />

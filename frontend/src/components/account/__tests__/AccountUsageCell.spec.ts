@@ -846,6 +846,40 @@ describe('AccountUsageCell', () => {
     wrapper.unmount()
   })
 
+  it('shows SenseAudio import balance without claiming a live probe', async () => {
+    const wrapper = mount(AccountUsageCell, {
+      props: {
+        account: makeAccount({
+          platform: 'senseaudio',
+          type: 'apikey',
+          extra: { senseaudio_initial_balance: { amount: 62, currency: 'CNY', captured_at: '2026-09-25T00:00:00Z' } }
+        })
+      }
+    })
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="senseaudio-initial-balance"]').text()).toContain('CNY 62.00')
+    expect(wrapper.text()).toContain('admin.accounts.senseaudio.initialBalanceHint')
+    expect(getUsage).not.toHaveBeenCalled()
+  })
+
+  it('does not invent a currency for an imported SenseAudio balance', async () => {
+    const wrapper = mount(AccountUsageCell, {
+      props: {
+        account: makeAccount({
+          platform: 'senseaudio',
+          type: 'apikey',
+          extra: { senseaudio_initial_balance: { amount: 62, currency: '', captured_at: '2026-09-25T00:00:00Z' } }
+        })
+      }
+    })
+
+    const balance = wrapper.get('[data-testid="senseaudio-initial-balance"]').text()
+    expect(balance).toContain('62.00')
+    expect(balance).not.toContain('CNY')
+    expect(getUsage).not.toHaveBeenCalled()
+  })
+
   it('Tierflow uses parent batch usage and delegates forced refresh without another request', async () => {
     const requestBatchedUsage = vi.fn()
     const wrapper = mount(AccountUsageCell, {

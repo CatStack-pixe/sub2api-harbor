@@ -14,6 +14,7 @@ const concretePlatforms = [
   'nvidia',
   'tokenrhythm',
   'tierflow',
+  'senseaudio',
   'kimi',
   'zhipu',
   'chatanywhere',
@@ -31,6 +32,12 @@ describe('platform option catalogs', () => {
     expect(platformLabel('tierflow')).toBe('Tierflow / 清枢智汇')
     expect(platformAccentColor('tierflow')).toBe('#0891b2')
     expect(getKeyGroupProvider('tierflow')).toBe('other')
+  })
+
+  it('labels and styles SenseAudio as a distinct platform', () => {
+    expect(platformLabel('senseaudio')).toBe('SenseAudio')
+    expect(platformAccentColor('senseaudio')).toBe('#059669')
+    expect(getKeyGroupProvider('senseaudio')).toBe('other')
   })
 
   it('exposes every concrete account platform', () => {

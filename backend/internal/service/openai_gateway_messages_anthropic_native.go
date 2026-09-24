@@ -132,8 +132,8 @@ func (s *OpenAIGatewayService) nativeAnthropicTargetURL(account *Account) (strin
 	if err != nil {
 		return "", fmt.Errorf("invalid base_url: %w", err)
 	}
-	if account.IsOpenCodeGo() {
-		// OpenCode Go 的 Chat Completions base 带 /v1；用版本感知拼接避免 /v1/v1/messages。
+	if account.IsOpenCodeGo() || account.IsSenseAudio() {
+		// These bases include /v1; version-aware joining avoids /v1/v1/messages.
 		return buildOpenAIEndpointURL(validatedURL, "/v1/messages"), nil
 	}
 	return strings.TrimRight(validatedURL, "/") + "/v1/messages", nil

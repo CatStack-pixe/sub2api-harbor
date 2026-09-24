@@ -41,6 +41,7 @@ export const isProfitControlPlatform = (platform: string): boolean =>
     "nvidia",
     "tokenrhythm",
     "tierflow",
+    "senseaudio",
     "kimi",
     "zhipu",
     "chatanywhere",

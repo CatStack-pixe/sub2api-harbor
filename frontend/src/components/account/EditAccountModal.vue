@@ -62,6 +62,8 @@
                             ? 'https://tokenrhythm.studio/v1'
                           : account.platform === 'tierflow'
                             ? 'https://tierflow.cn/v1'
+                          : account.platform === 'senseaudio'
+                            ? 'https://api.senseaudio.cn/v1'
                           : account.platform === 'nvidia'
                             ? 'https://integrate.api.nvidia.com/v1'
                           : account.platform === 'deepseek'
@@ -3270,6 +3272,7 @@ const baseUrlHint = computed(() => {
   if (props.account.platform === 'kimi') return t('admin.accounts.kimi.baseUrlHint')
   if (props.account.platform === 'tokenrhythm') return t('admin.accounts.tokenrhythm.baseUrlHint')
   if (props.account.platform === 'tierflow') return t('admin.accounts.tierflow.baseUrlHint')
+  if (props.account.platform === 'senseaudio') return t('admin.accounts.senseaudio.baseUrlHint')
   if (props.account.platform === 'chatanywhere') return t('admin.accounts.chatanywhere.baseUrlHint')
   if (props.account.platform === 'glm') return t('admin.accounts.glm.baseUrlHint')
   if (props.account.platform === 'nvidia') return t('admin.accounts.nvidia.baseUrlHint')
@@ -3584,7 +3587,8 @@ const genericUpstreamBillingProbeExcludedPlatforms = new Set([
   'minimax',
   'volcengine',
   'sensenova',
-  'tierflow'
+  'tierflow',
+  'senseaudio'
 ])
 const supportsGenericUpstreamBillingProbe = computed(() => {
   const platform = props.account?.platform
@@ -3966,6 +3970,7 @@ const defaultBaseUrl = computed(() => {
   if (props.account?.platform === 'nvidia') return 'https://integrate.api.nvidia.com/v1'
   if (props.account?.platform === 'tokenrhythm') return 'https://tokenrhythm.studio/v1'
   if (props.account?.platform === 'tierflow') return 'https://tierflow.cn/v1'
+  if (props.account?.platform === 'senseaudio') return 'https://api.senseaudio.cn/v1'
   if (props.account?.platform === 'chatanywhere') return 'https://api.chatanywhere.tech/v1'
   if (props.account?.platform === 'glm') return 'https://open.bigmodel.cn/api/paas/v4'
   if (props.account?.platform === 'modelscope') return 'https://api-inference.modelscope.cn/v1'
@@ -4429,6 +4434,7 @@ const syncFormFromAccount = (newAccount: Account | null) => {
       agnes: 'https://apihub.agnes-ai.com/v1',
       tokenrhythm: 'https://tokenrhythm.studio/v1',
       tierflow: 'https://tierflow.cn/v1',
+      senseaudio: 'https://api.senseaudio.cn/v1',
       chatanywhere: 'https://api.chatanywhere.tech/v1',
       glm: 'https://open.bigmodel.cn/api/paas/v4',
       nvidia: 'https://integrate.api.nvidia.com/v1',
@@ -4519,6 +4525,8 @@ const syncFormFromAccount = (newAccount: Account | null) => {
                 ? 'https://tokenrhythm.studio/v1'
               : newAccount.platform === 'tierflow'
                 ? 'https://tierflow.cn/v1'
+              : newAccount.platform === 'senseaudio'
+                ? 'https://api.senseaudio.cn/v1'
               : newAccount.platform === 'chatanywhere'
                 ? 'https://api.chatanywhere.tech/v1'
               : newAccount.platform === 'glm'

@@ -764,9 +764,9 @@ const form = reactive({
 let abortController: AbortController | null = null
 
 // ── Platform config ──
-const platformOrder: GroupPlatform[] = ['anthropic', 'openai', 'gemini', 'antigravity', 'grok', 'agnes', 'deepseek', 'nvidia', 'tokenrhythm', 'tierflow', 'kimi', 'zhipu', 'chatanywhere', 'glm', 'modelscope', 'dashscope', 'minimax', 'volcengine', 'sensenova', 'opencode_go']
+const platformOrder: GroupPlatform[] = ['anthropic', 'openai', 'gemini', 'antigravity', 'grok', 'agnes', 'deepseek', 'nvidia', 'tokenrhythm', 'tierflow', 'senseaudio', 'kimi', 'zhipu', 'chatanywhere', 'glm', 'modelscope', 'dashscope', 'minimax', 'volcengine', 'sensenova', 'opencode_go']
 // Composite pricing/mapping may target every concrete schedulable provider.
-const compositePlatforms: GroupPlatform[] = ['anthropic', 'openai', 'gemini', 'antigravity', 'grok', 'agnes', 'deepseek', 'nvidia', 'tokenrhythm', 'tierflow', 'kimi', 'zhipu', 'chatanywhere', 'glm', 'modelscope', 'dashscope', 'minimax', 'volcengine', 'sensenova', 'opencode_go']
+const compositePlatforms: GroupPlatform[] = ['anthropic', 'openai', 'gemini', 'antigravity', 'grok', 'agnes', 'deepseek', 'nvidia', 'tokenrhythm', 'tierflow', 'senseaudio', 'kimi', 'zhipu', 'chatanywhere', 'glm', 'modelscope', 'dashscope', 'minimax', 'volcengine', 'sensenova', 'opencode_go']
 
 // ── Helpers ──
 function formatDate(value: string): string {

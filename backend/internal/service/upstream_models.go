@@ -796,7 +796,7 @@ func (s *AccountTestService) buildUpstreamModelsRequest(ctx context.Context, acc
 		return s.buildDeepSeekUpstreamModelsRequest(ctx, account)
 	case account.IsOpenAI() || account.IsCNProvider() || account.IsAgnes() || account.IsNvidia() ||
 		account.IsTokenRhythm() || account.IsChatAnywhere() || account.IsGLM() || account.IsModelScope() ||
-		account.IsDashScope() || account.IsMiniMax() || account.IsVolcengine() || account.IsSenseNova() || account.IsTierflow() || account.IsOpenCodeGo():
+		account.IsDashScope() || account.IsMiniMax() || account.IsVolcengine() || account.IsSenseNova() || account.IsSenseAudio() || account.IsTierflow() || account.IsOpenCodeGo():
 		// OpenAI-compatible fork and CN providers reuse the OpenAI /v1/models probe.
 		return s.buildOpenAIUpstreamModelsRequest(ctx, account)
 	case account.IsGemini():
@@ -1064,6 +1064,11 @@ func buildOpenAIAPIKeyModelsRequest(ctx context.Context, account *Account, valid
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, buildOpenAIModelsURL(normalizedBaseURL), nil)
 	if err != nil {
 		return nil, newUpstreamModelSyncConfigError("Invalid OpenAI model list URL", err)
+	}
+	if account.IsSenseAudio() {
+		query := req.URL.Query()
+		query.Set("mode", "llm")
+		req.URL.RawQuery = query.Encode()
 	}
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("Authorization", "Bearer "+apiKey)

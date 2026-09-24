@@ -213,6 +213,7 @@ const upstreamSyncPlatforms = new Set([
   'nvidia',
   'tokenrhythm',
   'tierflow',
+  'senseaudio',
   'zhipu',
   'chatanywhere',
   'glm',

@@ -57,6 +57,7 @@ const (
 	PlatformMiniMax           = domain.PlatformMiniMax
 	PlatformVolcengine        = domain.PlatformVolcengine
 	PlatformSenseNova         = domain.PlatformSenseNova
+	PlatformSenseAudio        = domain.PlatformSenseAudio
 	PlatformTierflow          = domain.PlatformTierflow
 	PlatformComposite         = domain.PlatformComposite
 	PlatformKiro              = "kiro"
@@ -76,6 +77,7 @@ const (
 	MiniMaxDefaultBaseURL     = domain.MiniMaxDefaultBaseURL
 	VolcengineDefaultBaseURL  = domain.VolcengineDefaultBaseURL
 	SenseNovaDefaultBaseURL   = domain.SenseNovaDefaultBaseURL
+	SenseAudioDefaultBaseURL  = domain.SenseAudioDefaultBaseURL
 	TierflowDefaultBaseURL    = domain.TierflowDefaultBaseURL
 	PlatformOpenCodeGo        = domain.PlatformOpenCodeGo
 )
@@ -128,7 +130,7 @@ const (
 // IsCNProvider reports whether platform uses the CN OpenAI-compatible provider family.
 func IsCNProvider(platform string) bool {
 	switch platform {
-	case PlatformKimi, PlatformZhipu, PlatformDeepseek, PlatformSenseNova, PlatformMiniMax:
+	case PlatformKimi, PlatformZhipu, PlatformDeepseek, PlatformSenseNova, PlatformSenseAudio, PlatformMiniMax:
 		return true
 	default:
 		return false
@@ -168,6 +170,7 @@ var AllowedQuotaPlatforms = []string{
 	PlatformMiniMax,
 	PlatformVolcengine,
 	PlatformSenseNova,
+	PlatformSenseAudio,
 	PlatformTierflow,
 	PlatformOpenCodeGo,
 }

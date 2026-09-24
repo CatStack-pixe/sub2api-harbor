@@ -49,6 +49,7 @@ export function isHeaderOverrideCapable(platform: string, type: string): boolean
     platform === 'nvidia' ||
     platform === 'tokenrhythm' ||
     platform === 'tierflow' ||
+    platform === 'senseaudio' ||
     platform === 'chatanywhere' ||
     platform === 'glm' ||
     platform === 'modelscope' ||

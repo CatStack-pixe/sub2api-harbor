@@ -111,6 +111,7 @@ export default {
         nvidia: 'NVIDIA',
         tokenrhythm: 'TokenRhythm',
         tierflow: 'Tierflow',
+        senseaudio: 'SenseAudio',
         chatanywhere: 'ChatAnywhere',
         glm: 'GLM',
         modelscope: 'ModelScope',
@@ -735,6 +736,13 @@ export default {
         userId: 'Console user ID / TF-User (optional)',
         userIdPlaceholder: 'Numeric console user ID',
         userIdHint: 'Enter the numeric user ID from the console TF-User request header. Balance queries use it together with the Session Cookie.'
+      },
+      senseaudio: {
+        baseUrlHint: 'SenseAudio OpenAI-compatible endpoint (default: https://api.senseaudio.cn/v1). Sync available models from upstream.',
+        apiKeyHint: 'Your SenseAudio API key.',
+        initialBalance: 'Balance at import',
+        noInitialBalance: 'No import balance recorded',
+        initialBalanceHint: 'Recorded at import; not a live balance.'
       },
       tokenrhythm: {
         baseUrlHint: 'TokenRhythm uses its fixed official OpenAI-compatible endpoint.',
