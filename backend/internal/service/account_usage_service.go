@@ -220,6 +220,7 @@ type UsageInfo struct {
 	ChatAnywhereDaily       *UsageProgress `json:"chatanywhere_daily,omitempty"`   // Local rolling 24h request observation
 	ChatAnywhereWeekly      *UsageProgress `json:"chatanywhere_weekly,omitempty"`  // Local rolling 7d token observation
 	ChatAnywhereQuotaStatus string         `json:"chatanywhere_quota_status,omitempty"`
+	TierflowBalance        *TierflowBalanceResult `json:"tierflow_balance,omitempty"`
 
 	// Antigravity 多模型配额
 	AntigravityQuota map[string]*AntigravityModelQuota `json:"antigravity_quota,omitempty"`
@@ -325,6 +326,7 @@ type AccountUsageService struct {
 	grokQuotaFetcher        *GrokQuotaFetcher
 	grokQuotaService        *GrokQuotaService
 	openAIQuotaService      *OpenAIQuotaService
+	upstreamBillingProbeService *UpstreamBillingProbeService
 	cache                   *UsageCache
 	identityCache           IdentityCache
 	tlsFPProfileService     *TLSFingerprintProfileService
@@ -435,6 +437,9 @@ func (s *AccountUsageService) getUsageForAccount(ctx context.Context, account *A
 	// reusing the request admission counter.
 	if account.IsChatAnywhere() {
 		return s.getChatAnywhereUsage(ctx, account)
+	}
+	if account.IsTierflow() {
+		return s.getTierflowUsage(ctx, account, forceProbe)
 	}
 
 	// 只有oauth类型账号可以通过API获取usage（有profile scope）

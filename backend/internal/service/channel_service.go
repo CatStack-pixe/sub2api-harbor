@@ -370,7 +370,7 @@ func matchingPlatforms(groupPlatform string) []string {
 		return []string{PlatformAnthropic, PlatformGemini, PlatformOpenAI, PlatformAntigravity,
 			PlatformGrok, PlatformAgnes, PlatformDeepSeek, PlatformNvidia, PlatformTokenRhythm,
 			PlatformKimi, PlatformZhipu, PlatformChatAnywhere, PlatformGLM, PlatformModelScope,
-			PlatformDashScope, PlatformMiniMax, PlatformVolcengine, PlatformSenseNova, PlatformOpenCodeGo}
+			PlatformDashScope, PlatformMiniMax, PlatformVolcengine, PlatformSenseNova, PlatformTierflow, PlatformOpenCodeGo}
 	}
 	return []string{groupPlatform}
 }

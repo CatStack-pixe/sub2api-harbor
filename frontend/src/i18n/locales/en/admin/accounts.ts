@@ -110,6 +110,7 @@ export default {
         deepseek: 'DeepSeek',
         nvidia: 'NVIDIA',
         tokenrhythm: 'TokenRhythm',
+        tierflow: 'Tierflow',
         chatanywhere: 'ChatAnywhere',
         glm: 'GLM',
         modelscope: 'ModelScope',
@@ -720,6 +721,20 @@ export default {
         apiKeyHint: 'Your Kimi Open Platform API Key',
         chinaRegion: 'China: api.moonshot.cn',
         internationalRegion: 'International: api.moonshot.ai'
+      },
+      tierflow: {
+        remainingBalance: 'Upstream balance',
+        usedBalance: 'Upstream used',
+        noBalance: 'No available balance data',
+        refreshBalance: 'Refresh balance',
+        baseUrlHint: 'OpenAI-compatible Tierflow endpoint (default: https://tierflow.cn/v1). Sync the model catalog from upstream.',
+        apiKeyHint: 'Enter an API key created in the Tierflow console. A phone number or login password is not required.',
+        cookie: 'Console Session Cookie (optional)',
+        cookiePlaceholder: 'session=… or the raw Session Cookie value',
+        cookieHint: 'Used only to query the upstream balance, never for model inference. Leave blank when editing to keep the saved value.',
+        userId: 'Console user ID / TF-User (optional)',
+        userIdPlaceholder: 'Numeric console user ID',
+        userIdHint: 'Enter the numeric user ID from the console TF-User request header. Balance queries use it together with the Session Cookie.'
       },
       tokenrhythm: {
         baseUrlHint: 'TokenRhythm uses its fixed official OpenAI-compatible endpoint.',

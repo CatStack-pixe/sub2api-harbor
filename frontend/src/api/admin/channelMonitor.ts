@@ -15,6 +15,7 @@ export type Provider =
   | 'zhipu'
   | 'deepseek'
   | 'sensenova'
+  | 'tierflow'
   | 'minimax'
   | 'opencode_go'
 export type MonitorStatus = 'operational' | 'degraded' | 'failed' | 'error'

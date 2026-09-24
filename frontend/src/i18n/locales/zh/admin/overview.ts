@@ -925,6 +925,7 @@ export default {
         kimi: 'Kimi',
         nvidia: 'NVIDIA',
         tokenrhythm: 'TokenRhythm',
+        tierflow: 'Tierflow / 清枢智汇',
         chatanywhere: 'ChatAnywhere',
         glm: 'GLM',
         zhipu: 'Zhipu GLM',

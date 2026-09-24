@@ -18,6 +18,7 @@ export const PROVIDER_KIMI: Provider = 'kimi'
 export const PROVIDER_ZHIPU: Provider = 'zhipu'
 export const PROVIDER_DEEPSEEK: Provider = 'deepseek'
 export const PROVIDER_SENSENOVA: Provider = 'sensenova'
+export const PROVIDER_TIERFLOW: Provider = 'tierflow'
 export const PROVIDER_MINIMAX: Provider = 'minimax'
 export const PROVIDER_OPENCODE_GO: Provider = 'opencode_go'
 
@@ -29,6 +30,7 @@ export const DEFAULT_KIMI_ENDPOINT = 'https://api.moonshot.cn'
 export const DEFAULT_ZHIPU_ENDPOINT = 'https://open.bigmodel.cn'
 export const DEFAULT_DEEPSEEK_ENDPOINT = 'https://api.deepseek.com'
 export const DEFAULT_SENSENOVA_ENDPOINT = 'https://token.sensenova.cn'
+export const DEFAULT_TIERFLOW_ENDPOINT = 'https://tierflow.cn/v1'
 export const DEFAULT_MINIMAX_ENDPOINT = 'https://api.minimaxi.com'
 export const DEFAULT_OPENCODE_GO_ENDPOINT = 'https://opencode.ai/zen/go/v1'
 
@@ -49,6 +51,7 @@ export const PROVIDERS: readonly Provider[] = [
   PROVIDER_ZHIPU,
   PROVIDER_DEEPSEEK,
   PROVIDER_SENSENOVA,
+  PROVIDER_TIERFLOW,
   PROVIDER_MINIMAX,
   PROVIDER_OPENCODE_GO,
 ]

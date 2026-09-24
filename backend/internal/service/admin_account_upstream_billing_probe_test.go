@@ -178,6 +178,49 @@ func TestCreateTokenRhythmAccountEnablesBalanceProbeByDefault(t *testing.T) {
 	require.Equal(t, true, created.Extra[UpstreamBillingProbeEnabledExtraKey])
 }
 
+func TestCreateTierflowAccountOnlyEnablesBalanceProbeWithConsoleCredentials(t *testing.T) {
+	for _, withConsole := range []bool{false, true} {
+		credentials := map[string]any{"api_key": "test-key"}
+		if withConsole {
+			credentials["tierflow_cookie"] = "test-session"
+			credentials["tierflow_user_id"] = "123"
+		}
+		repo := &upstreamBillingProbeAccountRepo{}
+		created, err := (&adminServiceImpl{accountRepo: repo}).CreateAccount(context.Background(), &CreateAccountInput{
+			Name: "tierflow-default-probe", Platform: PlatformTierflow, Type: AccountTypeAPIKey,
+			Credentials: credentials, SkipDefaultGroupBind: true,
+		})
+		require.NoError(t, err)
+		require.Equal(t, withConsole, upstreamBillingProbeEnabled(created))
+	}
+}
+
+func TestUpdateTierflowConsoleCredentialsPreservesExplicitProbeChoice(t *testing.T) {
+	for _, test := range []struct {
+		name       string
+		extra      map[string]any
+		explicit   *bool
+		wantProbe  bool
+	}{
+		{name: "first console credentials default on", wantProbe: true},
+		{name: "existing opt out preserved", extra: map[string]any{UpstreamBillingProbeEnabledExtraKey: false}},
+		{name: "explicit update opt out preserved", explicit: func() *bool { value := false; return &value }()},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			repo := &upstreamBillingProbeAccountRepo{accounts: map[int64]*Account{42: {
+				ID: 42, Platform: PlatformTierflow, Type: AccountTypeAPIKey, Status: StatusActive,
+				Credentials: map[string]any{"api_key": "test-key"}, Extra: test.extra,
+			}}}
+			updated, err := (&adminServiceImpl{accountRepo: repo}).UpdateAccount(context.Background(), 42, &UpdateAccountInput{
+				Credentials: map[string]any{"tierflow_cookie": "new-test-session", "tierflow_user_id": "123"},
+				ProbeEnabled: test.explicit,
+			})
+			require.NoError(t, err)
+			require.Equal(t, test.wantProbe, upstreamBillingProbeEnabled(updated))
+		})
+	}
+}
+
 func TestUpdateAccountPreservesManagedUpstreamBillingProbeStateForUnrelatedEdit(t *testing.T) {
 	accountID := int64(110)
 	repo := &upstreamBillingProbeAccountRepo{accounts: map[int64]*Account{

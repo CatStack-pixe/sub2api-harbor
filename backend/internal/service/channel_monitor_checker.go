@@ -177,6 +177,7 @@ var providerAdapters = map[string]providerAdapter{
 	MonitorProviderDeepseek:  providerDeepseekChatAdapter,
 	MonitorProviderSenseNova: providerSenseNovaChatAdapter,
 	MonitorProviderMiniMax:   providerMiniMaxChatAdapter,
+	MonitorProviderTierflow:  providerOpenAIChatAdapter,
 	MonitorProviderAnthropic: {
 		buildPath: func(string) string { return providerAnthropicPath },
 		buildBody: func(model, prompt string) ([]byte, error) {
@@ -471,6 +472,7 @@ var bodyMergeKeyDenyList = map[string]map[string]bool{
 	MonitorProviderDeepseek:  {"model": true, "messages": true, "stream": true},
 	MonitorProviderSenseNova: {"model": true, "messages": true, "stream": true},
 	MonitorProviderMiniMax:   {"model": true, "messages": true, "stream": true},
+	MonitorProviderTierflow:  {"model": true, "messages": true, "stream": true},
 }
 
 func checkAPIMode(opts *CheckOptions) string {
@@ -493,7 +495,7 @@ func isOpenAICompatibleChatProvider(provider string) bool {
 	switch provider {
 	case MonitorProviderOpenAI, MonitorProviderGrok,
 		MonitorProviderKimi, MonitorProviderZhipu, MonitorProviderDeepseek,
-		MonitorProviderSenseNova, MonitorProviderMiniMax:
+		MonitorProviderSenseNova, MonitorProviderMiniMax, MonitorProviderTierflow:
 		return true
 	default:
 		return false

@@ -20,6 +20,7 @@ const PROVIDER_BY_PLATFORM: Record<GroupPlatform, KeyGroupProvider> = {
   agnes: 'other',
   nvidia: 'other',
   tokenrhythm: 'other',
+  tierflow: 'other',
   chatanywhere: 'other',
   gemini: 'other',
   grok: 'other',

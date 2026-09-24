@@ -37,6 +37,11 @@
   <svg v-else-if="platform === 'tokenrhythm'" :class="sizeClass" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
     <path d="M3 12h3l2.2-6 3.6 12 2.4-8 1.5 2H21" />
   </svg>
+  <!-- Tierflow relay flow mark -->
+  <svg v-else-if="platform === 'tierflow'" :class="sizeClass" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M4 6h16M8 12h12M12 18h8M4 6v12h4" />
+    <path d="m17 3 3 3-3 3m0 6 3 3-3 3" />
+  </svg>
   <!-- ChatAnywhere connected nodes mark -->
   <svg v-else-if="platform === 'chatanywhere'" :class="sizeClass" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <circle cx="6" cy="12" r="2.5" />

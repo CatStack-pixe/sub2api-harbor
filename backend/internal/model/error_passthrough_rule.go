@@ -54,6 +54,7 @@ const (
 	PlatformMiniMax      = domain.PlatformMiniMax
 	PlatformVolcengine   = domain.PlatformVolcengine
 	PlatformSenseNova    = domain.PlatformSenseNova
+	PlatformTierflow     = domain.PlatformTierflow
 	PlatformOpenCodeGo   = domain.PlatformOpenCodeGo
 )
 
@@ -78,6 +79,7 @@ func AllPlatforms() []string {
 		PlatformMiniMax,
 		PlatformVolcengine,
 		PlatformSenseNova,
+		PlatformTierflow,
 		PlatformOpenCodeGo,
 	}
 }

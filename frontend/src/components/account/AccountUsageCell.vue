@@ -194,6 +194,33 @@
     </template>
 
     <!-- SenseNova API key accounts: local rolling point windows -->
+    <template v-else-if="account.platform === 'tierflow'">
+      <div class="space-y-1" data-testid="tierflow-balance">
+        <div v-if="loading" class="h-3 w-24 animate-pulse rounded bg-gray-200 dark:bg-gray-700"></div>
+        <div v-else-if="error || usageInfo?.error" class="max-w-[200px] truncate text-xs text-red-500" :title="error || usageInfo?.error || undefined">
+          {{ error || usageInfo?.error }}
+        </div>
+        <template v-else-if="tierflowBalance?.is_available">
+          <div class="text-xs font-medium text-cyan-700 dark:text-cyan-300">
+            {{ t('admin.accounts.tierflow.remainingBalance') }}: {{ formatTierflowAmount(tierflowBalance.remaining_balance) }}
+          </div>
+          <div class="text-[10px] text-gray-500 dark:text-gray-400">
+            {{ t('admin.accounts.tierflow.usedBalance') }}: {{ formatTierflowAmount(tierflowBalance.total_usage) }}
+          </div>
+        </template>
+        <div v-else class="text-xs text-gray-400">{{ t('admin.accounts.tierflow.noBalance') }}</div>
+        <button
+          type="button"
+          class="rounded px-1.5 py-0.5 text-[10px] text-cyan-700 hover:bg-cyan-50 disabled:opacity-50 dark:text-cyan-300 dark:hover:bg-cyan-900/30"
+          data-testid="tierflow-balance-refresh"
+          :disabled="loading"
+          @click="loadUsage({ source: 'active', bypassCache: true })"
+        >
+          {{ t('admin.accounts.tierflow.refreshBalance') }}
+        </button>
+      </div>
+    </template>
+
     <template v-else-if="account.platform === 'sensenova'">
       <div v-if="loading" class="space-y-1.5">
         <div class="flex items-center gap-1">
@@ -838,6 +865,7 @@ const showUsageWindows = computed(() => {
     return true
   }
   if (props.account.platform === 'sensenova') return true
+  if (props.account.platform === 'tierflow') return true
   return props.account.type === 'oauth' || props.account.type === 'setup-token'
 })
 
@@ -850,6 +878,9 @@ const shouldFetchUsage = computed(() => {
   }
   if (props.account.platform === 'sensenova') {
     return true
+  }
+  if (props.account.platform === 'tierflow') {
+    return props.account.type === 'apikey'
   }
   if (props.account.platform === 'chatanywhere') {
     return true
@@ -874,6 +905,13 @@ const cnAccountMode = computed(() => {
 })
 const cnQuotaCellVisible = computed(() => cnQuotaCellVisibleFn(props.account.platform, cnAccountMode.value))
 const cnBalanceCellVisible = computed(() => cnBalanceCellVisibleFn(props.account.platform, cnAccountMode.value))
+
+const tierflowBalance = computed(() => usageInfo.value?.tierflow_balance)
+const formatTierflowAmount = (value: number | undefined): string => {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return '-'
+  const currency = tierflowBalance.value?.currency || ''
+  return `${currency} ${value.toFixed(2)}`.trim()
+}
 
 const isBatchManaged = computed(() => typeof props.requestBatchedUsage === 'function')
 

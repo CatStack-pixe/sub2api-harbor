@@ -820,6 +820,71 @@ describe('AccountUsageCell', () => {
   expect(wrapper.text()).toContain('7d|100|106540000')
   })
 
+  it('Tierflow API key displays the observed currency and refreshes a zero balance', async () => {
+    const balance = {
+      is_available: true,
+      remaining_balance: 0,
+      total_usage: 50,
+      currency: 'USD',
+      quota_per_unit: 500000,
+      request_count: 3,
+      fetched_at: 1790208000
+    }
+    getUsage.mockResolvedValue({ tierflow_balance: balance })
+    const wrapper = mount(AccountUsageCell, {
+      props: { account: makeAccount({ id: 5101, platform: 'tierflow', type: 'apikey' }) }
+    })
+    await flushPromises()
+
+    expect(getUsage).toHaveBeenCalledWith(5101)
+    expect(wrapper.get('[data-testid="tierflow-balance"]').text()).toContain('USD 0.00')
+    expect(wrapper.text()).toContain('USD 50.00')
+    expect(wrapper.text()).not.toContain('CNY')
+    await wrapper.get('[data-testid="tierflow-balance-refresh"]').trigger('click')
+    await flushPromises()
+    expect(getUsage).toHaveBeenLastCalledWith(5101, 'active', true)
+    wrapper.unmount()
+  })
+
+  it('Tierflow uses parent batch usage and delegates forced refresh without another request', async () => {
+    const requestBatchedUsage = vi.fn()
+    const wrapper = mount(AccountUsageCell, {
+      props: {
+        account: makeAccount({ id: 5102, platform: 'tierflow', type: 'apikey' }),
+        requestBatchedUsage,
+        batchedUsage: {
+          tierflow_balance: {
+            is_available: true,
+            remaining_balance: 42.5,
+            total_usage: 7.5,
+            currency: 'CNY',
+            quota_per_unit: 500000,
+            request_count: 2,
+            fetched_at: 1790208000
+          }
+        } as never
+      }
+    })
+    await flushPromises()
+
+    expect(getUsage).not.toHaveBeenCalled()
+    expect(wrapper.text()).toContain('CNY 42.50')
+    await wrapper.get('[data-testid="tierflow-balance-refresh"]').trigger('click')
+    expect(requestBatchedUsage).toHaveBeenLastCalledWith(expect.objectContaining({ id: 5102 }), { force: true })
+    wrapper.unmount()
+  })
+
+  it('Tierflow does not display a fabricated balance when console access is unavailable', async () => {
+    getUsage.mockResolvedValue({ tierflow_balance: { is_available: false, remaining_balance: 0 } })
+    const wrapper = mount(AccountUsageCell, {
+      props: { account: makeAccount({ id: 5103, platform: 'tierflow', type: 'apikey' }) }
+    })
+    await flushPromises()
+    expect(wrapper.text()).toContain('admin.accounts.tierflow.noBalance')
+    expect(wrapper.text()).not.toContain('0.00')
+    wrapper.unmount()
+  })
+
   it('SenseNova API key renders local rolling 5-hour and weekly point windows', async () => {
     getUsage.mockResolvedValue({
       sensenova_five_hour: {

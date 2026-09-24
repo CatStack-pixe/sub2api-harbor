@@ -96,6 +96,7 @@ const PLATFORM_LABELS: Record<string, string> = {
   gemini: 'Gemini',
   antigravity: 'Antigravity',
   chatanywhere: 'ChatAnywhere',
+  tierflow: 'Tierflow / 清枢智汇',
   glm: 'GLM',
   grok: 'Grok',
   kimi: 'Kimi',

@@ -61,6 +61,7 @@ func newGatewayRoutesTestRouterWithConfig(cfg *config.Config, platform ...string
 func TestOpenAIMessagesCompatiblePlatformIncludesNVIDIA(t *testing.T) {
 	require.True(t, isOpenAIMessagesCompatiblePlatform(service.PlatformNvidia))
 	require.True(t, isOpenAIMessagesCompatiblePlatform(service.PlatformKimi))
+	require.True(t, isOpenAIMessagesCompatiblePlatform(service.PlatformTierflow))
 	require.False(t, isOpenAIMessagesCompatiblePlatform(service.PlatformAnthropic))
 }
 
@@ -91,6 +92,7 @@ func TestGatewayRoutesChatOnlyPlatformsResponsesUseOpenAICompatibleHandler(t *te
 		{name: "deepseek", platform: service.PlatformDeepSeek, model: "deepseek-v4-flash"},
 		{name: "nvidia", platform: service.PlatformNvidia, model: "z-ai/glm-5.2"},
 		{name: "chatanywhere", platform: service.PlatformChatAnywhere, model: "gpt-4o-mini"},
+		{name: "tierflow", platform: service.PlatformTierflow, model: "custom/provider-model"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

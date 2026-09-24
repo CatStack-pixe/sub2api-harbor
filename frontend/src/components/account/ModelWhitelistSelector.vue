@@ -212,6 +212,7 @@ const upstreamSyncPlatforms = new Set([
   'kimi',
   'nvidia',
   'tokenrhythm',
+  'tierflow',
   'zhipu',
   'chatanywhere',
   'glm',

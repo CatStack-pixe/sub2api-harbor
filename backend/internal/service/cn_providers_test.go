@@ -528,7 +528,7 @@ func TestNormalizeOpenAICompatiblePlatform_SchedulerExactMatch(t *testing.T) {
 	for _, platform := range []string{
 		PlatformGrok, PlatformAgnes, PlatformDeepSeek, PlatformNvidia,
 		PlatformTokenRhythm, PlatformKimi, PlatformZhipu, PlatformChatAnywhere,
-		PlatformGLM, PlatformModelScope, PlatformDashScope, PlatformMiniMax, PlatformVolcengine, PlatformSenseNova, PlatformOpenCodeGo,
+		PlatformGLM, PlatformModelScope, PlatformDashScope, PlatformMiniMax, PlatformVolcengine, PlatformSenseNova, PlatformTierflow, PlatformOpenCodeGo,
 	} {
 		require.Equal(t, platform, NormalizeOpenAICompatiblePlatform(platform))
 	}
@@ -695,7 +695,7 @@ func TestNativeResponsesSelectionPreservesChatOnlyForkProviders(t *testing.T) {
 		account := &Account{Platform: platform, Type: AccountTypeAPIKey, Credentials: map[string]any{"api_protocol": APIProtocolResponses}}
 		require.True(t, account.ShouldUseOpenAIResponsesAPI(), platform)
 	}
-	for _, platform := range []string{PlatformAgnes, PlatformNvidia, PlatformTokenRhythm, PlatformChatAnywhere, PlatformGLM, PlatformModelScope, PlatformDashScope, PlatformVolcengine, PlatformSenseNova} {
+	for _, platform := range []string{PlatformAgnes, PlatformNvidia, PlatformTokenRhythm, PlatformChatAnywhere, PlatformGLM, PlatformModelScope, PlatformDashScope, PlatformVolcengine, PlatformSenseNova, PlatformTierflow} {
 		account := &Account{Platform: platform, Type: AccountTypeAPIKey, Credentials: map[string]any{"api_protocol": APIProtocolResponses}}
 		require.False(t, account.ShouldUseOpenAIResponsesAPI(), platform)
 	}

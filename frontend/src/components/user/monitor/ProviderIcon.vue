@@ -93,6 +93,11 @@ const PROVIDER_ICONS: Record<Provider, IconData> = {
       'M16 6H8v12h8V6zm4 16H4V2h16v20z',
     ],
   },
+  tierflow: {
+    paths: [
+      'M3 5h14V2l5 4-5 4V7H5v10h3v2H3V5zm5 6h12v2H8v-2zm4 6h5v-3l5 4-5 4v-3h-5v-2z',
+    ],
+  },
 }
 
 const props = withDefaults(defineProps<{

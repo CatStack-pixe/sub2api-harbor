@@ -295,7 +295,7 @@ func openAIMessagesDispatchBypassPlatform(platform string) bool {
 	switch platform {
 	case service.PlatformGrok, service.PlatformAgnes, service.PlatformNvidia,
 		service.PlatformTokenRhythm, service.PlatformChatAnywhere, service.PlatformGLM,
-		service.PlatformModelScope, service.PlatformDashScope, service.PlatformMiniMax, service.PlatformVolcengine, service.PlatformSenseNova:
+		service.PlatformModelScope, service.PlatformDashScope, service.PlatformMiniMax, service.PlatformVolcengine, service.PlatformSenseNova, service.PlatformTierflow:
 		return true
 	default:
 		return false
@@ -308,7 +308,7 @@ func openAICompatibleTextTargetAllowed(c *gin.Context, apiKey *service.APIKey, m
 		service.PlatformDeepSeek, service.PlatformNvidia, service.PlatformTokenRhythm,
 		service.PlatformKimi, service.PlatformZhipu, service.PlatformChatAnywhere,
 		service.PlatformGLM, service.PlatformModelScope, service.PlatformDashScope,
-		service.PlatformMiniMax, service.PlatformVolcengine, service.PlatformSenseNova, service.PlatformOpenCodeGo)
+		service.PlatformMiniMax, service.PlatformVolcengine, service.PlatformSenseNova, service.PlatformTierflow, service.PlatformOpenCodeGo)
 }
 
 // isResponsesWebSocketCompositePlatform 限定 composite 分组在 Responses WebSocket
@@ -3880,7 +3880,7 @@ func (h *OpenAIGatewayHandler) openAIResponsesKeepaliveInterval() time.Duration 
 // pre-output SSE keepalive while the upstream is silent.
 func isResponsesChatFallbackPlatform(platform string) bool {
 	switch platform {
-	case service.PlatformNvidia, service.PlatformDeepSeek, service.PlatformTokenRhythm:
+	case service.PlatformNvidia, service.PlatformDeepSeek, service.PlatformTokenRhythm, service.PlatformTierflow:
 		return true
 	default:
 		return false

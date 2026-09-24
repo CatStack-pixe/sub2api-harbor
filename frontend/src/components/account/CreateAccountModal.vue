@@ -249,6 +249,20 @@
           </button>
           <button
             type="button"
+            data-testid="tierflow-platform"
+            @click="form.platform = 'tierflow'"
+            :class="[
+              'flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium transition-all',
+              form.platform === 'tierflow'
+                ? 'bg-white text-cyan-700 shadow-sm dark:bg-dark-600 dark:text-cyan-300'
+                : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200'
+            ]"
+          >
+            <PlatformIcon platform="tierflow" size="sm" />
+            Tierflow / 清枢智汇
+          </button>
+          <button
+            type="button"
             data-testid="chatanywhere-platform"
             @click="form.platform = 'chatanywhere'"
             :class="[
@@ -665,6 +679,26 @@
             <div>
               <span class="block text-sm font-medium text-gray-900 dark:text-white">API Key</span>
               <span class="text-xs text-gray-500 dark:text-gray-400">TokenRhythm API</span>
+            </div>
+          </button>
+        </div>
+      </div>
+
+      <div v-if="form.platform === 'tierflow'">
+        <label class="input-label">{{ t('admin.accounts.accountType') }}</label>
+        <div class="mt-2 grid grid-cols-1 gap-3" data-tour="account-form-type">
+          <button
+            type="button"
+            data-testid="tierflow-account-type-api-key"
+            @click="accountCategory = 'apikey'"
+            class="flex items-center gap-3 rounded-lg border-2 border-cyan-500 bg-cyan-50 p-3 text-left dark:bg-cyan-900/20"
+          >
+            <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-cyan-600 text-white">
+              <Icon name="key" size="sm" />
+            </div>
+            <div>
+              <span class="block text-sm font-medium text-gray-900 dark:text-white">API Key</span>
+              <span class="text-xs text-gray-500 dark:text-gray-400">Tierflow API</span>
             </div>
           </button>
         </div>
@@ -1731,6 +1765,12 @@
           <p v-if="apiKeyHint" class="input-hint">{{ apiKeyHint }}</p>
         </div>
 
+        <TierflowCredentialsFields
+          v-if="form.platform === 'tierflow'"
+          v-model:cookie="tierflowCookie"
+          v-model:user-id="tierflowUserId"
+        />
+
         <div v-if="form.platform === 'sensenova'">
           <label class="input-label">{{ t('admin.accounts.sensenova.quotaAccessToken') }}</label>
           <input
@@ -1770,7 +1810,7 @@
 
         <!-- 上游倍率自动探测：全部 API-key 平台可用（所在区块已限定 apikey 类型） -->
         <div
-          v-if="form.platform !== 'deepseek' && form.platform !== 'kimi' && form.platform !== 'tokenrhythm' && form.platform !== 'chatanywhere' && form.platform !== 'glm' && form.platform !== 'modelscope' && form.platform !== 'dashscope' && form.platform !== 'minimax' && form.platform !== 'volcengine' && form.platform !== 'sensenova'"
+          v-if="form.platform !== 'deepseek' && form.platform !== 'kimi' && form.platform !== 'tokenrhythm' && form.platform !== 'chatanywhere' && form.platform !== 'glm' && form.platform !== 'modelscope' && form.platform !== 'dashscope' && form.platform !== 'minimax' && form.platform !== 'volcengine' && form.platform !== 'sensenova' && form.platform !== 'tierflow'"
           class="flex items-center justify-between gap-4 border-t border-gray-200 pt-4 dark:border-dark-600"
         >
           <div>
@@ -4290,6 +4330,8 @@ import CnBaseUrlPresets from '@/components/account/CnBaseUrlPresets.vue'
 import OpenCodeGoProtocolRulesEditor from '@/components/account/OpenCodeGoProtocolRulesEditor.vue'
 import HeaderOverrideEditor from '@/components/account/HeaderOverrideEditor.vue'
 import TokenRhythmSessionResolver from '@/components/account/TokenRhythmSessionResolver.vue'
+import TierflowCredentialsFields from '@/components/account/TierflowCredentialsFields.vue'
+import { applyTierflowConsoleCredentials } from '@/components/account/tierflowCredentials'
 import { allSelectedGroupsEnableLongContextPricing } from '@/components/account/longContextBilling'
 import {
   applyAntigravityProjectID,
@@ -4375,6 +4417,7 @@ const baseUrlHint = computed(() => {
   if (form.platform === 'deepseek') return t('admin.accounts.deepseek.baseUrlHint')
   if (form.platform === 'kimi') return t('admin.accounts.kimi.baseUrlHint')
   if (form.platform === 'tokenrhythm') return t('admin.accounts.tokenrhythm.baseUrlHint')
+  if (form.platform === 'tierflow') return t('admin.accounts.tierflow.baseUrlHint')
   if (form.platform === 'chatanywhere') return t('admin.accounts.chatanywhere.baseUrlHint')
   if (form.platform === 'glm') return t('admin.accounts.glm.baseUrlHint')
   if (form.platform === 'nvidia') return t('admin.accounts.nvidia.baseUrlHint')
@@ -4394,6 +4437,7 @@ const apiKeyHint = computed(() => {
   if (form.platform === 'deepseek') return t('admin.accounts.deepseek.apiKeyHint')
   if (form.platform === 'kimi') return t('admin.accounts.kimi.apiKeyHint')
   if (form.platform === 'tokenrhythm') return t('admin.accounts.tokenrhythm.apiKeyHint')
+  if (form.platform === 'tierflow') return t('admin.accounts.tierflow.apiKeyHint')
   if (form.platform === 'chatanywhere') return t('admin.accounts.chatanywhere.apiKeyHint')
   if (form.platform === 'glm') return t('admin.accounts.glm.apiKeyHint')
   if (form.platform === 'nvidia') return t('admin.accounts.nvidia.apiKeyHint')
@@ -4422,6 +4466,8 @@ const apiKeyBaseUrlPlaceholder = computed(() => {
       return 'https://apihub.agnes-ai.com/v1'
     case 'nvidia':
       return 'https://integrate.api.nvidia.com/v1'
+    case 'tierflow':
+      return 'https://tierflow.cn/v1'
     case 'tokenrhythm':
       return 'https://tokenrhythm.studio/v1'
     case 'chatanywhere':
@@ -4460,6 +4506,7 @@ const apiKeyValuePlaceholder = computed(() => {
     case 'nvidia':
       return 'nvapi-...'
     case 'agnes':
+    case 'tierflow':
     case 'tokenrhythm':
     case 'chatanywhere':
       return 'sk-...'
@@ -4563,6 +4610,8 @@ const apiKeyBaseUrl = ref('https://api.anthropic.com')
 const apiKeyValue = ref('')
 const sensenovaAccessToken = ref('')
 const tokenRhythmCookie = ref('')
+const tierflowCookie = ref('')
+const tierflowUserId = ref('')
 const upstreamBillingAutoProbeEnabled = ref(true)
 
 // ── 国产供应商（Kimi / Zhipu / DeepSeek）账号类型、API 协议与端点 ──
@@ -5256,6 +5305,7 @@ watch(
         agnes: 'https://apihub.agnes-ai.com/v1',
         nvidia: 'https://integrate.api.nvidia.com/v1',
         tokenrhythm: 'https://tokenrhythm.studio/v1',
+        tierflow: 'https://tierflow.cn/v1',
         chatanywhere: 'https://api.chatanywhere.tech/v1',
         glm: 'https://open.bigmodel.cn/api/paas/v4',
         modelscope: 'https://api-inference.modelscope.cn/v1',
@@ -5328,6 +5378,13 @@ watch(
       form.concurrency = 10
       form.load_factor = null
     }
+    if (newPlatform === 'tierflow') {
+      accountCategory.value = 'apikey'
+      modelRestrictionMode.value = 'whitelist'
+      allowedModels.value = []
+      form.concurrency = 10
+      form.load_factor = null
+    }
     if (newPlatform === 'chatanywhere') {
       accountCategory.value = 'apikey'
       modelRestrictionMode.value = 'whitelist'
@@ -5343,6 +5400,8 @@ watch(
       form.load_factor = null
     }
     tokenRhythmCookie.value = ''
+    tierflowCookie.value = ''
+    tierflowUserId.value = ''
     if (newPlatform !== 'gemini' && newPlatform !== 'anthropic' && accountCategory.value === 'service_account') {
       accountCategory.value = 'oauth-based'
     }
@@ -5790,6 +5849,8 @@ const resetForm = () => {
   apiKeyValue.value = ''
   sensenovaAccessToken.value = ''
   tokenRhythmCookie.value = ''
+  tierflowCookie.value = ''
+  tierflowUserId.value = ''
   upstreamRequestIdHeader.value = ''
   upstreamBillingAutoProbeEnabled.value = true
   editQuotaLimit.value = null
@@ -6251,6 +6312,8 @@ const handleSubmit = async () => {
                 ? 'https://apihub.agnes-ai.com/v1'
                 : form.platform === 'tokenrhythm'
                   ? 'https://tokenrhythm.studio/v1'
+                : form.platform === 'tierflow'
+                  ? 'https://tierflow.cn/v1'
                 : form.platform === 'chatanywhere'
                   ? 'https://api.chatanywhere.tech/v1'
                 : form.platform === 'glm'
@@ -6277,6 +6340,9 @@ const handleSubmit = async () => {
   const credentials: Record<string, unknown> = {
     base_url: apiKeyBaseUrl.value.trim() || defaultBaseUrl,
     api_key: apiKeyValue.value.trim()
+  }
+  if (form.platform === 'tierflow') {
+    applyTierflowConsoleCredentials(credentials, tierflowCookie.value, tierflowUserId.value)
   }
   if (form.platform === 'sensenova' && sensenovaAccessToken.value.trim()) {
     credentials.access_token = sensenovaAccessToken.value.trim()
@@ -6381,7 +6447,7 @@ const handleSubmit = async () => {
     group_ids: form.group_ids,
     extra: withUpstreamRequestIdHeader(extra),
     upstream_billing_probe_enabled:
-      form.platform === 'deepseek' || form.platform === 'kimi' || form.platform === 'chatanywhere' || form.platform === 'glm' || form.platform === 'modelscope' || form.platform === 'dashscope' || form.platform === 'minimax' || form.platform === 'volcengine' || form.platform === 'sensenova'
+      form.platform === 'deepseek' || form.platform === 'kimi' || form.platform === 'chatanywhere' || form.platform === 'glm' || form.platform === 'modelscope' || form.platform === 'dashscope' || form.platform === 'minimax' || form.platform === 'volcengine' || form.platform === 'sensenova' || form.platform === 'tierflow'
         ? undefined
         : form.platform === 'tokenrhythm'
           ? true
@@ -6520,7 +6586,7 @@ const createAccountAndFinish = async (
       type === 'apikey'
         ? form.platform === 'tokenrhythm'
           ? true
-          : form.platform !== 'deepseek' && form.platform !== 'kimi' && form.platform !== 'chatanywhere' && form.platform !== 'glm' && form.platform !== 'modelscope' && form.platform !== 'dashscope' && form.platform !== 'minimax' && form.platform !== 'volcengine' && form.platform !== 'sensenova'
+          : form.platform !== 'deepseek' && form.platform !== 'kimi' && form.platform !== 'chatanywhere' && form.platform !== 'glm' && form.platform !== 'modelscope' && form.platform !== 'dashscope' && form.platform !== 'minimax' && form.platform !== 'volcengine' && form.platform !== 'sensenova' && form.platform !== 'tierflow'
             ? upstreamBillingAutoProbeEnabled.value
             : undefined
         : undefined,

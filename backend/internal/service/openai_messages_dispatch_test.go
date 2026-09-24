@@ -59,6 +59,20 @@ func TestGroupResolveMessagesDispatchModel_AgnesMapsClaudeFamilyToDefaultModel(t
 	require.Empty(t, group.ResolveMessagesDispatchModel(AgnesDefaultModel))
 }
 
+func TestTierflowMessagesDispatchPreservesRelayCatalogAndAccountMappings(t *testing.T) {
+	group := &Group{Platform: PlatformTierflow}
+	account := &Account{Platform: PlatformTierflow, Type: AccountTypeAPIKey, Credentials: map[string]any{
+		"model_mapping": map[string]any{"claude-sonnet-4-5": "GLM-5.3"},
+	}}
+	for _, model := range []string{"claude-opus-4-6", "claude-sonnet-4-5", "claude-haiku-4-5", "TierSense", "DeepSeek-V4.1-Flash", "GLM-5.3"} {
+		// No group-level rewrite: the scheduler must see the public alias before
+		// the chosen account maps it to a case-sensitive upstream catalog ID.
+		require.Empty(t, group.ResolveMessagesDispatchModel(model))
+	}
+	require.Equal(t, "GLM-5.3", account.GetMappedModel("claude-sonnet-4-5"))
+	require.Equal(t, "TierSense", normalizeOpenAIModelForUpstream(account, "TierSense"))
+}
+
 func TestSanitizeGroupMessagesDispatchFields_ClearsNonOpenAIPlatform(t *testing.T) {
 	t.Parallel()
 

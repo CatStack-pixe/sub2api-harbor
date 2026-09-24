@@ -193,6 +193,8 @@ func openAICompatibleSelectionErrorForLog(err error, platform string) error {
 		provider = "Volcengine"
 	case service.PlatformSenseNova:
 		provider = "SenseNova"
+	case service.PlatformTierflow:
+		provider = "Tierflow"
 	default:
 		return err
 	}

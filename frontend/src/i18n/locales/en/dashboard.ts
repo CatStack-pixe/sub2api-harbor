@@ -518,6 +518,7 @@ export default {
       agnes: 'Agnes',
       nvidia: 'NVIDIA',
       tokenrhythm: 'TokenRhythm',
+      tierflow: 'Tierflow',
       chatanywhere: 'ChatAnywhere',
       glm: 'GLM',
       modelscope: 'ModelScope',

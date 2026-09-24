@@ -313,6 +313,7 @@ export default {
         deepseek: 'DeepSeek',
         nvidia: 'NVIDIA',
         tokenrhythm: 'TokenRhythm',
+        tierflow: 'Tierflow / 清枢智汇',
         chatanywhere: 'ChatAnywhere',
         glm: 'GLM',
         modelscope: 'ModelScope',
@@ -813,6 +814,20 @@ export default {
       deepseek: {
         baseUrlHint: '留空使用官方 DeepSeek API',
         apiKeyHint: '您的 DeepSeek API Key'
+      },
+      tierflow: {
+        remainingBalance: '上游余额',
+        usedBalance: '上游已用',
+        noBalance: '暂无可用余额数据',
+        refreshBalance: '刷新余额',
+        baseUrlHint: '清枢智汇 OpenAI 兼容接口，默认地址为 https://tierflow.cn/v1。模型列表请从上游同步。',
+        apiKeyHint: '填写清枢智汇控制台创建的 API Key；不需要填写手机号或登录密码。',
+        cookie: '控制台 Session Cookie（可选）',
+        cookiePlaceholder: 'session=… 或 Session Cookie 原值',
+        cookieHint: '仅用于查询上游余额，不会发送到模型推理接口。编辑时留空保留已保存值。',
+        userId: '控制台用户 ID / TF-User（可选）',
+        userIdPlaceholder: '控制台数字用户 ID',
+        userIdHint: '填写控制台请求头 TF-User 中的数字用户 ID，与 Session Cookie 配合查询余额。'
       },
       tokenrhythm: {
         baseUrlHint: 'TokenRhythm 使用固定的官方 OpenAI 兼容接口。',

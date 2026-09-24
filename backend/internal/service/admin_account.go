@@ -485,6 +485,13 @@ func buildAccountForCreate(input *CreateAccountInput, accountExtra map[string]an
 		enabled := cookieErr == nil
 		probeEnabled = &enabled
 	}
+	if probeEnabled == nil && account.IsTierflow() {
+		// A console session enables balance refresh; key-only accounts can still
+		// forward inference without depending on browser session availability.
+		_, _, cookieErr := TierflowCookieCredentials(input.Credentials)
+		enabled := cookieErr == nil
+		probeEnabled = &enabled
+	}
 	if probeEnabled != nil && *probeEnabled {
 		if !isUpstreamBillingProbeAccount(account) {
 			return nil, ErrUpstreamBillingProbeAccountInvalid
@@ -669,6 +676,11 @@ func (s *adminServiceImpl) UpdateAccount(ctx context.Context, id int64, input *U
 	}
 	previousProbeIdentity := upstreamBillingProbeIdentity(account)
 	previousOllamaUsageIdentity := ollamaCloudUsageIdentity(account)
+	hadTierflowConsoleCredentials := false
+	if account.IsTierflow() {
+		_, _, cookieErr := TierflowCookieCredentials(account.Credentials)
+		hadTierflowConsoleCredentials = cookieErr == nil
+	}
 	// 安全/身份不变量(影子账号):通用更新路径被 edit/re-auth/refresh/batch 共用,
 	// 必须在此守住,否则仅在创建时的保证可被这些路径绕过。
 	if account.IsCredentialShadow() {
@@ -800,6 +812,16 @@ func (s *adminServiceImpl) UpdateAccount(ctx context.Context, id int64, input *U
 	}
 	if input.Extra == nil {
 		account.Extra = prepareCodexFingerprintExtraForUpdate(account, account.Extra)
+	}
+	if account.IsTierflow() && !hadTierflowConsoleCredentials && len(input.Credentials) > 0 && requestedProbeEnabledUpdate == nil {
+		// Match create defaults when a key-only account first gains a console
+		// session, while preserving an explicit administrator opt-out.
+		if _, explicitlyConfigured := account.Extra[UpstreamBillingProbeEnabledExtraKey]; !explicitlyConfigured {
+			if _, _, cookieErr := TierflowCookieCredentials(account.Credentials); cookieErr == nil {
+				enabled := true
+				requestedProbeEnabledUpdate = &enabled
+			}
+		}
 	}
 	if requestedRateSyncEnabledUpdate != nil && *requestedRateSyncEnabledUpdate {
 		if requestedProbeEnabledUpdate != nil && !*requestedProbeEnabledUpdate {
