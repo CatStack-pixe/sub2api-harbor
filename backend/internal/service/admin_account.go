@@ -748,6 +748,11 @@ func (s *adminServiceImpl) UpdateAccount(ctx context.Context, id int64, input *U
 		// Strip SSO/password residue that must never sit next to OAuth tokens.
 		account.Credentials = SanitizeStoredCredentials(account.Platform, account.Credentials)
 	}
+	if account.IsTierflow() {
+		if err := validateAccountCredentials(account.Platform, account.Type, account.Credentials); err != nil {
+			return nil, err
+		}
+	}
 	// Extra 使用 map：需要区分“未提供(nil)”与“显式清空({})”。
 	// 关闭配额限制时前端会删除 quota_* 键并提交 extra:{}，此时也必须落库。
 	requestedProbeEnabledUpdate := input.ProbeEnabled
@@ -1194,7 +1199,37 @@ func (s *adminServiceImpl) BulkUpdateAccounts(ctx context.Context, input *BulkUp
 	// Bulk may mix platforms; always drop ephemeral SSO/password keys (cookie
 	// only when platform is known Grok — empty platform still strips password/*).
 	if input.Credentials != nil {
-		input.Credentials = SanitizeStoredCredentials("", input.Credentials)
+		bulkCredentialsPlatform := ""
+		_, updatesTierflowCookie := input.Credentials["tierflow_cookie"]
+		_, updatesTierflowUserID := input.Credentials["tierflow_user_id"]
+		if updatesTierflowCookie || updatesTierflowUserID {
+			var session, userID string
+			for _, accountID := range input.AccountIDs {
+				account := targetsByID[accountID]
+				if account == nil {
+					return nil, ErrAccountNotFound
+				}
+				if !account.IsTierflow() || account.Type != AccountTypeAPIKey {
+					return nil, infraerrors.BadRequest("INVALID_TIERFLOW_CREDENTIALS_TARGET", "Tierflow console credentials require Tierflow API key accounts")
+				}
+				mergedCredentials := mergeMap(account.Credentials, input.Credentials)
+				var err error
+				session, userID, err = TierflowCookieCredentials(mergedCredentials)
+				if err != nil {
+					return nil, infraerrors.BadRequest("INVALID_TIERFLOW_CREDENTIALS", err.Error())
+				}
+			}
+			// Only write supplied keys: a Cookie-only rotation must retain each
+			// account's own user ID, and vice versa.
+			if updatesTierflowCookie {
+				input.Credentials["tierflow_cookie"] = session
+			}
+			if updatesTierflowUserID {
+				input.Credentials["tierflow_user_id"] = userID
+			}
+			bulkCredentialsPlatform = PlatformTierflow
+		}
+		input.Credentials = SanitizeStoredCredentials(bulkCredentialsPlatform, input.Credentials)
 		for _, account := range cachedTargets {
 			if account != nil && account.Platform == PlatformGrok {
 				delete(input.Credentials, "subscription_tier")
@@ -1302,7 +1337,7 @@ func (s *adminServiceImpl) BulkUpdateAccounts(ctx context.Context, input *BulkUp
 }
 
 func updatesUpstreamBillingProbeIdentity(credentials map[string]any) bool {
-	for _, key := range []string{"api_key", "base_url", credKeyHeaderOverrideEnabled, credKeyHeaderOverrides} {
+	for _, key := range []string{"api_key", "base_url", "tierflow_cookie", "tierflow_user_id", credKeyHeaderOverrideEnabled, credKeyHeaderOverrides} {
 		if _, ok := credentials[key]; ok {
 			return true
 		}
@@ -1318,7 +1353,7 @@ func upstreamBillingProbeIdentity(account *Account) map[string]any {
 	if account.ProxyID != nil {
 		identity["proxy_id"] = *account.ProxyID
 	}
-	for _, key := range []string{"api_key", "base_url", credKeyHeaderOverrideEnabled, credKeyHeaderOverrides} {
+	for _, key := range []string{"api_key", "base_url", "tierflow_cookie", "tierflow_user_id", credKeyHeaderOverrideEnabled, credKeyHeaderOverrides} {
 		if value, ok := account.Credentials[key]; ok {
 			identity[key] = value
 		}

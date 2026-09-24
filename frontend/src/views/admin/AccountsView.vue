@@ -317,7 +317,7 @@
               :account="row"
               :today-stats="todayStatsByAccountId[String(row.id)] ?? null"
               :today-stats-loading="todayStatsLoading"
-              :manual-refresh-token="usageManualRefreshToken"
+              :manual-refresh-token="usageManualRefreshToken + (usageAccountEditRefreshTokens[row.id] ?? 0)"
               :batched-usage="usageBatchByAccountId[String(row.id)] ?? null"
               :batched-usage-error="usageBatchErrorByAccountId[String(row.id)] ?? null"
               :batched-usage-loading="usageBatchLoadingByAccountId[String(row.id)] === true"
@@ -452,7 +452,7 @@
       <template #pagination><Pagination v-if="pagination.total > 0" :page="pagination.page" :total="pagination.total" :page-size="pagination.page_size" @update:page="handlePageChange" @update:pageSize="handlePageSizeChange" /></template>
     </TablePageLayout>
     <CreateAccountModal :show="showCreate" :proxies="proxies" :groups="groups" @close="showCreate = false" @created="reload" />
-    <EditAccountModal :show="showEdit" :account="edAcc" :proxies="proxies" :groups="groups" @close="showEdit = false" @updated="handleAccountUpdated" />
+    <EditAccountModal :show="showEdit" :account="edAcc" :proxies="proxies" :groups="groups" @close="showEdit = false" @updated="handleAccountEdited" />
     <ReAuthAccountModal :show="showReAuth" :account="reAuthAcc" @close="closeReAuthModal" @reauthorized="handleAccountUpdated" />
     <AccountTestModal :show="showTest" :account="testingAcc" @close="closeTestModal" />
     <AccountStatsModal :show="showStats" :account="statsAcc" @close="closeStatsModal" />
@@ -708,6 +708,7 @@ const todayStatsError = ref<string | null>(null)
 const todayStatsReqSeq = ref(0)
 const pendingTodayStatsRefresh = ref(false)
 const usageManualRefreshToken = ref(0)
+const usageAccountEditRefreshTokens = ref<Record<number, number>>({})
 const documentVisibility = useDocumentVisibility()
 invalidateDeepSeekBalanceCache()
 invalidateTokenRhythmBalanceCache()
@@ -2273,6 +2274,17 @@ const handleAccountUpdated = (updatedAccount: Account) => {
   if (updatedAccount.platform === 'kimi') invalidateKimiBalanceCache(updatedAccount.id)
   patchAccountInList(updatedAccount)
   enterAutoRefreshSilentWindow()
+}
+const handleAccountEdited = (updatedAccount: Account) => {
+  handleAccountUpdated(updatedAccount)
+  if (updatedAccount.platform !== 'tierflow') return
+  // Console credential edits invalidate both desktop batch and mobile cell
+  // caches. Only the explicit editor event advances this token; background
+  // balance snapshots also update updated_at and must not trigger a probe loop.
+  usageBatchCache.delete(updatedAccount.id)
+  setUsageBatchState(updatedAccount.id, null, null)
+  usageAccountEditRefreshTokens.value[updatedAccount.id] =
+    (usageAccountEditRefreshTokens.value[updatedAccount.id] ?? 0) + 1
 }
 const formatExportTimestamp = () => {
   const now = new Date()

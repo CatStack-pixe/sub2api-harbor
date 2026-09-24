@@ -42,7 +42,7 @@ func tierflowQuotaNumber(raw json.RawMessage) (float64, error) {
 	}
 	number, err := strconv.ParseFloat(value, 64)
 	if err != nil || math.IsNaN(number) || math.IsInf(number, 0) {
-		return 0, fmt.Errorf("Tierflow balance response contains an invalid quota value")
+		return 0, fmt.Errorf("tierflow balance response contains an invalid quota value")
 	}
 	return number, nil
 }
@@ -63,20 +63,20 @@ func ParseTierflowBalanceResponse(balanceBody, statusBody []byte) (*TierflowBala
 		} `json:"data"`
 	}
 	if json.Unmarshal(balanceBody, &balance) != nil || json.Unmarshal(statusBody, &status) != nil {
-		return nil, fmt.Errorf("Tierflow balance response is invalid")
+		return nil, fmt.Errorf("tierflow balance response is invalid")
 	}
 	if !balance.Success || !status.Success {
-		return nil, fmt.Errorf("Tierflow balance request was rejected")
+		return nil, fmt.Errorf("tierflow balance request was rejected")
 	}
 	quota, quotaErr := tierflowQuotaNumber(balance.Data.Quota)
 	usedQuota, usedErr := tierflowQuotaNumber(balance.Data.UsedQuota)
 	quotaPerUnit, unitErr := tierflowQuotaNumber(status.Data.QuotaPerUnit)
 	if quotaErr != nil || usedErr != nil || unitErr != nil || quotaPerUnit <= 0 || usedQuota < 0 || balance.Data.RequestCount == nil || *balance.Data.RequestCount < 0 {
-		return nil, fmt.Errorf("Tierflow balance response has incomplete or invalid quota data")
+		return nil, fmt.Errorf("tierflow balance response has incomplete or invalid quota data")
 	}
 	remaining, used := quota/quotaPerUnit, usedQuota/quotaPerUnit
 	if math.IsInf(remaining, 0) || math.IsInf(used, 0) {
-		return nil, fmt.Errorf("Tierflow balance response contains an invalid quota value")
+		return nil, fmt.Errorf("tierflow balance response contains an invalid quota value")
 	}
 	return &TierflowBalanceResult{
 		IsAvailable:      true,
@@ -92,7 +92,7 @@ func ParseTierflowBalanceResponse(balanceBody, statusBody []byte) (*TierflowBala
 // redirects, and honors the account's proxy and TLS fingerprint settings.
 func (s *AccountTestService) FetchTierflowBalance(ctx context.Context, accountID int64) (*TierflowBalanceResult, error) {
 	if s == nil || s.accountRepo == nil || s.httpUpstream == nil {
-		return nil, fmt.Errorf("Tierflow balance service is not configured")
+		return nil, fmt.Errorf("tierflow balance service is not configured")
 	}
 	account, err := s.accountRepo.GetByID(ctx, accountID)
 	if err != nil {
@@ -108,7 +108,7 @@ func (s *AccountTestService) FetchTierflowBalance(ctx context.Context, accountID
 	proxyURL := ""
 	if account.ProxyID != nil {
 		if account.Proxy == nil || account.Proxy.ID != *account.ProxyID {
-			return nil, fmt.Errorf("Tierflow balance account proxy is unavailable")
+			return nil, fmt.Errorf("tierflow balance account proxy is unavailable")
 		}
 		proxyURL = account.Proxy.URL()
 	}
@@ -132,10 +132,10 @@ func (s *AccountTestService) FetchTierflowBalance(ctx context.Context, accountID
 		if err != nil {
 			// Transport errors may contain URLs, proxy credentials or request
 			// headers. Do not surface their text through the admin usage API.
-			return nil, 0, fmt.Errorf("Tierflow balance request failed")
+			return nil, 0, fmt.Errorf("tierflow balance request failed")
 		}
 		if resp == nil || resp.Body == nil {
-			return nil, 0, fmt.Errorf("Tierflow balance request returned no response")
+			return nil, 0, fmt.Errorf("tierflow balance request returned no response")
 		}
 		defer func() { _ = resp.Body.Close() }()
 		if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
@@ -146,7 +146,7 @@ func (s *AccountTestService) FetchTierflowBalance(ctx context.Context, accountID
 			return nil, resp.StatusCode, fmt.Errorf("read Tierflow balance response failed")
 		}
 		if len(body) > tierflowBalanceBodyLimit {
-			return nil, resp.StatusCode, fmt.Errorf("Tierflow balance response exceeds %d bytes", tierflowBalanceBodyLimit)
+			return nil, resp.StatusCode, fmt.Errorf("tierflow balance response exceeds %d bytes", tierflowBalanceBodyLimit)
 		}
 		return body, resp.StatusCode, nil
 	}
@@ -203,11 +203,11 @@ func (s *AccountUsageService) getTierflowUsage(ctx context.Context, account *Acc
 	}
 	body, err := json.Marshal(snapshot.Data)
 	if err != nil {
-		return nil, fmt.Errorf("Tierflow balance snapshot is invalid")
+		return nil, fmt.Errorf("tierflow balance snapshot is invalid")
 	}
 	var result TierflowBalanceResult
 	if json.Unmarshal(body, &result) != nil || !result.IsAvailable || result.QuotaPerUnit <= 0 {
-		return nil, fmt.Errorf("Tierflow balance snapshot is invalid")
+		return nil, fmt.Errorf("tierflow balance snapshot is invalid")
 	}
 	result.StatusCode = snapshot.HTTPStatus
 	usage.TierflowBalance = &result

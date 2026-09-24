@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 
 import AccountsView from '../AccountsView.vue'
+import AccountUsageCell from '@/components/account/AccountUsageCell.vue'
 
 const {
   listAccounts,
@@ -94,7 +95,7 @@ const HelpTooltipStub = {
   template: '<span data-test="usage-windows-hint">{{ content }}</span>'
 }
 
-function mountView() {
+function mountView(realUsage = false) {
   return mount(AccountsView, {
     global: {
       stubs: {
@@ -130,7 +131,7 @@ function mountView() {
         AccountStatusIndicator: true,
         AccountTodayStatsCell: true,
         AccountGroupsCell: true,
-        AccountUsageCell: {
+        AccountUsageCell: realUsage ? false : {
           props: ['account', 'requestBatchedUsage'],
           template: '<button data-test="request-batched-usage" @click="requestBatchedUsage?.(account)" />'
         },
@@ -274,5 +275,74 @@ describe('admin AccountsView usage windows hint', () => {
     await flushPromises()
 
     expect(getBatchUsage).toHaveBeenCalledWith([42], false)
+  })
+
+  it('refreshes only the edited Tierflow wallet and ignores background account snapshots', async () => {
+    const account = {
+      id: 43,
+      name: 'tierflow-account',
+      platform: 'tierflow',
+      type: 'apikey',
+      status: 'active',
+      schedulable: true,
+      created_at: '2026-09-24T00:00:00Z',
+      updated_at: '2026-09-24T00:00:00Z'
+    }
+    listAccounts.mockResolvedValueOnce({
+      items: [account, { ...account, id: 44 }],
+      total: 2,
+      page: 1,
+      page_size: 20,
+      pages: 1
+    })
+    getBatchUsage.mockResolvedValueOnce({
+      usage: { 43: { error: 'missing_credentials', error_code: 'missing_credentials' } },
+      errors: {}
+    })
+    const wrapper = mountView(true)
+    await flushPromises()
+    await new Promise(resolve => setTimeout(resolve, 0))
+    await flushPromises()
+    expect(wrapper.get('[data-test="account-usage-43"]').text()).toContain('missing_credentials')
+    expect(getBatchUsage).toHaveBeenCalledTimes(1)
+
+    getBatchUsage.mockResolvedValueOnce({
+      usage: {
+        43: {
+          tierflow_balance: {
+            is_available: true,
+            remaining_balance: 42.5,
+            total_usage: 7.5,
+            currency: 'CNY',
+            quota_per_unit: 500000,
+            request_count: 2,
+            fetched_at: 1790208000
+          }
+        }
+      },
+      errors: {}
+    })
+    const updatedAccount = { ...account, updated_at: '2026-09-24T00:01:00Z' }
+    wrapper.getComponent({ name: 'EditAccountModal' }).vm.$emit('updated', updatedAccount)
+    await flushPromises()
+    await new Promise(resolve => setTimeout(resolve, 0))
+    await flushPromises()
+
+    expect(getBatchUsage).toHaveBeenCalledTimes(2)
+    expect(getBatchUsage).toHaveBeenLastCalledWith([43], true)
+    expect(wrapper.get('[data-test="account-usage-43"]').text()).toContain('CNY 42.50')
+    expect(wrapper.get('[data-test="account-usage-43"]').text()).not.toContain('missing_credentials')
+    const cells = wrapper.findAllComponents(AccountUsageCell)
+    expect(cells.find(cell => cell.props('account').id === 44)?.props('manualRefreshToken')).toBe(0)
+
+    cells.find(cell => cell.props('account').id === 43)?.vm.$emit('account-updated', {
+      ...updatedAccount,
+      updated_at: '2026-09-24T00:02:00Z'
+    })
+    await flushPromises()
+    await new Promise(resolve => setTimeout(resolve, 0))
+    await flushPromises()
+    expect(getBatchUsage).toHaveBeenCalledTimes(2)
+    wrapper.unmount()
   })
 })

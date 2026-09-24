@@ -193,7 +193,7 @@
       </div>
     </template>
 
-    <!-- SenseNova API key accounts: local rolling point windows -->
+    <!-- Tierflow API key accounts: console wallet balance -->
     <template v-else-if="account.platform === 'tierflow'">
       <div class="space-y-1" data-testid="tierflow-balance">
         <div v-if="loading" class="h-3 w-24 animate-pulse rounded bg-gray-200 dark:bg-gray-700"></div>
@@ -1558,12 +1558,14 @@ const syncManagedUsageState = () => {
   loading.value = props.batchedUsageLoading === true
 }
 
+let usageRequestGeneration = 0
 const loadUsage = async (options?: { source?: 'passive' | 'active'; bypassCache?: boolean }) => {
   if (!shouldFetchUsage.value) return
   if (isBatchManaged.value) {
     requestParentBatchUsage({ force: options?.bypassCache === true })
     return
   }
+  const generation = ++usageRequestGeneration
 
   // Check cache
   if (!options?.bypassCache) {
@@ -1583,17 +1585,17 @@ const loadUsage = async (options?: { source?: 'passive' | 'active'; bypassCache?
 			? adminAPI.accounts.getUsage(props.account.id, options.source, options.bypassCache === true)
 			: adminAPI.accounts.getUsage(props.account.id)
     const result = await enqueueUsageRequest(props.account, fetchFn)
-    if (!unmounted.value) {
+    if (!unmounted.value && generation === usageRequestGeneration) {
       usageInfo.value = result
       _usageCache.set(props.account.id, { data: result, ts: Date.now() })
     }
   } catch (e: any) {
-    if (!unmounted.value) {
+    if (!unmounted.value && generation === usageRequestGeneration) {
       error.value = t('common.error')
       console.error('Failed to load usage:', e)
     }
   } finally {
-    if (!unmounted.value) loading.value = false
+    if (!unmounted.value && generation === usageRequestGeneration) loading.value = false
   }
 }
 
@@ -1866,13 +1868,16 @@ watch(
     if (nextToken === prevToken) return
     if (!shouldFetchUsage.value) return
 
+    ++usageRequestGeneration
+    _usageCache.delete(props.account.id)
     if (isBatchManaged.value) {
       requestParentBatchUsage({ force: true })
       return
     }
 
-    const source = isAnthropicOAuthOrSetupToken.value ? 'passive' : undefined
-    _usageCache.delete(props.account.id)
+    const source = isAnthropicOAuthOrSetupToken.value
+      ? 'passive'
+      : props.account.platform === 'tierflow' ? 'active' : undefined
     loadUsage({ source, bypassCache: true }).catch((e) => {
       console.error('Failed to refresh usage after manual refresh:', e)
     })

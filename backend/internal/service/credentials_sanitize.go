@@ -60,10 +60,10 @@ func SanitizeStoredCredentials(platform string, creds map[string]any) map[string
 func TierflowCookieCredentials(creds map[string]any) (string, string, error) {
 	raw, ok := creds["tierflow_cookie"].(string)
 	if !ok || strings.TrimSpace(raw) == "" {
-		return "", "", fmt.Errorf("Tierflow session Cookie is required for balance queries")
+		return "", "", fmt.Errorf("tierflow session Cookie is required for balance queries")
 	}
 	if strings.ContainsAny(raw, "\r\n") {
-		return "", "", fmt.Errorf("Tierflow Cookie contains an invalid line break")
+		return "", "", fmt.Errorf("tierflow Cookie contains an invalid line break")
 	}
 	session := strings.TrimSpace(raw)
 	if strings.HasPrefix(session, "session=") || strings.Contains(session, ";") {
@@ -75,33 +75,33 @@ func TierflowCookieCredentials(creds map[string]any) (string, string, error) {
 				continue
 			}
 			if foundSession {
-				return "", "", fmt.Errorf("Tierflow Cookie contains duplicate session values")
+				return "", "", fmt.Errorf("tierflow Cookie contains duplicate session values")
 			}
 			foundSession = true
 			session = value
 		}
 	}
 	if session == "" || len(session) > 16*1024 {
-		return "", "", fmt.Errorf("Tierflow session Cookie is invalid")
+		return "", "", fmt.Errorf("tierflow session Cookie is invalid")
 	}
 	for _, char := range session {
 		if char < 0x21 || char > 0x7e || strings.ContainsRune("\";,\\", char) {
-			return "", "", fmt.Errorf("Tierflow session Cookie is invalid")
+			return "", "", fmt.Errorf("tierflow session Cookie is invalid")
 		}
 	}
 	userID, ok := creds["tierflow_user_id"].(string)
 	if !ok {
-		return "", "", fmt.Errorf("Tierflow user ID must be a positive numeric string")
+		return "", "", fmt.Errorf("tierflow user ID must be a positive numeric string")
 	}
 	userID = strings.TrimSpace(userID)
 	for _, char := range userID {
 		if char < '0' || char > '9' {
-			return "", "", fmt.Errorf("Tierflow user ID must be a positive numeric string")
+			return "", "", fmt.Errorf("tierflow user ID must be a positive numeric string")
 		}
 	}
 	numericID, err := strconv.ParseUint(userID, 10, 64)
 	if err != nil || numericID == 0 {
-		return "", "", fmt.Errorf("Tierflow user ID must be a positive numeric string")
+		return "", "", fmt.Errorf("tierflow user ID must be a positive numeric string")
 	}
 	return session, strconv.FormatUint(numericID, 10), nil
 }

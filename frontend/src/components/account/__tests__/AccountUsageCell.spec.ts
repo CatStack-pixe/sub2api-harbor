@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import AccountUsageCell from '../AccountUsageCell.vue'
-import type { Account } from '@/types'
+import type { Account, AccountUsageInfo } from '@/types'
 
 const { getUsage } = vi.hoisted(() => ({
   getUsage: vi.fn()
@@ -882,6 +882,50 @@ describe('AccountUsageCell', () => {
     await flushPromises()
     expect(wrapper.text()).toContain('admin.accounts.tierflow.noBalance')
     expect(wrapper.text()).not.toContain('0.00')
+    wrapper.unmount()
+  })
+
+  it('forces a mobile Tierflow edit refresh and discards a late response from old credentials', async () => {
+    vi.mocked(window.matchMedia).mockImplementation(query => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn()
+    }))
+    let resolveOldRequest!: (value: AccountUsageInfo) => void
+    getUsage.mockReturnValueOnce(new Promise<AccountUsageInfo>(resolve => {
+      resolveOldRequest = resolve
+    }))
+    getUsage.mockResolvedValueOnce({
+      tierflow_balance: {
+        is_available: true,
+        remaining_balance: 42.5,
+        total_usage: 7.5,
+        currency: 'CNY',
+        quota_per_unit: 500000,
+        request_count: 2,
+        fetched_at: 1790208000
+      }
+    })
+    const account = makeAccount({ id: 5104, platform: 'tierflow', type: 'apikey' })
+    const wrapper = mount(AccountUsageCell, { props: { account } })
+    await wrapper.setProps({ manualRefreshToken: 1 })
+    expect(getUsage).toHaveBeenCalledTimes(1)
+
+    await wrapper.setProps({ manualRefreshToken: 2 })
+    await flushPromises()
+    expect(getUsage).toHaveBeenCalledTimes(2)
+    expect(getUsage).toHaveBeenLastCalledWith(5104, 'active', true)
+    expect(wrapper.text()).toContain('CNY 42.50')
+
+    resolveOldRequest({ error: 'obsolete_session' } as AccountUsageInfo)
+    await flushPromises()
+    expect(wrapper.text()).toContain('CNY 42.50')
+    expect(wrapper.text()).not.toContain('obsolete_session')
     wrapper.unmount()
   })
 

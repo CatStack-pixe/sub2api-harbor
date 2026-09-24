@@ -5,9 +5,13 @@ import { isHeaderOverrideCapable, isMultiProtocolApiKeyPlatform } from '../crede
 import { getModelsByPlatform, getPresetMappingsByPlatform } from '@/composables/useModelWhitelist'
 import TierflowCredentialsFields from '../TierflowCredentialsFields.vue'
 
-vi.mock('vue-i18n', () => ({
-  useI18n: () => ({ t: (key: string) => key })
-}))
+vi.mock('vue-i18n', async () => {
+  const actual = await vi.importActual<typeof import('vue-i18n')>('vue-i18n')
+  return {
+    ...actual,
+    useI18n: () => ({ t: (key: string) => key })
+  }
+})
 
 describe('Tierflow optional console credentials', () => {
   it('trims both independent console credential fields without changing the API key', () => {
