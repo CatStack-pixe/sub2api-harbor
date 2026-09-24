@@ -123,8 +123,8 @@ describe('UserPlatformQuotaModal', () => {
     })
     const w = await mountAndOpen()
     const inputs = w.findAll('input[type=number]')
-    // 19 platforms x 3 windows = 57 inputs
-    expect(inputs.length).toBe(57)
+    // 20 platforms x 3 windows = 60 inputs
+    expect(inputs.length).toBe(60)
     // 第一个 input 是 anthropic.daily = 10
     expect((inputs[0].element as HTMLInputElement).value).toBe('10')
   })
@@ -146,7 +146,8 @@ describe('UserPlatformQuotaModal', () => {
     expect(apiMocks.updatePlatformQuotas).toHaveBeenCalledTimes(1)
     const [uid, payload] = apiMocks.updatePlatformQuotas.mock.calls[0]
     expect(uid).toBe(99)
-    expect(payload).toHaveLength(19) // All quota platforms, including Tierflow, are always submitted
+    expect(payload).toHaveLength(20) // All quota platforms are always submitted
+    expect(payload.some((p: { platform: string }) => p.platform === 'senseaudio')).toBe(true)
     const openai = payload.find((p: any) => p.platform === 'openai')
     expect(openai.weekly_limit_usd).toBe(20)
   })
@@ -211,7 +212,7 @@ describe('UserPlatformQuotaModal', () => {
   it('未配置限额的平台重置按钮禁用并提示不可用', async () => {
     const w = await mountAndOpen()
     const resetBtns = w.findAll('button').filter((b) => b.text() === '↻')
-    expect(resetBtns.length).toBe(57) // 19 retained fork platforms × 3 windows
+    expect(resetBtns.length).toBe(60) // 20 retained fork platforms x 3 windows
     for (const b of resetBtns) {
       expect((b.element as HTMLButtonElement).disabled).toBe(true)
       expect(b.attributes('title')).toBe('admin.users.platformQuota.reset.unavailable')

@@ -64,7 +64,7 @@ const (
 	// SenseNova TokenPlan exposes an OpenAI-compatible endpoint at token.sensenova.cn.
 	SenseNovaDefaultBaseURL  = "https://token.sensenova.cn/v1"
 	SenseAudioDefaultBaseURL = "https://api.senseaudio.cn/v1"
-	TierflowDefaultBaseURL    = "https://tierflow.cn/v1"
+	TierflowDefaultBaseURL   = "https://tierflow.cn/v1"
 )
 
 // Account mode constants 区分国产供应商的「按量付费（余额）」与「Coding Plan」两种接入方式。
