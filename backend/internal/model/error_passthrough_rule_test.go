@@ -10,6 +10,6 @@ func TestAllPlatformsIncludesEveryConcretePlatform(t *testing.T) {
 	require.ElementsMatch(t, []string{
 		"anthropic", "openai", "gemini", "antigravity", "grok", "agnes",
 		"deepseek", "nvidia", "tokenrhythm", "kimi", "zhipu", "chatanywhere",
-		"glm", "modelscope", "dashscope", "minimax", "volcengine", "sensenova", "opencode_go", "tierflow",
+		"glm", "modelscope", "dashscope", "minimax", "volcengine", "sensenova", "senseaudio", "opencode_go", "tierflow",
 	}, AllPlatforms())
 }
