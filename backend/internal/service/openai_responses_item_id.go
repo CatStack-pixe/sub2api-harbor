@@ -123,5 +123,29 @@ func sanitizeOpenAIResponsesInputItemIDs(body []byte) ([]byte, bool, error) {
 		}
 		rebuiltItems = append(rebuiltItems, string(itemBody))
 	}
+
+	rebuiltInput := make([]byte, 0, len(input.Raw))
+	rebuiltInput = append(rebuiltInput, '[')
+	for i, item := range rebuiltItems {
+		if i > 0 {
+			rebuiltInput = append(rebuiltInput, ',')
+		}
+		itemBody := []byte(item.raw)
+		if item.stripID {
+			var err error
+			itemBody, err = sjson.DeleteBytes(itemBody, "id")
+			if err != nil {
+				return nil, false, fmt.Errorf("delete input.%d.id: %w", index, err)
+			}
+		}
+		if item.stripCallID {
+			var err error
+			itemBody, err = sjson.DeleteBytes(itemBody, "call_id")
+			if err != nil {
+				return nil, false, fmt.Errorf("delete input.%d.call_id: %w", index, err)
+			}
+		}
+		rebuiltItems = append(rebuiltItems, string(itemBody))
+	}
 	return replaceOpenAIRawInput(body, input, rebuiltItems), true, nil
 }

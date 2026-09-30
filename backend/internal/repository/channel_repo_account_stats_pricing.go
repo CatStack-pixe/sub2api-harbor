@@ -81,6 +81,7 @@ func (r *channelRepository) batchLoadAccountStatsModelPricing(ctx context.Contex
 		var p service.ChannelModelPricing
 		var ruleID int64
 		var modelsJSON []byte
+		var reasoningEffortMultipliersJSON []byte
 		if err := rows.Scan(
 			&p.ID, &ruleID, &p.Platform, &modelsJSON, &p.BillingMode,
 			&p.InputPrice, &p.OutputPrice, &p.CacheWritePrice, &p.CacheWrite1hPrice, &p.CacheReadPrice,
@@ -91,6 +92,11 @@ func (r *channelRepository) batchLoadAccountStatsModelPricing(ctx context.Contex
 		if err := json.Unmarshal(modelsJSON, &p.Models); err != nil {
 			p.Models = []string{}
 		}
+		multipliers, err := unmarshalReasoningEffortMultipliers(reasoningEffortMultipliersJSON)
+		if err != nil {
+			return nil, err
+		}
+		p.ReasoningEffortMultipliers = multipliers
 		pricingMap[ruleID] = append(pricingMap[ruleID], p)
 	}
 	if err := rows.Err(); err != nil {
@@ -171,6 +177,10 @@ func createAccountStatsModelPricingTx(ctx context.Context, tx *sql.Tx, ruleID in
 	modelsJSON, err := json.Marshal(pricing.Models)
 	if err != nil {
 		return fmt.Errorf("marshal models: %w", err)
+	}
+	reasoningEffortMultipliersJSON, err := marshalReasoningEffortMultipliers(pricing.ReasoningEffortMultipliers)
+	if err != nil {
+		return err
 	}
 	billingMode := pricing.BillingMode
 	if billingMode == "" {

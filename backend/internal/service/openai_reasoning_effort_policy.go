@@ -55,6 +55,71 @@ type openAIReasoningEffortPolicy struct {
 	mappings  []ReasoningEffortMapping
 }
 
+// ReasoningEffortOverLimitError is returned when a group policy is set to deny
+// requests whose explicit reasoning effort exceeds the ceiling.
+type ReasoningEffortOverLimitError struct {
+	Requested string
+	Max       string
+}
+
+func (e *ReasoningEffortOverLimitError) Error() string {
+	if e == nil {
+		return "reasoning effort exceeds this group's limit"
+	}
+	requested := strings.TrimSpace(e.Requested)
+	max := strings.TrimSpace(e.Max)
+	if requested == "" && max == "" {
+		return "reasoning effort exceeds this group's limit"
+	}
+	if requested == "" {
+		return fmt.Sprintf("reasoning effort exceeds this group's limit of %q", max)
+	}
+	if max == "" {
+		return fmt.Sprintf("reasoning effort %q exceeds this group's limit", requested)
+	}
+	return fmt.Sprintf("reasoning effort %q exceeds this group's limit of %q", requested, max)
+}
+
+// ReasoningEffortMappingDeniedError is returned when a group mapping target is
+// set to deny the explicit reasoning effort on the request.
+type ReasoningEffortMappingDeniedError struct {
+	Requested string
+}
+
+func (e *ReasoningEffortMappingDeniedError) Error() string {
+	if e == nil {
+		return "reasoning effort is denied by this group's mapping policy"
+	}
+	requested := strings.TrimSpace(e.Requested)
+	if requested == "" {
+		return "reasoning effort is denied by this group's mapping policy"
+	}
+	return fmt.Sprintf("reasoning effort %q is denied by this group's mapping policy", requested)
+}
+
+// IsReasoningEffortPolicyDenied reports whether err is a local reasoning-effort
+// policy rejection (ceiling deny or mapping deny).
+func IsReasoningEffortPolicyDenied(err error) bool {
+	if err == nil {
+		return false
+	}
+	var overLimit *ReasoningEffortOverLimitError
+	if errors.As(err, &overLimit) {
+		return true
+	}
+	var mappingDenied *ReasoningEffortMappingDeniedError
+	return errors.As(err, &mappingDenied)
+}
+
+type openAIReasoningEffortPolicyContextKey struct{}
+type requestedReasoningEffortContextKey struct{}
+
+type openAIReasoningEffortPolicy struct {
+	maxEffort string
+	overLimit string
+	mappings  []ReasoningEffortMapping
+}
+
 // ReasoningEffortOverLimitError reports a request rejected by a group's
 // reasoning-effort ceiling.
 type ReasoningEffortOverLimitError struct {

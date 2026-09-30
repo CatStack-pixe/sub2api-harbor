@@ -138,8 +138,6 @@ type Group struct {
 	DefaultMappedModel string `json:"default_mapped_model,omitempty"`
 	// OpenAI Messages 调度模型配置：按 Claude 系列/精确模型映射到目标 GPT 模型
 	MessagesDispatchModelConfig domain.OpenAIMessagesDispatchModelConfig `json:"messages_dispatch_model_config,omitempty"`
-	// Independent model listing and request alias configuration
-	ModelsListConfig domain.GroupModelsListConfig `json:"models_list_config,omitempty"`
 	// 分组模型白名单：同时约束模型列表接口与请求准入
 	ModelAllowlist domain.GroupModelAllowlist `json:"model_allowlist,omitempty"`
 	// 固定账号获取 Codex Model Manifest 配置；开启后 /models 请求只用选定账号拉取（仅 openai 平台）
@@ -680,12 +678,20 @@ func (_m *Group) assignValues(columns []string, values []any) error {
 					return fmt.Errorf("unmarshal field messages_dispatch_model_config: %w", err)
 				}
 			}
-		case group.FieldModelsListConfig:
+		case group.FieldModelAllowlist:
 			if value, ok := values[i].(*[]byte); !ok {
-				return fmt.Errorf("unexpected type %T for field models_list_config", values[i])
+				return fmt.Errorf("unexpected type %T for field model_allowlist", values[i])
 			} else if value != nil && len(*value) > 0 {
-				if err := json.Unmarshal(*value, &_m.ModelsListConfig); err != nil {
-					return fmt.Errorf("unmarshal field models_list_config: %w", err)
+				if err := json.Unmarshal(*value, &_m.ModelAllowlist); err != nil {
+					return fmt.Errorf("unmarshal field model_allowlist: %w", err)
+				}
+			}
+		case group.FieldCodexModelsManifestConfig:
+			if value, ok := values[i].(*[]byte); !ok {
+				return fmt.Errorf("unexpected type %T for field codex_models_manifest_config", values[i])
+			} else if value != nil && len(*value) > 0 {
+				if err := json.Unmarshal(*value, &_m.CodexModelsManifestConfig); err != nil {
+					return fmt.Errorf("unmarshal field codex_models_manifest_config: %w", err)
 				}
 			}
 		case group.FieldModelAllowlist:
@@ -1039,8 +1045,11 @@ func (_m *Group) String() string {
 	builder.WriteString("messages_dispatch_model_config=")
 	builder.WriteString(fmt.Sprintf("%v", _m.MessagesDispatchModelConfig))
 	builder.WriteString(", ")
-	builder.WriteString("models_list_config=")
-	builder.WriteString(fmt.Sprintf("%v", _m.ModelsListConfig))
+	builder.WriteString("model_allowlist=")
+	builder.WriteString(fmt.Sprintf("%v", _m.ModelAllowlist))
+	builder.WriteString(", ")
+	builder.WriteString("codex_models_manifest_config=")
+	builder.WriteString(fmt.Sprintf("%v", _m.CodexModelsManifestConfig))
 	builder.WriteString(", ")
 	builder.WriteString("model_allowlist=")
 	builder.WriteString(fmt.Sprintf("%v", _m.ModelAllowlist))

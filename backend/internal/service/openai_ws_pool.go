@@ -490,6 +490,11 @@ func (c *openAIWSConn) acquire(ctx context.Context) error {
 				c.release()
 				return err
 			}
+			select {
+			case <-c.closedCh:
+				c.release()
+				return err
+			}
 			if !c.leaseTokenUsable() {
 				return errOpenAIWSConnClosed
 			}

@@ -478,16 +478,16 @@ func TestTryModelFilePricing_Success(t *testing.T) {
 	require.InDelta(t, 0.2, *result, 1e-12)
 }
 
-func TestTryModelFilePricing_Fable51MaxEffortUsesTripleQuota(t *testing.T) {
+func TestTryModelFilePricing_Fable51HasNoImplicitReasoningMultiplier(t *testing.T) {
 	bs := newTestBillingServiceWithPrices(map[string]*ModelPricing{
 		"claude-fable-5-1": {InputPricePerToken: 0.001},
 	})
 	tokens := UsageTokens{InputTokens: 100}
-	standard := tryModelFilePricing(bs, "claude-fable-5-1", tokens, "", time.Time{}, "xhigh")
-	max := tryModelFilePricing(bs, "claude-fable-5-1", tokens, "", time.Time{}, "max")
+	standard := tryModelFilePricing(bs, "claude-fable-5-1", tokens, "", time.Time{}, true, "xhigh")
+	max := tryModelFilePricing(bs, "claude-fable-5-1", tokens, "", time.Time{}, true, "max")
 	require.NotNil(t, standard)
 	require.NotNil(t, max)
-	require.InDelta(t, *standard*3, *max, 1e-12)
+	require.Equal(t, *standard, *max)
 }
 
 func TestTryModelFilePricing_AppliesLongContextPricing(t *testing.T) {
@@ -692,7 +692,7 @@ func TestTryModelFilePricing_DeepSeekPeakPricing(t *testing.T) {
 					{"sunday", time.Date(2026, time.August, 23, 7, 0, 0, 0, time.UTC), 1},
 				} {
 					t.Run(slot.name, func(t *testing.T) {
-						cost := tryModelFilePricing(bs, model.name, tokens, "", slot.at)
+						cost := tryModelFilePricing(bs, model.name, tokens, "", slot.at, true)
 						require.NotNil(t, cost)
 						require.InDelta(t, baseCost*slot.multiplier, *cost, 1e-12)
 					})
@@ -738,7 +738,7 @@ func TestResolveAccountStatsCost_DeepSeekPricingPriority(t *testing.T) {
 				groupID = 99
 			}
 			cost := resolveAccountStatsCost(context.Background(), cs, newTestBillingService(),
-				1, groupID, "deepseek-v4-flash", UsageTokens{InputTokens: 1000}, 1, 0.75, "", peak)
+				1, groupID, "deepseek-v4-flash", UsageTokens{InputTokens: 1000}, 1, 0.75, "", peak, true)
 			if tt.noChannel {
 				require.Nil(t, cost)
 				return

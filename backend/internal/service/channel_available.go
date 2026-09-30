@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"maps"
 	"sort"
 	"strings"
 )
@@ -176,12 +177,12 @@ func synthesizePricingFromLiteLLM(lp *LiteLLMModelPricing, existing *ChannelMode
 
 	if mode == BillingModeImage || mode == BillingModePerRequest {
 		return &ChannelModelPricing{
-			BillingMode:                  mode,
-			PerRequestPrice:              nonZeroPtr(lp.OutputCostPerImage),
-			ImageOutputPrice:             nonZeroPtr(lp.OutputCostPerImageToken),
-			InputPrice:                   nonZeroPtr(lp.InputCostPerToken),
-			OutputPrice:                  nonZeroPtr(lp.OutputCostPerToken),
-			MaxReasoningEffortMultiplier: maxReasoningEffortMultiplierFromPricing(existing),
+			BillingMode:                mode,
+			PerRequestPrice:            nonZeroPtr(lp.OutputCostPerImage),
+			ImageOutputPrice:           nonZeroPtr(lp.OutputCostPerImageToken),
+			InputPrice:                 nonZeroPtr(lp.InputCostPerToken),
+			OutputPrice:                nonZeroPtr(lp.OutputCostPerToken),
+			ReasoningEffortMultipliers: reasoningEffortMultipliersFromPricing(existing),
 		}
 	}
 	return &ChannelModelPricing{
@@ -196,11 +197,11 @@ func synthesizePricingFromLiteLLM(lp *LiteLLMModelPricing, existing *ChannelMode
 	}
 }
 
-func maxReasoningEffortMultiplierFromPricing(pricing *ChannelModelPricing) *float64 {
+func reasoningEffortMultipliersFromPricing(pricing *ChannelModelPricing) map[string]float64 {
 	if pricing == nil {
 		return nil
 	}
-	return pricing.MaxReasoningEffortMultiplier
+	return maps.Clone(pricing.ReasoningEffortMultipliers)
 }
 
 func nonZeroPtr(v float64) *float64 {
