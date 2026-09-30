@@ -187,5 +187,24 @@ class ReleaseMatrixTest(unittest.TestCase):
 
 
 
+class ReleaseWorkflowBoundaryTest(unittest.TestCase):
+    def test_image_inspection_uses_resolved_release_plan_and_skips_dry_run(self):
+        workflow = yaml.safe_load(
+            (ROOT / '.github/workflows/release.yml').read_text(encoding='utf-8')
+        )
+        publish = workflow['jobs']['release']
+        step = next(
+            item for item in publish['steps']
+            if item.get('name') == 'Pull and inspect the published GHCR image'
+        )
+        self.assertEqual(step['if'], "${{ env.DRY_RUN != 'true' }}")
+        self.assertEqual(
+            step['env']['GHCR_IMAGE'],
+            'ghcr.io/${{ needs.prepare.outputs.owner_lower }}/sub2api',
+        )
+        self.assertNotIn('RELEASE_TAG', step['env'])
+        self.assertEqual(publish['env']['RELEASE_TAG'], '${{ needs.prepare.outputs.tag }}')
+
+
 if __name__ == '__main__':
     unittest.main()
