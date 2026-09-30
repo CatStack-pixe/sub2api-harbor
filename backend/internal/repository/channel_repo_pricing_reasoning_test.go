@@ -56,10 +56,14 @@ func TestChannelReasoningEffortMultipliersRoundTrip(t *testing.T) {
 				}
 				stored := &capturedReasoningMultipliersJSON{}
 				if operation == "update" {
+					mock.ExpectBegin()
 					mock.ExpectExec(`(?s)UPDATE channel_model_pricing.*reasoning_effort_multipliers = \$10.*WHERE id = \$16`).
 						WithArgs([]byte(`["custom-model"]`), service.BillingModeToken,
 							nil, nil, nil, nil, nil, nil, nil, stored, nil, nil, nil, nil, "openai", int64(11)).
 						WillReturnResult(sqlmock.NewResult(0, 1))
+					mock.ExpectExec(`DELETE FROM channel_pricing_time_windows WHERE pricing_id = \$1`).
+						WithArgs(int64(11)).WillReturnResult(sqlmock.NewResult(0, 0))
+					mock.ExpectCommit()
 					require.NoError(t, repo.UpdateModelPricing(ctx, pricing))
 				} else {
 					if operation == "replace" {
@@ -83,6 +87,7 @@ func TestChannelReasoningEffortMultipliersRoundTrip(t *testing.T) {
 				mock.ExpectQuery(`(?s)SELECT .*reasoning_effort_multipliers.*FROM channel_model_pricing.*channel_id = \$1`).
 					WithArgs(int64(7)).WillReturnRows(reasoningPricingRow(stored.value))
 				expectEmptyModelPricingIntervals(mock)
+				expectEmptyModelPricingTimeWindows(mock)
 				loaded, err := repo.ListModelPricing(ctx, 7)
 				require.NoError(t, err)
 				require.Len(t, loaded, 1)
@@ -102,6 +107,7 @@ func TestChannelReasoningEffortMultipliersBatchLoad(t *testing.T) {
 	mock.ExpectQuery(`(?s)SELECT .*reasoning_effort_multipliers.*FROM channel_model_pricing.*channel_id = ANY`).
 		WithArgs(pq.Array([]int64{7})).WillReturnRows(reasoningPricingRow(`{"medium":1.25,"high":2}`))
 	expectEmptyModelPricingIntervals(mock)
+	expectEmptyModelPricingTimeWindows(mock)
 	pricing, err := repo.batchLoadModelPricing(context.Background(), []int64{7})
 	require.NoError(t, err)
 	require.Len(t, pricing[7], 1)

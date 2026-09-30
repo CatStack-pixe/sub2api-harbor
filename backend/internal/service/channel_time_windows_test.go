@@ -1,6 +1,7 @@
 package service
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -58,4 +59,56 @@ func TestValidatePricingTimeWindows(t *testing.T) {
 		{StartMinute: 0, EndMinute: 60, InputPrice: timeWindowFloat(1)},
 		{StartMinute: 30, EndMinute: 90, InputPrice: timeWindowFloat(1)},
 	}))
+}
+
+func TestChannelModelPricingCompatibilityClone(t *testing.T) {
+	pricing := ChannelModelPricing{
+		Models:                     []string{"custom-model"},
+		CacheWrite1hPrice:          timeWindowFloat(6e-6),
+		ReasoningEffortMultipliers: map[string]float64{"high": 1.5, "max": 4},
+		Intervals: []PricingInterval{{
+			MinTokens: 0, CacheWrite1hPrice: timeWindowFloat(12e-6),
+		}},
+		TimeWindows: []PricingTimeWindow{{
+			StartMinute: 540, EndMinute: 720, CacheWritePrice: timeWindowFloat(3e-6),
+		}},
+		TimePricing: &ChannelTimePricing{
+			Timezone: "Asia/Shanghai", WeekdaysOnly: true,
+			Periods: []ChannelTimePricingPeriod{{
+				StartTime: "09:00:00", EndTime: "12:00:00", Multiplier: 2,
+			}},
+		},
+	}
+
+	cloned := pricing.Clone()
+	require.Equal(t, pricing, cloned)
+	cloned.Models[0] = "changed"
+	cloned.ReasoningEffortMultipliers["high"] = 99
+	cloned.Intervals[0].MinTokens = 10
+	cloned.TimeWindows[0].StartMinute = 600
+	cloned.TimePricing.Periods[0].Multiplier = 99
+	require.Equal(t, "custom-model", pricing.Models[0])
+	require.Equal(t, 1.5, pricing.ReasoningEffortMultipliers["high"])
+	require.Equal(t, 0, pricing.Intervals[0].MinTokens)
+	require.Equal(t, 540, pricing.TimeWindows[0].StartMinute)
+	require.Equal(t, 2.0, pricing.TimePricing.Periods[0].Multiplier)
+
+	resolved := pricing.ApplyTimeWindow(time.Date(2026, 9, 30, 2, 0, 0, 0, time.UTC))
+	require.Equal(t, pricing.CacheWrite1hPrice, resolved.CacheWrite1hPrice)
+	require.Equal(t, pricing.Intervals[0].CacheWrite1hPrice, resolved.Intervals[0].CacheWrite1hPrice)
+	require.Equal(t, 3e-6, *resolved.CacheWritePrice)
+	require.Equal(t, 3e-6, *resolved.Intervals[0].CacheWritePrice)
+	require.Nil(t, pricing.CacheWritePrice)
+	require.Nil(t, pricing.Intervals[0].CacheWritePrice)
+	require.Equal(t, pricing.ReasoningEffortMultipliers, resolved.ReasoningEffortMultipliers)
+	require.Equal(t, pricing.TimePricing, resolved.TimePricing)
+	resolved.ReasoningEffortMultipliers["max"] = 99
+	require.Equal(t, 4.0, pricing.ReasoningEffortMultipliers["max"])
+
+	encoded, err := json.Marshal(pricing)
+	require.NoError(t, err)
+	var decoded ChannelModelPricing
+	require.NoError(t, json.Unmarshal(encoded, &decoded))
+	require.Equal(t, pricing, decoded)
+	require.NotContains(t, string(encoded), "max_reasoning_effort_multiplier")
 }

@@ -507,12 +507,12 @@ func TestOpenAILegacyUpstreamRateOrderIgnoresNonOpenAIPlatforms(t *testing.T) {
 	grokCheap := nonOpenAI(1, PlatformGrok, 0.01)
 	anthropicExpensive := nonOpenAI(2, PlatformAnthropic, 0.9)
 
-	order := newOpenAILegacyUpstreamRateOrder([]*Account{grokCheap, anthropicExpensive, nil}, now, defaultOpenAIOAuthSchedulingRateMultiplier)
+	order := newOpenAILegacyUpstreamRateOrder([]*Account{grokCheap, anthropicExpensive, nil}, now, floatPtr(defaultOpenAIOAuthSchedulingRateMultiplier))
 	require.False(t, order.enabled)
 	require.Empty(t, order.rates)
 	require.Zero(t, order.compare(grokCheap, anthropicExpensive))
 
-	factors := openAIUpstreamCostFactors([]*Account{grokCheap, anthropicExpensive}, now, defaultOpenAIOAuthSchedulingRateMultiplier)
+	factors := openAIUpstreamCostFactors([]*Account{grokCheap, anthropicExpensive}, now, floatPtr(defaultOpenAIOAuthSchedulingRateMultiplier))
 	require.Equal(t, openAIUpstreamCostNeutralFactor, factors[grokCheap.ID])
 	require.Equal(t, openAIUpstreamCostNeutralFactor, factors[anthropicExpensive.ID])
 
@@ -521,7 +521,7 @@ func TestOpenAILegacyUpstreamRateOrderIgnoresNonOpenAIPlatforms(t *testing.T) {
 	openAIExpensive := upstreamCostTestAccount(4, UpstreamBillingProbeStatusOK, 0.12, now.Add(-time.Minute), 30*time.Minute)
 	mixed := newOpenAILegacyUpstreamRateOrder(
 		[]*Account{grokCheap, openAICheap, anthropicExpensive, openAIExpensive},
-		now, defaultOpenAIOAuthSchedulingRateMultiplier,
+		now, floatPtr(defaultOpenAIOAuthSchedulingRateMultiplier),
 	)
 	require.True(t, mixed.enabled)
 	require.Len(t, mixed.rates, 2)

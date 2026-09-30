@@ -22258,6 +22258,7 @@ type GroupMutation struct {
 	require_privacy_set                     *bool
 	default_mapped_model                    *string
 	messages_dispatch_model_config          *domain.OpenAIMessagesDispatchModelConfig
+	models_list_config                      *domain.GroupModelsListConfig
 	model_allowlist                         *domain.GroupModelAllowlist
 	codex_models_manifest_config            *domain.GroupCodexModelsManifestConfig
 	rpm_limit                               *int
@@ -25330,76 +25331,40 @@ func (m *GroupMutation) ResetMessagesDispatchModelConfig() {
 	m.messages_dispatch_model_config = nil
 }
 
-// SetModelAllowlist sets the "model_allowlist" field.
-func (m *GroupMutation) SetModelAllowlist(dma domain.GroupModelAllowlist) {
-	m.model_allowlist = &dma
+// SetModelsListConfig sets the "models_list_config" field.
+func (m *GroupMutation) SetModelsListConfig(dmlc domain.GroupModelsListConfig) {
+	m.models_list_config = &dmlc
 }
 
-// ModelAllowlist returns the value of the "model_allowlist" field in the mutation.
-func (m *GroupMutation) ModelAllowlist() (r domain.GroupModelAllowlist, exists bool) {
-	v := m.model_allowlist
+// ModelsListConfig returns the value of the "models_list_config" field in the mutation.
+func (m *GroupMutation) ModelsListConfig() (r domain.GroupModelsListConfig, exists bool) {
+	v := m.models_list_config
 	if v == nil {
 		return
 	}
 	return *v, true
 }
 
-// OldModelAllowlist returns the old "model_allowlist" field's value of the Group entity.
+// OldModelsListConfig returns the old "models_list_config" field's value of the Group entity.
 // If the Group object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *GroupMutation) OldModelAllowlist(ctx context.Context) (v domain.GroupModelAllowlist, err error) {
+func (m *GroupMutation) OldModelsListConfig(ctx context.Context) (v domain.GroupModelsListConfig, err error) {
 	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldModelAllowlist is only allowed on UpdateOne operations")
+		return v, errors.New("OldModelsListConfig is only allowed on UpdateOne operations")
 	}
 	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldModelAllowlist requires an ID field in the mutation")
+		return v, errors.New("OldModelsListConfig requires an ID field in the mutation")
 	}
 	oldValue, err := m.oldValue(ctx)
 	if err != nil {
-		return v, fmt.Errorf("querying old value for OldModelAllowlist: %w", err)
+		return v, fmt.Errorf("querying old value for OldModelsListConfig: %w", err)
 	}
-	return oldValue.ModelAllowlist, nil
+	return oldValue.ModelsListConfig, nil
 }
 
-// ResetModelAllowlist resets all changes to the "model_allowlist" field.
-func (m *GroupMutation) ResetModelAllowlist() {
-	m.model_allowlist = nil
-}
-
-// SetCodexModelsManifestConfig sets the "codex_models_manifest_config" field.
-func (m *GroupMutation) SetCodexModelsManifestConfig(dcmmc domain.GroupCodexModelsManifestConfig) {
-	m.codex_models_manifest_config = &dcmmc
-}
-
-// CodexModelsManifestConfig returns the value of the "codex_models_manifest_config" field in the mutation.
-func (m *GroupMutation) CodexModelsManifestConfig() (r domain.GroupCodexModelsManifestConfig, exists bool) {
-	v := m.codex_models_manifest_config
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldCodexModelsManifestConfig returns the old "codex_models_manifest_config" field's value of the Group entity.
-// If the Group object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *GroupMutation) OldCodexModelsManifestConfig(ctx context.Context) (v domain.GroupCodexModelsManifestConfig, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldCodexModelsManifestConfig is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldCodexModelsManifestConfig requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldCodexModelsManifestConfig: %w", err)
-	}
-	return oldValue.CodexModelsManifestConfig, nil
-}
-
-// ResetCodexModelsManifestConfig resets all changes to the "codex_models_manifest_config" field.
-func (m *GroupMutation) ResetCodexModelsManifestConfig() {
-	m.codex_models_manifest_config = nil
+// ResetModelsListConfig resets all changes to the "models_list_config" field.
+func (m *GroupMutation) ResetModelsListConfig() {
+	m.models_list_config = nil
 }
 
 // SetModelAllowlist sets the "model_allowlist" field.
@@ -26337,11 +26302,8 @@ func (m *GroupMutation) Fields() []string {
 	if m.messages_dispatch_model_config != nil {
 		fields = append(fields, group.FieldMessagesDispatchModelConfig)
 	}
-	if m.model_allowlist != nil {
-		fields = append(fields, group.FieldModelAllowlist)
-	}
-	if m.codex_models_manifest_config != nil {
-		fields = append(fields, group.FieldCodexModelsManifestConfig)
+	if m.models_list_config != nil {
+		fields = append(fields, group.FieldModelsListConfig)
 	}
 	if m.model_allowlist != nil {
 		fields = append(fields, group.FieldModelAllowlist)
@@ -26496,6 +26458,8 @@ func (m *GroupMutation) Field(name string) (ent.Value, bool) {
 		return m.DefaultMappedModel()
 	case group.FieldMessagesDispatchModelConfig:
 		return m.MessagesDispatchModelConfig()
+	case group.FieldModelsListConfig:
+		return m.ModelsListConfig()
 	case group.FieldModelAllowlist:
 		return m.ModelAllowlist()
 	case group.FieldCodexModelsManifestConfig:
@@ -26641,6 +26605,8 @@ func (m *GroupMutation) OldField(ctx context.Context, name string) (ent.Value, e
 		return m.OldDefaultMappedModel(ctx)
 	case group.FieldMessagesDispatchModelConfig:
 		return m.OldMessagesDispatchModelConfig(ctx)
+	case group.FieldModelsListConfig:
+		return m.OldModelsListConfig(ctx)
 	case group.FieldModelAllowlist:
 		return m.OldModelAllowlist(ctx)
 	case group.FieldCodexModelsManifestConfig:
@@ -27081,19 +27047,12 @@ func (m *GroupMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetMessagesDispatchModelConfig(v)
 		return nil
-	case group.FieldModelAllowlist:
-		v, ok := value.(domain.GroupModelAllowlist)
+	case group.FieldModelsListConfig:
+		v, ok := value.(domain.GroupModelsListConfig)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
-		m.SetModelAllowlist(v)
-		return nil
-	case group.FieldCodexModelsManifestConfig:
-		v, ok := value.(domain.GroupCodexModelsManifestConfig)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetCodexModelsManifestConfig(v)
+		m.SetModelsListConfig(v)
 		return nil
 	case group.FieldModelAllowlist:
 		v, ok := value.(domain.GroupModelAllowlist)
@@ -27846,11 +27805,8 @@ func (m *GroupMutation) ResetField(name string) error {
 	case group.FieldMessagesDispatchModelConfig:
 		m.ResetMessagesDispatchModelConfig()
 		return nil
-	case group.FieldModelAllowlist:
-		m.ResetModelAllowlist()
-		return nil
-	case group.FieldCodexModelsManifestConfig:
-		m.ResetCodexModelsManifestConfig()
+	case group.FieldModelsListConfig:
+		m.ResetModelsListConfig()
 		return nil
 	case group.FieldModelAllowlist:
 		m.ResetModelAllowlist()

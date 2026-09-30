@@ -97,6 +97,12 @@ func classifyOpenAITransportError(err error) upstreamTransportErrorClass {
 	return classifyUpstreamTransportError(err)
 }
 
+// isClientCanceledTransportError identifies a canceled client request rather
+// than a fault in the upstream account or its proxy.
+func isClientCanceledTransportError(ctx context.Context, err error) bool {
+	return errors.Is(err, context.Canceled) && ctx != nil && errors.Is(ctx.Err(), context.Canceled)
+}
+
 // handleOpenAIUpstreamTransportError handles a transport-level upstream failure
 // (Do/DoWithTLS returned a non-HTTP error: proxy/DNS/TCP/TLS). It:
 //  1. records the failure in Ops error logs (status 0, kind=request_error),

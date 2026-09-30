@@ -37,7 +37,7 @@ func TestOpenAIAccountSchedulerLatencySignalDeprioritizesSlowAccount(t *testing.
 		nil,
 		weights,
 		false,
-		defaultOpenAIOAuthSchedulingRateMultiplier,
+		parseOpenAIOAuthSchedulingRateMultiplier(nil),
 		stats,
 	)
 
@@ -88,6 +88,16 @@ func (r schedulerTestOpenAIAccountRepo) GetByID(ctx context.Context, id int64) (
 		}
 	}
 	return nil, errors.New("account not found")
+}
+
+func (r schedulerTestOpenAIAccountRepo) ListSchedulableByGroupID(_ context.Context, groupID int64) ([]Account, error) {
+	var result []Account
+	for _, acc := range r.accounts {
+		if openAIStickyAccountMatchesGroup(&acc, &groupID) {
+			result = append(result, acc)
+		}
+	}
+	return result, nil
 }
 
 func (r schedulerTestOpenAIAccountRepo) ListSchedulableByGroupIDAndPlatform(ctx context.Context, groupID int64, platform string) ([]Account, error) {

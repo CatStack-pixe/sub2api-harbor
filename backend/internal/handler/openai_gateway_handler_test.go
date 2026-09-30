@@ -382,6 +382,20 @@ func TestOpenAIEnsureForwardErrorResponse_AfterDeltaAppendsSingleValidResponseFa
 	require.Equal(t, 1, errorEvents)
 }
 
+func TestOpenAIEnsureForwardErrorResponse_PreservesCommittedStreamError(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodPost, EndpointResponses, nil)
+	body := "event: error\ndata: {\"type\":\"error\",\"code\":\"upstream_stream_read_error\",\"message\":\"Upstream response stream was interrupted\",\"param\":null,\"sequence_number\":0}\n\n"
+	_, err := c.Writer.WriteString(body)
+	require.NoError(t, err)
+	service.MarkResponseCommitted(c)
+	h := &OpenAIGatewayHandler{}
+	require.False(t, h.ensureForwardErrorResponse(c, true))
+	require.Equal(t, body, w.Body.String(), "preserve the service error without a second terminal event")
+}
+
 func TestOpenAIEnsureForwardErrorResponse_CompactKeepaliveOnlyWritesResponseFailed(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	w := httptest.NewRecorder()
@@ -1945,12 +1959,14 @@ func newOpenAIWSHandlerTestServer(t *testing.T, h *OpenAIGatewayHandler, subject
 }
 
 type openAIResponsesWSUsageLogCase struct {
-	simpleModeRejectAtRead int64
-	compositeResolver      *service.CompositeRouteResolver
-	accountPlatform        string
-	closeReason            string
-	closeStatus            coderws.StatusCode
-	firstPayload           string
+	simpleModeRejectAtRead         int64
+	simpleModeWindow               string
+	simpleModeKeyRateLimitDisabled bool
+	compositeResolver              *service.CompositeRouteResolver
+	accountPlatform                string
+	closeReason                    string
+	closeStatus                    coderws.StatusCode
+	firstPayload                   string
 	// midPayload 在首个 turn 完成后发送（如 session.update），上游桩会为它
 	// 回一个 response.completed，客户端按普通事件读取。
 	midPayload                string
@@ -1975,6 +1991,7 @@ type openAIResponsesWSUsageLogResult struct {
 	upstreamFirstPayload []byte
 	upstreamPayloads     [][]byte
 	clientEvents         [][]byte
+	keyWindowReads       int64
 }
 
 type openAIWSUsageHandlerAccountRepoStub struct {
@@ -3012,9 +3029,11 @@ func runOpenAIResponsesWebSocketUsageLogCase(t *testing.T, tc openAIResponsesWSU
 	}
 
 	var keyRepo service.APIKeyRepository
+	var keyWindowRepo *simpleModeWSRateLimitRepo
 	if tc.simpleModeRejectAtRead > 0 {
-		cfg.SimpleModeKeyRateLimitEnabled = true
-		keyRepo = &simpleModeWSRateLimitRepo{rejectAt: tc.simpleModeRejectAtRead}
+		cfg.SimpleModeKeyRateLimitEnabled = !tc.simpleModeKeyRateLimitDisabled
+		keyWindowRepo = &simpleModeWSRateLimitRepo{rejectAt: tc.simpleModeRejectAtRead, window: tc.simpleModeWindow}
+		keyRepo = keyWindowRepo
 	}
 	billingCacheSvc := service.NewBillingCacheService(nil, nil, nil, keyRepo, nil, nil, cfg, nil)
 	t.Cleanup(billingCacheSvc.Stop)
@@ -3066,7 +3085,14 @@ func runOpenAIResponsesWebSocketUsageLogCase(t *testing.T, tc openAIResponsesWSU
 		User:    &service.User{ID: 1701, Status: service.StatusActive},
 	}
 	if tc.simpleModeRejectAtRead > 0 {
-		apiKey.RateLimit5h = 1
+		switch tc.simpleModeWindow {
+		case "1d":
+			apiKey.RateLimit1d = 1
+		case "7d":
+			apiKey.RateLimit7d = 1
+		default:
+			apiKey.RateLimit5h = 1
+		}
 	}
 	if tc.group != nil {
 		apiKey.Group = tc.group
@@ -3208,12 +3234,17 @@ func runOpenAIResponsesWebSocketUsageLogCase(t *testing.T, tc openAIResponsesWSU
 		t.Fatal("等待上游 WebSocket 结束超时")
 	}
 
+	var keyWindowReads int64
+	if keyWindowRepo != nil {
+		keyWindowReads = keyWindowRepo.reads.Load()
+	}
 	return openAIResponsesWSUsageLogResult{
 		log:                  usageLogs[0],
 		logs:                 usageLogs,
 		upstreamFirstPayload: upstreamPayloads[0],
 		upstreamPayloads:     upstreamPayloads,
 		clientEvents:         clientEvents,
+		keyWindowReads:       keyWindowReads,
 	}
 }
 
@@ -3292,6 +3323,7 @@ type simpleModeWSRateLimitRepo struct {
 	service.APIKeyRepository
 	reads    atomic.Int64
 	rejectAt int64
+	window   string
 }
 
 func (r *simpleModeWSRateLimitRepo) GetRateLimitData(context.Context, int64) (*service.APIKeyRateLimitData, error) {
@@ -3300,8 +3332,16 @@ func (r *simpleModeWSRateLimitRepo) GetRateLimitData(context.Context, int64) (*s
 	if r.reads.Add(1) >= r.rejectAt {
 		usage = 1
 	}
-	return &service.APIKeyRateLimitData{Usage5h: usage, Window5hStart: &now}, nil
+	switch r.window {
+	case "1d":
+		return &service.APIKeyRateLimitData{Usage1d: usage, Window1dStart: &now}, nil
+	case "7d":
+		return &service.APIKeyRateLimitData{Usage7d: usage, Window7dStart: &now}, nil
+	default:
+		return &service.APIKeyRateLimitData{Usage5h: usage, Window5hStart: &now}, nil
+	}
 }
+
 func TestOpenAIResponsesWebSocketSimpleModeRechecksKeyWindows(t *testing.T) {
 	for _, mode := range []string{service.OpenAIWSIngressModePassthrough, service.OpenAIWSIngressModeCtxPool} {
 		t.Run(mode+"/after-account-selection", func(t *testing.T) {
@@ -3316,6 +3356,57 @@ func TestOpenAIResponsesWebSocketSimpleModeRechecksKeyWindows(t *testing.T) {
 				secondPayload: `{"type":"response.create","model":"gpt-5.1"}`,
 				ingressMode:   mode, simpleModeRejectAtRead: 3, secondTurnCloseExpected: true, closeReason: "billing check failed",
 			})
+		})
+	}
+}
+
+func TestOpenAIResponsesWebSocketSimpleModeRechecksDailyAndWeeklyKeyWindows(t *testing.T) {
+	for _, mode := range []string{service.OpenAIWSIngressModePassthrough, service.OpenAIWSIngressModeCtxPool} {
+		for _, window := range []string{"1d", "7d"} {
+			t.Run(mode+"/"+window+"/after-account-selection", func(t *testing.T) {
+				runOpenAIResponsesWebSocketUsageLogCase(t, openAIResponsesWSUsageLogCase{
+					firstPayload: `{"type":"response.create","model":"gpt-5.1"}`,
+					ingressMode:  mode, simpleModeWindow: window, simpleModeRejectAtRead: 2,
+					firstFrameCloseExpected: true, closeReason: "billing check failed",
+				})
+			})
+			t.Run(mode+"/"+window+"/followup-turn", func(t *testing.T) {
+				runOpenAIResponsesWebSocketUsageLogCase(t, openAIResponsesWSUsageLogCase{
+					firstPayload:  `{"type":"response.create","model":"gpt-5.1"}`,
+					secondPayload: `{"type":"response.create","model":"gpt-5.1"}`,
+					ingressMode:   mode, simpleModeWindow: window, simpleModeRejectAtRead: 3,
+					secondTurnCloseExpected: true, closeReason: "billing check failed",
+				})
+			})
+		}
+	}
+}
+
+func TestOpenAIResponsesWebSocketSimpleModeKeyWindowChecksRemainOptIn(t *testing.T) {
+	for _, mode := range []string{service.OpenAIWSIngressModePassthrough, service.OpenAIWSIngressModeCtxPool} {
+		t.Run(mode, func(t *testing.T) {
+			result := runOpenAIResponsesWebSocketUsageLogCase(t, openAIResponsesWSUsageLogCase{
+				firstPayload:  `{"type":"response.create","model":"gpt-5.1"}`,
+				secondPayload: `{"type":"response.create","model":"gpt-5.1"}`,
+				ingressMode:   mode, simpleModeRejectAtRead: 1, simpleModeKeyRateLimitDisabled: true,
+			})
+			require.Len(t, result.logs, 2)
+			require.Len(t, result.upstreamPayloads, 2)
+			require.Zero(t, result.keyWindowReads, "default simple mode must not load key windows")
+		})
+	}
+}
+
+func TestOpenAIResponsesWebSocketSimpleModeChecksKeyWindowsOncePerTurn(t *testing.T) {
+	for _, mode := range []string{service.OpenAIWSIngressModePassthrough, service.OpenAIWSIngressModeCtxPool} {
+		t.Run(mode, func(t *testing.T) {
+			result := runOpenAIResponsesWebSocketUsageLogCase(t, openAIResponsesWSUsageLogCase{
+				firstPayload:  `{"type":"response.create","model":"gpt-5.1"}`,
+				secondPayload: `{"type":"response.create","model":"gpt-5.1"}`,
+				ingressMode:   mode, simpleModeRejectAtRead: 4,
+			})
+			require.Len(t, result.upstreamPayloads, 2)
+			require.Equal(t, int64(3), result.keyWindowReads, "one handshake check and one check per admitted turn")
 		})
 	}
 }

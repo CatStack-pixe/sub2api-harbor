@@ -1169,7 +1169,7 @@ func TestGPT6ReasoningModeAndSamplingCompatibility(t *testing.T) {
 		require.Equal(t, "medium", *d.DefaultReasoningLevel)
 		require.EqualValues(t, 872000, d.MaxContextWindow)
 		require.Len(t, d.SupportedReasoningLevels, 5)
-		require.Len(t, d.ServiceTiers, 1)
+		require.Empty(t, d.ServiceTiers, "fork catalog requires account/provider capabilities instead of inferring speed tiers from model names")
 	}
 }
 

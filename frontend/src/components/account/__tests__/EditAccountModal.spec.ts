@@ -331,22 +331,61 @@ describe('EditAccountModal', () => {
 
   afterEach(() => vi.useRealTimers())
 
-  it('passes existing non-identity mappings to the whitelist selector and preserves them on save', async () => {
-    const account = buildAccount()
-    account.credentials.model_mapping = { 'gpt-5.2': 'gpt-5.2', 'gpt-latest': 'deepseek-chat' }
+  it('updates Tierflow console credentials while retaining the redacted API key', async () => {
+    const account = {
+      ...buildAccount(),
+      name: 'Tierflow account',
+      platform: 'tierflow',
+      credentials: { base_url: 'https://tierflow.cn/v1' },
+      credentials_status: { has_api_key: true }
+    }
     updateAccountMock.mockReset().mockResolvedValue(account)
     checkMixedChannelRiskMock.mockReset().mockResolvedValue({ has_risk: false })
     const wrapper = mountModal(account)
-    expect(wrapper.getComponent(ModelWhitelistSelectorStub).props('modelMappings')).toEqual([
-      { from: 'gpt-latest', to: 'deepseek-chat' }
-    ])
+    await wrapper.get('[data-testid="tierflow-cookie"]').setValue(' updated-cookie ')
+    await wrapper.get('[data-testid="tierflow-user-id"]').setValue(' 67890 ')
     await wrapper.get('form#edit-account-form').trigger('submit.prevent')
-    expect(updateAccountMock.mock.calls[0]?.[1]?.credentials?.model_mapping).toEqual(account.credentials.model_mapping)
-    await wrapper.setProps({ show: false })
-    await wrapper.setProps({ show: true, account: { ...account } })
-    expect(wrapper.getComponent(ModelWhitelistSelectorStub).props('modelMappings')).toEqual([
-      { from: 'gpt-latest', to: 'deepseek-chat' }
-    ])
+
+    expect(updateAccountMock).toHaveBeenCalledTimes(1)
+    const credentials = updateAccountMock.mock.calls[0]?.[1]?.credentials
+    expect(credentials).toMatchObject({
+      base_url: 'https://tierflow.cn/v1',
+      tierflow_cookie: 'updated-cookie',
+      tierflow_user_id: '67890'
+    })
+    expect(credentials).not.toHaveProperty('api_key')
+    expect(credentials).not.toHaveProperty('api_protocol')
+    expect(updateAccountMock.mock.calls[0]?.[1]?.upstream_billing_probe_enabled).toBeUndefined()
+    expect(updateAccountMock.mock.calls[0]?.[1]?.upstream_billing_rate_sync_enabled).toBe(false)
+    expect(wrapper.find('[data-testid="upstream-billing-rate-sync"]').exists()).toBe(false)
+    wrapper.unmount()
+  })
+
+  it.each([true, false])('preserves the Tierflow balance probe setting %s and blank stored secrets', async (enabled) => {
+    const account = {
+      ...buildAccount(),
+      platform: 'tierflow',
+      credentials: {},
+      extra: { upstream_billing_probe_enabled: enabled, upstream_billing_rate_sync_enabled: true },
+      credentials_status: { has_api_key: true }
+    }
+    updateAccountMock.mockReset().mockResolvedValue(account)
+    checkMixedChannelRiskMock.mockReset().mockResolvedValue({ has_risk: false })
+    const wrapper = mountModal(account)
+    await wrapper.get('form#edit-account-form').trigger('submit.prevent')
+
+    expect(updateAccountMock).toHaveBeenCalledTimes(1)
+    const credentials = updateAccountMock.mock.calls[0]?.[1]?.credentials
+    expect(credentials.base_url).toBe('https://tierflow.cn/v1')
+    expect(credentials).not.toHaveProperty('tierflow_cookie')
+    expect(credentials).not.toHaveProperty('tierflow_user_id')
+    expect(credentials).not.toHaveProperty('api_key')
+    const payload = updateAccountMock.mock.calls[0]?.[1]
+    expect(payload.upstream_billing_probe_enabled).toBeUndefined()
+    expect(payload.extra.upstream_billing_probe_enabled).toBe(enabled)
+    expect(payload.upstream_billing_rate_sync_enabled).toBe(false)
+    expect(payload.extra).not.toHaveProperty('upstream_billing_rate_sync_enabled')
+    wrapper.unmount()
   })
 
   it('sets expiry presets from now instead of extending the saved expiry', async () => {

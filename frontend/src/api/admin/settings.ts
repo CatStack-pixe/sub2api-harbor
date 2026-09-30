@@ -76,48 +76,6 @@ export function sanitizeAccountSchedulingThresholdsMap(
   return normalizeAccountSchedulingThresholdsMap(input)
 }
 
-export type SchedulingThresholdPlatformType =
-  | "openai"
-  | "anthropic"
-  | "grok"
-  | "kimi"
-  | "zhipu"
-  | "minimax"
-  | "opencode_go"
-
-export type AccountSchedulingThresholdsMap = Record<SchedulingThresholdPlatformType, number>
-
-// 与后端 AllowedSchedulingThresholdPlatforms 保持一致（deepseek 为余额型，
-// 走余额检测而非用量阈值；minimax Coding/Token Plan 与 OpenCode GO 有滚动窗口）。
-export const SCHEDULING_THRESHOLD_PLATFORMS: SchedulingThresholdPlatformType[] = [
-  "openai",
-  "anthropic",
-  "grok",
-  "kimi",
-  "zhipu",
-  "minimax",
-  "opencode_go",
-]
-
-export function normalizeAccountSchedulingThresholdsMap(
-  input?: Partial<Record<SchedulingThresholdPlatformType, number>> | null,
-): AccountSchedulingThresholdsMap {
-  const result = {} as AccountSchedulingThresholdsMap
-  for (const platform of SCHEDULING_THRESHOLD_PLATFORMS) {
-    const value = input?.[platform]
-    result[platform] = typeof value === "number" && Number.isFinite(value)
-      ? Math.min(100, Math.max(1, Math.trunc(value)))
-      : 100
-  }
-  return result
-}
-
-export function sanitizeAccountSchedulingThresholdsMap(
-  input?: Partial<Record<SchedulingThresholdPlatformType, number>> | null,
-): AccountSchedulingThresholdsMap {
-  return normalizeAccountSchedulingThresholdsMap(input)
-}
-
 /** 归一化为全 4 平台 × 3 窗口（缺失填 null），供模板非空绑定 */
 export function normalizePlatformQuotasMap(input?: DefaultPlatformQuotasMap | null): DefaultPlatformQuotasMap {
   const result: DefaultPlatformQuotasMap = {}
@@ -684,6 +642,9 @@ export interface SystemSettings {
   openai_codex_client_version: string;
   openai_codex_client_version_synced: string;
   openai_codex_version_auto_sync_enabled: boolean;
+  claude_code_client_version: string;
+  claude_code_client_version_synced: string;
+  claude_code_version_auto_sync_enabled: boolean;
   // codex_cli_only 加固
   min_codex_version: string;
   max_codex_version: string;
@@ -1006,6 +967,8 @@ export interface UpdateSettingsRequest {
   openai_codex_user_agent?: string;
   openai_codex_client_version?: string;
   openai_codex_version_auto_sync_enabled?: boolean;
+  claude_code_client_version?: string;
+  claude_code_version_auto_sync_enabled?: boolean;
   // codex_cli_only 加固
   min_codex_version?: string;
   max_codex_version?: string;

@@ -106,12 +106,12 @@ export async function getById(id: number): Promise<AdminGroup> {
  * Get candidate models for the group model allowlist.
  * id=0 returns platform default models for create flow.
  */
-export async function getModelAllowlistCandidates(
+export async function getModelsListCandidates(
   id: number,
   platform?: GroupPlatform
 ): Promise<string[]> {
   const { data } = await apiClient.get<{ models: string[] }>(
-    `/admin/groups/${id}/model-allowlist-candidates`,
+    `/admin/groups/${id}/models-list-candidates`,
     {
       params: platform ? { platform } : undefined
     }
@@ -490,6 +490,7 @@ export const groupsAPI = {
   getAllIncludingInactive,
   getLiveCapability,
   getById,
+  getModelsListCandidates,
   getModelAllowlistCandidates,
   create,
   duplicate,

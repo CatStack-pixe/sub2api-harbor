@@ -2044,7 +2044,7 @@
 
       <!-- OpenAI APIKey images: backfill b64_json from url -->
       <div
-        v-if="supportsGenericUpstreamBillingProbe"
+        v-if="account?.platform === 'openai' && account?.type === 'apikey'"
         class="flex items-center justify-between gap-4 border-t border-gray-200 pt-4 dark:border-dark-600"
       >
         <div>
@@ -2074,7 +2074,7 @@
       </div>
 
       <div
-        v-if="account?.type === 'apikey'"
+        v-if="supportsGenericUpstreamBillingProbe"
         class="flex items-center justify-between gap-4 border-t border-gray-200 pt-4 dark:border-dark-600"
       >
         <div>
@@ -3209,7 +3209,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, watch, nextTick } from 'vue'
+import { ref, reactive, computed, watch, nextTick, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
 
@@ -3258,6 +3258,7 @@ import {
   applyPlanType,
   buildPlanTypeOptions,
   cloneOpenCodeGoProtocolRules,
+  cnSupportsNativeResponses,
   defaultOpenCodeProtocolRules,
   parseOpenCodeGoProtocolRules,
   readPlanType,
@@ -3285,6 +3286,7 @@ import {
   getBrowserTimeZone,
   parseDateTimeLocalInput
 } from '@/utils/format'
+import { extractApiErrorMessage, extractI18nErrorMessage } from '@/utils/apiError'
 import { createStableObjectKeyResolver } from '@/utils/stableObjectKey'
 import { getAccountExpiryTimestamp } from '@/components/account/accountExpiry'
 import { allSelectedGroupsEnableLongContextPricing } from '@/components/account/longContextBilling'
