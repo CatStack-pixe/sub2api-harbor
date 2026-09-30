@@ -105,7 +105,7 @@ func (s *OpenAIGatewayService) forwardResponsesViaRawChatCompletions(
 			chatBody = normalizedBody
 		}
 	}
-	if !bytes.Contains(chatBody, []byte(`"input"`)) && deepSeekTextOnlyImageRequest(account, upstreamModel, chatBody) {
+	if deepSeekTextOnlyImageRequest(account, upstreamModel, chatBody) {
 		MarkOpsClientBusinessLimited(c, OpsClientBusinessLimitedReasonLocalModelConfiguration)
 		writeOpenAIResponsesFallbackError(c, http.StatusBadRequest, "invalid_request_error", deepSeekTextOnlyImageInputMessage)
 		return nil, errors.New(deepSeekTextOnlyImageInputMessage)

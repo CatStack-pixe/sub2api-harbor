@@ -600,11 +600,6 @@ func newConfiguredCodexModelDescriptor(modelID string) configuredCodexModelDescr
 		descriptor.DisplayName = openaiCodexDisplayName(modelID)
 		descriptor.Description = "OpenAI GPT coding model routed through Sub2API."
 		descriptor.SupportsParallelToolCalls = true
-		if openai.IsGPT6SolOrLunaModelSpelling(modelID) {
-			for _, tier := range configuredCodexServiceTiersForModel(modelID) {
-				descriptor.ServiceTiers = append(descriptor.ServiceTiers, tier)
-			}
-		}
 		// The fork does not infer purchasable speed tiers from a model name.
 		// Explicit tiers in provider manifests remain intact during completion.
 		if isOpenAICodexReasoningGPTModel(modelID) {

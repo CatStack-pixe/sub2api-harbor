@@ -394,7 +394,11 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 			upstreamModel = compactModel
 		}
 	}
-	if !bytes.Contains(body, []byte(`"input"`)) && deepSeekTextOnlyImageRequest(account, upstreamModel, body) {
+	// Keep the fork's explicit v4 text-only guard while allowing the provider's
+	// newer native Responses model aliases to use the image schema adapter.
+	nativeDeepSeekImages := nativeCNResponses && account.Platform == PlatformDeepseek &&
+		!strings.HasPrefix(strings.ToLower(upstreamModel), "deepseek-v4")
+	if !nativeDeepSeekImages && deepSeekTextOnlyImageRequest(account, upstreamModel, body) {
 		MarkOpsClientBusinessLimited(c, OpsClientBusinessLimitedReasonLocalModelConfiguration)
 		writeOpenAIResponsesFallbackError(c, http.StatusBadRequest, "invalid_request_error", deepSeekTextOnlyImageInputMessage)
 		return nil, errors.New(deepSeekTextOnlyImageInputMessage)

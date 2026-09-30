@@ -30,7 +30,7 @@ var errOpenAIResponsesToolSchemaLimit = errors.New("OpenAI Responses tool schema
 // path requires a concrete object type at a function tool's parameter root.
 // This defect is shared by the OpenAI, Anthropic, and CN-compatible paths.
 func shouldRepairOpenAIResponsesNullToolSchemaType(platform string) bool {
-	return platform == PlatformOpenAI || platform == PlatformAnthropic || platform == PlatformGrok || IsCNProvider(platform)
+	return platform == PlatformOpenAI || platform == PlatformAnthropic || IsCNProvider(platform)
 }
 
 // shouldSanitizeOpenAIResponsesToolSchemaPatterns is intentionally narrower:
@@ -42,6 +42,11 @@ func shouldSanitizeOpenAIResponsesToolSchemaPatterns(platform string) bool {
 func sanitizeOpenAIResponsesToolSchemasForPlatform(body []byte, platform string) ([]byte, bool, error) {
 	normalized := body
 	changed := false
+	if platform == PlatformGrok {
+		return sanitizeOpenAIResponsesToolSchemas(body, openAIResponsesToolSchemaOptions{
+			dropNullRequired: true,
+		})
+	}
 	if shouldRepairOpenAIResponsesNullToolSchemaType(platform) {
 		next, repaired, err := sanitizeOpenAIResponsesToolParameterTypes(normalized)
 		if err != nil {
