@@ -69,7 +69,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Icon from '@/components/icons/Icon.vue'
 import { sanitizeSvg } from '@/utils/sanitize'
@@ -106,9 +106,6 @@ function removeImage() {
   reader?.abort()
   emit('update:modelValue', '')
 }
-
-const resolvedUploadLabel = computed(() => props.uploadLabel || t('common.upload'))
-const resolvedRemoveLabel = computed(() => props.removeLabel || t('common.remove'))
 
 const resolvedUploadLabel = computed(() => props.uploadLabel || t('common.upload'))
 const resolvedRemoveLabel = computed(() => props.removeLabel || t('common.remove'))

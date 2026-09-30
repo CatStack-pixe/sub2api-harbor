@@ -1,8 +1,6 @@
 export interface ModelAllowlistConfig {
   enabled: boolean
   models: string[]
-  model_mapping_enabled?: boolean
-  model_mapping?: Record<string, string>
 }
 
 export interface ModelAllowlistItem {
@@ -13,39 +11,18 @@ export interface ModelAllowlistItem {
 export interface ModelAllowlistState {
   enabled: boolean
   savedModels: string[]
-  items: ModelsListItem[]
-  modelMappingEnabled: boolean
-  modelMappingRows: ModelMappingRow[]
+  items: ModelAllowlistItem[]
 }
 
-export interface ModelMappingRow {
-  id: string
-  requestedModel: string
-  upstreamModel: string
-}
+// 自定义条目校验错误码，由视图映射为 i18n 提示。
+export type ModelAllowlistAddError = 'empty' | 'duplicate'
 
-let nextModelMappingRowID = 0
-
-const createModelMappingRow = (
-  requestedModel = "",
-  upstreamModel = "",
-): ModelMappingRow => ({
-  id: `model-mapping-${++nextModelMappingRowID}`,
-  requestedModel,
-  upstreamModel,
-})
-
-export const createModelsListState = (
-  config?: Partial<ModelsListConfig> | null,
-): ModelsListState => ({
+export const createModelAllowlistState = (
+  config?: Partial<ModelAllowlistConfig> | null,
+): ModelAllowlistState => ({
   enabled: config?.enabled ?? false,
   savedModels: normalizeModels(config?.models ?? []),
   items: [],
-  modelMappingEnabled: config?.model_mapping_enabled ?? false,
-  modelMappingRows: Object.entries(config?.model_mapping ?? {}).map(
-    ([requestedModel, upstreamModel]) =>
-      createModelMappingRow(requestedModel, upstreamModel),
-  ),
 })
 
 export const hydrateModelAllowlistState = (
@@ -128,48 +105,34 @@ export const moveModelAllowlistItem = (
   state.items.splice(toIndex, 0, item)
 }
 
-export const buildModelsListConfig = (state: ModelsListState): ModelsListConfig => {
-  const config: ModelsListConfig = {
-    enabled: state.enabled,
-    models: state.items.length > 0
-      ? state.items.filter(item => item.selected).map(item => item.id)
-      : [...state.savedModels],
+// addCustomModelAllowlistItem 把手工输入的条目追加到白名单末尾（选中状态）。
+// 去重；`*` 可出现在任意位置。返回错误码或 null（成功）。
+export const addCustomModelAllowlistItem = (
+  state: ModelAllowlistState,
+  raw: string,
+): ModelAllowlistAddError | null => {
+  const entry = raw.trim()
+  if (!entry) {
+    return 'empty'
   }
-  const modelMapping = normalizeModelMappingRows(state.modelMappingRows)
-  if (state.modelMappingEnabled || Object.keys(modelMapping).length > 0) {
-    config.model_mapping_enabled = state.modelMappingEnabled
-    config.model_mapping = modelMapping
+  if (
+    state.items.some(item => item.id.toLowerCase() === entry.toLowerCase()) ||
+    state.savedModels.some(model => model.toLowerCase() === entry.toLowerCase())
+  ) {
+    return 'duplicate'
   }
-  return config
+  state.items.push({ id: entry, selected: true })
+  return null
 }
 
-export const addModelMappingRow = (state: ModelsListState) => {
-  state.modelMappingRows.push(createModelMappingRow())
-}
-
-export const removeModelMappingRow = (
-  state: ModelsListState,
-  rowID: string,
-) => {
-  const index = state.modelMappingRows.findIndex(row => row.id === rowID)
-  if (index !== -1) {
-    state.modelMappingRows.splice(index, 1)
-  }
-}
-
-const normalizeModelMappingRows = (
-  rows: ModelMappingRow[],
-): Record<string, string> => {
-  const mapping: Record<string, string> = {}
-  for (const row of rows) {
-    const requestedModel = row.requestedModel.trim()
-    const upstreamModel = row.upstreamModel.trim()
-    if (requestedModel && upstreamModel) {
-      mapping[requestedModel] = upstreamModel
-    }
-  }
-  return mapping
-}
+export const buildModelAllowlistConfig = (
+  state: ModelAllowlistState,
+): ModelAllowlistConfig => ({
+  enabled: state.enabled,
+  models: state.items.length > 0
+    ? state.items.filter(item => item.selected).map(item => item.id)
+    : [...state.savedModels],
+})
 
 export const selectedModelAllowlistCount = (state: ModelAllowlistState): number =>
   state.items.filter(item => item.selected).length
