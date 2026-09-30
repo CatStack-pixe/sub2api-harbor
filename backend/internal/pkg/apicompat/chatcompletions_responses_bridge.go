@@ -141,6 +141,36 @@ func EffectiveResponsesTools(req *ResponsesRequest) ([]ResponsesTool, error) {
 		}
 		tools = append(tools, item.Tools...)
 	}
+
+	// A completed client tool search can introduce tools for the remainder of
+	// the turn. Promote them before lowering to ChatCompletions, using the same
+	// dedupe, conflict, namespace, and custom-tool rules as the native adapter.
+	toolsRaw, err := json.Marshal(tools)
+	if err != nil {
+		return nil, fmt.Errorf("encode responses tools for discovery promotion: %w", err)
+	}
+	var rawTools, rawInput []any
+	if err := json.Unmarshal(toolsRaw, &rawTools); err != nil {
+		return nil, fmt.Errorf("decode responses tools for discovery promotion: %w", err)
+	}
+	if err := json.Unmarshal(inputRaw, &rawInput); err != nil {
+		return nil, fmt.Errorf("parse responses input for discovery promotion: %w", err)
+	}
+	promoted, err := promotedResponsesToolSearchDiscoveries(rawTools, rawInput)
+	if err != nil {
+		return nil, err
+	}
+	if len(promoted) > 0 {
+		promotedRaw, err := json.Marshal(promoted)
+		if err != nil {
+			return nil, fmt.Errorf("encode promoted responses tools: %w", err)
+		}
+		var discovered []ResponsesTool
+		if err := json.Unmarshal(promotedRaw, &discovered); err != nil {
+			return nil, fmt.Errorf("decode promoted responses tools: %w", err)
+		}
+		tools = append(tools, discovered...)
+	}
 	return tools, nil
 }
 
@@ -487,6 +517,21 @@ func buildChatMessagesFromItems(messages []ChatMessage, rawItems []json.RawMessa
 				Content:    content,
 			})
 			pendingReasoning = ""
+			continue
+		case "agent_message":
+			// Codex multi_agent_v2 用 agent_message 在父线程与子智能体之间传递任务和回复：
+			// input_text 是信封（消息类型、任务名、发送者），正文放在 encrypted_content 片段里
+			// （自定义 provider 下为明文）。chat 上游没有对应条目，按原顺序拼成一条 user 消息，
+			// 否则子智能体收不到任务却仍返回 200。
+			text := agentMessageText(item["content"])
+			if text == "" {
+				pendingReasoning = ""
+				continue
+			}
+			content, _ := json.Marshal(text)
+			messages = append(messages, ChatMessage{Role: "user", Content: content})
+			pendingReasoning = ""
+			lastTurnReasoning = ""
 			continue
 		case "input_text", "text":
 			content, _ := json.Marshal(rawString(item["text"]))

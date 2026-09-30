@@ -247,6 +247,8 @@ func newOpenAISilentRefusalFailoverError(c *gin.Context, account *Account, upstr
 
 	setOpsUpstreamError(c, http.StatusBadGateway, openAISilentRefusalUpstreamMessage, "")
 	appendOpsUpstreamError(c, OpsUpstreamErrorEvent{
+		ProxyID:            opsUpstreamProxyID(account),
+		ProxyName:          opsUpstreamProxyName(account),
 		Platform:           platform,
 		AccountID:          accountID,
 		AccountName:        accountName,

@@ -333,10 +333,10 @@ func expectedGroupLifecycleBuckets(groupID int64) []SchedulerBucket {
 			SchedulerBucket{GroupID: groupID, Platform: platform, Mode: SchedulerModeForced},
 		)
 		if platform == PlatformAnthropic || platform == PlatformGemini {
-			buckets = append(buckets, SchedulerBucket{GroupID: groupID, Platform: platform, Mode: SchedulerModeMixed})
+			count++
 		}
 	}
-	return buckets
+	return count
 }
 
 func expectedSchedulerCanonicalBucketCount() int {

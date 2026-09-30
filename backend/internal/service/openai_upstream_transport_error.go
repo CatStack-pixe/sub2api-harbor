@@ -99,7 +99,8 @@ func classifyOpenAITransportError(err error) upstreamTransportErrorClass {
 
 // handleOpenAIUpstreamTransportError handles a transport-level upstream failure
 // (Do/DoWithTLS returned a non-HTTP error: proxy/DNS/TCP/TLS). It:
-//  1. records the failure in Ops error logs (status 0, kind=request_error);
+//  1. records the failure in Ops error logs (status 0, kind=request_error),
+//     except when the client disconnected (see isClientCanceledTransportError);
 //  2. for durable faults (expired/rejected proxy creds, dead proxy, DNS/routing)
 //     temporarily unschedules the account (DB + in-memory) and logs a stable
 //     warn event that alert rules can key on;
@@ -112,9 +113,14 @@ func classifyOpenAITransportError(err error) upstreamTransportErrorClass {
 //
 // passthrough tags the Ops error event for the OpenAI passthrough forward path.
 func (s *OpenAIGatewayService) handleOpenAIUpstreamTransportError(ctx context.Context, c *gin.Context, account *Account, err error, passthrough bool) error {
+	if isClientCanceledTransportError(ctx, err) {
+		return err
+	}
 	safeErr := sanitizeUpstreamErrorMessage(err.Error())
 	setOpsUpstreamError(c, 0, safeErr, "")
 	appendOpsUpstreamError(c, OpsUpstreamErrorEvent{
+		ProxyID:            opsUpstreamProxyID(account),
+		ProxyName:          opsUpstreamProxyName(account),
 		Platform:           account.Platform,
 		AccountID:          account.ID,
 		AccountName:        account.Name,
@@ -130,9 +136,10 @@ func (s *OpenAIGatewayService) handleOpenAIUpstreamTransportError(ctx context.Co
 		return err
 	}
 
-	// Transport attempt reached the network path; count as Ollama Cloud activity.
+	// Transport attempt reached the network path; count as Ollama Cloud / OpenCode Go activity.
 	if s != nil {
 		scheduleOllamaCloudUsageActivity(s.deferredService, account)
+		scheduleOpenCodeGoUsageActivity(s.deferredService, account)
 	}
 
 	// 插件已把请求交给上游时，自动切换账号可能造成重复扣费或重复执行。
@@ -179,8 +186,9 @@ func (s *OpenAIGatewayService) tempUnscheduleOpenAITransportError(ctx context.Co
 	until := time.Now().Add(openAITransportErrorTempUnschedDuration)
 	reason := "upstream transport error (proxy/network): " + safeErr
 
-	// Immediate in-memory block (honoured by the scheduler at selection time),
-	// effective even if the DB write below fails or the account cache lags.
+	// Immediate in-memory block so this process skips the account until the
+	// persisted cooldown is visible on the scheduling Account. Selection is
+	// fail-open: empty snapshot/DB cooldown fields drop a stale local block.
 	s.BlockAccountScheduling(account, until, "transport_error")
 
 	if s.accountRepo == nil {

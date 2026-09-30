@@ -1,18 +1,14 @@
 package routes
 
 import (
-	"bytes"
 	"errors"
-	"io"
-	"mime"
-	"mime/multipart"
 	"net/http"
-	"strconv"
 	"strings"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/handler"
 	pkghttputil "github.com/Wei-Shaw/sub2api/internal/pkg/httputil"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/requestmodel"
 	"github.com/Wei-Shaw/sub2api/internal/server/middleware"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 
@@ -60,6 +56,10 @@ func RegisterGatewayRoutes(
 	// 未分组 Key 拦截中间件（按协议格式区分错误响应）
 	requireGroupAnthropic := middleware.RequireGroupAssignment(settingService, middleware.AnthropicErrorWriter)
 	requireGroupGoogle := middleware.RequireGroupAssignment(settingService, middleware.GoogleErrorWriter)
+
+	// 分组级模型白名单准入：在 apiKeyAuth 之后、compositeTarget 之前，
+	// 保证校验发生在合成路由改写与调度之前，且只看客户端书写的模型名。
+	groupModelAllowlist := middleware.GroupModelAllowlist()
 
 	isOpenAIResponsesCompatibleGatewayPlatform := func(c *gin.Context) bool {
 		switch getGroupPlatform(c) {
@@ -216,6 +216,7 @@ func RegisterGatewayRoutes(
 	gateway.Use(endpointNorm)
 	gateway.Use(gin.HandlerFunc(apiKeyAuth))
 	gateway.GET("/sub2api/billing", h.Gateway.KeyBillingInfo)
+	gateway.Use(groupModelAllowlist)
 	gateway.Use(compositeTarget)
 	gateway.Use(requireGroupAnthropic)
 	{
@@ -234,6 +235,8 @@ func RegisterGatewayRoutes(
 		// /models endpoint with a client_version query and expect the ChatGPT
 		// Codex manifest format; other clients keep the OpenAI-style list.
 		gateway.GET("/models", modelsHandler)
+		// Single-model discovery never selects the Codex client_version manifest.
+		gateway.GET("/models/:model", h.Gateway.Models)
 		gateway.GET("/usage", h.Gateway.Usage)
 		gateway.POST("/live", h.OpenAIGateway.Live)
 		gateway.GET("/live/:call_id", h.OpenAIGateway.LiveSideband)
@@ -368,6 +371,7 @@ func RegisterGatewayRoutes(
 	gemini.Use(opsErrorLogger)
 	gemini.Use(endpointNorm)
 	gemini.Use(middleware.APIKeyAuthWithSubscriptionGoogle(apiKeyService, subscriptionService, cfg))
+	gemini.Use(groupModelAllowlist)
 	gemini.Use(compositeGeminiTarget)
 	gemini.Use(requireGroupGoogle)
 	{
@@ -391,10 +395,11 @@ func RegisterGatewayRoutes(
 	r.GET("/responses", bodyLimit, clientRequestID, opsErrorLogger, endpointNorm, gin.HandlerFunc(apiKeyAuth), compositeTarget, requireGroupAnthropic, func(c *gin.Context) {
 		h.OpenAIGateway.ResponsesWebSocket(c)
 	})
-	r.GET("/models", bodyLimit, clientRequestID, opsErrorLogger, endpointNorm, gin.HandlerFunc(apiKeyAuth), requireGroupAnthropic, modelsHandler)
-	r.POST("/messages/count_tokens", bodyLimit, clientRequestID, opsErrorLogger, endpointNorm, gin.HandlerFunc(apiKeyAuth), compositeTarget, requireGroupAnthropic, countTokensHandler)
+	rootRoute(http.MethodGet, "/models", bodyLimit, modelsHandler)
+	rootRoute(http.MethodGet, "/models/:model", bodyLimit, h.Gateway.Models)
+	rootRoute(http.MethodPost, "/messages/count_tokens", bodyLimit, countTokensHandler)
 	codexDirect := r.Group("/backend-api/codex")
-	codexDirect.Use(bodyLimit, clientRequestID, opsErrorLogger, endpointNorm, gin.HandlerFunc(apiKeyAuth), compositeTarget, requireGroupAnthropic)
+	codexDirect.Use(bodyLimit, clientRequestID, opsErrorLogger, endpointNorm, gin.HandlerFunc(apiKeyAuth), groupModelAllowlist, compositeTarget, requireGroupAnthropic)
 	{
 		codexDirect.POST("/realtime/calls", h.OpenAIGateway.Live)
 		codexDirect.GET("/:call_id", h.OpenAIGateway.LiveSideband)
@@ -414,7 +419,7 @@ func RegisterGatewayRoutes(
 		}
 		h.Gateway.ChatCompletions(c)
 	})
-	r.POST("/embeddings", textBodyLimit, clientRequestID, opsErrorLogger, endpointNorm, gin.HandlerFunc(apiKeyAuth), compositeTarget, requireGroupAnthropic, func(c *gin.Context) {
+	rootRoute(http.MethodPost, "/embeddings", textBodyLimit, func(c *gin.Context) {
 		if !isOpenAIOnlyEndpointGatewayPlatform(c) {
 			service.MarkOpsClientBusinessLimited(c, service.OpsClientBusinessLimitedReasonLocalFeatureGate)
 			c.JSON(http.StatusNotFound, gin.H{
@@ -507,6 +512,7 @@ func RegisterGatewayRoutes(
 	antigravityV1.Use(endpointNorm)
 	antigravityV1.Use(middleware.ForcePlatform(service.PlatformAntigravity))
 	antigravityV1.Use(gin.HandlerFunc(apiKeyAuth))
+	antigravityV1.Use(groupModelAllowlist)
 	antigravityV1.Use(requireGroupAnthropic)
 	{
 		antigravityV1.POST("/messages", h.Gateway.Messages)
@@ -522,6 +528,7 @@ func RegisterGatewayRoutes(
 	antigravityV1Beta.Use(endpointNorm)
 	antigravityV1Beta.Use(middleware.ForcePlatform(service.PlatformAntigravity))
 	antigravityV1Beta.Use(middleware.APIKeyAuthWithSubscriptionGoogle(apiKeyService, subscriptionService, cfg))
+	antigravityV1Beta.Use(groupModelAllowlist)
 	antigravityV1Beta.Use(requireGroupGoogle)
 	{
 		antigravityV1Beta.GET("/models", h.Gateway.GeminiV1BetaListModels)
@@ -582,7 +589,10 @@ func compositeTargetPlatformMiddleware(resolver *service.CompositeRouteResolver)
 			return
 		}
 
-		model := compositeRequestModelFromBody(c.GetHeader("Content-Type"), body)
+		// Live 入口按 session.model 分发并改写（与白名单准入、Live handler 的
+		// 解析保持一致），避免顶层 model 别名与 session 模型不一致时改错对象。
+		routePath := c.FullPath()
+		model := requestmodel.FromBodyForRoute(routePath, c.GetHeader("Content-Type"), body)
 		if model != "" {
 			decision, err := resolver.Resolve(c.Request.Context(), apiKey.Group.ID, model, compositeRouteEndpointForPath(c.Request.URL.Path))
 			if err != nil {
@@ -601,7 +611,7 @@ func compositeTargetPlatformMiddleware(resolver *service.CompositeRouteResolver)
 				}
 			}
 		}
-		resetRequestBody(c, body)
+		requestmodel.ResetRequestBody(c.Request, body)
 		c.Next()
 	}
 }
@@ -721,12 +731,6 @@ func compositeGeminiModelFromParams(c *gin.Context) string {
 		return strings.TrimSpace(modelAction[:idx])
 	}
 	return modelAction
-}
-
-func resetRequestBody(c *gin.Context, body []byte) {
-	c.Request.Body = io.NopCloser(bytes.NewReader(body))
-	c.Request.ContentLength = int64(len(body))
-	c.Request.Header.Set("Content-Length", strconv.Itoa(len(body)))
 }
 
 func compositeRouteEndpointForPath(path string) string {

@@ -222,6 +222,7 @@
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
+import { FeatureFlags, resolveFeatureFlag } from '@/utils/featureFlags'
 import { keysAPI, usageAPI, userGroupsAPI } from '@/api'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import Pagination from '@/components/common/Pagination.vue'
@@ -623,6 +624,7 @@ const escapeCSVValue = (value: unknown): string => {
   if (value == null) return ''
   const str = String(value)
   const escaped = str.replace(/"/g, '""')
+  if (str === '-') return str
   if (/^[=+\-@\t\r]/.test(str)) return `"\'${escaped}"`
   if (/[,"\n\r]/.test(str)) return `"${escaped}"`
   return str
@@ -638,9 +640,10 @@ const exportToCSV = async () => {
   try {
     const allLogs: UsageLog[] = []
     const pageSize = 100
+    const exportParams = buildUsageListParams(1, pageSize)
     const totalPages = Math.ceil(pagination.total / pageSize)
     for (let page = 1; page <= totalPages; page++) {
-      const response = await usageAPI.query(buildUsageListParams(page, pageSize))
+      const response = await usageAPI.query({ ...exportParams, page })
       allLogs.push(...response.items)
     }
     if (allLogs.length === 0) {
@@ -693,7 +696,7 @@ const exportToCSV = async () => {
     const url = window.URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
-    link.download = `usage_${startDate.value}_to_${endDate.value}.csv`
+    link.download = `usage_${exportParams.start_date}_to_${exportParams.end_date}.csv`
     link.click()
     window.URL.revokeObjectURL(url)
     appStore.showSuccess(t('usage.exportSuccess'))
@@ -811,13 +814,24 @@ const handleColumnClickOutside = (event: MouseEvent) => {
   }
 }
 
+const loadApiKeys = async () => {
+  const firstPage = await keysAPI.list(1, 100)
+  const keys = [...firstPage.items]
+  for (let page = 2; page <= firstPage.pages && keys.length > 0; page++) {
+    const response = await keysAPI.list(page, 100)
+    if (response.items.length === 0) break
+    keys.push(...response.items)
+  }
+  return keys
+}
+
 const loadFilterOptions = async () => {
   try {
     const [keys, availableGroups] = await Promise.all([
-      keysAPI.list(1, 100),
+      loadApiKeys(),
       userGroupsAPI.getAvailable(),
     ])
-    apiKeys.value = keys.items
+    apiKeys.value = keys
     groups.value = availableGroups
   } catch (error) {
     console.error('Failed to load usage filter options:', error)

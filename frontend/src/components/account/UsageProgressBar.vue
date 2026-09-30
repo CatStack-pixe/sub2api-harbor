@@ -32,6 +32,14 @@
         >
           U ${{ formatUserCost }}
         </span>
+        <span
+          v-if="estimatedTotalCost != null"
+          data-test="estimated-total-cost"
+          class="rounded bg-gray-100 px-1.5 py-0.5 dark:bg-gray-800"
+          :title="t('admin.accounts.usageWindow.estimatedTotalCostTooltip')"
+        >
+          {{ t('admin.accounts.usageWindow.estimatedTotalCost', { cost: estimatedTotalCost.toFixed(2) }) }}
+        </span>
       </div>
     </div>
 
@@ -191,12 +199,10 @@ const shouldShowResetTime = computed(() => {
 
 // Format reset time
 const formatResetTime = computed(() => {
-  // For rolling windows, when utilization is 0%, treat as immediately available.
-  if (props.showNowWhenIdle && props.utilization <= 0) {
-    return t('usage.resetNow')
+  if (!props.resetsAt) {
+    // Idle rolling window without a known reset time: treat as immediately available.
+    return props.showNowWhenIdle && props.utilization <= 0 ? t('usage.resetNow') : '-'
   }
-
-  if (!props.resetsAt) return '-'
 
   const date = new Date(props.resetsAt)
   const diffMs = date.getTime() - now.value.getTime()

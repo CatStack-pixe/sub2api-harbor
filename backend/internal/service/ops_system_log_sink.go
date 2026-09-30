@@ -42,10 +42,11 @@ type OpsSystemLogSink struct {
 	cancel context.CancelFunc
 	wg     sync.WaitGroup
 
-	droppedCount uint64
-	writeFailed  uint64
-	writtenCount uint64
-	totalDelayNs uint64
+	droppedCount      uint64
+	writeFailed       uint64
+	writtenCount      uint64
+	totalDelayNs      uint64
+	persistAccessLogs atomic.Bool
 
 	lastError atomic.Value
 }
@@ -145,6 +146,15 @@ func (s *OpsSystemLogSink) WriteLogEvent(event *logger.LogEvent) {
 	default:
 		atomic.AddUint64(&s.droppedCount, 1)
 	}
+}
+
+// SetPersistAccessLogs controls whether high-volume request access logs are
+// copied into PostgreSQL. Warning/error and audit events are always retained.
+func (s *OpsSystemLogSink) SetPersistAccessLogs(enabled bool) {
+	if s == nil {
+		return
+	}
+	s.persistAccessLogs.Store(enabled)
 }
 
 func (s *OpsSystemLogSink) shouldIndex(event *logger.LogEvent) bool {

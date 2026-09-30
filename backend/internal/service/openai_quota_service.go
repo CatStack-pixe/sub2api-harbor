@@ -75,6 +75,21 @@ type OpenAIRateLimitResetCredits struct {
 	Credits        []OpenAIRateLimitResetCreditDetail `json:"credits,omitempty"`
 }
 
+// OpenAICredits is the spendable Codex credit balance from /wham/usage.
+// It is separate from reset credits. Upstream represents the balance as a
+// nullable decimal string; keep that representation to preserve precision.
+// Source: Codex 41ece455b7fa, codex-backend-openapi-models/src/models/credit_status_details.rs.
+type OpenAICredits struct {
+	HasCredits bool    `json:"has_credits"`
+	Unlimited  bool    `json:"unlimited"`
+	Balance    *string `json:"balance"`
+}
+
+type openAICreditsSnapshot struct {
+	Credits   *OpenAICredits `json:"credits"`
+	FetchedAt int64          `json:"fetched_at"`
+}
+
 // OpenAIQuotaUsage is the typed projection of /wham/usage we expose to the UI.
 // Fields not relevant to the quota card are intentionally omitted to keep the
 // surface narrow; full upstream payload preservation is unnecessary.
@@ -86,6 +101,7 @@ type OpenAIQuotaUsage struct {
 	RateLimit             *OpenAIRateLimit             `json:"rate_limit,omitempty"`
 	AdditionalRateLimits  []OpenAIAdditionalRateLimit  `json:"additional_rate_limits,omitempty"`
 	RateLimitResetCredits *OpenAIRateLimitResetCredits `json:"rate_limit_reset_credits,omitempty"`
+	Credits               *OpenAICredits               `json:"credits,omitempty"`
 	FetchedAt             int64                        `json:"fetched_at"`
 	autoResetCandidates   []openAIAutoResetCreditCandidate
 }
@@ -119,6 +135,7 @@ type OpenAIQuotaService struct {
 	proxyRepo            ProxyRepository
 	tokenProvider        *OpenAITokenProvider
 	privacyClientFactory PrivacyClientFactory
+	referralClient       OpenAIReferralClient
 	agentIdentityTaskMu  sync.Mutex
 	agentIdentityWS      agentIdentityWSConnectionInvalidator
 }
@@ -131,12 +148,14 @@ func NewOpenAIQuotaService(
 	proxyRepo ProxyRepository,
 	tokenProvider *OpenAITokenProvider,
 	privacyClientFactory PrivacyClientFactory,
+	referralClient OpenAIReferralClient,
 ) *OpenAIQuotaService {
 	return &OpenAIQuotaService{
 		accountRepo:          accountRepo,
 		proxyRepo:            proxyRepo,
 		tokenProvider:        tokenProvider,
 		privacyClientFactory: privacyClientFactory,
+		referralClient:       referralClient,
 	}
 }
 

@@ -11,6 +11,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -1338,7 +1339,7 @@ func isRetryableCodexModelsManifestTransportError(err error) bool {
 	return false
 }
 
-type codexModelsManifestRequest struct {
+type openAIModelsRequest struct {
 	url                 string
 	headers             http.Header
 	proxyURL            string
@@ -1347,49 +1348,55 @@ type codexModelsManifestRequest struct {
 	credentialAccount   *Account
 	accountConcurrency  int
 	useAPIKeyUpstream   bool
+	// Cached bodies have already been converted to their requested format.
+	standardModelsList bool
 }
 
-type codexModelsManifestCacheEntry struct {
-	manifest   *CodexModelsManifest
+type openAIModelsCacheEntry struct {
+	manifest   *OpenAIModelsResponse
 	order      uint64
 	expiresAt  time.Time
 	staleUntil time.Time
 }
 
-type codexModelsManifestCacheState uint8
+type openAIModelsCacheState uint8
 
 const (
-	codexModelsManifestCacheMiss codexModelsManifestCacheState = iota
-	codexModelsManifestCacheFresh
-	codexModelsManifestCacheStale
+	openAIModelsCacheMiss openAIModelsCacheState = iota
+	openAIModelsCacheFresh
+	openAIModelsCacheStale
 )
 
-type codexModelsManifestCache struct {
+type openAIModelsCache struct {
 	mu        sync.Mutex
-	entries   map[string]codexModelsManifestCacheEntry
+	entries   map[string]openAIModelsCacheEntry
 	nextOrder uint64
 	refresh   singleflight.Group
 }
 
-func (c *codexModelsManifestCache) get(key string, now time.Time) (*CodexModelsManifest, codexModelsManifestCacheState) {
+func (c *openAIModelsCache) get(key string, now time.Time) (*OpenAIModelsResponse, openAIModelsCacheState) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	entry, ok := c.entries[key]
 	if !ok {
-		return nil, codexModelsManifestCacheMiss
+		return nil, openAIModelsCacheMiss
 	}
 	if !now.Before(entry.staleUntil) {
 		delete(c.entries, key)
-		return nil, codexModelsManifestCacheMiss
+		return nil, openAIModelsCacheMiss
 	}
 	if now.Before(entry.expiresAt) {
-		return entry.manifest, codexModelsManifestCacheFresh
+		return entry.manifest, openAIModelsCacheFresh
 	}
-	return entry.manifest, codexModelsManifestCacheStale
+	return entry.manifest, openAIModelsCacheStale
 }
 
-func (c *codexModelsManifestCache) set(key string, manifest *CodexModelsManifest, now time.Time) {
-	if manifest == nil || len(manifest.Body) > codexModelsManifestCacheBodyLimit {
+func (c *openAIModelsCache) set(key string, manifest *OpenAIModelsResponse, now time.Time) {
+	if manifest == nil || len(manifest.Body) > openAIModelsCacheBodyLimit {
+		return
+	}
+	remainingBodyBudget := openAIModelsCacheBodyLimit - len(manifest.Body)
+	if len(manifest.upstreamSourceBody) > remainingBodyBudget {
 		return
 	}
 	remainingBodyBudget := codexModelsManifestCacheBodyLimit - len(manifest.Body)
@@ -1399,9 +1406,9 @@ func (c *codexModelsManifestCache) set(key string, manifest *CodexModelsManifest
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.entries == nil {
-		c.entries = make(map[string]codexModelsManifestCacheEntry)
+		c.entries = make(map[string]openAIModelsCacheEntry)
 	}
-	if _, exists := c.entries[key]; !exists && len(c.entries) >= codexModelsManifestCacheMaxEntries {
+	if _, exists := c.entries[key]; !exists && len(c.entries) >= openAIModelsCacheMaxEntries {
 		oldestKey := ""
 		var oldestOrder uint64
 		for candidateKey, entry := range c.entries {
@@ -1414,16 +1421,16 @@ func (c *codexModelsManifestCache) set(key string, manifest *CodexModelsManifest
 				oldestOrder = entry.order
 			}
 		}
-		if len(c.entries) >= codexModelsManifestCacheMaxEntries && oldestKey != "" {
+		if len(c.entries) >= openAIModelsCacheMaxEntries && oldestKey != "" {
 			delete(c.entries, oldestKey)
 		}
 	}
 	c.nextOrder++
-	c.entries[key] = codexModelsManifestCacheEntry{
+	c.entries[key] = openAIModelsCacheEntry{
 		manifest:   manifest,
 		order:      c.nextOrder,
-		expiresAt:  now.Add(codexModelsManifestCacheTTL),
-		staleUntil: now.Add(codexModelsManifestCacheStaleTTL),
+		expiresAt:  now.Add(openAIModelsCacheTTL),
+		staleUntil: now.Add(openAIModelsCacheStaleTTL),
 	}
 }
 
@@ -1433,7 +1440,7 @@ func (c *codexModelsManifestCache) set(key string, manifest *CodexModelsManifest
 // After validating the stable top-level envelope, OAuth response bodies are
 // passed through verbatim. Custom API key manifests receive only the narrowly
 // scoped compatibility adjustments required by custom-provider Codex clients.
-func (s *OpenAIGatewayService) FetchCodexModelsManifest(ctx context.Context, account *Account, clientVersion, ifNoneMatch string) (*CodexModelsManifest, error) {
+func (s *OpenAIGatewayService) FetchCodexModelsManifest(ctx context.Context, account *Account, clientVersion, ifNoneMatch string) (*OpenAIModelsResponse, error) {
 	if account == nil {
 		return nil, infraerrors.New(http.StatusInternalServerError, "OPENAI_CODEX_MODELS_ACCOUNT_REQUIRED", "account is required")
 	}
@@ -1521,7 +1528,7 @@ func (s *OpenAIGatewayService) FetchCodexModelsManifest(ctx context.Context, acc
 		proxyURL = account.Proxy.URL()
 	}
 
-	request := codexModelsManifestRequest{
+	request := openAIModelsRequest{
 		url:                 requestURL.String(),
 		headers:             headers,
 		proxyURL:            proxyURL,
@@ -1532,30 +1539,35 @@ func (s *OpenAIGatewayService) FetchCodexModelsManifest(ctx context.Context, acc
 		useAPIKeyUpstream:   useAPIKeyUpstream,
 	}
 	if useAPIKeyUpstream {
-		return s.fetchCachedAPIKeyCodexModelsManifest(ctx, request, ifNoneMatch)
+		return s.fetchCachedOpenAIModels(ctx, request, s.fetchCodexModelsManifestUpstreamForRequest(request), ifNoneMatch)
 	}
-	manifest, fetchErr := s.fetchCodexModelsManifestUpstream(ctx, request, ifNoneMatch)
-	if !credAccount.IsOpenAIAgentIdentity() || !isAgentIdentityTaskInvalidCodexModelsError(fetchErr) {
-		s.handleCodexModelsManifestAccountAuthError(ctx, account, credAccount, fetchErr)
-		return manifest, fetchErr
-	}
-	expectedTaskID := strings.TrimSpace(credAccount.GetCredential("task_id"))
-	if recoverErr := s.recoverAgentIdentityTask(ctx, credAccount, expectedTaskID); recoverErr != nil {
-		return nil, infraerrors.Newf(http.StatusBadGateway, "OPENAI_CODEX_MODELS_AUTH_FAILED", "agent identity task recovery failed: %v", recoverErr)
-	}
-	authHeaders, authErr := s.buildOpenAIAuthenticationHeaders(ctx, credAccount, "")
-	if authErr != nil {
-		return nil, infraerrors.Newf(http.StatusBadGateway, "OPENAI_CODEX_MODELS_AUTH_FAILED", "build Codex models authentication after task recovery: %v", authErr)
-	}
-	request.headers.Del("Authorization")
-	request.headers.Del("ChatGPT-Account-ID")
-	for key, values := range authHeaders {
-		for _, value := range values {
-			request.headers.Add(key, value)
+	// OAuth 账号同样经过账号级缓存；闭包保留 agent identity 任务恢复逻辑，
+	// 错误时仍交给 handleCodexModelsManifestAccountAuthError 处理账号状态。
+	oauthFetch := func(fetchCtx context.Context, ifNoneMatch string) (*OpenAIModelsResponse, error) {
+		manifest, fetchErr := s.fetchCodexModelsManifestUpstream(fetchCtx, request, ifNoneMatch)
+		if !credAccount.IsOpenAIAgentIdentity() || !isAgentIdentityTaskInvalidCodexModelsError(fetchErr) {
+			s.handleCodexModelsManifestAccountAuthError(fetchCtx, account, credAccount, fetchErr)
+			return manifest, fetchErr
 		}
+		expectedTaskID := strings.TrimSpace(credAccount.GetCredential("task_id"))
+		if recoverErr := s.recoverAgentIdentityTask(fetchCtx, credAccount, expectedTaskID); recoverErr != nil {
+			return nil, infraerrors.Newf(http.StatusBadGateway, "OPENAI_CODEX_MODELS_AUTH_FAILED", "agent identity task recovery failed: %v", recoverErr)
+		}
+		authHeaders, authErr := s.buildOpenAIAuthenticationHeaders(fetchCtx, credAccount, "")
+		if authErr != nil {
+			return nil, infraerrors.Newf(http.StatusBadGateway, "OPENAI_CODEX_MODELS_AUTH_FAILED", "build Codex models authentication after task recovery: %v", authErr)
+		}
+		request.headers.Del("Authorization")
+		request.headers.Del("ChatGPT-Account-ID")
+		for key, values := range authHeaders {
+			for _, value := range values {
+				request.headers.Add(key, value)
+			}
+		}
+		setOpenAIChatGPTAccountHeaders(request.headers, credAccount)
+		return s.fetchCodexModelsManifestUpstream(fetchCtx, request, ifNoneMatch)
 	}
-	setOpenAIChatGPTAccountHeaders(request.headers, credAccount)
-	return s.fetchCodexModelsManifestUpstream(ctx, request, ifNoneMatch)
+	return s.fetchCachedOpenAIModels(ctx, request, oauthFetch, ifNoneMatch)
 }
 
 func isAgentIdentityTaskInvalidCodexModelsError(err error) bool {
@@ -1595,18 +1607,18 @@ func (s *OpenAIGatewayService) handleCodexModelsManifestAccountAuthError(ctx con
 	s.handleOpenAIAccountUpstreamError(ctx, account, upstreamErr.statusCode, headers, upstreamErr.body)
 }
 
-func (s *OpenAIGatewayService) fetchCachedAPIKeyCodexModelsManifest(ctx context.Context, request codexModelsManifestRequest, ifNoneMatch string) (*CodexModelsManifest, error) {
+func (s *OpenAIGatewayService) fetchCachedOpenAIModels(ctx context.Context, request openAIModelsRequest, fetch func(ctx context.Context, ifNoneMatch string) (*OpenAIModelsResponse, error), ifNoneMatch string) (*OpenAIModelsResponse, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	cacheKey := buildCodexModelsManifestCacheKey(request)
-	manifest, state := s.codexModelsManifestCache.get(cacheKey, time.Now())
-	if state == codexModelsManifestCacheFresh {
-		return codexModelsManifestForClient(manifest, ifNoneMatch), nil
+	cacheKey := buildOpenAIModelsCacheKey(request)
+	manifest, state := s.openAIModelsCache.get(cacheKey, time.Now())
+	if state == openAIModelsCacheFresh {
+		return openAIModelsResponseForClient(manifest, ifNoneMatch), nil
 	}
-	resultCh := s.refreshCachedAPIKeyCodexModelsManifest(cacheKey, request)
-	if state == codexModelsManifestCacheStale {
-		return codexModelsManifestForClient(manifest, ifNoneMatch), nil
+	resultCh := s.refreshCachedOpenAIModels(cacheKey, request, fetch)
+	if state == openAIModelsCacheStale {
+		return openAIModelsResponseForClient(manifest, ifNoneMatch), nil
 	}
 	select {
 	case <-ctx.Done():
@@ -1615,37 +1627,45 @@ func (s *OpenAIGatewayService) fetchCachedAPIKeyCodexModelsManifest(ctx context.
 		if result.Err != nil {
 			return nil, result.Err
 		}
-		manifest, ok := result.Val.(*CodexModelsManifest)
+		manifest, ok := result.Val.(*OpenAIModelsResponse)
 		if !ok || manifest == nil {
 			return nil, infraerrors.New(http.StatusInternalServerError, "OPENAI_CODEX_MODELS_REQUEST_FAILED", "invalid shared Codex models manifest result")
 		}
-		return codexModelsManifestForClient(manifest, ifNoneMatch), nil
+		return openAIModelsResponseForClient(manifest, ifNoneMatch), nil
 	}
 }
 
-func (s *OpenAIGatewayService) refreshCachedAPIKeyCodexModelsManifest(cacheKey string, request codexModelsManifestRequest) <-chan singleflight.Result {
-	return s.codexModelsManifestCache.refresh.DoChan(cacheKey, func() (any, error) {
-		cached, _ := s.codexModelsManifestCache.get(cacheKey, time.Now())
+func (s *OpenAIGatewayService) refreshCachedOpenAIModels(cacheKey string, request openAIModelsRequest, fetch func(ctx context.Context, ifNoneMatch string) (*OpenAIModelsResponse, error)) <-chan singleflight.Result {
+	return s.openAIModelsCache.refresh.DoChan(cacheKey, func() (any, error) {
+		ctx, cancel := context.WithTimeout(context.Background(), codexModelsManifestRequestTimeout)
+		defer cancel()
+		cached, _ := s.openAIModelsCache.get(cacheKey, time.Now())
 		ifNoneMatch := ""
 		if cached != nil {
 			ifNoneMatch = cached.upstreamETag
 		}
-		manifest, err := s.fetchCodexModelsManifestUpstream(context.Background(), request, ifNoneMatch)
+		manifest, err := fetch(ctx, ifNoneMatch)
 		if err != nil {
 			return nil, err
 		}
 		if manifest.NotModified && cached != nil {
-			s.codexModelsManifestCache.set(cacheKey, cached, time.Now())
+			s.openAIModelsCache.set(cacheKey, cached, time.Now())
 			return cached, nil
 		}
 		if !manifest.NotModified {
-			s.codexModelsManifestCache.set(cacheKey, manifest, time.Now())
+			s.openAIModelsCache.set(cacheKey, manifest, time.Now())
 		}
 		return manifest, nil
 	})
 }
 
-func (s *OpenAIGatewayService) fetchCodexModelsManifestUpstream(ctx context.Context, request codexModelsManifestRequest, ifNoneMatch string) (*CodexModelsManifest, error) {
+func (s *OpenAIGatewayService) fetchCodexModelsManifestUpstreamForRequest(request openAIModelsRequest) func(ctx context.Context, ifNoneMatch string) (*OpenAIModelsResponse, error) {
+	return func(ctx context.Context, ifNoneMatch string) (*OpenAIModelsResponse, error) {
+		return s.fetchCodexModelsManifestUpstream(ctx, request, ifNoneMatch)
+	}
+}
+
+func (s *OpenAIGatewayService) fetchOpenAIModelsUpstream(ctx context.Context, request openAIModelsRequest, ifNoneMatch string) (*OpenAIModelsResponse, error) {
 	reqCtx, cancel := context.WithTimeout(ctx, codexModelsManifestRequestTimeout)
 	defer cancel()
 	req, err := http.NewRequestWithContext(reqCtx, http.MethodGet, request.url, nil)
@@ -1690,7 +1710,7 @@ func (s *OpenAIGatewayService) fetchCodexModelsManifestUpstream(ctx context.Cont
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode == http.StatusNotModified {
-		return &CodexModelsManifest{ETag: resp.Header.Get("ETag"), NotModified: true}, nil
+		return &OpenAIModelsResponse{ETag: resp.Header.Get("ETag"), NotModified: true}, nil
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 2048))
@@ -1798,6 +1818,8 @@ func CodexModelsManifestETag(body []byte) string {
 }
 
 var apiKeyCodexModelsWithoutResponsesLite = map[string]struct{}{
+	"gpt-6.1-sol":   {},
+	"gpt-6-astra":   {},
 	"gpt-5.6-sol":   {},
 	"gpt-5.6-terra": {},
 	"gpt-5.6-luna":  {},
@@ -1807,7 +1829,7 @@ var apiKeyCodexModelsWithoutResponsesLite = map[string]struct{}{
 // Lite for custom API key providers. Those clients do not install web.run in
 // Lite mode, so the affected model manifests must advertise the full Responses
 // path. Return the original body when no targeted true value is present.
-func adjustAPIKeyCodexModelsManifest(body []byte) ([]byte, error) {
+func adjustAPIKeyCodexModelsManifest(body []byte, account *Account) ([]byte, error) {
 	var envelope map[string]json.RawMessage
 	if err := json.Unmarshal(body, &envelope); err != nil {
 		return nil, fmt.Errorf("decode JSON object: %w", err)
@@ -1827,7 +1849,14 @@ func adjustAPIKeyCodexModelsManifest(body []byte) ([]byte, error) {
 		if err := json.Unmarshal(model["slug"], &slug); err != nil {
 			continue
 		}
-		if _, targeted := apiKeyCodexModelsWithoutResponsesLite[slug]; !targeted {
+		target := slug
+		if account != nil {
+			target = account.GetMappedModel(slug)
+		}
+		if isOpenAIGPT6AstraModel(target) {
+			target = "gpt-6-astra"
+		}
+		if _, targeted := apiKeyCodexModelsWithoutResponsesLite[target]; !targeted {
 			continue
 		}
 		var useResponsesLite bool
@@ -1880,15 +1909,17 @@ func convertOpenAIModelListToCodexManifestForAccount(body []byte, account *Accou
 	if !ok {
 		return body
 	}
-	var entries []struct {
-		ID string `json:"id"`
-	}
+	var entries []map[string]json.RawMessage
 	if err := json.Unmarshal(data, &entries); err != nil {
 		return body
 	}
 	modelIDs := make([]string, 0, len(entries))
 	for _, entry := range entries {
-		id := strings.TrimSpace(entry.ID)
+		var id string
+		if err := json.Unmarshal(entry["id"], &id); err != nil {
+			continue
+		}
+		id = strings.TrimSpace(id)
 		if id == "" {
 			continue
 		}
@@ -2209,12 +2240,8 @@ func validateCodexModelsManifestEnvelope(body []byte) error {
 		return errors.New("missing top-level models array")
 	}
 	models = bytes.TrimSpace(models)
-	var entries []json.RawMessage
 	if len(models) == 0 || models[0] != '[' {
 		return errors.New("top-level models field is not an array")
-	}
-	if err := json.Unmarshal(models, &entries); err != nil {
-		return fmt.Errorf("decode top-level models array: %w", err)
 	}
 	return nil
 }
@@ -2272,7 +2299,7 @@ func FilterCodexModelsManifest(body []byte, apiKey *APIKey) ([]byte, error) {
 
 func buildCodexModelsManifestCacheKey(request codexModelsManifestRequest) string {
 	hasher := sha256.New()
-	_, _ = fmt.Fprintf(hasher, "%d\n%d\n%s\n%s\n", request.accountID, request.credentialAccountID, request.proxyURL, request.url)
+	_, _ = fmt.Fprintf(hasher, "%d\n%d\n%t\n%s\n%s\n", request.accountID, request.credentialAccountID, request.standardModelsList, request.proxyURL, request.url)
 	headerNames := make([]string, 0, len(request.headers))
 	for name := range request.headers {
 		headerNames = append(headerNames, name)
@@ -2306,7 +2333,7 @@ func codexModelsManifestForClient(manifest *CodexModelsManifest, ifNoneMatch str
 		return nil
 	}
 	if codexModelsManifestETagMatches(ifNoneMatch, manifest.ETag) {
-		return &CodexModelsManifest{ETag: manifest.ETag, NotModified: true}
+		return &OpenAIModelsResponse{ETag: manifest.ETag, NotModified: true}
 	}
 	return cloneCodexModelsManifest(manifest)
 }
@@ -2369,4 +2396,43 @@ func buildCodexModelsManifestURL(endpoint string, appendModelsPath bool, clientV
 	query.Set("client_version", clientVersion)
 	requestURL.RawQuery = query.Encode()
 	return requestURL, nil
+}
+
+// MarshalJSON keeps fields added by the official client, including nested tool
+// instructions, while the generated descriptor still controls routing metadata.
+func (d configuredCodexModelDescriptor) MarshalJSON() ([]byte, error) {
+	type descriptor configuredCodexModelDescriptor
+	encoded, err := json.Marshal(descriptor(d))
+	if err != nil || len(d.officialMetadata) == 0 {
+		return encoded, err
+	}
+	var fields, official map[string]json.RawMessage
+	if err := json.Unmarshal(encoded, &fields); err != nil {
+		return nil, err
+	}
+	if err := json.Unmarshal(d.officialMetadata, &official); err != nil {
+		return nil, err
+	}
+	for key, value := range official {
+		if _, exists := fields[key]; !exists {
+			fields[key] = value
+		}
+	}
+	var messages, officialMessages map[string]json.RawMessage
+	if err := json.Unmarshal(fields["model_messages"], &messages); err != nil {
+		return nil, err
+	}
+	if err := json.Unmarshal(official["model_messages"], &officialMessages); err != nil {
+		return nil, err
+	}
+	for key, value := range officialMessages {
+		if _, exists := messages[key]; !exists {
+			messages[key] = value
+		}
+	}
+	fields["model_messages"], err = json.Marshal(messages)
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(fields)
 }

@@ -334,7 +334,7 @@
 
             <!-- Whitelist Mode -->
             <div v-if="modelRestrictionMode === 'whitelist'">
-              <ModelWhitelistSelector v-model="allowedModels" :platform="account?.platform || 'anthropic'" :account-id="account?.id" />
+              <ModelWhitelistSelector v-model="allowedModels" :model-mappings="modelMappings" :platform="account?.platform || 'anthropic'" :account-id="account?.id" />
               <p class="text-xs text-gray-500 dark:text-gray-400">
                 {{ t('admin.accounts.selectedModels', { count: allowedModels.length }) }}
                 <span v-if="allowedModels.length === 0 && modelMappings.length === 0">{{
@@ -634,6 +634,57 @@
         </div>
       </div>
 
+      <!-- Grok OAuth media generation eligibility override -->
+      <div
+        v-if="isGrokOAuthAccount"
+        class="border-t border-gray-200 pt-4 dark:border-dark-600"
+        data-testid="grok-media-eligibility-card"
+      >
+        <div class="space-y-3">
+          <div>
+            <label class="input-label mb-0">{{ t('admin.accounts.grokMediaEligibility.title') }}</label>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              {{ t('admin.accounts.grokMediaEligibility.hint') }}
+            </p>
+          </div>
+          <select
+            v-model="grokMediaEligibilityMode"
+            class="input"
+            data-testid="grok-media-eligibility-mode"
+            :disabled="grokMediaEligibilityLoading"
+          >
+            <option value="auto">{{ t('admin.accounts.grokMediaEligibility.auto') }}</option>
+            <option value="enabled">{{ t('admin.accounts.grokMediaEligibility.enabled') }}</option>
+            <option value="disabled">{{ t('admin.accounts.grokMediaEligibility.disabled') }}</option>
+          </select>
+          <p v-if="grokMediaEligibilityLoading" class="text-xs text-gray-500 dark:text-gray-400">
+            {{ t('admin.accounts.grokMediaEligibility.loading') }}
+          </p>
+          <p v-else-if="grokMediaEligibilityError" class="text-xs text-red-600 dark:text-red-400">
+            {{ grokMediaEligibilityError }}
+          </p>
+          <div v-else-if="grokMediaEligibilityState" class="rounded-lg bg-gray-50 p-3 text-xs dark:bg-dark-700">
+            <span class="font-medium">{{ t('admin.accounts.grokMediaEligibility.current') }}</span>
+            <span class="ml-1" data-testid="grok-media-eligibility-status">
+              {{ grokMediaEligibilityState.eligible ? t('admin.accounts.grokMediaEligibility.eligible') : t('admin.accounts.grokMediaEligibility.ineligible') }}
+              · {{ t(`admin.accounts.grokMediaEligibility.reasons.${grokMediaEligibilityState.reason}`) }}
+            </span>
+          </div>
+          <div
+            v-if="grokMediaEligibilityMode === 'enabled'"
+            class="rounded-lg bg-amber-50 p-3 dark:bg-amber-900/20"
+          >
+            <p class="text-xs text-amber-700 dark:text-amber-400">
+              <Icon name="exclamationTriangle" size="sm" class="mr-1 inline" :stroke-width="2" />
+              {{ t('admin.accounts.grokMediaEligibility.forceEnableWarning') }}
+            </p>
+          </div>
+          <p v-else-if="grokMediaEligibilityMode === 'auto'" class="text-xs text-gray-500 dark:text-gray-400">
+            {{ t('admin.accounts.grokMediaEligibility.autoHint') }}
+          </p>
+        </div>
+      </div>
+
       <!-- Grok OAuth Custom Upstream URL (仅改写转发端点，OAuth 授权/刷新不受影响) -->
       <div
         v-if="account.platform === 'grok' && account.type === 'oauth'"
@@ -763,7 +814,7 @@
 
           <!-- Whitelist Mode -->
           <div v-if="modelRestrictionMode === 'whitelist'">
-            <ModelWhitelistSelector v-model="allowedModels" :platform="account?.platform || 'anthropic'" :account-id="account?.id" />
+            <ModelWhitelistSelector v-model="allowedModels" :model-mappings="modelMappings" :platform="account?.platform || 'anthropic'" :account-id="account?.id" />
             <p class="text-xs text-gray-500 dark:text-gray-400">
               {{ t('admin.accounts.selectedModels', { count: allowedModels.length }) }}
               <span v-if="allowedModels.length === 0 && modelMappings.length === 0">{{
@@ -975,7 +1026,7 @@
 
           <!-- Whitelist Mode -->
           <div v-if="modelRestrictionMode === 'whitelist'">
-            <ModelWhitelistSelector v-model="allowedModels" :platform="account?.platform || 'anthropic'" :account-id="account?.id" />
+            <ModelWhitelistSelector v-model="allowedModels" :model-mappings="modelMappings" :platform="account?.platform || 'anthropic'" :account-id="account?.id" />
             <p class="text-xs text-gray-500 dark:text-gray-400">
               {{ t('admin.accounts.selectedModels', { count: allowedModels.length }) }}
               <span v-if="allowedModels.length === 0 && modelMappings.length === 0">{{
@@ -1197,7 +1248,7 @@
 
           <!-- Whitelist Mode -->
           <div v-if="modelRestrictionMode === 'whitelist'">
-            <ModelWhitelistSelector v-model="allowedModels" platform="anthropic" />
+            <ModelWhitelistSelector v-model="allowedModels" :model-mappings="modelMappings" platform="anthropic" />
             <p class="text-xs text-gray-500 dark:text-gray-400">
               {{ t('admin.accounts.selectedModels', { count: allowedModels.length }) }}
               <span v-if="allowedModels.length === 0 && modelMappings.length === 0">{{ t('admin.accounts.supportsAllModels') }}</span>
@@ -1635,6 +1686,12 @@
         <ProxySelector v-model="form.proxy_id" :proxies="proxies" />
       </div>
 
+      <UpstreamRequestIdHeaderField
+        v-model="upstreamRequestIdHeader"
+        :platform="account.platform"
+        :type="account.type"
+      />
+
       <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <div>
           <label class="input-label">{{ t('admin.accounts.concurrency') }}</label>
@@ -1841,8 +1898,8 @@
             <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
               {{ t('admin.accounts.openai.wsModeDesc') }}
             </p>
-            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              {{ t(openAIWSModeConcurrencyHintKey) }}
+            <p v-if="openAIWSModeHintKey" class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              {{ t(openAIWSModeHintKey) }}
             </p>
           </div>
           <div class="w-52">
@@ -1907,8 +1964,39 @@
         </div>
       </div>
 
+      <!-- OpenAI APIKey images: backfill b64_json from url -->
       <div
         v-if="supportsGenericUpstreamBillingProbe"
+        class="flex items-center justify-between gap-4 border-t border-gray-200 pt-4 dark:border-dark-600"
+      >
+        <div>
+          <label class="input-label mb-0">{{ t('admin.accounts.openai.imagesUrlToB64Json') }}</label>
+          <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            {{ t('admin.accounts.openai.imagesUrlToB64JsonDesc') }}
+          </p>
+        </div>
+        <button
+          type="button"
+          data-testid="openai-images-url-to-b64-json-toggle"
+          role="switch"
+          :aria-checked="openAIImagesUrlToB64JsonEnabled"
+          @click="openAIImagesUrlToB64JsonEnabled = !openAIImagesUrlToB64JsonEnabled"
+          :class="[
+            'relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2',
+            openAIImagesUrlToB64JsonEnabled ? 'bg-primary-600' : 'bg-gray-200 dark:bg-dark-600'
+          ]"
+        >
+          <span
+            :class="[
+              'pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out',
+              openAIImagesUrlToB64JsonEnabled ? 'translate-x-5' : 'translate-x-0'
+            ]"
+          />
+        </button>
+      </div>
+
+      <div
+        v-if="account?.type === 'apikey'"
         class="flex items-center justify-between gap-4 border-t border-gray-200 pt-4 dark:border-dark-600"
       >
         <div>
@@ -1930,6 +2018,91 @@
         :account="account"
         @updated="handleOllamaCloudUsageUpdated"
       />
+
+      <section
+        v-if="account?.opencode_go_usage?.eligible"
+        class="space-y-4 border-t border-gray-200 pt-4 dark:border-dark-600"
+        data-testid="opencode-go-usage-settings"
+      >
+        <div class="flex items-start justify-between gap-4">
+          <div>
+            <h3 class="text-sm font-semibold text-gray-900 dark:text-white">
+              {{ t('admin.accounts.opencodeGo.title') }}
+            </h3>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              {{ t('admin.accounts.opencodeGo.panelHint') }}
+            </p>
+          </div>
+          <span
+            class="whitespace-nowrap rounded px-2 py-1 text-xs font-medium"
+            :class="opencodeGoStatusOk
+              ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
+              : 'bg-gray-100 text-gray-600 dark:bg-dark-700 dark:text-gray-300'"
+          >
+            {{ opencodeGoStatusLabel }}
+          </span>
+        </div>
+
+        <div v-if="opencodeGoLoading" class="flex h-20 items-center justify-center text-gray-400">
+          <Icon name="refresh" size="sm" class="animate-spin" />
+        </div>
+        <template v-else>
+          <div
+            v-if="opencodeGoSnapshot"
+            class="border-y border-gray-100 py-3 dark:border-dark-700"
+            data-testid="opencode-go-usage-details"
+          >
+            <div class="grid grid-cols-[minmax(4rem,auto)_minmax(0,1fr)] gap-x-3 gap-y-1.5 text-xs">
+              <span class="text-gray-500 dark:text-gray-400">{{ t('admin.accounts.opencodeGo.rolling') }}</span>
+              <span class="break-words text-gray-900 dark:text-white">{{ opencodeGoWindowSummary(opencodeGoSnapshot.data?.rolling) }}</span>
+              <span class="text-gray-500 dark:text-gray-400">{{ t('admin.accounts.opencodeGo.weekly') }}</span>
+              <span class="break-words text-gray-900 dark:text-white">{{ opencodeGoWindowSummary(opencodeGoSnapshot.data?.weekly) }}</span>
+              <span class="text-gray-500 dark:text-gray-400">{{ t('admin.accounts.opencodeGo.monthly') }}</span>
+              <span class="break-words text-gray-900 dark:text-white">{{ opencodeGoWindowSummary(opencodeGoSnapshot.data?.monthly) }}</span>
+              <span class="text-gray-500 dark:text-gray-400">{{ t('admin.accounts.opencodeGo.status') }}</span>
+              <span class="break-words font-medium text-gray-900 dark:text-white">{{ opencodeGoStatusLabel }}</span>
+              <span class="text-gray-500 dark:text-gray-400">{{ t('admin.accounts.opencodeGo.updatedAt') }}</span>
+              <span class="break-words text-gray-900 dark:text-white">{{ opencodeGoFormatDate(opencodeGoSnapshot.fetched_at || opencodeGoSnapshot.last_attempt_at) }}</span>
+            </div>
+            <p
+              v-if="opencodeGoSnapshot.last_error"
+              class="mt-2 break-words border-t border-gray-100 pt-2 text-xs text-amber-700 dark:border-dark-700 dark:text-amber-300"
+            >
+              {{ t(`admin.accounts.opencodeGo.errors.${opencodeGoSnapshot.last_error}`, opencodeGoSnapshot.last_error) }}
+            </p>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              class="btn btn-secondary btn-sm"
+              :disabled="opencodeGoRefreshing"
+              data-testid="opencode-go-refresh"
+              @click="refreshOpenCodeGoUsage"
+            >
+              <Icon name="refresh" size="xs" class="mr-1.5" :class="{ 'animate-spin': opencodeGoRefreshing }" />
+              {{ t('admin.accounts.opencodeGo.refreshNow') }}
+            </button>
+          </div>
+
+          <div class="flex items-center justify-between gap-4 border-t border-gray-100 pt-4 dark:border-dark-700">
+            <div>
+              <label class="text-sm font-medium text-gray-900 dark:text-white">
+                {{ t('admin.accounts.opencodeGo.autoRefresh') }}
+              </label>
+              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                {{ t('admin.accounts.opencodeGo.autoRefreshHint') }}
+              </p>
+            </div>
+            <Toggle
+              :model-value="opencodeGoState?.auto_refresh_enabled ?? false"
+              :disabled="opencodeGoSaving"
+              data-testid="opencode-go-auto-refresh"
+              @update:model-value="setOpenCodeGoAutoRefresh"
+            />
+          </div>
+        </template>
+      </section>
 
       <!-- Anthropic API Key 自动透传开关 -->
       <div
@@ -2897,9 +3070,8 @@
 
       <!-- Group Selection - 仅标准模式显示 -->
       <GroupSelector
-        v-if="!authStore.isSimpleMode"
         v-model="form.group_ids"
-        :groups="groups"
+        :groups="selectableGroups"
         :platform="account?.platform"
         :mixed-scheduling="mixedScheduling"
         data-tour="account-form-groups"
@@ -2962,18 +3134,23 @@
 import { ref, reactive, computed, watch, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
-import { useAuthStore } from '@/stores/auth'
+
 import { adminAPI } from '@/api/admin'
 import { useQuotaNotifyState } from '@/composables/useQuotaNotifyState'
 import type {
   Account,
   Proxy,
   AdminGroup,
+  Group,
   CheckMixedChannelResponse,
   OpenAICompactMode,
   OpenAIResponsesMode,
   OpenAIEndpointCapability,
-  OllamaCloudUsageState
+  OllamaCloudUsageState,
+  GrokMediaEligibilityMode,
+  GrokMediaEligibilityState,
+  OpenCodeGoUsageState,
+  OpenCodeGoUsageWindow
 } from '@/types'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
@@ -2995,9 +3172,14 @@ import {
   applyAntigravityProjectID,
   applyHeaderOverride,
   applyInterceptWarmup,
+  applyOpenCodeGoProtocolRules,
   applyPlanType,
   buildPlanTypeOptions,
+  cloneOpenCodeGoProtocolRules,
+  defaultOpenCodeProtocolRules,
+  parseOpenCodeGoProtocolRules,
   readPlanType,
+  resolveOpenCodeAccountMode,
   isCustomGrokBaseUrl,
   isHeaderOverrideCapable,
   splitHeaderOverridesObject,
@@ -3026,7 +3208,7 @@ import {
   OPENAI_WS_MODE_PASSTHROUGH,
   OPENAI_WS_MODE_HTTP_BRIDGE,
   isOpenAIWSModeEnabled,
-  resolveOpenAIWSModeConcurrencyHintKey,
+  resolveOpenAIWSModeHintKey,
   type OpenAIWSMode,
   resolveOpenAIWSModeFromExtra
 } from '@/utils/openaiWsMode'
@@ -3067,6 +3249,88 @@ const hideAccountLongContextBilling = computed(() => {
 const handleOllamaCloudUsageUpdated = (state: OllamaCloudUsageState) => {
   if (props.account) emit('updated', { ...props.account, ollama_cloud_usage: state })
 }
+
+// OpenCode Go usage panel state
+const opencodeGoState = ref<OpenCodeGoUsageState | null>(props.account?.opencode_go_usage ?? null)
+const opencodeGoLoading = ref(false)
+const opencodeGoSaving = ref(false)
+const opencodeGoRefreshing = ref(false)
+const opencodeGoSnapshot = computed(() => opencodeGoState.value?.snapshot)
+const opencodeGoStatusOk = computed(() => opencodeGoSnapshot.value?.status === 'ok')
+const opencodeGoStatusLabel = computed(() => {
+  if (!opencodeGoSnapshot.value) return t('admin.accounts.opencodeGo.notRefreshed')
+  if (opencodeGoSnapshot.value.status === 'unauthorized') return t('admin.accounts.opencodeGo.unauthorized')
+  if (opencodeGoSnapshot.value.status === 'failed') return t('admin.accounts.opencodeGo.failed')
+  return t('admin.accounts.opencodeGo.ok')
+})
+const opencodeGoFormatPercent = (value?: number) => typeof value === 'number' && Number.isFinite(value)
+  ? `${value.toFixed(value % 1 ? 1 : 0)}%`
+  : '-'
+const opencodeGoFormatDate = (value?: string) => {
+  if (!value) return '-'
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleString()
+}
+const opencodeGoWindowSummary = (window?: OpenCodeGoUsageWindow) => {
+  if (!window) return '-'
+  const reset = window.resets_at ? opencodeGoFormatDate(window.resets_at) : null
+  return reset
+    ? t('admin.accounts.opencodeGo.windowWithReset', { percent: opencodeGoFormatPercent(window.percent), reset })
+    : opencodeGoFormatPercent(window.percent)
+}
+
+const applyOpenCodeGoState = (next: OpenCodeGoUsageState) => {
+  opencodeGoState.value = next
+  if (props.account) emit('updated', { ...props.account, opencode_go_usage: next })
+}
+
+const loadOpenCodeGoUsage = async () => {
+  opencodeGoLoading.value = true
+  try {
+    applyOpenCodeGoState(await adminAPI.accounts.getOpenCodeGoUsage(props.account!.id))
+  } catch (error) {
+    appStore.showError(extractApiErrorMessage(error, t('admin.accounts.opencodeGo.loadFailed')))
+  } finally {
+    opencodeGoLoading.value = false
+  }
+}
+
+const setOpenCodeGoAutoRefresh = async (enabled: boolean) => {
+  opencodeGoSaving.value = true
+  try {
+    applyOpenCodeGoState(await adminAPI.accounts.setOpenCodeGoUsageAutoRefresh(props.account!.id, enabled))
+  } catch (error) {
+    appStore.showError(extractApiErrorMessage(error, t('admin.accounts.opencodeGo.autoRefreshFailed')))
+  } finally {
+    opencodeGoSaving.value = false
+  }
+}
+
+const refreshOpenCodeGoUsage = async () => {
+  opencodeGoRefreshing.value = true
+  try {
+    applyOpenCodeGoState(await adminAPI.accounts.refreshOpenCodeGoUsage(props.account!.id))
+    appStore.showSuccess(t('admin.accounts.opencodeGo.refreshSuccess'))
+  } catch (error) {
+    appStore.showError(extractI18nErrorMessage(
+      error,
+      t,
+      'admin.accounts.opencodeGo.errors',
+      t('admin.accounts.opencodeGo.refreshFailed')
+    ))
+  } finally {
+    opencodeGoRefreshing.value = false
+  }
+}
+
+watch(() => props.account?.id, () => {
+  opencodeGoState.value = props.account?.opencode_go_usage ?? null
+  if (opencodeGoState.value && !opencodeGoState.value.snapshot) void loadOpenCodeGoUsage()
+})
+
+onMounted(() => {
+  if (opencodeGoState.value && !opencodeGoState.value.snapshot) void loadOpenCodeGoUsage()
+})
 
 // Platform-specific hint for Base URL
 const baseUrlHint = computed(() => {
@@ -3299,6 +3563,46 @@ const grokOAuthBaseUrl = ref('')
 // Grok Free OAuth accounts use client-tool prompt caching by default. Keep an
 // explicit false in the account extra as the opt-out signal.
 const grokClientToolCacheEnabled = ref(true)
+const isGrokOAuthAccount = computed(
+  () => props.account?.platform === 'grok' && props.account?.type === 'oauth'
+)
+const grokMediaEligibilityMode = ref<GrokMediaEligibilityMode>('auto')
+const grokMediaEligibilityInitialMode = ref<GrokMediaEligibilityMode>('auto')
+const grokMediaEligibilityState = ref<GrokMediaEligibilityState | null>(null)
+const grokMediaEligibilityLoading = ref(false)
+const grokMediaEligibilityError = ref('')
+let grokMediaEligibilityRequestVersion = 0
+
+const modeFromGrokMediaExtra = (extra: Record<string, unknown> | undefined): GrokMediaEligibilityMode => {
+  if (extra?.grok_media_eligible === true) return 'enabled'
+  if (extra?.grok_media_eligible === false) return 'disabled'
+  return 'auto'
+}
+
+const loadGrokMediaEligibility = async (accountID: number): Promise<GrokMediaEligibilityState | null> => {
+  if (!isGrokOAuthAccount.value || typeof adminAPI.accounts.getGrokMediaEligibility !== 'function') {
+    return null
+  }
+  const requestVersion = ++grokMediaEligibilityRequestVersion
+  grokMediaEligibilityLoading.value = true
+  grokMediaEligibilityError.value = ''
+  try {
+    const state = await adminAPI.accounts.getGrokMediaEligibility(accountID)
+    if (requestVersion !== grokMediaEligibilityRequestVersion) return null
+    grokMediaEligibilityState.value = state
+    grokMediaEligibilityMode.value = state.mode
+    grokMediaEligibilityInitialMode.value = state.mode
+    return state
+  } catch (error: any) {
+    if (requestVersion !== grokMediaEligibilityRequestVersion) return null
+    grokMediaEligibilityError.value = error?.message || t('admin.accounts.grokMediaEligibility.loadFailed')
+    return null
+  } finally {
+    if (requestVersion === grokMediaEligibilityRequestVersion) {
+      grokMediaEligibilityLoading.value = false
+    }
+  }
+}
 
 const interceptWarmupRequests = ref(false)
 const autoPauseOnExpired = ref(false)
@@ -3329,6 +3633,12 @@ const supportsGenericUpstreamBillingProbe = computed(() => {
     !genericUpstreamBillingProbeExcludedPlatforms.has(platform || '')
 })
 const mixedScheduling = ref(false) // For antigravity accounts: enable mixed scheduling
+// 上游ID：直接上游声明请求标识的响应头名，留空不记录。
+const upstreamRequestIdHeader = ref('')
+const readUpstreamRequestIdHeader = (extra: unknown): string => {
+  const value = (extra as Record<string, unknown> | undefined)?.upstream_request_id_header
+  return typeof value === 'string' ? value : ''
+}
 const allowOverages = ref(false) // For antigravity accounts: enable AI Credits overages
 const antigravityProjectId = ref('')
 const antigravityModelRestrictionMode = ref<'whitelist' | 'mapping'>('whitelist')
@@ -3387,10 +3697,13 @@ const openaiPassthroughEnabled = ref(false)
 // OpenAI Codex namespace 工具摊平兼容开关（仅 OAuth），缺省关闭即原样保留
 const openaiFlattenNamespacesEnabled = ref(false)
 const openAILongContextBillingEnabled = ref(false)
-// OpenAI 订阅档位（Plus/Pro/Free）手动覆盖值,存于 credentials.plan_type;'' 表示清空/自动识别
+// OpenAI 订阅档位（Plus / Pro 20x / Pro 5x / Business Standard / Business Premium / Free）手动覆盖值,
+// 存于 credentials.plan_type;'' 表示清空/自动识别
 const editPlanType = ref<string>('')
 const openAICompactMode = ref<OpenAICompactMode>('auto')
 const openAIResponsesMode = ref<OpenAIResponsesMode>('auto')
+// Images 非流式响应缺 b64_json 时由网关下载 url 回填（仅 OpenAI API Key）。
+const openAIImagesUrlToB64JsonEnabled = ref(false)
 const openAIEndpointCapabilities = ref<OpenAIEndpointCapability[]>(['chat_completions', 'embeddings'])
 const openaiOAuthResponsesWebSocketV2Mode = ref<OpenAIWSMode>(OPENAI_WS_MODE_OFF)
 const openaiAPIKeyResponsesWebSocketV2Mode = ref<OpenAIWSMode>(OPENAI_WS_MODE_OFF)
@@ -3457,8 +3770,8 @@ const openaiResponsesWebSocketV2Mode = computed({
     openaiOAuthResponsesWebSocketV2Mode.value = mode
   }
 })
-const openAIWSModeConcurrencyHintKey = computed(() =>
-  resolveOpenAIWSModeConcurrencyHintKey(openaiResponsesWebSocketV2Mode.value)
+const openAIWSModeHintKey = computed(() =>
+  resolveOpenAIWSModeHintKey(openaiResponsesWebSocketV2Mode.value)
 )
 const codexImageToolOptions = computed<Array<{
   value: CodexImageToolMode
@@ -3552,16 +3865,17 @@ const openAITextEndpointCapabilityLabel = computed(() => {
 })
 const openAIEndpointCapabilityOptions = computed<{ value: OpenAIEndpointCapability; label: string }[]>(() => [
   { value: 'chat_completions', label: openAITextEndpointCapabilityLabel.value },
-  { value: 'embeddings', label: t('admin.accounts.openai.capabilityEmbeddings') }
+  { value: 'embeddings', label: t('admin.accounts.openai.capabilityEmbeddings') },
+  { value: 'seedance', label: 'Seedance (Ark)' }
 ])
 const openAITextGenerationCapabilityEnabled = computed(() =>
   openAIEndpointCapabilities.value.includes('chat_completions')
 )
 
 const normalizeOpenAIEndpointCapabilities = (values: OpenAIEndpointCapability[]) => {
-  const allowed: OpenAIEndpointCapability[] = ['chat_completions', 'embeddings']
+  const allowed: OpenAIEndpointCapability[] = ['chat_completions', 'embeddings', 'seedance']
   const selected = allowed.filter((value) => values.includes(value))
-  return selected.length > 0 ? selected : allowed
+  return selected.length > 0 ? selected : ['chat_completions', 'embeddings'] as OpenAIEndpointCapability[]
 }
 
 const readOpenAIEndpointCapabilities = (credentials?: Record<string, unknown>): OpenAIEndpointCapability[] => {
@@ -3569,7 +3883,7 @@ const readOpenAIEndpointCapabilities = (credentials?: Record<string, unknown>): 
   if (Array.isArray(raw)) {
     return normalizeOpenAIEndpointCapabilities(
       raw.filter((value): value is OpenAIEndpointCapability =>
-        value === 'chat_completions' || value === 'embeddings'
+        value === 'chat_completions' || value === 'embeddings' || value === 'seedance'
       )
     )
   }
@@ -3607,7 +3921,7 @@ const toggleOpenAIEndpointCapability = (capability: OpenAIEndpointCapability, ev
 
 const applyOpenAIEndpointCapabilities = (credentials: Record<string, unknown>) => {
   const capabilities = normalizeOpenAIEndpointCapabilities(openAIEndpointCapabilities.value)
-  if (capabilities.length === 2) {
+  if (capabilities.length === 2 && !capabilities.includes('seedance')) {
     delete credentials.openai_capabilities
     return
   }
@@ -3860,6 +4174,8 @@ const syncFormFromAccount = (newAccount: Account | null) => {
 	const extra = newAccount.extra as Record<string, unknown> | undefined
 	mixedScheduling.value = extra?.mixed_scheduling === true
 	allowOverages.value = extra?.allow_overages === true
+	upstreamRequestIdHeader.value = readUpstreamRequestIdHeader(extra)
+	openAIImagesUrlToB64JsonEnabled.value = extra?.images_url_to_b64_json === true
 	autoPause5hThreshold.value = typeof extra?.auto_pause_5h_threshold === 'number' ? extra.auto_pause_5h_threshold * 100 : null
 	autoPause7dThreshold.value = typeof extra?.auto_pause_7d_threshold === 'number' ? extra.auto_pause_7d_threshold * 100 : null
 	autoPause5hDisabled.value = extra?.auto_pause_5h_disabled === true
@@ -4058,6 +4374,15 @@ const syncFormFromAccount = (newAccount: Account | null) => {
     newAccount.platform === 'grok' &&
     newAccount.type === 'oauth' &&
     (grokClientToolCacheSetting === undefined || grokClientToolCacheSetting === true)
+  grokMediaEligibilityMode.value = modeFromGrokMediaExtra(extra)
+  grokMediaEligibilityInitialMode.value = grokMediaEligibilityMode.value
+  grokMediaEligibilityState.value = null
+  grokMediaEligibilityError.value = ''
+  if (newAccount.platform === 'grok' && newAccount.type === 'oauth') {
+    void loadGrokMediaEligibility(newAccount.id)
+  } else {
+    grokMediaEligibilityRequestVersion++
+  }
   if (newAccount.platform === 'grok' && newAccount.type === 'oauth' && newAccount.credentials) {
     const grokCreds = newAccount.credentials as Record<string, unknown>
     if (isCustomGrokBaseUrl(grokCreds.base_url)) {
@@ -4359,6 +4684,9 @@ const syncAntigravityUpstreamModels = async () => {
       appStore.showSuccess(t('admin.accounts.syncUpstreamModelsSuccess', { count: addedCount, total: upstreamModels.length }))
     } else {
       appStore.showInfo(t('admin.accounts.syncUpstreamModelsNoChanges', { count: upstreamModels.length }))
+    }
+    if (hasPartialMetadata) {
+      appStore.showWarning(t('admin.accounts.syncUpstreamModelsMetadataPartial'))
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : t('admin.accounts.syncUpstreamModelsFailed')
@@ -4777,10 +5105,48 @@ const handleClose = () => {
   emit('close')
 }
 
+const persistGrokMediaEligibility = async (accountID: number, updatedAccount: Account): Promise<Account> => {
+  if (
+    !isGrokOAuthAccount.value ||
+    grokMediaEligibilityMode.value === grokMediaEligibilityInitialMode.value ||
+    typeof adminAPI.accounts.updateGrokMediaEligibility !== 'function'
+  ) {
+    return updatedAccount
+  }
+
+  try {
+    const state = await adminAPI.accounts.updateGrokMediaEligibility(accountID, grokMediaEligibilityMode.value)
+    grokMediaEligibilityState.value = state
+    grokMediaEligibilityInitialMode.value = state.mode
+    const nextExtra = { ...((updatedAccount.extra as Record<string, unknown> | undefined) || {}) }
+    if (state.mode === 'auto') {
+      delete nextExtra.grok_media_eligible
+    } else {
+      nextExtra.grok_media_eligible = state.mode === 'enabled'
+    }
+    updatedAccount.extra = nextExtra
+  } catch (error: any) {
+    appStore.showError(t('admin.accounts.grokMediaEligibility.partialSave'))
+    try {
+      const state = await loadGrokMediaEligibility(accountID)
+      if (state) {
+        const nextExtra = { ...((updatedAccount.extra as Record<string, unknown> | undefined) || {}) }
+        if (state.mode === 'auto') delete nextExtra.grok_media_eligible
+        else nextExtra.grok_media_eligible = state.mode === 'enabled'
+        updatedAccount.extra = nextExtra
+      }
+    } catch {
+      // The original save result remains useful even when the refresh fails.
+    }
+  }
+  return updatedAccount
+}
+
 const submitUpdateAccount = async (accountID: number, updatePayload: Record<string, unknown>) => {
   submitting.value = true
   try {
-    const updatedAccount = await adminAPI.accounts.update(accountID, withAntigravityConfirmFlag(updatePayload))
+    let updatedAccount = await adminAPI.accounts.update(accountID, withAntigravityConfirmFlag(updatePayload))
+    updatedAccount = await persistGrokMediaEligibility(accountID, updatedAccount)
     appStore.showSuccess(t('admin.accounts.accountUpdated'))
     emit('updated', updatedAccount)
     handleClose()
@@ -5173,7 +5539,8 @@ const handleSubmit = async () => {
       updatePayload.extra = newExtra
     }
 
-    // OpenAI: 手动覆盖订阅档位 plan_type（Plus/Pro/Free）。仅 OAuth 非影子账号：
+    // OpenAI: 手动覆盖订阅档位 plan_type（Plus / Pro 20x / Pro 5x / Business Standard / Business Premium / Free）。
+    // 仅 OAuth 非影子账号：
     // 影子账号凭据由母账号管理(且后端会 sanitize),setup-token 无订阅调度语义。
     if (props.account.platform === 'openai' && props.account.type === 'oauth' && !isSparkShadow.value) {
       const currentCredentials = (updatePayload.credentials as Record<string, unknown>) ||
@@ -5512,6 +5879,19 @@ const handleSubmit = async () => {
       }
       // Quota notify config
       writeQuotaNotifyToExtra(newExtra, 'update')
+      updatePayload.extra = newExtra
+    }
+
+    // 上游ID头名只在改动时写回 extra，避免用弹窗打开时的快照覆盖运行态键。
+    const nextUpstreamRequestIdHeader = upstreamRequestIdHeader.value.trim()
+    if (nextUpstreamRequestIdHeader !== readUpstreamRequestIdHeader(props.account.extra)) {
+      const currentExtra = (updatePayload.extra as Record<string, unknown>) || (props.account.extra as Record<string, unknown>) || {}
+      const newExtra: Record<string, unknown> = { ...currentExtra }
+      if (nextUpstreamRequestIdHeader) {
+        newExtra.upstream_request_id_header = nextUpstreamRequestIdHeader
+      } else {
+        delete newExtra.upstream_request_id_header
+      }
       updatePayload.extra = newExtra
     }
 

@@ -63,7 +63,7 @@ func shouldStripOpenAIResponsesNonPairCallID(itemType string) bool {
 }
 
 func sanitizeOpenAIResponsesInputItemIDs(body []byte) ([]byte, bool, error) {
-	input := gjson.GetBytes(body, "input")
+	input := parseRawJSONView(body).Get("input")
 	if !input.IsArray() {
 		return body, false, nil
 	}
@@ -126,13 +126,22 @@ func sanitizeOpenAIResponsesInputItemIDs(body []byte) ([]byte, bool, error) {
 		if i > 0 {
 			rebuiltInput = append(rebuiltInput, ',')
 		}
-		rebuiltInput = append(rebuiltInput, item...)
+		itemBody := []byte(item.raw)
+		if item.stripID {
+			var err error
+			itemBody, err = sjson.DeleteBytes(itemBody, "id")
+			if err != nil {
+				return nil, false, fmt.Errorf("delete input.%d.id: %w", index, err)
+			}
+		}
+		if item.stripCallID {
+			var err error
+			itemBody, err = sjson.DeleteBytes(itemBody, "call_id")
+			if err != nil {
+				return nil, false, fmt.Errorf("delete input.%d.call_id: %w", index, err)
+			}
+		}
+		rebuiltItems = append(rebuiltItems, string(itemBody))
 	}
-	rebuiltInput = append(rebuiltInput, ']')
-
-	sanitized, err := sjson.SetRawBytes(body, "input", rebuiltInput)
-	if err != nil {
-		return nil, false, fmt.Errorf("replace sanitized input: %w", err)
-	}
-	return sanitized, true, nil
+	return replaceOpenAIRawInput(body, input, rebuiltItems), true, nil
 }

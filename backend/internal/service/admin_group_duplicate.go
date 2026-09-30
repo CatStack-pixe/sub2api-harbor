@@ -207,6 +207,9 @@ func cloneGroupStringMap(source map[string]string) map[string]string {
 // RecoverDuplicateGroup performs a read-only lookup for a copy that was already
 // committed for the same actor, source group, and idempotency key.
 func (s *adminServiceImpl) RecoverDuplicateGroup(ctx context.Context, id int64, actorScope, operationKey string) (*Group, error) {
+	if err := s.ValidateSimpleModeGroupOperation(AdminGroupOperationDuplicate); err != nil {
+		return nil, err
+	}
 	operationID := duplicateGroupOperationID(id, actorScope, operationKey)
 	if operationID == "" {
 		return nil, nil
@@ -232,6 +235,9 @@ func (s *adminServiceImpl) RecoverDuplicateGroup(ctx context.Context, id int64, 
 // account priorities. The repository commits the group, bindings, and outbox
 // event atomically so a failed binding never leaves an orphan group.
 func (s *adminServiceImpl) DuplicateGroup(ctx context.Context, id int64, actorScope, operationKey string) (*Group, error) {
+	if err := s.ValidateSimpleModeGroupOperation(AdminGroupOperationDuplicate); err != nil {
+		return nil, err
+	}
 	existing, err := s.RecoverDuplicateGroup(ctx, id, actorScope, operationKey)
 	if err != nil {
 		return nil, err

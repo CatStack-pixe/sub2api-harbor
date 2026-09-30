@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"strings"
+	"time"
 )
 
 // resolveAccountStatsCost 计算账号统计定价费用。
@@ -29,6 +30,10 @@ func resolveAccountStatsCost(
 	totalCost float64,
 	serviceTier string,
 ) *float64 {
+	reasoningEffort := ""
+	if len(reasoningEfforts) > 0 {
+		reasoningEffort = reasoningEfforts[0]
+	}
 	if channelService == nil || upstreamModel == "" {
 		return nil
 	}
@@ -40,7 +45,7 @@ func resolveAccountStatsCost(
 	platform := channelService.GetGroupPlatform(ctx, groupID)
 
 	// 优先级 1：自定义规则（始终尝试）
-	if cost := tryCustomRules(channel, accountID, groupID, platform, upstreamModel, tokens, requestCount); cost != nil {
+	if cost := tryCustomRules(channel, accountID, groupID, platform, upstreamModel, tokens, requestCount, reasoningEffort); cost != nil {
 		return cost
 	}
 
@@ -95,7 +100,12 @@ func tryModelFilePricing(billingService *BillingService, model string, tokens Us
 func tryCustomRules(
 	channel *Channel, accountID, groupID int64,
 	platform, model string, tokens UsageTokens, requestCount int,
+	reasoningEfforts ...string,
 ) *float64 {
+	reasoningEffort := ""
+	if len(reasoningEfforts) > 0 {
+		reasoningEffort = reasoningEfforts[0]
+	}
 	modelLower := strings.ToLower(model)
 	for _, rule := range channel.AccountStatsPricingRules {
 		if !matchAccountStatsRule(&rule, accountID, groupID) {
@@ -105,7 +115,11 @@ func tryCustomRules(
 		if pricing == nil {
 			continue // 规则匹配但模型不在规则定价中，继续下一条
 		}
-		return calculateStatsCost(pricing, tokens, requestCount)
+		cost := calculateStatsCost(pricing, tokens, requestCount)
+		if cost != nil {
+			*cost *= reasoningEffortBillingMultiplier(reasoningEffort, pricing.ReasoningEffortMultipliers)
+		}
+		return cost
 	}
 	return nil
 }
@@ -179,7 +193,7 @@ func calculateStatsCost(pricing *ChannelModelPricing, tokens UsageTokens, reques
 		return nil
 	}
 	switch pricing.BillingMode {
-	case BillingModePerRequest, BillingModeImage:
+	case BillingModePerRequest, BillingModeImage, BillingModeVideo:
 		return calculatePerRequestStatsCost(pricing, requestCount)
 	default:
 		return calculateTokenStatsCost(pricing, tokens)
@@ -249,6 +263,8 @@ func applyAccountStatsCost(
 	upstreamModel, requestedModel string,
 	tokens UsageTokens,
 	totalCost float64,
+	pricingAt time.Time,
+	longContextPricingEnabled bool,
 ) {
 	model := upstreamModel
 	if model == "" {
@@ -265,4 +281,12 @@ func applyAccountStatsCost(
 	usageLog.AccountStatsCost = resolveAccountStatsCost(
 		ctx, cs, bs, accountID, groupID, model, tokens, requestCount, totalCost, serviceTier,
 	)
+}
+
+// accountStatsLongContextPricingEnabled 判断账号统计成本是否计入长上下文阶梯。
+// 账号统计成本反映上游实际成本：OpenAI 账号由开关声明上游是否收取长上下文费率；
+// 其它平台没有该开关（accountGate 为 nil），按官方阶梯计。分组开关只决定客户售价，
+// 不参与成本判断。
+func accountStatsLongContextPricingEnabled(accountGate *bool) bool {
+	return accountGate == nil || *accountGate
 }

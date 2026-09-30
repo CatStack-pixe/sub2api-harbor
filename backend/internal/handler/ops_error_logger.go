@@ -1142,6 +1142,9 @@ func OpsErrorLoggerMiddleware(ops *service.OpsService) gin.HandlerFunc {
 		if shouldSkipOpsErrorLog(c.Request.Context(), ops, parsed.Message, string(body), c.Request.URL.Path) {
 			return
 		}
+		if shouldSkipOpsClientClosed(c, ops, status) {
+			return
+		}
 
 		apiKey := getOpsAPIKey(c)
 
@@ -1436,9 +1439,19 @@ func logOpsStreamErrorValue(c *gin.Context, ops *service.OpsService, wireStatus 
 		classifyStatus = wireStatus
 	}
 	normalizedType := normalizeOpsErrorType(streamErr.ErrType, streamErr.Code)
-	phase, isBusinessLimited, errorOwner, errorSource := classifyOpsErrorLog(c, normalizedType, streamErr.Message, streamErr.Code, classifyStatus)
+	var phase, errorOwner, errorSource string
+	var isBusinessLimited bool
+	if streamErr.RequestScoped {
+		// 请求级带内结果只按错误类型分类，此前尝试残留的上游错误上下文不参与判定。
+		phase = classifyOpsPhase(normalizedType, streamErr.Message, streamErr.Code)
+		isBusinessLimited = true
+		errorOwner = classifyOpsErrorOwner(phase, streamErr.Message)
+		errorSource = classifyOpsErrorSource(phase, streamErr.Message)
+	} else {
+		phase, isBusinessLimited, errorOwner, errorSource = classifyOpsErrorLog(c, normalizedType, streamErr.Message, streamErr.Code, classifyStatus)
+	}
 	recordedStatus := wireStatus
-	if streamErr.CountTowardsSLA && streamErr.IntendedStatus >= 400 {
+	if streamErr.IntendedStatus >= 400 && (streamErr.CountTowardsSLA || streamErr.RequestScoped) {
 		recordedStatus = streamErr.IntendedStatus
 	}
 	errorBody := ""
@@ -1489,8 +1502,8 @@ func logOpsStreamErrorValue(c *gin.Context, ops *service.OpsService, wireStatus 
 			}
 			return ""
 		}(),
-		// 就地 SSE 错误只出现在流式请求上。
-		Stream:           true,
+		// 带内错误默认挂在 SSE 流上；NonStream 标记的来自非流式 2xx 响应体。
+		Stream:           !streamErr.NonStream,
 		InboundEndpoint:  GetInboundEndpoint(c),
 		UpstreamEndpoint: GetUpstreamEndpoint(c, platform),
 		RequestedModel:   modelName,
@@ -2466,6 +2479,21 @@ func shouldSkipOpsErrorLog(ctx context.Context, ops *service.OpsService, message
 	}
 
 	return false
+}
+
+// shouldSkipOpsClientClosed 按 IgnoreContextCanceled 过滤纯客户端取消的 499。
+// 499 表示客户端在响应提交前断开（见 failoverClientGone），通常不带
+// "context canceled" 文案，shouldSkipOpsErrorLog 的文本过滤命中不了。
+// 本次请求未观察到上游错误时是纯客户端取消；已有上游错误的 499 表示上游失败后
+// 客户端没等到换号结果就离开，仍按上游失败落库。
+func shouldSkipOpsClientClosed(c *gin.Context, ops *service.OpsService, status int) bool {
+	if status != statusClientClosedRequest || ops == nil {
+		return false
+	}
+	if !ops.OpsAdvancedSettingsSnapshot().IgnoreContextCanceled {
+		return false
+	}
+	return !hasOpsUpstreamErrorContext(c)
 }
 
 // shouldSkipOpsErrorLogForCyber：cyber_policy 命中的请求由 recordCyberPolicyIfMarked

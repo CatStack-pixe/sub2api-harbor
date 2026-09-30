@@ -72,6 +72,48 @@ export function sanitizeAccountSchedulingThresholdsMap(
   return normalizeAccountSchedulingThresholdsMap(input)
 }
 
+export type SchedulingThresholdPlatformType =
+  | "openai"
+  | "anthropic"
+  | "grok"
+  | "kimi"
+  | "zhipu"
+  | "minimax"
+  | "opencode_go"
+
+export type AccountSchedulingThresholdsMap = Record<SchedulingThresholdPlatformType, number>
+
+// 与后端 AllowedSchedulingThresholdPlatforms 保持一致（deepseek 为余额型，
+// 走余额检测而非用量阈值；minimax Coding/Token Plan 与 OpenCode GO 有滚动窗口）。
+export const SCHEDULING_THRESHOLD_PLATFORMS: SchedulingThresholdPlatformType[] = [
+  "openai",
+  "anthropic",
+  "grok",
+  "kimi",
+  "zhipu",
+  "minimax",
+  "opencode_go",
+]
+
+export function normalizeAccountSchedulingThresholdsMap(
+  input?: Partial<Record<SchedulingThresholdPlatformType, number>> | null,
+): AccountSchedulingThresholdsMap {
+  const result = {} as AccountSchedulingThresholdsMap
+  for (const platform of SCHEDULING_THRESHOLD_PLATFORMS) {
+    const value = input?.[platform]
+    result[platform] = typeof value === "number" && Number.isFinite(value)
+      ? Math.min(100, Math.max(1, Math.trunc(value)))
+      : 100
+  }
+  return result
+}
+
+export function sanitizeAccountSchedulingThresholdsMap(
+  input?: Partial<Record<SchedulingThresholdPlatformType, number>> | null,
+): AccountSchedulingThresholdsMap {
+  return normalizeAccountSchedulingThresholdsMap(input)
+}
+
 /** 归一化为全 4 平台 × 3 窗口（缺失填 null），供模板非空绑定 */
 export function normalizePlatformQuotasMap(input?: DefaultPlatformQuotasMap | null): DefaultPlatformQuotasMap {
   const result: DefaultPlatformQuotasMap = {}
@@ -652,6 +694,7 @@ export interface SystemSettings {
   risk_control_enabled: boolean;
 
   // Cyber session block
+  cyber_policy_user_allowlist: string;
   cyber_session_block_enabled: boolean;
   cyber_session_block_ttl_seconds: number;
 
@@ -682,7 +725,8 @@ export interface SystemSettings {
   payment_visible_method_alipay_enabled?: boolean;
   payment_visible_method_wxpay_enabled?: boolean;
   openai_low_upstream_rate_priority_enabled?: boolean;
-  openai_oauth_scheduling_rate_multiplier?: number;
+  /** null means OAuth accounts use their individual account rates. */
+  openai_oauth_scheduling_rate_multiplier?: number | null;
   openai_advanced_scheduler_enabled?: boolean;
   openai_advanced_scheduler_sticky_weighted_enabled?: boolean;
   openai_advanced_scheduler_subscription_priority_enabled?: boolean;
@@ -966,6 +1010,7 @@ export interface UpdateSettingsRequest {
   risk_control_enabled?: boolean;
 
   // Cyber session block
+  cyber_policy_user_allowlist?: string;
   cyber_session_block_enabled?: boolean;
   cyber_session_block_ttl_seconds?: number;
 
@@ -996,7 +1041,8 @@ export interface UpdateSettingsRequest {
   payment_visible_method_alipay_enabled?: boolean;
   payment_visible_method_wxpay_enabled?: boolean;
   openai_low_upstream_rate_priority_enabled?: boolean;
-  openai_oauth_scheduling_rate_multiplier?: number;
+  /** Omit to preserve the override; null clears it; zero is an explicit rate. */
+  openai_oauth_scheduling_rate_multiplier?: number | null;
   openai_advanced_scheduler_enabled?: boolean;
   openai_advanced_scheduler_sticky_weighted_enabled?: boolean;
   openai_advanced_scheduler_subscription_priority_enabled?: boolean;
@@ -1434,7 +1480,7 @@ export async function updateRectifierSettings(
  * Matches backend dto.OpenAIFastPolicyRule.
  */
 export interface OpenAIFastPolicyRule {
-  service_tier: "all" | "priority" | "flex";
+  service_tier: "all" | "priority" | "flex" | "ultrafast" | "missing";
   action: "pass" | "filter" | "block" | "force_priority";
   scope: "all" | "oauth" | "apikey" | "bedrock";
   user_ids?: number[];

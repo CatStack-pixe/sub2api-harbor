@@ -1091,6 +1091,7 @@ function accountStatsRulesToAPI(): AccountStatsPricingRule[] {
             cache_write_price: mTokToPerToken(p.cache_write_price),
             cache_write_1h_price: mTokToPerToken(p.cache_write_1h_price),
             cache_read_price: mTokToPerToken(p.cache_read_price),
+            reasoning_effort_multipliers: formReasoningEffortMultipliersToAPI(p.reasoning_effort_multipliers),
             image_input_price: mTokToPerToken(p.image_input_price),
             image_output_price: mTokToPerToken(p.image_output_price),
             per_request_price: p.per_request_price != null && p.per_request_price !== '' ? Number(p.per_request_price) : null,
@@ -1432,6 +1433,7 @@ function distributeRulesToPlatforms(apiRules: AccountStatsPricingRule[]) {
         cache_write_price: perTokenToMTok(p.cache_write_price),
         cache_write_1h_price: perTokenToMTok(p.cache_write_1h_price),
         cache_read_price: perTokenToMTok(p.cache_read_price),
+        reasoning_effort_multipliers: p.reasoning_effort_multipliers ? { ...p.reasoning_effort_multipliers } : null,
         image_input_price: perTokenToMTok(p.image_input_price),
         image_output_price: perTokenToMTok(p.image_output_price),
         per_request_price: p.per_request_price,
@@ -1542,6 +1544,23 @@ async function handleSubmit() {
         appStore.showError(t('admin.channels.form.perRequestPriceRequired'))
         return
       }
+    }
+  }
+
+  // 思考等级倍率同时适用于渠道计价和独立的账号统计计价规则。
+  for (const section of form.platforms.filter(s => s.enabled)) {
+    const entries = [
+      ...section.model_pricing,
+      ...section.account_stats_pricing_rules.flatMap(rule => rule.pricing),
+    ]
+    for (const entry of entries) {
+      const error = validateReasoningEffortMultipliers(entry.reasoning_effort_multipliers, t)
+      if (!error) continue
+      const platformLabel = t('admin.groups.platforms.' + section.platform, section.platform)
+      const modelLabel = entry.models.join(', ') || t('admin.channels.form.unnamed')
+      appStore.showError(`${platformLabel} - ${modelLabel}: ${error}`)
+      activeTab.value = section.platform
+      return
     }
   }
 

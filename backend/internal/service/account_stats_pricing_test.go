@@ -478,6 +478,18 @@ func TestTryModelFilePricing_Success(t *testing.T) {
 	require.InDelta(t, 0.2, *result, 1e-12)
 }
 
+func TestTryModelFilePricing_Fable51HasNoImplicitReasoningMultiplier(t *testing.T) {
+	bs := newTestBillingServiceWithPrices(map[string]*ModelPricing{
+		"claude-fable-5-1": {InputPricePerToken: 0.001},
+	})
+	tokens := UsageTokens{InputTokens: 100}
+	standard := tryModelFilePricing(bs, "claude-fable-5-1", tokens, "", time.Time{}, true, "xhigh")
+	max := tryModelFilePricing(bs, "claude-fable-5-1", tokens, "", time.Time{}, true, "max")
+	require.NotNil(t, standard)
+	require.NotNil(t, max)
+	require.Equal(t, *standard, *max)
+}
+
 func TestTryModelFilePricing_AppliesLongContextPricing(t *testing.T) {
 	bs := newTestBillingServiceWithPrices(map[string]*ModelPricing{
 		"gpt-5.6-sol": {
@@ -637,6 +649,104 @@ func TestTryModelFilePricing_WithCacheTokens(t *testing.T) {
 	// 100*0.001 + 50*0.002 + 200*0.003 + 300*0.0005
 	// = 0.1 + 0.1 + 0.6 + 0.15 = 0.95
 	require.InDelta(t, 0.95, *result, 1e-12)
+}
+
+func TestTryModelFilePricing_DeepSeekPeakPricing(t *testing.T) {
+	weekday := func(hour, minute int) time.Time {
+		return time.Date(2026, time.August, 24, hour, minute, 0, 0, time.UTC)
+	}
+	for _, model := range []struct {
+		name                          string
+		input, output, cacheReadPrice float64
+	}{
+		{"deepseek-v4-flash", 1.5e-7, 6e-7, 3e-9},
+		{"deepseek-v4-pro", 6.6e-7, 1.98e-6, 2.2e-8},
+	} {
+		for _, usage := range []struct {
+			name   string
+			tokens UsageTokens
+		}{
+			{"input", UsageTokens{InputTokens: 1000}},
+			{"output", UsageTokens{OutputTokens: 500}},
+			{"cache_read", UsageTokens{CacheReadTokens: 1000}},
+			{"mixed", UsageTokens{InputTokens: 1000, OutputTokens: 500, CacheReadTokens: 1000}},
+		} {
+			t.Run(model.name+"/"+usage.name, func(t *testing.T) {
+				bs := newTestBillingService()
+				tokens := usage.tokens
+				baseCost := float64(tokens.InputTokens)*model.input +
+					float64(tokens.OutputTokens)*model.output + float64(tokens.CacheReadTokens)*model.cacheReadPrice
+				for _, slot := range []struct {
+					name       string
+					at         time.Time
+					multiplier float64
+				}{
+					{"before_morning_peak", weekday(0, 59), 1},
+					{"morning_peak_start", weekday(1, 0), 2},
+					{"morning_peak_last_minute", weekday(3, 59), 2},
+					{"morning_peak_end", weekday(4, 0), 1},
+					{"afternoon_peak_start", weekday(6, 0), 2},
+					{"afternoon_peak_last_minute", weekday(9, 59), 2},
+					{"afternoon_peak_end", weekday(10, 0), 1},
+					{"saturday", time.Date(2026, time.August, 22, 2, 0, 0, 0, time.UTC), 1},
+					{"sunday", time.Date(2026, time.August, 23, 7, 0, 0, 0, time.UTC), 1},
+				} {
+					t.Run(slot.name, func(t *testing.T) {
+						cost := tryModelFilePricing(bs, model.name, tokens, "", slot.at, true)
+						require.NotNil(t, cost)
+						require.InDelta(t, baseCost*slot.multiplier, *cost, 1e-12)
+					})
+				}
+			})
+		}
+	}
+}
+
+func TestResolveAccountStatsCost_DeepSeekPricingPriority(t *testing.T) {
+	peak := time.Date(2026, time.August, 24, 2, 0, 0, 0, time.UTC)
+	for _, tt := range []struct {
+		name         string
+		customRule   bool
+		applyPricing bool
+		noChannel    bool
+		want         float64
+	}{
+		{name: "catalog", want: 1000 * 1.5e-7 * 2},
+		{name: "custom_rule", customRule: true, want: 1},
+		{name: "custom_rule_before_customer_price", customRule: true, applyPricing: true, want: 1},
+		{name: "customer_price", applyPricing: true, want: 0.75},
+		{name: "no_channel", noChannel: true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			channel := &Channel{
+				ID: 1, Status: StatusActive, ApplyPricingToAccountStats: tt.applyPricing,
+				ModelPricing: []ChannelModelPricing{{
+					Models: []string{"deepseek-v4-flash"}, InputPrice: testPtrFloat64(0.02),
+				}},
+			}
+			if tt.customRule {
+				channel.AccountStatsPricingRules = []AccountStatsPricingRule{{
+					AccountIDs: []int64{1},
+					Pricing: []ChannelModelPricing{{
+						Models: []string{"deepseek-v4-flash"}, InputPrice: testPtrFloat64(0.001),
+					}},
+				}}
+			}
+			cs := newTestChannelServiceForStats(t, channel, 10, PlatformDeepseek)
+			groupID := int64(10)
+			if tt.noChannel {
+				groupID = 99
+			}
+			cost := resolveAccountStatsCost(context.Background(), cs, newTestBillingService(),
+				1, groupID, "deepseek-v4-flash", UsageTokens{InputTokens: 1000}, 1, 0.75, "", peak, true)
+			if tt.noChannel {
+				require.Nil(t, cost)
+				return
+			}
+			require.NotNil(t, cost)
+			require.InDelta(t, tt.want, *cost, 1e-12)
+		})
+	}
 }
 
 // ---------------------------------------------------------------------------

@@ -52,9 +52,9 @@ func TestEnableOpenAIHTTP2KeepAlive_EnablesPingHealthCheck(t *testing.T) {
 	requireHTTP2Configured(t, tr, "http2 必须已挂到底层 http.Transport 上")
 }
 
-// openai_h2 模式构建的 Transport 必须带上 H2 PING 健康探测，从源头剔除死连接。
-func TestBuildUpstreamTransport_OpenAIH2_EnablesPingHealthCheck(t *testing.T) {
-	tr, err := buildUpstreamTransport(http2KeepAliveTestPoolSettings(), nil, upstreamProtocolModeOpenAIH2)
+// long_stream_h2 模式构建的 Transport 必须带上 H2 PING 健康探测，从源头剔除死连接。
+func TestBuildUpstreamTransport_LongStreamH2_EnablesPingHealthCheck(t *testing.T) {
+	tr, err := buildUpstreamTransport(http2KeepAliveTestPoolSettings(), nil, upstreamProtocolModeLongStreamH2)
 	require.NoError(t, err)
 	require.True(t, tr.ForceAttemptHTTP2, "openai_h2 必须启用 HTTP/2")
 	requireHTTP2Configured(t, tr, "openai_h2 必须显式配置 http2 以启用 ReadIdleTimeout")
@@ -98,7 +98,7 @@ func TestBuildUpstreamTransport_OpenAIH2_NegotiatesHTTP2(t *testing.T) {
 
 // 死连接在经 HTTP 代理（CONNECT 隧道）时最高发，这是带 proxy 账号的真实生产路径：
 // 显式 http2 配置须与 Transport.Proxy 同时正确生效，不能相互干扰。
-func TestBuildUpstreamTransport_OpenAIH2_WithHTTPProxy_EnablesKeepAlive(t *testing.T) {
+func TestBuildUpstreamTransport_HTTP2_WithHTTPProxy_EnablesKeepAlive(t *testing.T) {
 	proxyURL, err := url.Parse("http://127.0.0.1:8080")
 	require.NoError(t, err)
 

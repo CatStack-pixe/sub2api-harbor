@@ -195,7 +195,9 @@ func TestTokenRefreshService_ProcessRefreshUsesOAuthRefreshCandidates(t *testing
 	svc.processRefresh()
 
 	require.Zero(t, repo.listActiveCalls, "TokenRefreshService should not use the broad active-account query")
-	require.ElementsMatch(t, []int64{1, 6}, repo.updatedCredentialIDs)
+	// Account 7 is paused (schedulable=false) but active: it must still be
+	// refreshed so its stored access_token does not silently expire.
+	require.ElementsMatch(t, []int64{1, 6, 7}, repo.updatedCredentialIDs)
 	require.Equal(t, 1, repo.clearTempCalls, "successful refresh should clear the OAuth 401 temp-unschedulable state")
 }
 

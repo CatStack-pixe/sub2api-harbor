@@ -50,6 +50,7 @@ export default {
       accountCost: 'Cost',
       noDataAvailable: 'No data available',
       recentUsage: 'Recent Usage',
+      actualSpending: 'Actual spending ($)',
       viewModelDistribution: 'Model Distribution',
       viewSpendingRanking: 'User Spending Ranking',
       spendingRankingTitle: 'User Spending Ranking',
@@ -122,10 +123,42 @@ export default {
         cronExpr: 'Cron Expression',
         cronHint: 'e.g. "0 2 * * *" means every day at 2:00 AM',
         retainDays: 'Backup Expire Days',
-        retainDaysHint: 'Backup files auto-delete after this many days, 0 = never expire',
+        retainDaysHint: 'Ordinary backups are deleted after this many days; 0 = no age limit',
         retainCount: 'Max Retain Count',
-        retainCountHint: 'Maximum number of backups to keep, 0 = unlimited',
+        retainCountHint: 'Maximum ordinary backups to keep; 0 = no count limit',
+        ordinaryRetention: 'Ordinary backup retention',
+        ordinaryHint: 'Clean up the oldest ordinary backups when either limit is reached. Monthly archives are retained separately.',
+        preview: 'Retention preview',
+        previewBoth: 'Keep up to {count} ordinary backups from the last {days} days.',
+        previewDays: 'Keep ordinary backups from the last {days} days, with no count limit.',
+        previewCount: 'Keep the latest {count} ordinary backups, with no age limit.',
+        previewUnlimited: 'Ordinary backups are not automatically deleted.',
         saved: 'Schedule configuration saved'
+      },
+      archive: {
+        title: 'Monthly archives',
+        enabled: 'Enable',
+        dates: 'Archive dates (select multiple)',
+        selectDates: 'Select at least one archive date',
+        selectedDates: '{count} dates selected',
+        day: 'Day {day}',
+        monthEnd: 'Month end',
+        done: 'Done',
+        datesHint: 'Archive the first successful scheduled backup for each selected date, using its start date and the schedule time zone.',
+        retention: 'Archive retention',
+        count: 'Number of archives to keep',
+        copies: 'copies',
+        forever: 'Keep forever',
+        foreverHint: 'Keep all new archives permanently. Existing permanent archives remain protected after settings change.',
+        countHint: 'Count non-permanent archives across all selected dates together; delete the oldest when the limit is exceeded.',
+        fallbackHint: 'If no backup succeeds on a selected date, use the next successful backup in that month. Missing dates use month end. Count each backup only once.',
+        independentHint: 'Archives reuse scheduled backups and do not count toward ordinary retention. No archive is created if the month has no later successful backup.',
+        disabledHint: 'Disabling stops new archives. Existing archives keep their previous retention policy.',
+        invalidRetention: 'Retention days and counts must be non-negative integers. Non-permanent archives require at least 1 copy.',
+        preview: 'Archive one backup on {dates} each month: {retention}.',
+        retainLatest: 'keep the latest {count} archives in total',
+        badge: 'Monthly archive',
+        deleteConfirm: 'This is a monthly archive. Remove archive protection and permanently delete this backup? This cannot be undone.',
       },
       operations: {
         title: 'Backup Records',
@@ -390,10 +423,12 @@ export default {
 
     affiliates: {
       invitesDescription: 'View site-wide inviter and invitee relationships',
-      rebatesDescription: 'View recharge orders that generated affiliate rebates',
-      transfersDescription: 'View affiliate quota transfers into account balance',
+      rebatesDescription: 'View every affiliate rebate accrual from recharge orders, redeem codes, and admin recharges',
+      transfersDescription: 'View affiliate quota transfers into balance and offline withdrawals',
       errors: {
-        loadFailed: 'Failed to load affiliate records'
+        loadFailed: 'Failed to load affiliate records',
+        AFFILIATE_QUOTA_INSUFFICIENT: 'Insufficient available affiliate quota',
+        AFFILIATE_WITHDRAW_AMOUNT_INVALID: 'Invalid withdrawal amount'
       },
       records: {
         search: 'Search',
@@ -418,7 +453,33 @@ export default {
         historyQuotaAfter: 'Historical Rebate After',
         invitedAt: 'Invited At',
         rebatedAt: 'Rebated At',
-        transferredAt: 'Transferred At'
+        transferredAt: 'Transferred At',
+        outflowType: 'Type'
+      },
+      outflowTypes: {
+        transfer: 'To Balance',
+        withdraw: 'Offline Withdrawal'
+      },
+      withdraw: {
+        button: 'Record Offline Withdrawal',
+        title: 'Record Offline Withdrawal',
+        user: 'User',
+        userPlaceholder: 'Search by email or username',
+        noUserFound: 'No matching users',
+        changeUser: 'Change user',
+        availableQuota: 'Available quota',
+        frozenHint: 'Rebates still in the freeze period are not included in the available quota',
+        amount: 'Withdrawal amount (USD)',
+        amountHint: 'Enter the amount already paid to this user outside the site',
+        fillAll: 'All',
+        warning: 'Recording deducts this amount from the user\'s available affiliate quota and cannot be undone. Make sure the off-site payment is complete.',
+        submit: 'Confirm',
+        submitting: 'Recording...',
+        success: 'Recorded offline withdrawal of {amount}; {remaining} still available',
+        replayed: 'This offline withdrawal of {amount} was already recorded and was not deducted again; {remaining} was left available after it',
+        uncertainHint: 'The last submission returned no result and may already be recorded. The user and amount are locked; submitting again retries the same registration and never deducts twice.',
+        amountRequired: 'Enter an amount greater than 0',
+        amountExceeds: 'Amount cannot exceed the available quota'
       },
       overview: {
         title: 'Affiliate User Overview',
@@ -436,6 +497,13 @@ export default {
       title: 'User Management',
       description: 'Manage users and their permissions',
       createUser: 'Create User',
+      bulkDelete: {
+        action: 'Delete selected ({count})',
+        title: 'Delete selected users',
+        confirm: 'Delete the {count} selected users? This action cannot be undone. Administrator accounts cannot be deleted.',
+        success: 'Deleted {count} users',
+        failed: 'Failed to delete {count} users. They remain selected for retry.'
+      },
       bulkLimits: {
         action: 'Set limits ({count})',
         title: 'Set user limits',
@@ -494,6 +562,7 @@ export default {
       leaveEmptyToKeep: 'Leave empty to keep current password',
       generatePassword: 'Generate random password',
       copyPassword: 'Copy password',
+      passwordCopied: 'Password copied',
       creating: 'Creating...',
       updating: 'Updating...',
       form: {
@@ -757,6 +826,7 @@ export default {
         clearAllConfirm: 'Clear daily / weekly / monthly limits for ALL platforms? All platforms will become "unlimited" with no local undo — you must manually re-enter values before saving.',
         reset: {
           button: 'Reset window',
+          unavailable: 'No limit configured for this platform, so there is no usage window to reset',
           confirm: 'Reset the {window} usage for {platform} for this user? This is effective immediately.',
           success: 'Reset {platform} {window} usage',
           failed: 'Reset failed',
@@ -829,7 +899,7 @@ export default {
       accountsAvailable: 'Avail:',
       accountsRateLimited: 'Limited:',
       accountsTotal: 'Total:',
-      accountsUnit: '',
+      accountsUnit: 'accounts',
       rateAndAccounts: '{rate}x rate · {count} accounts',
       accountsCount: '{count} accounts',
       rateLabel: 'rate',
@@ -875,6 +945,7 @@ export default {
         reasoningEffortModelPlaceholder: 'Empty = all / gpt / gpt-5.4',
         reasoningEffortFrom: 'Request value',
         reasoningEffortTo: 'Forwarded value',
+        reasoningEffortToDeny: 'Deny',
         reasoningEffortFromPlaceholder: 'Select A',
         reasoningEffortToPlaceholder: 'Select B',
         fromRequired: 'Select request value A',
@@ -1082,7 +1153,28 @@ export default {
         empty: 'No displayable models',
         selectedSummary: 'Selected {selected} / {total}',
         selectAll: 'Select all',
-        invertSelection: 'Invert'
+        invertSelection: 'Invert',
+        wildcardTag: 'wildcard',
+        customPlaceholder: 'Custom entry, e.g. gpt-*-codex or claude-*',
+        addCustom: 'Add',
+        emptySelectionError: 'The model allowlist is enabled; select or add at least one model entry',
+        errors: {
+          empty: 'Please enter a model entry',
+          duplicate: 'This entry already exists'
+        }
+      },
+      codexModelsManifest: {
+        title: 'Pinned Accounts for Model Lists',
+        hint: 'When enabled, ordinary model lists and Codex Model Manifest are discovered from the pinned accounts first, then merged and filtered using account mappings and the group model list. Rate-limited or overloaded pinned accounts are still used.',
+        enable: 'Fetch model lists with specific accounts',
+        enabledHint: 'Accounts are limited to OpenAI accounts bound to this group, at most 10.',
+        disabledHint: 'Disabled: ordinary lists use local mappings or defaults; Codex uses a local catalog when configured, otherwise scheduler discovery.',
+        accounts: 'Pinned accounts',
+        searchPlaceholder: 'Search accounts (OpenAI accounts in this group)',
+        searchEmpty: 'No matching accounts',
+        fallback: 'Fall back to the scheduler when all pinned accounts are unavailable',
+        fallbackHint: 'Off: return 503 / the upstream error. On: fall back to the existing scheduler path.',
+        selectAtLeastOne: 'Select at least one account after enabling pinned accounts'
       },
       modelMapping: {
         title: 'Agnes request model mapping',
@@ -1223,12 +1315,6 @@ export default {
         searchAccountPlaceholder: 'Search accounts...',
         accountsHint: 'Select accounts to prioritize for this model pattern'
       },
-      mcpXml: {
-        title: 'MCP XML Protocol Injection',
-        tooltip: 'When enabled, if the request contains MCP tools, an XML format call protocol prompt will be injected into the system prompt. Disable this to avoid interference with certain clients.',
-        enabled: 'Enabled',
-        disabled: 'Disabled'
-      },
       claudeMaxSimulation: {
         title: 'Claude Max Usage Simulation',
         tooltip:
@@ -1236,6 +1322,12 @@ export default {
         enabled: 'Enabled (simulate 1h cache)',
         disabled: 'Disabled',
         hint: 'Only token categories in usage billing logs are adjusted. No per-request mapping state is persisted.'
+      },
+      mcpXml: {
+        title: 'MCP XML Protocol Injection',
+        tooltip: 'When enabled, if the request contains MCP tools, an XML format call protocol prompt will be injected into the system prompt. Disable this to avoid interference with certain clients.',
+        enabled: 'Enabled',
+        disabled: 'Disabled'
       },
       supportedScopes: {
         title: 'Supported Model Families',

@@ -191,6 +191,7 @@ export interface ModelDefaultPricing {
   cache_read_price?: number
   image_input_price?: number
   image_output_price?: number
+  reasoning_effort_multipliers?: Record<string, number> | null
 }
 
 export async function getModelDefaultPricing(model: string): Promise<ModelDefaultPricing> {

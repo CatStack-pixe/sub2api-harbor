@@ -903,6 +903,10 @@ func resolveRequestedModelInMapping(mapping map[string]string, requestedModel st
 // 会把未知模型原样透传，Codex 上游对这类模型必然返回不可重试的 400，导致
 // 请求卡死在该账号上、无法 failover 到真正支持该模型的 API Key 账号（#3662）。
 // 未知/自定义别名仍保持允许（兼容渠道级映射），见 isOpenAIOAuthServableModel。
+//
+// 例外：DeepSeek 平台的空映射不再是「允许所有」，改按官方模型白名单判定
+// （isDeepseekServableModel）——未知模型名透传上游只会得到 404/400，并误触发
+// per-(账号,模型) 30 分钟冷却；带 [1m] 上下文后缀的写法先归一化再比对。
 func (a *Account) IsModelSupported(requestedModel string) bool {
 	// 透传模式仅替换认证、模型语义完全交由上游决定，因此放行所有模型。
 	// 该短路必须在 model_mapping 判定之前：账号从"白名单模式"切换到透传后，
@@ -915,6 +919,9 @@ func (a *Account) IsModelSupported(requestedModel string) bool {
 	if len(mapping) == 0 {
 		if a.IsOpenAIOAuth() {
 			return isOpenAIOAuthServableModel(requestedModel)
+		}
+		if a.Platform == PlatformDeepseek {
+			return isDeepseekServableModel(requestedModel)
 		}
 		return true // 无映射 = 允许所有
 	}
@@ -1927,6 +1934,11 @@ func (a *Account) SupportsOpenAIEndpointCapability(capability OpenAIEndpointCapa
 	if a == nil {
 		return false
 	}
+	if capability == OpenAIEndpointCapabilitySeedance {
+		configured, _ := a.openAIEndpointCapabilitySet()
+		return configured["seedance"] && a.Platform == PlatformOpenAI && a.Type == AccountTypeAPIKey &&
+			strings.TrimSpace(a.GetCredential("base_url")) != ""
+	}
 	if capability == "" {
 		return true
 	}
@@ -2017,9 +2029,10 @@ func (a *Account) SupportsOpenAIEndpointCapability(capability OpenAIEndpointCapa
 }
 
 // GrokMediaGenerationEligibility reports whether a Grok account may receive
-// new image/video generation requests. OAuth media fails closed unless billing
-// observations provide positive paid-entitlement evidence. An explicit
-// operator override takes precedence over probe data.
+// new image/video generation requests. Explicit evidence of a forbidden or
+// free account blocks media, while an incomplete successful billing response
+// remains eligible for backwards compatibility. An explicit operator
+// override takes precedence over probe data.
 func (a *Account) GrokMediaGenerationEligibility() (bool, string) {
 	if a == nil || !a.IsGrok() {
 		return false, "not_grok"
@@ -2045,7 +2058,12 @@ func (a *Account) GrokMediaGenerationEligibility() (bool, string) {
 		return false, "billing_free_tier"
 	}
 	if !grokBillingHasAuthoritativeQuota(billing) {
-		return false, "billing_inconclusive"
+		// Billing endpoints can return 200 with an account-specific schema that
+		// omits plan/quota fields (for example, some SuperGrok accounts). An
+		// incomplete observation is not proof of ineligibility; keep the account
+		// routable and expose the reason for diagnostics. Operators can still
+		// quarantine a known-bad account with grok_media_eligible=false.
+		return true, "billing_inconclusive"
 	}
 	return true, "eligible"
 }
@@ -2132,6 +2150,8 @@ func (a *Account) SupportsOpenAIImageCapability(capability OpenAIImagesCapabilit
 		return false
 	}
 	switch capability {
+	case OpenAIImagesCapabilityAPIKey:
+		return a.Type == AccountTypeAPIKey
 	case OpenAIImagesCapabilityBasic, OpenAIImagesCapabilityNative:
 		return a.Type == AccountTypeOAuth || a.Type == AccountTypeSetupToken || a.Type == AccountTypeAPIKey
 	default:

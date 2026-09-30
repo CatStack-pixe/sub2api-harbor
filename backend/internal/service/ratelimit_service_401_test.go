@@ -17,6 +17,7 @@ type rateLimitAccountRepoStub struct {
 	mockAccountRepoForGemini
 	setErrorCalls          int
 	tempCalls              int
+	rateLimitedCalls       int
 	updateCredentialsCalls int
 	updateExtraCalls       int
 	lastCredentials        map[string]any
@@ -234,6 +235,29 @@ func TestRateLimitService_HandleUpstreamError_NonOAuth401(t *testing.T) {
 	require.True(t, shouldDisable)
 	require.Equal(t, 1, repo.setErrorCalls)
 	require.Empty(t, invalidator.accounts)
+}
+
+func TestRateLimitService_HandleUpstreamError_NonOAuthModel401StillDisablesCredentials(t *testing.T) {
+	repo := &rateLimitAccountRepoStub{}
+	service := NewRateLimitService(repo, nil, &config.Config{}, nil, nil)
+	account := &Account{
+		ID:       104,
+		Platform: PlatformOpenAI,
+		Type:     AccountTypeAPIKey,
+	}
+
+	shouldDisable := service.HandleUpstreamError(
+		context.Background(),
+		account,
+		http.StatusUnauthorized,
+		http.Header{},
+		[]byte(`{"error":{"message":"invalid or expired credentials"}}`),
+		"definitely-not-real",
+	)
+
+	require.True(t, shouldDisable)
+	require.Equal(t, 1, repo.setErrorCalls)
+	require.Equal(t, 0, repo.tempCalls)
 }
 
 // TestRateLimitService_HandleUpstreamError_OAuth401DoesNotOverwriteCredentials

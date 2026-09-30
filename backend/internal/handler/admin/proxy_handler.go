@@ -205,9 +205,15 @@ func (h *ProxyHandler) Update(c *gin.Context) {
 	}
 
 	var expiresAt *time.Time
-	if req.ExpiresAt != nil && *req.ExpiresAt > 0 {
-		t := time.Unix(*req.ExpiresAt, 0).UTC()
+	if req.ExpiresAt.Value != nil && *req.ExpiresAt.Value > 0 {
+		t := time.Unix(*req.ExpiresAt.Value, 0).UTC()
 		expiresAt = &t
+	}
+	if req.Username != nil {
+		*req.Username = strings.TrimSpace(*req.Username)
+	}
+	if req.Password != nil {
+		*req.Password = strings.TrimSpace(*req.Password)
 	}
 	proxy, err := h.adminService.UpdateProxy(c.Request.Context(), proxyID, &service.UpdateProxyInput{
 		Name:            strings.TrimSpace(req.Name),

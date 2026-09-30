@@ -26,7 +26,7 @@ const publicSettings = {
 }
 
 vi.mock('vue-router', () => ({
-  useRouter: () => ({ push: vi.fn() }),
+  useRouter: () => ({ push: pushMock }),
   useRoute: () => ({ query: {} })
 }))
 
@@ -68,7 +68,10 @@ function mountRegister() {
       stubs: {
         AuthLayout: { template: '<div><slot /><slot name="footer" /></div>' },
         Icon: true,
-        TurnstileWidget: { template: '<div data-testid="turnstile-widget" />' },
+        TurnstileWidget: {
+          template: '<div data-testid="turnstile-widget" />',
+          methods: { verifyAction: verifyActionMock, reset: vi.fn() }
+        },
         LoginAgreementPrompt: true,
         EmailOAuthButtons: true,
         LinuxDoOAuthSection: true,
@@ -81,7 +84,7 @@ function mountRegister() {
   })
 }
 
-describe('RegisterView invitation layout', () => {
+describe('RegisterView', () => {
   beforeEach(() => {
     getPublicSettingsMock.mockReset()
     registerMock.mockReset()

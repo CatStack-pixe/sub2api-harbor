@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -309,8 +310,10 @@ func TestRelay_UpstreamDisconnect(t *testing.T) {
 	defer cancel()
 
 	result, relayExit := Relay(ctx, clientConn, upstreamConn, firstPayload, RelayOptions{})
-	// 上游 EOF 属于 disconnect，标记为 graceful
-	require.Nil(t, relayExit, "上游 EOF 应被视为 graceful disconnect")
+	require.NotNil(t, relayExit)
+	require.Equal(t, "read_upstream", relayExit.Stage)
+	require.False(t, relayExit.Graceful)
+	require.ErrorContains(t, relayExit.Err, "upstream websocket closed before terminal event")
 	require.Equal(t, "gpt-4o", result.RequestModel)
 }
 
@@ -921,7 +924,10 @@ func TestRelay_BinaryFramePassthrough(t *testing.T) {
 	defer cancel()
 
 	result, relayExit := Relay(ctx, clientConn, upstreamConn, firstPayload, RelayOptions{})
-	require.Nil(t, relayExit)
+	require.NotNil(t, relayExit)
+	require.Equal(t, "read_upstream", relayExit.Stage)
+	require.False(t, relayExit.Graceful)
+	require.ErrorContains(t, relayExit.Err, "upstream websocket closed before terminal event")
 	// binary frame 不解析 usage
 	require.Equal(t, 0, result.Usage.InputTokens)
 
@@ -986,7 +992,12 @@ func TestRelay_PreservesFirstMessageType(t *testing.T) {
 	t.Parallel()
 
 	clientConn := newPassthroughTestFrameConn(nil, false)
-	upstreamConn := newPassthroughTestFrameConn(nil, true)
+	upstreamConn := newPassthroughTestFrameConn([]passthroughTestFrame{
+		{
+			msgType: coderws.MessageBinary,
+			payload: []byte(`{"type":"response.completed","response":{"id":"resp_binary_first_type"}}`),
+		},
+	}, true)
 
 	firstPayload := []byte(`{"type":"response.create","model":"gpt-4o","input":[]}`)
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
@@ -1001,6 +1012,9 @@ func TestRelay_PreservesFirstMessageType(t *testing.T) {
 	require.Len(t, upstreamWrites, 1)
 	require.Equal(t, coderws.MessageBinary, upstreamWrites[0].msgType)
 	require.Equal(t, firstPayload, upstreamWrites[0].payload)
+	clientWrites := clientConn.Writes()
+	require.Len(t, clientWrites, 1)
+	require.Equal(t, coderws.MessageBinary, clientWrites[0].msgType)
 }
 
 func TestRelay_UsageParseFailureDoesNotBlockRelay(t *testing.T) {

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -18,6 +19,7 @@ import (
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/claude"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/openai"
 	"github.com/Wei-Shaw/sub2api/internal/util/urlvalidator"
@@ -107,6 +109,7 @@ var (
 // LiteLLMModelPricing LiteLLM价格数据结构
 // 只保留我们需要的字段，使用指针来处理可能缺失的值
 type LiteLLMModelPricing struct {
+	CacheCreationInputTokenCostExplicit bool    `json:"-"`
 	InputCostPerToken                   float64 `json:"input_cost_per_token"`
 	InputCostPerTokenPriority           float64 `json:"input_cost_per_token_priority"`
 	OutputCostPerToken                  float64 `json:"output_cost_per_token"`
@@ -126,6 +129,7 @@ type LiteLLMModelPricing struct {
 	OutputCostPerImage                  float64 `json:"output_cost_per_image"`       // 图片生成模型每张图片价格
 	OutputCostPerImageToken             float64 `json:"output_cost_per_image_token"` // 图片输出 token 价格
 	InputCostPerImageToken              float64 `json:"input_cost_per_image_token"`  // 图片输入 token 价格（如 gpt-image-2 图片编辑）
+	CacheReadInputImageTokenCost        float64 `json:"cache_read_input_image_token_cost"`
 
 	// TokenPricingAbsent 表示源数据中 input/output token 价格均缺失（仅有图片价）。
 	// 此类条目只可用于图片计费，token 计费必须回退到 fallback 或 fail-closed，
@@ -160,6 +164,7 @@ type LiteLLMRawEntry struct {
 	OutputCostPerImage                  *float64 `json:"output_cost_per_image"`
 	OutputCostPerImageToken             *float64 `json:"output_cost_per_image_token"`
 	InputCostPerImageToken              *float64 `json:"input_cost_per_image_token"`
+	CacheReadInputImageTokenCost        *float64 `json:"cache_read_input_image_token_cost"`
 }
 
 // PricingService 动态价格服务
@@ -170,6 +175,9 @@ type PricingService struct {
 	pricingData  map[string]*LiteLLMModelPricing
 	lastUpdated  time.Time
 	localHash    string
+	// fallback/override 文件在最近一次成功重建时的内容指纹，定时器据此判断是否
+	// 需要从本地目录缓存重建叠加层。
+	customFilesHash string
 
 	// 停止信号
 	stopCh chan struct{}
@@ -216,14 +224,21 @@ func (s *PricingService) Stop() {
 	logger.LegacyPrintf("service.pricing", "%s", "[Pricing] Service stopped")
 }
 
-// startUpdateScheduler 启动定时更新调度器
+// startUpdateScheduler 启动定时调度器：每个周期先做远程目录哈希同步（配置了 remote_url 时），
+// 再比对 fallback/override 文件指纹做本地热重载（配置了任一文件时）。两者都未配置则不启动。
 func (s *PricingService) startUpdateScheduler() {
-	if s == nil || s.cfg == nil || strings.TrimSpace(s.cfg.Pricing.RemoteURL) == "" {
+	if s == nil || s.cfg == nil {
+		return
+	}
+	remoteEnabled := strings.TrimSpace(s.cfg.Pricing.RemoteURL) != ""
+	watchCustom := s.hasCustomPricingFiles()
+	if !remoteEnabled {
 		logger.LegacyPrintf("service.pricing", "%s", "[Pricing] Remote sync disabled: pricing remote URL is empty")
+	}
+	if !remoteEnabled && !watchCustom {
 		return
 	}
 
-	// 定期检查哈希更新
 	hashInterval := time.Duration(s.cfg.Pricing.HashCheckIntervalMinutes) * time.Minute
 	if hashInterval < time.Minute {
 		hashInterval = 10 * time.Minute
@@ -238,8 +253,13 @@ func (s *PricingService) startUpdateScheduler() {
 		for {
 			select {
 			case <-ticker.C:
-				if err := s.syncWithRemote(); err != nil {
-					logger.LegacyPrintf("service.pricing", "[Pricing] Sync failed: %v", err)
+				if remoteEnabled {
+					if err := s.syncWithRemote(); err != nil {
+						logger.LegacyPrintf("service.pricing", "[Pricing] Sync failed: %v", err)
+					}
+				}
+				if watchCustom {
+					s.reloadIfCustomFilesChanged()
 				}
 			case <-s.stopCh:
 				return
@@ -247,7 +267,7 @@ func (s *PricingService) startUpdateScheduler() {
 		}
 	}()
 
-	logger.LegacyPrintf("service.pricing", "[Pricing] Update scheduler started (check every %v)", hashInterval)
+	logger.LegacyPrintf("service.pricing", "[Pricing] Update scheduler started (check every %v, remote sync=%t, custom file watch=%t)", hashInterval, remoteEnabled, watchCustom)
 }
 
 // checkAndUpdatePricing 检查并更新价格数据
@@ -348,6 +368,118 @@ func (s *PricingService) syncWithRemote() error {
 	return nil
 }
 
+// hasCustomPricingFiles 报告是否配置了 fallback/override 任一文件路径（不要求文件存在）。
+func (s *PricingService) hasCustomPricingFiles() bool {
+	if s == nil || s.cfg == nil {
+		return false
+	}
+	return strings.TrimSpace(s.cfg.Pricing.FallbackFile) != "" || strings.TrimSpace(s.cfg.Pricing.OverrideFile) != ""
+}
+
+// customPricingFilesFingerprint 返回 fallback、override 两个文件当前内容的联合 sha256。
+// 每个文件以"长度前缀 + 正文"参与计算，不可读的文件按空正文处理；未配置任何文件返回空串。
+func (s *PricingService) customPricingFilesFingerprint() string {
+	if !s.hasCustomPricingFiles() {
+		return ""
+	}
+	h := sha256.New()
+	for _, path := range []string{s.cfg.Pricing.FallbackFile, s.cfg.Pricing.OverrideFile} {
+		var body []byte
+		if p := strings.TrimSpace(path); p != "" {
+			body, _ = os.ReadFile(p)
+		}
+		var size [8]byte
+		binary.BigEndian.PutUint64(size[:], uint64(len(body)))
+		_, _ = h.Write(size[:])
+		_, _ = h.Write(body)
+	}
+	return hex.EncodeToString(h.Sum(nil))
+}
+
+// validateCustomPricingFiles 要求每个已配置且存在的 fallback/override 文件可读且为 JSON
+// 对象，任一不满足即返回带路径的错误；文件不存在视为该层为空，属合法状态。
+func (s *PricingService) validateCustomPricingFiles() error {
+	for _, path := range []string{s.cfg.Pricing.FallbackFile, s.cfg.Pricing.OverrideFile} {
+		p := strings.TrimSpace(path)
+		if p == "" {
+			continue
+		}
+		body, err := os.ReadFile(p)
+		if os.IsNotExist(err) {
+			continue
+		}
+		if err != nil {
+			return err
+		}
+		var entries map[string]json.RawMessage
+		if err := json.Unmarshal(body, &entries); err != nil {
+			return fmt.Errorf("%s: %w", p, err)
+		}
+	}
+	return nil
+}
+
+// reloadIfCustomFilesChanged 比对 fallback/override 文件指纹，与最近一次重建时不同则从
+// 本地目录缓存重建内存数据。文件被删除视为该层清空，照常重建；文件存在但不可读或不是
+// JSON 对象时保留当前数据且不更新指纹，下一轮会再次尝试并重复告警。目录正文与远程同步
+// 锚点(localHash)不受本路径影响。
+func (s *PricingService) reloadIfCustomFilesChanged() {
+	fingerprint := s.customPricingFilesFingerprint()
+	s.mu.RLock()
+	unchanged := fingerprint == s.customFilesHash
+	s.mu.RUnlock()
+	if unchanged {
+		return
+	}
+	if err := s.reloadCustomPricingLayers(); err != nil {
+		logger.LegacyPrintf("service.pricing", "[Pricing] Custom pricing file changed but reload failed: %v", err)
+	}
+}
+
+// reloadCustomPricingLayers 读取本地目录缓存并重新叠加 fallback/override，只替换内存数据
+// 与叠加层指纹。
+func (s *PricingService) reloadCustomPricingLayers() error {
+	pricingFile := s.getPricingFilePath()
+	// 定价层文件可能在读取期间被替换。只有构建前后指纹一致时才提交，
+	// 否则丢弃这次混合快照并重试，避免短暂应用不匹配的 fallback/override。
+	var data map[string]*LiteLLMModelPricing
+	var fingerprint string
+	var err error
+	for attempt := 0; attempt < 3; attempt++ {
+		if validateErr := s.validateCustomPricingFiles(); validateErr != nil {
+			return fmt.Errorf("validate custom pricing files: %w", validateErr)
+		}
+		before := s.customPricingFilesFingerprint()
+		body, readErr := os.ReadFile(pricingFile)
+		if readErr != nil {
+			return fmt.Errorf("read file failed: %w", readErr)
+		}
+		data, fingerprint, err = s.buildPricingData(body)
+		if err != nil {
+			return fmt.Errorf("parse pricing data: %w", err)
+		}
+		after := s.customPricingFilesFingerprint()
+		if validateErr := s.validateCustomPricingFiles(); validateErr != nil {
+			return fmt.Errorf("validate custom pricing files: %w", validateErr)
+		}
+		if before == after && after == fingerprint {
+			break
+		}
+		if attempt == 2 {
+			return fmt.Errorf("custom pricing files changed during reload")
+		}
+	}
+
+	s.mu.Lock()
+	warnDroppedLongContextLadders(s.pricingData, data)
+	s.pricingData = data
+	s.customFilesHash = fingerprint
+	s.mu.Unlock()
+
+	logger.LegacyPrintf("service.pricing", "[Pricing] Custom pricing files changed, reloaded %d models from %s", len(data), pricingFile)
+	return nil
+}
+
 // downloadPricingData 从远程下载价格数据
 func (s *PricingService) downloadPricingData() error {
 	remoteURL, err := s.validatePricingURL(s.cfg.Pricing.RemoteURL)
@@ -382,8 +514,7 @@ func (s *PricingService) downloadPricingData() error {
 			remoteHash[:min(8, len(remoteHash))], dataHashStr[:8])
 	}
 
-	// 解析JSON数据（使用灵活的解析方式）
-	data, err := s.parsePricingData(body)
+	data, customFilesHash, err := s.buildPricingData(body)
 	if err != nil {
 		return fmt.Errorf("parse pricing data: %w", err)
 	}
@@ -413,6 +544,7 @@ func (s *PricingService) downloadPricingData() error {
 	s.pricingData = data
 	s.lastUpdated = time.Now()
 	s.localHash = syncHash
+	s.customFilesHash = customFilesHash
 	s.mu.Unlock()
 
 	logger.LegacyPrintf("service.pricing", "[Pricing] Downloaded %d models successfully", len(data))
@@ -472,6 +604,7 @@ func (s *PricingService) parsePricingData(body []byte) (map[string]*LiteLLMModel
 		}
 		if entry.CacheCreationInputTokenCost != nil {
 			pricing.CacheCreationInputTokenCost = *entry.CacheCreationInputTokenCost
+			pricing.CacheCreationInputTokenCostExplicit = true
 		}
 		if entry.CacheCreationInputTokenCostPriority != nil {
 			pricing.CacheCreationInputTokenCostPriority = *entry.CacheCreationInputTokenCostPriority
@@ -502,6 +635,23 @@ func (s *PricingService) parsePricingData(body []byte) (map[string]*LiteLLMModel
 		}
 		if entry.InputCostPerImageToken != nil {
 			pricing.InputCostPerImageToken = *entry.InputCostPerImageToken
+		}
+		if entry.CacheReadInputImageTokenCost != nil {
+			pricing.CacheReadInputImageTokenCost = *entry.CacheReadInputImageTokenCost
+		}
+
+		hasExplicitLongContext := entry.LongContextInputTokenThreshold != nil ||
+			entry.LongContextInputCostMultiplier != nil ||
+			entry.LongContextOutputCostMultiplier != nil
+		if !hasExplicitLongContext {
+			deriveLongContextFromAboveTierFields(rawEntry, pricing)
+			if isLopsidedLongContextLadder(pricing) {
+				lopsidedLadders = append(lopsidedLadders, fmt.Sprintf("%s(input x%.2f, output x%.2f)", modelName,
+					pricing.LongContextInputCostMultiplier, pricing.LongContextOutputCostMultiplier))
+			}
+		}
+		if orphans := orphanCacheTierFields(rawEntry); len(orphans) > 0 {
+			orphanCacheTiers = append(orphanCacheTiers, modelName+"("+strings.Join(orphans, ",")+")")
 		}
 
 		hasExplicitLongContext := entry.LongContextInputTokenThreshold != nil ||
@@ -805,8 +955,7 @@ func (s *PricingService) loadPricingData(filePath string) error {
 		return fmt.Errorf("read file failed: %w", err)
 	}
 
-	// 使用灵活的解析方式
-	pricingData, err := s.parsePricingData(data)
+	pricingData, customFilesHash, err := s.buildPricingData(data)
 	if err != nil {
 		return fmt.Errorf("parse pricing data: %w", err)
 	}
@@ -821,6 +970,7 @@ func (s *PricingService) loadPricingData(filePath string) error {
 	warnDroppedLongContextLadders(s.pricingData, pricingData)
 	s.pricingData = pricingData
 	s.localHash = hashStr
+	s.customFilesHash = customFilesHash
 
 	info, _ := os.Stat(filePath)
 	if info != nil {
@@ -1052,7 +1202,7 @@ func (s *PricingService) buildModelLookupCandidates(modelLower string) []string 
 	normalized := normalizeModelNameForPricing(modelLower)
 
 	// A tier-specific entry should take precedence when the pricing catalog gains
-	// one later. Today Antigravity's Gemini 3.6 Flash tiers share the base rate,
+	// one later. Antigravity's Gemini Flash thinking tiers share the base rate,
 	// so the normalized base remains the fallback after the exact aliases.
 	candidates := rawCandidates
 	if normalizeGeminiThinkingTierAlias(lastSegment(modelLower)) != lastSegment(modelLower) {
@@ -1100,6 +1250,9 @@ func normalizeModelNameForPricing(model string) string {
 
 	model = strings.TrimLeft(model, "/")
 	if canonical := canonicalizeOpenAIModelAliasSpelling(model); canonical != "" {
+		if canonical == "gpt-6" {
+			return "gpt-6-astra"
+		}
 		if canonical == "gpt-5.6" {
 			return "gpt-5.6-sol"
 		}
@@ -1111,15 +1264,16 @@ func normalizeModelNameForPricing(model string) string {
 	return normalizeGeminiThinkingTierAlias(model)
 }
 
-// normalizeGeminiThinkingTierAlias maps Antigravity's Gemini 3.6 Flash
+// normalizeGeminiThinkingTierAlias maps Antigravity's Gemini Flash
 // thinking-tier model IDs to the public base model. The tier controls reasoning
 // behavior, not the published token rate, so this keeps -high/-low/-medium and
-// -tiered requests on the same price card as gemini-3.6-flash.
+// -tiered requests on the corresponding base model's price card.
 func normalizeGeminiThinkingTierAlias(model string) string {
-	const baseModel = "gemini-3.6-flash"
-	for _, tier := range []string{"-high", "-low", "-medium", "-tiered"} {
-		if model == baseModel+tier {
-			return baseModel
+	for _, baseModel := range []string{"gemini-3.6-flash", "gemini-3.7-flash", "gemini-3.8-flash"} {
+		for _, tier := range []string{"-high", "-low", "-medium", "-tiered"} {
+			if model == baseModel+tier {
+				return baseModel
+			}
 		}
 	}
 	return model
@@ -1153,6 +1307,18 @@ func (s *PricingService) extractBaseName(model string) string {
 
 // matchByModelFamily 基于模型系列匹配
 func (s *PricingService) matchByModelFamily(model string) *LiteLLMModelPricing {
+	if claude.IsOpus55(model) {
+		if pricing, ok := s.pricingData["claude-opus-5-5"]; ok {
+			return pricing
+		}
+		return claudeOpus55FallbackPricing
+	}
+	if claude.IsSonnet55(model) {
+		if pricing, ok := s.pricingData["claude-sonnet-5-5"]; ok {
+			return pricing
+		}
+		return claudeSonnet55FallbackPricing
+	}
 	// modelFamily 定义一个模型系列的匹配和定价查找规则。
 	type modelFamily struct {
 		name    string   // 系列名称
@@ -1253,6 +1419,9 @@ func (s *PricingService) matchByModelFamily(model string) *LiteLLMModelPricing {
 	for _, pattern := range lookups {
 		for key, pricing := range s.pricingData {
 			keyLower := strings.ToLower(key)
+			if matched.name == "opus-5" && claude.IsOpus55(keyLower) {
+				continue
+			}
 			if strings.Contains(keyLower, pattern) {
 				logger.LegacyPrintf("service.pricing", "[Pricing] Fuzzy matched %s -> %s", model, key)
 				return pricing
@@ -1281,6 +1450,22 @@ func (s *PricingService) matchOpenAIModel(model string) *LiteLLMModelPricing {
 		}
 	}
 
+	if openai.IsGPT61SolModelSpelling(model) {
+		if pricing, ok := s.pricingData["gpt-6.1-sol"]; ok {
+			return pricing
+		}
+		return openAIGPT61SolFallbackPricing
+	}
+	if openai.IsGPT6SolOrLunaModelSpelling(model) {
+		if pricing, ok := s.pricingData[normalizeKnownOpenAICodexModel(model)]; ok {
+			return pricing
+		}
+		if strings.HasPrefix(model, "gpt-6-sol") {
+			return openAIGPT6SolFallbackPricing
+		}
+		return openAIGPT6LunaFallbackPricing
+	}
+
 	// 尝试的回退变体
 	variants := s.generateOpenAIModelVariants(model, openAIModelDatePattern)
 
@@ -1298,6 +1483,12 @@ func (s *PricingService) matchOpenAIModel(model string) *LiteLLMModelPricing {
 				Info(fmt.Sprintf("[Pricing] OpenAI fallback matched %s -> %s", model, "gpt-5.2-codex"))
 			return pricing
 		}
+	}
+
+	if isOpenAIGPT6AstraModel(model) {
+		logger.With(zap.String("component", "service.pricing")).
+			Info(fmt.Sprintf("[Pricing] OpenAI fallback matched %s -> %s", model, "gpt-6-astra(static)"))
+		return openAIGPT6AstraFallbackPricing
 	}
 
 	if strings.HasPrefix(model, "gpt-5.6-sol") {
@@ -1341,6 +1532,13 @@ func (s *PricingService) matchOpenAIModel(model string) *LiteLLMModelPricing {
 		return openAIGPT54FallbackPricing
 	}
 
+	// Remote price mirrors can lag new releases. Never bill GPT Image 2.5
+	// using the older image model's rates when its entry is absent.
+	for _, imageModel := range []string{"gpt-image-2.5-flare", "gpt-image-2.5-sunburst"} {
+		if model == imageModel || model == imageModel+"-2026-09-08" {
+			return openAIGPTImage25FallbackPricing
+		}
+	}
 	if isOpenAIImageGenerationModel(model) {
 		for _, candidate := range []string{"gpt-image-2", "gpt-image-1.5", "gpt-image-1"} {
 			if pricing, ok := s.pricingData[candidate]; ok {

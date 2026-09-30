@@ -112,6 +112,8 @@ func (s *OpenAIGatewayService) failoverOpenAIUpstreamHTTPError(
 		upstreamDetail = truncateString(string(respBody), maxBytes)
 	}
 	appendOpsUpstreamError(c, OpsUpstreamErrorEvent{
+		ProxyID:            opsUpstreamProxyID(account),
+		ProxyName:          opsUpstreamProxyName(account),
 		Platform:           account.Platform,
 		AccountID:          account.ID,
 		AccountName:        account.Name,
@@ -202,6 +204,11 @@ func (s *OpenAIGatewayService) sendCCUpstreamRequest(
 	userAgent string,
 	grokCacheIdentity string,
 ) (*http.Response, error) {
+	// DeepSeek thinking mode 要求历史 assistant 回传 reasoning_content。
+	// Responses→CC 回退在加密-only / 缺 reasoning item 且缓存未命中时会漏掉该
+	// 字段，上游 400 "The `reasoning_content` in the thinking mode must be
+	// passed back to the API"。在共用出站点补空格占位，真实明文不覆盖。
+	body = ensureDeepSeekChatReasoningPlaceholders(account, body)
 	upstreamCtx, releaseUpstreamCtx := detachUpstreamContext(ctx)
 	// detachUpstreamContext intentionally ignores client cancellation so a
 	// streaming request can finish usage accounting. Preserve an explicit
@@ -256,6 +263,10 @@ func (s *OpenAIGatewayService) sendCCUpstreamRequest(
 		}
 		applyGrokCacheHeaders(upstreamReq.Header, grokCacheIdentity)
 	}
+	// 官方 OpenCode / Command Code 上游收敛为规范客户端 UA：客户端透传的编程库
+	// UA 会命中其前置 Cloudflare bot 拦截（CF 1010/403），并被计入账号 403 strike。
+	applyOpenCodeUpstreamUserAgent(account, targetURL, upstreamReq.Header)
+
 	// 账号级请求头覆写：放在所有内置默认头（含 Grok CLI 身份头）之后应用，
 	// 使配置值获得除共享传输层强制头之外的最高优先级。
 	account.ApplyHeaderOverrides(upstreamReq.Header)
@@ -264,7 +275,7 @@ func (s *OpenAIGatewayService) sendCCUpstreamRequest(
 	setOpenAIUpstreamRequestBody(upstreamReq, body)
 
 	proxyURL := ""
-	if account.Proxy != nil {
+	if account.ProxyID != nil && account.Proxy != nil {
 		proxyURL = account.Proxy.URL()
 	}
 	upstreamStart := time.Now()

@@ -57,6 +57,7 @@ func (s *OpenAIGatewayService) ForwardAsAnthropic(
 	if shouldForwardOpenAIResponsesViaRawChatCompletions(account) {
 		return s.forwardAnthropicViaRawChatCompletions(ctx, c, account, body, defaultMappedModel)
 	}
+	SetActualOpenAIUpstreamEndpoint(c, openAIResponsesUpstreamEndpoint)
 
 	startTime := time.Now()
 
@@ -74,6 +75,10 @@ func (s *OpenAIGatewayService) ForwardAsAnthropic(
 	// 2. Model mapping
 	billingModel := resolveOpenAIForwardModel(account, normalizedModel, defaultMappedModel)
 	upstreamModel := normalizeOpenAIModelForUpstream(account, billingModel)
+	if err := validateGPT61SolCompatRequest(body, upstreamModel); err != nil {
+		writeAnthropicError(c, http.StatusBadRequest, "invalid_request_error", err.Error())
+		return nil, err
+	}
 	promptCacheKey = strings.TrimSpace(promptCacheKey)
 	apiKeyID := getAPIKeyIDFromContext(c)
 	anthropicDigestChain := ""
@@ -125,6 +130,7 @@ func (s *OpenAIGatewayService) ForwardAsAnthropic(
 	}
 
 	// 3. Convert Anthropic → Responses after compatibility-only replay guard.
+	anthropicReq.Model = upstreamModel
 	responsesReq, err := apicompat.AnthropicToResponses(&anthropicReq)
 	if err != nil {
 		return nil, fmt.Errorf("convert anthropic to responses: %w", err)
@@ -365,7 +371,7 @@ func (s *OpenAIGatewayService) ForwardAsAnthropic(
 
 	// 7. Send request
 	proxyURL := ""
-	if account.Proxy != nil {
+	if account.ProxyID != nil && account.Proxy != nil {
 		proxyURL = account.Proxy.URL()
 	}
 	// Grok may reject encrypted reasoning replayed under a different OAuth
@@ -522,6 +528,7 @@ func (s *OpenAIGatewayService) ForwardAsAnthropic(
 		notifyOpenAIAutoReset(*account.ParentAccountID)
 	}
 
+	stampOpenAIResponsesUpstreamEndpoint(c, result)
 	return result, handleErr
 }
 
@@ -680,6 +687,8 @@ func (s *OpenAIGatewayService) recordOpenAIMessagesStreamUpstreamError(c *gin.Co
 	message = sanitizeUpstreamErrorMessage(message)
 	setOpsUpstreamError(c, http.StatusBadGateway, message, "")
 	event := OpsUpstreamErrorEvent{
+		ProxyID:            opsUpstreamProxyID(account),
+		ProxyName:          opsUpstreamProxyName(account),
 		Platform:           PlatformOpenAI,
 		UpstreamStatusCode: http.StatusBadGateway,
 		UpstreamRequestID:  strings.TrimSpace(upstreamRequestID),

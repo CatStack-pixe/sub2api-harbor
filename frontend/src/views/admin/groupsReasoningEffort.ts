@@ -12,6 +12,28 @@ const openAIReasoningEffortValues = [
   "xhigh",
   "max",
 ] as const;
+const openAIReasoningEffortSourceValues = [
+  "none",
+  ...openAIReasoningEffortValues,
+] as const;
+
+const anthropicReasoningEffortValues = [
+  "low",
+  "medium",
+  "high",
+  "xhigh",
+  "max",
+] as const;
+
+const reasoningEffortMatchTypes: readonly ReasoningEffortMatchType[] = [
+  "exact",
+  "prefix",
+  "suffix",
+];
+
+export const reasoningEffortOverLimitDowngrade = "downgrade";
+export const reasoningEffortOverLimitDeny = "deny";
+export const reasoningEffortMappingDeny = "deny";
 
 const reasoningEffortMatchTypes: readonly ReasoningEffortMatchType[] = [
   "exact",
@@ -40,6 +62,26 @@ export function reasoningEffortOptionsForPlatform(platform: GroupPlatform) {
     value,
     label: value,
   }));
+}
+
+export function reasoningEffortSourceOptionsForPlatform(
+  platform: GroupPlatform,
+) {
+  return (supportsReasoningEffortPolicyPlatform(platform)
+    ? openAIReasoningEffortSourceValues
+    : []
+  ).map((value) => ({ value, label: value }));
+}
+
+export function reasoningEffortTargetOptionsForPlatform(
+  platform: GroupPlatform,
+) {
+  const options = reasoningEffortOptionsForPlatform(platform);
+  if (options.length === 0) return options;
+  return [
+    ...options,
+    { value: reasoningEffortMappingDeny, label: reasoningEffortMappingDeny },
+  ];
 }
 
 export function normalizeReasoningEffortForPlatform(

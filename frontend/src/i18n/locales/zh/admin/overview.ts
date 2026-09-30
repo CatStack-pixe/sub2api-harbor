@@ -50,6 +50,7 @@ export default {
       tokens: 'Token',
       cache: '缓存',
       recentUsage: '最近使用',
+      actualSpending: '实际消费 ($)',
       viewModelDistribution: '模型分布',
       viewSpendingRanking: '用户消费榜',
       spendingRankingTitle: '用户消费榜',
@@ -122,10 +123,42 @@ export default {
         cronExpr: 'Cron 表达式',
         cronHint: '例如 "0 2 * * *" 表示每天凌晨 2 点',
         retainDays: '备份过期天数',
-        retainDaysHint: '备份文件超过此天数后自动删除，0 = 永不过期',
+        retainDaysHint: '普通备份超过此天数后自动删除，0 = 不按天数清理',
         retainCount: '最大保留份数',
-        retainCountHint: '最多保留的备份数量，0 = 不限制',
+        retainCountHint: '最多保留的普通备份数量，0 = 不按份数清理',
+        ordinaryRetention: '普通备份保留',
+        ordinaryHint: '达到任一清理条件时，清理最旧的普通备份；月度归档独立保留。',
+        preview: '保留效果',
+        previewBoth: '最近 {days} 天内最多保留 {count} 份普通备份。',
+        previewDays: '保留最近 {days} 天的普通备份，份数不限。',
+        previewCount: '保留最新 {count} 份普通备份，天数不限。',
+        previewUnlimited: '普通备份不自动清理。',
         saved: '定时备份配置已保存'
+      },
+      archive: {
+        title: '月度归档',
+        enabled: '启用',
+        dates: '归档日期（可多选）',
+        selectDates: '请至少选择一个归档日期',
+        selectedDates: '已选择 {count} 个日期',
+        day: '{day} 日',
+        monthEnd: '月末',
+        done: '完成',
+        datesHint: '按备份计划的时区与备份开始日期匹配，每个日期归档首份成功的定时备份。',
+        retention: '归档保留方式',
+        count: '归档保留数量',
+        copies: '份',
+        forever: '永久保留',
+        foreverHint: '所有新归档均永久保留；已有永久归档不会因配置变更被自动删除。',
+        countHint: '所有选定日期的非永久归档合计计数，超出时清理最旧归档。',
+        fallbackHint: '当日无成功备份时，顺延至本月下次成功备份；当月没有所选日期时按月末处理，同一份备份只计一份。',
+        independentHint: '归档不额外执行备份，不占普通备份名额；本月无后续成功备份则不归档。',
+        disabledHint: '关闭后停止产生新归档，已有归档继续按原保留方式管理。',
+        invalidRetention: '保留天数和份数须为非负整数；非永久归档须填写至少 1 份。',
+        preview: '每月 {dates} 各归档一份，{retention}。',
+        retainLatest: '合计保留最近 {count} 份',
+        badge: '月度归档',
+        deleteConfirm: '这是月度归档备份。确定要解除归档保护并永久删除此备份吗？此操作无法撤销。',
       },
       operations: {
         title: '备份记录',
@@ -390,10 +423,12 @@ export default {
 
     affiliates: {
       invitesDescription: '查看全站邀请关系和被邀请用户累计返利',
-      rebatesDescription: '查看每一笔产生返利的充值订单',
-      transfersDescription: '查看返利额度转入账户余额的提取流水',
+      rebatesDescription: '查看每一笔返利入账，包括充值订单、兑换码和管理员充值产生的返利',
+      transfersDescription: '查看返利额度转入余额与线下提现的流水',
       errors: {
-        loadFailed: '加载邀请返利记录失败'
+        loadFailed: '加载邀请返利记录失败',
+        AFFILIATE_QUOTA_INSUFFICIENT: '可提取返利额度不足',
+        AFFILIATE_WITHDRAW_AMOUNT_INVALID: '提现金额无效'
       },
       records: {
         search: '搜索',
@@ -418,7 +453,33 @@ export default {
         historyQuotaAfter: '提取后历史返利',
         invitedAt: '邀请时间',
         rebatedAt: '返利时间',
-        transferredAt: '提取时间'
+        transferredAt: '提取时间',
+        outflowType: '类型'
+      },
+      outflowTypes: {
+        transfer: '转入余额',
+        withdraw: '线下提现'
+      },
+      withdraw: {
+        button: '登记线下提现',
+        title: '登记线下提现',
+        user: '用户',
+        userPlaceholder: '输入邮箱或用户名搜索',
+        noUserFound: '未找到匹配的用户',
+        changeUser: '更换用户',
+        availableQuota: '当前可提取额度',
+        frozenHint: '冻结期内的返利不计入可提取额度',
+        amount: '提现金额（USD）',
+        amountHint: '填写已在站外实际打款给该用户的金额',
+        fillAll: '全部',
+        warning: '登记后将从该用户的可提取返利额度中扣除，且无法撤销。请确认已完成站外打款。',
+        submit: '确认登记',
+        submitting: '登记中...',
+        success: '已登记线下提现 {amount}，剩余可提取 {remaining}',
+        replayed: '这笔线下提现此前已登记（{amount}），本次未重复扣减；登记后剩余可提取 {remaining}',
+        uncertainHint: '上次提交没有收到结果，可能已经登记成功。用户与金额已锁定，重新提交会沿用同一笔登记，已登记时不会重复扣减。',
+        amountRequired: '请输入大于 0 的金额',
+        amountExceeds: '提现金额不能超过当前可提取额度'
       },
       overview: {
         title: '用户返利概览',
@@ -436,6 +497,13 @@ export default {
       title: '用户管理',
       description: '管理用户账户和权限',
       createUser: '创建用户',
+      bulkDelete: {
+        action: '批量删除（{count}）',
+        title: '删除已选用户',
+        confirm: '确定删除已选的 {count} 个用户吗？此操作无法撤销。管理员账号无法删除。',
+        success: '已删除 {count} 个用户',
+        failed: '{count} 个用户删除失败，已保留选中，可重试。'
+      },
       bulkLimits: {
         action: '批量设置限制（{count}）',
         title: '批量设置用户限制',
@@ -494,6 +562,7 @@ export default {
       leaveEmptyToKeep: '留空则保持原密码不变',
       generatePassword: '生成随机密码',
       copyPassword: '复制密码',
+      passwordCopied: '密码已复制',
       creating: '创建中...',
       updating: '更新中...',
       columns: {
@@ -754,6 +823,7 @@ export default {
         clearAllConfirm: '确认清空全部平台的日 / 周 / 月限额？所有平台将变为"无限额"，本地无法撤销，需要在保存前手动重填。',
         reset: {
           button: '重置该窗口',
+          unavailable: '该平台未配置限额，没有可重置的用量窗口',
           confirm: '确认重置该用户 {platform} 平台的 {window} 用量？此操作立即生效。',
           success: '已重置 {platform} {window} 用量',
           failed: '重置失败',
@@ -857,6 +927,7 @@ export default {
         reasoningEffortModelPlaceholder: '留空则全部 / gpt / gpt-5.4',
         reasoningEffortFrom: '请求值',
         reasoningEffortTo: '转发值',
+        reasoningEffortToDeny: '拒绝',
         reasoningEffortFromPlaceholder: '请选择 A',
         reasoningEffortToPlaceholder: '请选择 B',
         fromRequired: '请选择请求值 A',
@@ -1079,7 +1150,28 @@ export default {
         empty: '暂无可展示模型',
         selectedSummary: '已选 {selected} / {total}',
         selectAll: '全选',
-        invertSelection: '反选'
+        invertSelection: '反选',
+        wildcardTag: '通配',
+        customPlaceholder: '自定义条目，如 gpt-*-codex 或 claude-*',
+        addCustom: '添加',
+        emptySelectionError: '模型白名单已开启，请至少选择或添加一个模型条目',
+        errors: {
+          empty: '请输入模型条目',
+          duplicate: '该条目已存在'
+        }
+      },
+      codexModelsManifest: {
+        title: '固定账号获取模型列表',
+        hint: '开启后，普通模型列表与 Codex Model Manifest 均优先从选定账号获取并合并，再应用账号映射和分组列表过滤；限流/过载中的选定账号仍会被使用。',
+        enable: '使用特定账号获取模型列表',
+        enabledHint: '账号来源限定为当前分组内的 OpenAI 账号，最多选择 10 个。',
+        disabledHint: '未启用：普通列表使用本地映射或默认模型；Codex 优先使用本地目录，无本地目录时由调度器选账。',
+        accounts: '选定账号',
+        searchPlaceholder: '搜索账号（当前分组内 OpenAI 账号）',
+        searchEmpty: '未找到匹配账号',
+        fallback: '选定账号全部不可用时回退调度器',
+        fallbackHint: '关闭时返回 503 / 上游错误；开启时回退到现有调度器选账路径。',
+        selectAtLeastOne: '开启固定账号后至少选择一个账号'
       },
       modelMapping: {
         title: 'Agnes 请求模型映射',
@@ -1216,6 +1308,12 @@ export default {
         selectAccounts: '选择账号',
         noAccounts: '此分组暂无账号',
         loadingAccounts: '加载账号中...',
+        removeRule: '删除规则',
+        noRules: '暂无路由规则',
+        noRulesHint: '添加路由规则以将特定模型请求优先路由到指定账号',
+        searchAccountPlaceholder: '搜索账号...',
+        accountsHint: '选择此模型模式优先使用的账号'
+      },
       claudeMaxSimulation: {
         title: 'Claude Max 用量模拟',
         tooltip:
@@ -1223,12 +1321,6 @@ export default {
         enabled: '已启用（模拟 1h 缓存）',
         disabled: '已禁用',
         hint: '仅调整用量计费日志中的 token 类别。不会持久化每个请求的映射状态。'
-      },
-        removeRule: '删除规则',
-        noRules: '暂无路由规则',
-        noRulesHint: '添加路由规则以将特定模型请求优先路由到指定账号',
-        searchAccountPlaceholder: '搜索账号...',
-        accountsHint: '选择此模型模式优先使用的账号'
       },
       mcpXml: {
         title: 'MCP XML 协议注入',

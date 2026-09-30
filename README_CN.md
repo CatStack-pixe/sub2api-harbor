@@ -112,14 +112,6 @@
 </tr>
 
 <tr>
-<td width="180"><a href="http://www.fastaitoken.com/register"><img src="assets/partners/logos/fastaitoken.jpg" alt="fastaitoken" width="150"></a></td>
-<td>🎉 感谢 FastAIToken 对本项目的赞助！ <a href="http://www.fastaitoken.com/register">FastAIToken</a> 是面向开发者的 AI API 聚合平台，支持 OpenAI、Claude、Gemini 等主流大模型，充值 1:1，1 元 = 1 美元 API 额度，让开发者以更低成本、更便捷地使用全球领先的大模型服务。<br>
-
-🚀 平台提供多种渠道自由选择：超级低价的0.02x OpenAI 福利分组（限时）、低至 0.25x OpenAI 分组、0.7x Claude 95%固定缓存、1.2x Claude Max 渠道；同时提供公开状态页，实时展示各分组的可用率、延迟及运行状态，服务透明可靠，并提供 7×24 小时真人技术支持（非机器人），快速响应开发者需求。
-</td>
-</tr>
-
-<tr>
 <td width="180"><a href="http://aimzoon.com"><img src="assets/partners/logos/aimzoon.jpg" alt="aimzoon" width="150"></a></td>
 <td>感谢 Aimzoon 对本项目的赞助！ <a href="http://aimzoon.com">Aimzoon</a> 提供稳定、高性价比的 AI API 接入服务，支持开发者将常用 AI 服务快速接入 Codex、Claude Code、Gemini CLI 等编程工具。无需复杂配置，更快接入，更稳调用，更省成本。codex倍率优惠，特价倍率等促销不断，注册即送免费体验额度，让 AI 编程真正进入日常工作流。<a href="http://aimzoon.com">点击这里</a>注册体验！
 </td>
@@ -222,6 +214,30 @@ underscores_in_headers on;
 ```
 
 Nginx 默认会丢弃名称中含下划线的请求头（如 `session_id`），这会导致多账号环境下的粘性会话功能失效。
+
+## Codex Fast/Flex 策略说明
+
+管理员后台的 `系统设置 -> 网关服务 -> OpenAI Fast/Flex 策略` 只负责处理请求体中的 `service_tier`，不会修改 Codex 客户端的模型目录，也不会让 Codex UI 自动出现 Speed 或 `/fast` 选项。
+
+策略支持以下处理方式：
+
+- `pass`：保留客户端传入的 `service_tier`；`fast` 会规范为上游使用的 `priority`。
+- `filter`：移除 `service_tier`，按普通优先级请求。
+- `block`：拒绝匹配的 Fast/Flex 请求。
+- `force_priority`：将匹配请求强制设置为 `priority`，会按 Priority/Fast 价格计费。为避免升级后改变既有规则语义，`all` 只匹配显式存在的 tier；如需让省略 `service_tier` 的 OpenAI 请求也强制升级，必须新增 `service_tier=missing + force_priority` 规则。非 OpenAI 平台不会执行缺省 tier 注入。这种方式可以让请求实际使用 Fast，但 Codex UI 仍可能不显示 Fast 状态。
+
+Codex 的 Fast 入口由客户端模型目录驱动。只有当前模型目录声明了 `additional_speed_tiers: ["fast"]` 和对应的 `service_tiers`，Codex 才会显示 `/fast`。通过 API Key 或自定义模型提供商连接 Sub2API 时，如果模型目录没有这些字段，即使后台配置了 `force_priority`，重启 Codex 后也不会出现 Speed 选项。
+
+客户端可在 `~/.codex/config.toml` 中直接指定默认请求级别：
+
+```toml
+service_tier = "fast"
+
+[features]
+fast_mode = true
+```
+
+其中 `service_tier = "fast"` 会让请求携带 Fast 设置；`features.fast_mode` 只启用客户端 Fast 功能。模型目录没有声明 Fast 能力时，`/fast` 仍可能不显示。可通过 Sub2API 使用记录确认最终 `service_tier` 是否为 `priority`。
 
 ---
 
@@ -702,12 +718,23 @@ go generate ./cmd/server
 
 ---
 
+## OpenAI 图片模型
+
+支持 `gpt-image-2.5-flare`、`gpt-image-2.5-sunburst` 及其 `2026-09-08` 日期快照，可通过 `/v1/images/generations`、`/v1/images/edits` 调用。`quality` 支持 `xhigh`、`max`、`auto`，合法自定义尺寸和图片 usage 明细保持透传。
+
+OAuth / Setup Token 图片请求使用 Responses 主控模型调用 `image_generation` 工具，默认主控为 `gpt-5.6-luna`。可设置 `SUB2API_IMAGES_MAIN_MODEL` 切换为账号支持的文本模型；Docker Compose 用户修改 `.env` 后执行 `docker compose up -d` 重建容器。该配置不会替换所选图片模型，也不会覆盖 `/v1/responses` 请求中已经提供的文本主控模型。
+
+升级后，无模型限制的账号自动支持新模型。已有显式账号映射或分组白名单需要加入两个 2.5 模型（日期快照按需加入）；升级不会自动扩大管理员设置的模型权限。新模型内置价格包含官方文本输入、图片输入和图片输出 token 费率，远端价格表尚未更新时使用内置 2.5 价格；实际按次或按 token 计费仍由既有分组/渠道配置决定。
+
 ## 简易模式
 
 简易模式适合个人开发者或内部团队快速使用，不依赖完整 SaaS 功能。
 
 - 启用方式：设置环境变量 `RUN_MODE=simple`
+- 默认每次启动会补齐默认分组。设置 `SIMPLE_MODE_AUTO_CREATE_DEFAULT_GROUPS=false`（或 YAML `simple_mode.auto_create_default_groups: false`）可自行管理分组。默认值为 `true`；关闭后不删除已有分组，不改变运行时自动绑定或管理员并发设置。
 - 功能差异：隐藏 SaaS 相关功能，跳过计费流程
+- 可选密钥窗口：设置 `SIMPLE_MODE_KEY_RATE_LIMIT_ENABLED=true` 后，按每个 API Key 配置的 5 小时、1 天、7 天消费窗口进行限制，默认值为 `false`；启用后仍跳过余额和订阅扣费。
+- 窗口限制以数据库为准，只记录 API Key 窗口用量。它在请求完成后记账，并发中的请求可能以各自最终费用超过窗口上限。启用前的历史用量不会自动补算。
 - 安全注意事项：生产环境需同时设置 `SIMPLE_MODE_CONFIRM=true` 才允许启动
 
 ---

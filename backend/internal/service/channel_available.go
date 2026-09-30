@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"maps"
 	"sort"
 	"strings"
 )
@@ -123,8 +124,10 @@ func fillGlobalPricingFallback(pricingService *PricingService, models []Supporte
 		return
 	}
 	for i := range models {
-		if !pricingNeedsFallback(models[i].Pricing) {
-			continue
+		if pricingService != nil && pricingNeedsFallback(models[i].Pricing) {
+			if lp := pricingService.GetModelPricing(models[i].Name); lp != nil {
+				models[i].Pricing = synthesizePricingFromLiteLLM(lp, models[i].Pricing)
+			}
 		}
 		lp := pricingService.GetModelPricing(models[i].Name)
 		if lp == nil {
@@ -180,11 +183,12 @@ func synthesizePricingFromLiteLLM(lp *LiteLLMModelPricing, existing *ChannelMode
 
 	if mode == BillingModeImage || mode == BillingModePerRequest {
 		return &ChannelModelPricing{
-			BillingMode:      mode,
-			PerRequestPrice:  nonZeroPtr(lp.OutputCostPerImage),
-			ImageOutputPrice: nonZeroPtr(lp.OutputCostPerImageToken),
-			InputPrice:       nonZeroPtr(lp.InputCostPerToken),
-			OutputPrice:      nonZeroPtr(lp.OutputCostPerToken),
+			BillingMode:                mode,
+			PerRequestPrice:            nonZeroPtr(lp.OutputCostPerImage),
+			ImageOutputPrice:           nonZeroPtr(lp.OutputCostPerImageToken),
+			InputPrice:                 nonZeroPtr(lp.InputCostPerToken),
+			OutputPrice:                nonZeroPtr(lp.OutputCostPerToken),
+			ReasoningEffortMultipliers: reasoningEffortMultipliersFromPricing(existing),
 		}
 	}
 	return &ChannelModelPricing{
@@ -196,6 +200,13 @@ func synthesizePricingFromLiteLLM(lp *LiteLLMModelPricing, existing *ChannelMode
 		CacheReadPrice:    nonZeroPtr(lp.CacheReadInputTokenCost),
 		ImageOutputPrice:  nonZeroPtr(lp.OutputCostPerImageToken),
 	}
+}
+
+func reasoningEffortMultipliersFromPricing(pricing *ChannelModelPricing) map[string]float64 {
+	if pricing == nil {
+		return nil
+	}
+	return maps.Clone(pricing.ReasoningEffortMultipliers)
 }
 
 func nonZeroPtr(v float64) *float64 {

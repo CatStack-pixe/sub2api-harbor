@@ -1,13 +1,17 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 
 import UsageView from '../UsageView.vue'
+import Select, { type SelectOption } from '@/components/common/Select.vue'
+import DateRangePicker from '@/components/common/DateRangePicker.vue'
+import UsageTable from '@/components/admin/usage/UsageTable.vue'
 
 const {
   query,
   getStats,
   getDashboardModels,
   getDashboardSnapshotV2,
+  listMyErrorRequests,
   list,
   getAvailable,
   showError,
@@ -19,6 +23,7 @@ const {
   getStats: vi.fn(),
   getDashboardModels: vi.fn(),
   getDashboardSnapshotV2: vi.fn(),
+  listMyErrorRequests: vi.fn(),
   list: vi.fn(),
   getAvailable: vi.fn(),
   showError: vi.fn(),
@@ -47,6 +52,9 @@ const messages: Record<string, string> = {
   'admin.usage.allGroups': 'All groups',
   'admin.usage.allModels': 'All models',
   'usage.allApiKeys': 'All API Keys',
+  'usage.errors.allKeys': 'All API Keys',
+  'usage.tabs.usage': 'Usage records',
+  'usage.tabs.errors': 'Error records',
   'usage.apiKeyFilter': 'API Key',
   'usage.model': 'Model',
   'usage.type': 'Type',
@@ -73,6 +81,7 @@ vi.mock('@/api', () => ({
     getStats,
     getDashboardModels,
     getDashboardSnapshotV2,
+    listMyErrorRequests,
   },
   keysAPI: {
     list,
@@ -82,8 +91,17 @@ vi.mock('@/api', () => ({
   },
 }))
 
+const appStoreState = vi.hoisted(() => ({
+  cachedPublicSettings: { allow_user_view_error_requests: true } as Record<string, unknown>,
+}))
+
 vi.mock('@/stores/app', () => ({
-  useAppStore: () => ({ showError, showWarning, showSuccess, showInfo }),
+  useAppStore: () => ({
+    showError, showWarning, showSuccess, showInfo,
+    get cachedPublicSettings() {
+      return appStoreState.cachedPublicSettings
+    },
+  }),
 }))
 
 vi.mock('vue-i18n', async () => {
@@ -142,6 +160,7 @@ function mountUsageView() {
         Icon: true,
         UsageStatsCards: chartStub,
         UsageTable: chartStub,
+        UserErrorRequestsTable: chartStub,
         ModelDistributionChart: chartStub,
         GroupDistributionChart: chartStub,
         EndpointDistributionChart: chartStub,
@@ -157,6 +176,7 @@ describe('user UsageView', () => {
     getStats.mockReset()
     getDashboardModels.mockReset()
     getDashboardSnapshotV2.mockReset()
+    listMyErrorRequests.mockReset()
     list.mockReset()
     getAvailable.mockReset()
     showError.mockReset()
@@ -191,7 +211,8 @@ describe('user UsageView', () => {
       trend: [],
       groups: [],
     })
-    list.mockResolvedValue({ items: [{ id: 1, name: 'demo-key' }] })
+    listMyErrorRequests.mockResolvedValue({ items: [], total: 0, page: 1, page_size: 20, pages: 0 })
+    list.mockResolvedValue({ items: [{ id: 1, name: 'demo-key' }], total: 1, page: 1, page_size: 100, pages: 1 })
     getAvailable.mockResolvedValue([{ id: 1, name: 'default' }])
   })
 
@@ -207,6 +228,7 @@ describe('user UsageView', () => {
       include_model_stats: false,
       include_group_stats: true,
     }))
+    expect(list).toHaveBeenCalledTimes(1)
     expect(list).toHaveBeenCalledWith(1, 100)
     expect(getAvailable).toHaveBeenCalled()
   })
@@ -290,7 +312,7 @@ describe('user UsageView', () => {
     expect(csvContent.startsWith('\uFEFF')).toBe(true)
     expect(csvContent.slice(1)).toBe([
       'Time,API Key Name,Model,Reasoning Effort,Inbound Endpoint,IP Address,Type,Billing Mode,Input Tokens,Output Tokens,Cache Read Tokens,Cache Creation Tokens,Rate Multiplier,Billed Cost,Original Cost,First Token (ms),Duration (ms)',
-      '2026-03-08T00:00:00Z,demo-key,gpt-5.4,"\'-",,203.0.113.10,Sync,Token,4057,101,278272,4,1,0.09288300,0.09288300,12,345',
+      '2026-03-08T00:00:00Z,demo-key,gpt-5.4,-,,203.0.113.10,Sync,Token,4057,101,278272,4,1,0.09288300,0.09288300,12,345',
     ].join('\n'))
     expect(csvContent).toContain('IP Address')
     expect(csvContent).toContain('203.0.113.10')
@@ -304,6 +326,101 @@ describe('user UsageView', () => {
     window.URL.revokeObjectURL = originalRevokeObjectURL
     vi.unstubAllGlobals()
     clickSpy.mockRestore()
+  })
+
+  it('keeps formula-injection protection for dangerous exported values', async () => {
+    query.mockResolvedValue({
+      items: [{ ...usageLog, api_key: { name: '-1+1' } }],
+      total: 1,
+      pages: 1,
+    })
+    const wrapper = mountUsageView()
+    await flushPromises()
+
+    let csvContent = ''
+    const OriginalBlob = globalThis.Blob
+    vi.stubGlobal('Blob', vi.fn((parts: BlobPart[], options?: BlobPropertyBag) => {
+      csvContent = parts.map((part) => String(part)).join('')
+      return new OriginalBlob(parts, options)
+    }))
+    const originalCreateObjectURL = window.URL.createObjectURL
+    const originalRevokeObjectURL = window.URL.revokeObjectURL
+    window.URL.createObjectURL = vi.fn(() => 'blob:usage-export') as typeof window.URL.createObjectURL
+    window.URL.revokeObjectURL = vi.fn(() => {}) as typeof window.URL.revokeObjectURL
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+
+    await (wrapper.vm as any).exportToCSV()
+
+    expect(csvContent).toContain(',"\'-1+1",gpt-5.4,-,')
+    expect(showSuccess).toHaveBeenCalled()
+
+    window.URL.createObjectURL = originalCreateObjectURL
+    window.URL.revokeObjectURL = originalRevokeObjectURL
+    vi.unstubAllGlobals()
+    clickSpy.mockRestore()
+    wrapper.unmount()
+  })
+
+  it('keeps the initial filters, sort, and filename while exporting multiple pages', async () => {
+    const pageResponse = { items: [usageLog], total: 101, pages: 2 }
+    query.mockResolvedValue(pageResponse)
+    const wrapper = mountUsageView()
+    await flushPromises()
+
+    const datePicker = wrapper.findComponent(DateRangePicker)
+    datePicker.vm.$emit('change', { startDate: '2026-03-01', endDate: '2026-03-08', preset: null })
+    await flushPromises()
+
+    let resolveFirstPage!: (value: typeof pageResponse) => void
+    const firstPage = new Promise<typeof pageResponse>((resolve) => { resolveFirstPage = resolve })
+    query.mockClear()
+    query.mockImplementation((params, options) =>
+      !options && params.page === 1 ? firstPage : Promise.resolve(pageResponse)
+    )
+    const originalCreateObjectURL = window.URL.createObjectURL
+    const originalRevokeObjectURL = window.URL.revokeObjectURL
+    window.URL.createObjectURL = vi.fn(() => 'blob:usage-export')
+    window.URL.revokeObjectURL = vi.fn()
+    let filename = ''
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function () {
+      filename = this.download
+    })
+
+    try {
+      await wrapper.findAll('button').find((button) => button.text() === 'Export CSV')!.trigger('click')
+      const initialParams = { ...query.mock.calls[0][0] }
+      expect(initialParams).toMatchObject({
+        page: 1, page_size: 100, start_date: '2026-03-01', end_date: '2026-03-08',
+        sort_by: 'created_at', sort_order: 'desc',
+      })
+
+      const keySelect = wrapper.findAllComponents(Select).find((select) =>
+        select.props('options').some((option: SelectOption) => option.label === 'All API Keys')
+      )!
+      keySelect.vm.$emit('update:modelValue', 1)
+      keySelect.vm.$emit('change', 1)
+      datePicker.vm.$emit('change', { startDate: '2026-04-01', endDate: '2026-04-08', preset: null })
+      wrapper.findComponent(UsageTable).vm.$emit('sort', 'actual_cost', 'asc')
+      await flushPromises()
+      expect(query).toHaveBeenCalledWith(expect.objectContaining({
+        api_key_id: 1, start_date: '2026-04-01', end_date: '2026-04-08',
+        sort_by: 'actual_cost', sort_order: 'asc',
+      }), expect.anything())
+
+      resolveFirstPage(pageResponse)
+      await flushPromises()
+
+      const exportCalls = query.mock.calls.filter((call) => call.length === 1)
+      expect.soft(exportCalls).toEqual([[initialParams], [{ ...initialParams, page: 2 }]])
+      expect.soft(filename).toBe('usage_2026-03-01_to_2026-03-08.csv')
+      expect(showSuccess).toHaveBeenCalledWith('Export success')
+      expect(showError).not.toHaveBeenCalled()
+    } finally {
+      window.URL.createObjectURL = originalCreateObjectURL
+      window.URL.revokeObjectURL = originalRevokeObjectURL
+      clickSpy.mockRestore()
+      wrapper.unmount()
+    }
   })
 
   it('exports historical image rows with image billing mode derived from image_count', async () => {
@@ -357,5 +474,37 @@ describe('user UsageView', () => {
     window.URL.revokeObjectURL = originalRevokeObjectURL
     vi.unstubAllGlobals()
     clickSpy.mockRestore()
+  })
+})
+
+describe('UsageView subscription feature flag', () => {
+  afterEach(() => {
+    appStoreState.cachedPublicSettings = { allow_user_view_error_requests: true }
+  })
+
+  function billingTypeSelect(wrapper: ReturnType<typeof mountUsageView>) {
+    return wrapper.findAllComponents(Select).find((select) =>
+      select.props('options').some((option: SelectOption) => option.label === 'Subscription')
+    )
+  }
+
+  it('offers the balance / subscription billing-type filter by default', async () => {
+    const wrapper = mountUsageView()
+    await flushPromises()
+
+    expect(billingTypeSelect(wrapper)).toBeDefined()
+    expect(wrapper.text()).toContain('Billing type')
+    wrapper.unmount()
+  })
+
+  it('hides the billing-type filter entirely when subscriptions are disabled', async () => {
+    appStoreState.cachedPublicSettings = { allow_user_view_error_requests: true, subscription_enabled: false }
+
+    const wrapper = mountUsageView()
+    await flushPromises()
+
+    expect(billingTypeSelect(wrapper)).toBeUndefined()
+    expect(wrapper.text()).not.toContain('Billing type')
+    wrapper.unmount()
   })
 })

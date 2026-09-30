@@ -133,6 +133,7 @@ type SettingService struct {
 	codexRestrictionPolicyCache atomic.Value // *cachedCodexRestrictionPolicy
 	codexRestrictionPolicySF    singleflight.Group
 
+	cyberSessionBlockRuntimeMu    sync.Mutex
 	cyberSessionBlockRuntimeCache atomic.Value // *cachedCyberSessionBlockRuntime
 	cyberSessionBlockRuntimeSF    singleflight.Group
 
@@ -160,6 +161,11 @@ type DefaultPlatformQuotaSetting struct {
 	DailyLimitUSD   *float64 `json:"daily"`
 	WeeklyLimitUSD  *float64 `json:"weekly"`
 	MonthlyLimitUSD *float64 `json:"monthly"`
+}
+
+// HasAnyLimit 报告是否至少配置了一档限额（0 也算配置）。nil receiver 视为未配置。
+func (q *DefaultPlatformQuotaSetting) HasAnyLimit() bool {
+	return q != nil && (q.DailyLimitUSD != nil || q.WeeklyLimitUSD != nil || q.MonthlyLimitUSD != nil)
 }
 
 type ProviderDefaultGrantSettings struct {

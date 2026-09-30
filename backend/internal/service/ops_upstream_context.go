@@ -2,11 +2,15 @@ package service
 
 import (
 	"encoding/json"
+	"errors"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/ctxkey"
 	"github.com/gin-gonic/gin"
+	"github.com/tidwall/gjson"
+	"github.com/tidwall/sjson"
 )
 
 // Gin context keys used by Ops error logger for capturing upstream error details.
@@ -145,7 +149,7 @@ type OpsStreamError struct {
 	// Message 是写入 SSE 帧的对客错误消息。
 	Message string
 	// IntendedStatus 是流若未固化本应返回的 HTTP 状态码（如并发限流的 429）。
-	// 默认仅用于错误分级；CountTowardsSLA=true 时也作为 Ops 的逻辑状态码。
+	// 默认仅用于错误分级；CountTowardsSLA 或 RequestScoped 为 true 时也作为 Ops 的逻辑状态码。
 	IntendedStatus int
 	// CountTowardsSLA 表示虽然 wire 状态已固化为 200，请求在应用语义上仍然失败，
 	// Ops 应使用 IntendedStatus 计入错误率/SLA。
@@ -200,6 +204,16 @@ func MarkOpsStreamFailure(c *gin.Context, errType, code, message string, intende
 		IntendedStatus:  intendedStatus,
 		CountTowardsSLA: true,
 	})
+}
+
+// MarkOpsStreamErrorValue 以完整的 OpsStreamError 记录一次带内错误，供需要
+// RequestScoped / NonStream 等附加语义的调用方使用；首个标记生效的规则不变。
+// 调用方只填 ErrType / Code / Message / IntendedStatus / CountTowardsSLA / RequestScoped / NonStream。
+// AccountID、UpstreamModel 与 Turn 由请求上下文接管；UpstreamStatus、UpstreamMessage、
+// UpstreamDetail、UpstreamErrors 与 SkipMonitoring 在非 RequestScoped 时由上下文接管，
+// RequestScoped 时被忽略。
+func MarkOpsStreamErrorValue(c *gin.Context, streamErr OpsStreamError) {
+	markOpsStreamError(c, streamErr)
 }
 
 func markOpsStreamError(c *gin.Context, streamErr OpsStreamError) {
@@ -365,6 +379,17 @@ type OpsUpstreamErrorEvent struct {
 	AccountID   int64  `json:"account_id,omitempty"`
 	AccountName string `json:"account_name,omitempty"`
 
+	// Proxy attribution is an immutable, credential-free snapshot of the route
+	// used by this attempt. ProxyID is null for direct and unknown routes;
+	// ProxyName distinguishes direct/no_proxy from unknown.
+	// Never add proxy URLs or credentials to this event.
+	ProxyID   *int64 `json:"proxy_id"`
+	ProxyName string `json:"proxy_name"`
+
+	// DroppedEarlierAttempts is set on the oldest retained event when queue
+	// bounds forced earlier attempts of the same request to be discarded.
+	DroppedEarlierAttempts int `json:"dropped_earlier_attempts,omitempty"`
+
 	// Outcome
 	UpstreamStatusCode int    `json:"upstream_status_code,omitempty"`
 	UpstreamRequestID  string `json:"upstream_request_id,omitempty"`
@@ -394,6 +419,14 @@ type OpsUpstreamErrorEvent struct {
 	SkipMonitoring bool `json:"-"`
 }
 
+const (
+	opsProxyNameDirect  = "direct/no_proxy"
+	opsProxyNameUnknown = "unknown"
+	// opsProxyNameUnnamed labels a managed proxy whose name is blank. The
+	// proxies.name column is NOT NULL/non-empty, so this is a defensive value.
+	opsProxyNameUnnamed = "proxy"
+)
+
 func appendOpsUpstreamError(c *gin.Context, ev OpsUpstreamErrorEvent) {
 	if c == nil {
 		return
@@ -402,6 +435,7 @@ func appendOpsUpstreamError(c *gin.Context, ev OpsUpstreamErrorEvent) {
 		ev.AtUnixMs = time.Now().UnixMilli()
 	}
 	ev.Platform = strings.TrimSpace(ev.Platform)
+	normalizeOpsUpstreamProxyAttribution(&ev)
 	ev.UpstreamRequestID = strings.TrimSpace(ev.UpstreamRequestID)
 	ev.UpstreamResponseBody = strings.TrimSpace(ev.UpstreamResponseBody)
 	ev.Kind = strings.TrimSpace(ev.Kind)
@@ -478,6 +512,56 @@ func ParseOpsUpstreamErrors(raw string) ([]*OpsUpstreamErrorEvent, error) {
 	var out []*OpsUpstreamErrorEvent
 	if err := json.Unmarshal([]byte(raw), &out); err != nil {
 		return nil, err
+	}
+	for _, ev := range out {
+		normalizeOpsUpstreamProxyAttribution(ev)
+	}
+	return out, nil
+}
+
+// normalizeOpsUpstreamErrorsJSON materializes missing proxy attribution on
+// stored JSON for detail reads. It edits only the attribution keys of events
+// that lack them, so keys written by older struct versions and the original
+// key order survive; nothing is re-marshaled through the current struct.
+func normalizeOpsUpstreamErrorsJSON(raw string) (string, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return raw, nil
+	}
+	if !gjson.Valid(raw) {
+		return "", errors.New("upstream_errors is not valid JSON")
+	}
+	parsed := gjson.Parse(raw)
+	if !parsed.IsArray() {
+		return "", errors.New("upstream_errors is not a JSON array")
+	}
+	out := raw
+	for i, ev := range parsed.Array() {
+		if !ev.IsObject() {
+			continue
+		}
+		prefix := strconv.Itoa(i) + "."
+		proxyID := ev.Get("proxy_id")
+		proxyName := strings.TrimSpace(ev.Get("proxy_name").String())
+		hasValidID := proxyID.Exists() && proxyID.Type == gjson.Number && proxyID.Int() > 0
+		var err error
+		switch {
+		case hasValidID:
+			if proxyName == "" {
+				out, err = sjson.Set(out, prefix+"proxy_name", opsProxyNameUnnamed)
+			}
+		case proxyName == opsProxyNameDirect:
+			if !proxyID.Exists() || proxyID.Type != gjson.Null {
+				out, err = sjson.Set(out, prefix+"proxy_id", nil)
+			}
+		default:
+			if out, err = sjson.Set(out, prefix+"proxy_id", nil); err == nil {
+				out, err = sjson.Set(out, prefix+"proxy_name", opsProxyNameUnknown)
+			}
+		}
+		if err != nil {
+			return "", err
+		}
 	}
 	return out, nil
 }

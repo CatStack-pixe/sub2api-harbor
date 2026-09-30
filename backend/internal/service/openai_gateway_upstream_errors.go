@@ -291,6 +291,32 @@ func (s *OpenAIGatewayService) shouldFailoverOpenAIUpstreamResponse(statusCode i
 	return isOpenAITransientProcessingError(statusCode, upstreamMsg, upstreamBody)
 }
 
+func isOpenAICompatibleModelNotFound400(respBody []byte) bool {
+	return isOpenAICompatibleModelNotFoundBody(respBody)
+}
+
+func isOpenAICompatibleModelNotFoundBody(respBody []byte) bool {
+	code := strings.TrimSpace(extractUpstreamErrorCode(respBody))
+	if code != "" {
+		return strings.EqualFold(code, "model_not_found")
+	}
+
+	msg := strings.ToLower(strings.TrimSpace(extractUpstreamErrorMessage(respBody)))
+	if msg == "" && !gjson.ValidBytes(respBody) {
+		msg = strings.ToLower(strings.TrimSpace(string(respBody)))
+	}
+	return strings.Contains(msg, "unknown provider for model") ||
+		strings.Contains(msg, "unknown model") ||
+		strings.Contains(msg, "model not found") ||
+		strings.Contains(msg, "model is not supported")
+}
+
+// IsOpenAICompatibleModelNotFound400 reports whether an OpenAI-compatible 400
+// is an account-specific missing-model response eligible for failover.
+func IsOpenAICompatibleModelNotFound400(respBody []byte) bool {
+	return isOpenAICompatibleModelNotFound400(respBody)
+}
+
 // OpenAIRequestBodyTooLargeClientMessage is the fixed downstream message used
 // after all account-specific request body limit failovers are exhausted.
 const OpenAIRequestBodyTooLargeClientMessage = "Request payload is too large"
@@ -575,6 +601,8 @@ func (s *OpenAIGatewayService) handleErrorResponse(
 
 	if isOpenAIRequestBodyTooLargeError(resp.StatusCode, upstreamMsg, body) {
 		appendOpsUpstreamError(c, OpsUpstreamErrorEvent{
+			ProxyID:            opsUpstreamProxyID(account),
+			ProxyName:          opsUpstreamProxyName(account),
 			Platform:           account.Platform,
 			AccountID:          account.ID,
 			AccountName:        account.Name,
@@ -624,6 +652,8 @@ func (s *OpenAIGatewayService) handleErrorResponse(
 	// Check custom error codes
 	if !account.ShouldHandleErrorCode(resp.StatusCode) {
 		appendOpsUpstreamError(c, OpsUpstreamErrorEvent{
+			ProxyID:            opsUpstreamProxyID(account),
+			ProxyName:          opsUpstreamProxyName(account),
 			Platform:           account.Platform,
 			AccountID:          account.ID,
 			AccountName:        account.Name,
@@ -663,6 +693,8 @@ func (s *OpenAIGatewayService) handleErrorResponse(
 		kind = "failover"
 	}
 	appendOpsUpstreamError(c, OpsUpstreamErrorEvent{
+		ProxyID:            opsUpstreamProxyID(account),
+		ProxyName:          opsUpstreamProxyName(account),
 		Platform:           account.Platform,
 		AccountID:          account.ID,
 		AccountName:        account.Name,
@@ -830,6 +862,8 @@ func (s *OpenAIGatewayService) handleCompatErrorResponse(
 	// return a generic error without exposing upstream details.
 	if !account.ShouldHandleErrorCode(resp.StatusCode) {
 		appendOpsUpstreamError(c, OpsUpstreamErrorEvent{
+			ProxyID:            opsUpstreamProxyID(account),
+			ProxyName:          opsUpstreamProxyName(account),
 			Platform:           account.Platform,
 			AccountID:          account.ID,
 			AccountName:        account.Name,
@@ -860,6 +894,8 @@ func (s *OpenAIGatewayService) handleCompatErrorResponse(
 		kind = "failover"
 	}
 	appendOpsUpstreamError(c, OpsUpstreamErrorEvent{
+		ProxyID:            opsUpstreamProxyID(account),
+		ProxyName:          opsUpstreamProxyName(account),
 		Platform:           account.Platform,
 		AccountID:          account.ID,
 		AccountName:        account.Name,

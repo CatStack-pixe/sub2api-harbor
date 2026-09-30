@@ -9,13 +9,14 @@ import (
 
 // CustomMenuItem represents a user-configured custom menu entry.
 type CustomMenuItem struct {
-	ID         string `json:"id"`
-	Label      string `json:"label"`
-	IconSVG    string `json:"icon_svg"`
-	URL        string `json:"url"`
-	PageSlug   string `json:"page_slug,omitempty"`
-	Visibility string `json:"visibility"` // "user" or "admin"
-	SortOrder  int    `json:"sort_order"`
+	ID             string `json:"id"`
+	Label          string `json:"label"`
+	IconSVG        string `json:"icon_svg"`
+	URL            string `json:"url"`
+	PageSlug       string `json:"page_slug,omitempty"`
+	Visibility     string `json:"visibility"` // "user" or "admin"
+	SortOrder      int    `json:"sort_order"`
+	HideOpenButton bool   `json:"hide_open_button,omitempty"`
 }
 
 // CustomEndpoint represents an admin-configured API endpoint for quick copy.
@@ -236,33 +237,33 @@ type SystemSettings struct {
 	PaymentVisibleMethodWxpayEnabled  bool   `json:"payment_visible_method_wxpay_enabled"`
 
 	// OpenAI account scheduling
-	OpenAILowUpstreamRatePriorityEnabled                   bool    `json:"openai_low_upstream_rate_priority_enabled"`
-	OpenAIOAuthSchedulingRateMultiplier                    float64 `json:"openai_oauth_scheduling_rate_multiplier"`
-	OpenAIAdvancedSchedulerEnabled                         bool    `json:"openai_advanced_scheduler_enabled"`
-	OpenAIAdvancedSchedulerStickyWeightedEnabled           bool    `json:"openai_advanced_scheduler_sticky_weighted_enabled"`
-	OpenAIAdvancedSchedulerSubscriptionPriorityEnabled     bool    `json:"openai_advanced_scheduler_subscription_priority_enabled"`
-	OpenAIAdvancedSchedulerLBTopK                          string  `json:"openai_advanced_scheduler_lb_top_k"`
-	OpenAIAdvancedSchedulerWeightPriority                  string  `json:"openai_advanced_scheduler_weight_priority"`
-	OpenAIAdvancedSchedulerWeightLoad                      string  `json:"openai_advanced_scheduler_weight_load"`
-	OpenAIAdvancedSchedulerWeightQueue                     string  `json:"openai_advanced_scheduler_weight_queue"`
-	OpenAIAdvancedSchedulerWeightErrorRate                 string  `json:"openai_advanced_scheduler_weight_error_rate"`
-	OpenAIAdvancedSchedulerWeightTTFT                      string  `json:"openai_advanced_scheduler_weight_ttft"`
-	OpenAIAdvancedSchedulerWeightReset                     string  `json:"openai_advanced_scheduler_weight_reset"`
-	OpenAIAdvancedSchedulerWeightQuotaHeadroom             string  `json:"openai_advanced_scheduler_weight_quota_headroom"`
-	OpenAIAdvancedSchedulerWeightUpstreamCost              string  `json:"openai_advanced_scheduler_weight_upstream_cost"`
-	OpenAIAdvancedSchedulerWeightPreviousResponse          string  `json:"openai_advanced_scheduler_weight_previous_response"`
-	OpenAIAdvancedSchedulerWeightSessionSticky             string  `json:"openai_advanced_scheduler_weight_session_sticky"`
-	OpenAIAdvancedSchedulerEffectiveLBTopK                 string  `json:"openai_advanced_scheduler_effective_lb_top_k"`
-	OpenAIAdvancedSchedulerEffectiveWeightPriority         string  `json:"openai_advanced_scheduler_effective_weight_priority"`
-	OpenAIAdvancedSchedulerEffectiveWeightLoad             string  `json:"openai_advanced_scheduler_effective_weight_load"`
-	OpenAIAdvancedSchedulerEffectiveWeightQueue            string  `json:"openai_advanced_scheduler_effective_weight_queue"`
-	OpenAIAdvancedSchedulerEffectiveWeightErrorRate        string  `json:"openai_advanced_scheduler_effective_weight_error_rate"`
-	OpenAIAdvancedSchedulerEffectiveWeightTTFT             string  `json:"openai_advanced_scheduler_effective_weight_ttft"`
-	OpenAIAdvancedSchedulerEffectiveWeightReset            string  `json:"openai_advanced_scheduler_effective_weight_reset"`
-	OpenAIAdvancedSchedulerEffectiveWeightQuotaHeadroom    string  `json:"openai_advanced_scheduler_effective_weight_quota_headroom"`
-	OpenAIAdvancedSchedulerEffectiveWeightUpstreamCost     string  `json:"openai_advanced_scheduler_effective_weight_upstream_cost"`
-	OpenAIAdvancedSchedulerEffectiveWeightPreviousResponse string  `json:"openai_advanced_scheduler_effective_weight_previous_response"`
-	OpenAIAdvancedSchedulerEffectiveWeightSessionSticky    string  `json:"openai_advanced_scheduler_effective_weight_session_sticky"`
+	OpenAILowUpstreamRatePriorityEnabled                   bool     `json:"openai_low_upstream_rate_priority_enabled"`
+	OpenAIOAuthSchedulingRateMultiplier                    *float64 `json:"openai_oauth_scheduling_rate_multiplier"`
+	OpenAIAdvancedSchedulerEnabled                         bool     `json:"openai_advanced_scheduler_enabled"`
+	OpenAIAdvancedSchedulerStickyWeightedEnabled           bool     `json:"openai_advanced_scheduler_sticky_weighted_enabled"`
+	OpenAIAdvancedSchedulerSubscriptionPriorityEnabled     bool     `json:"openai_advanced_scheduler_subscription_priority_enabled"`
+	OpenAIAdvancedSchedulerLBTopK                          string   `json:"openai_advanced_scheduler_lb_top_k"`
+	OpenAIAdvancedSchedulerWeightPriority                  string   `json:"openai_advanced_scheduler_weight_priority"`
+	OpenAIAdvancedSchedulerWeightLoad                      string   `json:"openai_advanced_scheduler_weight_load"`
+	OpenAIAdvancedSchedulerWeightQueue                     string   `json:"openai_advanced_scheduler_weight_queue"`
+	OpenAIAdvancedSchedulerWeightErrorRate                 string   `json:"openai_advanced_scheduler_weight_error_rate"`
+	OpenAIAdvancedSchedulerWeightTTFT                      string   `json:"openai_advanced_scheduler_weight_ttft"`
+	OpenAIAdvancedSchedulerWeightReset                     string   `json:"openai_advanced_scheduler_weight_reset"`
+	OpenAIAdvancedSchedulerWeightQuotaHeadroom             string   `json:"openai_advanced_scheduler_weight_quota_headroom"`
+	OpenAIAdvancedSchedulerWeightUpstreamCost              string   `json:"openai_advanced_scheduler_weight_upstream_cost"`
+	OpenAIAdvancedSchedulerWeightPreviousResponse          string   `json:"openai_advanced_scheduler_weight_previous_response"`
+	OpenAIAdvancedSchedulerWeightSessionSticky             string   `json:"openai_advanced_scheduler_weight_session_sticky"`
+	OpenAIAdvancedSchedulerEffectiveLBTopK                 string   `json:"openai_advanced_scheduler_effective_lb_top_k"`
+	OpenAIAdvancedSchedulerEffectiveWeightPriority         string   `json:"openai_advanced_scheduler_effective_weight_priority"`
+	OpenAIAdvancedSchedulerEffectiveWeightLoad             string   `json:"openai_advanced_scheduler_effective_weight_load"`
+	OpenAIAdvancedSchedulerEffectiveWeightQueue            string   `json:"openai_advanced_scheduler_effective_weight_queue"`
+	OpenAIAdvancedSchedulerEffectiveWeightErrorRate        string   `json:"openai_advanced_scheduler_effective_weight_error_rate"`
+	OpenAIAdvancedSchedulerEffectiveWeightTTFT             string   `json:"openai_advanced_scheduler_effective_weight_ttft"`
+	OpenAIAdvancedSchedulerEffectiveWeightReset            string   `json:"openai_advanced_scheduler_effective_weight_reset"`
+	OpenAIAdvancedSchedulerEffectiveWeightQuotaHeadroom    string   `json:"openai_advanced_scheduler_effective_weight_quota_headroom"`
+	OpenAIAdvancedSchedulerEffectiveWeightUpstreamCost     string   `json:"openai_advanced_scheduler_effective_weight_upstream_cost"`
+	OpenAIAdvancedSchedulerEffectiveWeightPreviousResponse string   `json:"openai_advanced_scheduler_effective_weight_previous_response"`
+	OpenAIAdvancedSchedulerEffectiveWeightSessionSticky    string   `json:"openai_advanced_scheduler_effective_weight_session_sticky"`
 
 	// Payment configuration
 	PaymentEnabled                   bool     `json:"payment_enabled"`
@@ -327,8 +328,9 @@ type SystemSettings struct {
 	RiskControlEnabled bool `json:"risk_control_enabled"`
 
 	// cyber 会话屏蔽开关 + TTL
-	CyberSessionBlockEnabled    bool `json:"cyber_session_block_enabled"`
-	CyberSessionBlockTTLSeconds int  `json:"cyber_session_block_ttl_seconds"`
+	CyberSessionBlockEnabled    bool   `json:"cyber_session_block_enabled"`
+	CyberPolicyUserAllowlist    string `json:"cyber_policy_user_allowlist"`
+	CyberSessionBlockTTLSeconds int    `json:"cyber_session_block_ttl_seconds"`
 
 	// Affiliate (邀请返利) feature switch
 	AffiliateEnabled bool `json:"affiliate_enabled"`

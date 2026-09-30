@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/antigravity"
@@ -565,7 +566,7 @@ func TestGatewayModels_CustomModelsListDisabledKeepsOriginalModels(t *testing.T)
 		Group: &service.Group{
 			ID:       groupID,
 			Platform: service.PlatformOpenAI,
-			ModelsListConfig: service.GroupModelsListConfig{
+			ModelAllowlist: service.GroupModelAllowlist{
 				Enabled: false,
 				Models:  []string{"gpt-5.5"},
 			},
@@ -612,7 +613,7 @@ func TestGatewayModels_CustomModelsListFiltersAndOrdersMappedModels(t *testing.T
 		Group: &service.Group{
 			ID:       groupID,
 			Platform: service.PlatformOpenAI,
-			ModelsListConfig: service.GroupModelsListConfig{
+			ModelAllowlist: service.GroupModelAllowlist{
 				Enabled: true,
 				Models:  []string{"gpt-5.5", "missing-model", "gpt-5.4"},
 			},
@@ -697,7 +698,7 @@ func TestGatewayModels_CompositeCustomModelsListFiltersAcrossConcretePlatforms(t
 		Group: &service.Group{
 			ID:       groupID,
 			Platform: service.PlatformComposite,
-			ModelsListConfig: service.GroupModelsListConfig{
+			ModelAllowlist: service.GroupModelAllowlist{
 				Enabled: true,
 				Models:  []string{"gemini-2.5-flash", "missing-model", "ag-custom-model", "gpt-5.5", "kimi-custom", "glm-custom", "deepseek-custom"},
 			},
@@ -907,7 +908,7 @@ func TestGatewayModels_CustomModelsListKeepsConcreteModelAllowedByWildcardMappin
 		Group: &service.Group{
 			ID:       groupID,
 			Platform: service.PlatformAnthropic,
-			ModelsListConfig: service.GroupModelsListConfig{
+			ModelAllowlist: service.GroupModelAllowlist{
 				Enabled: true,
 				Models:  []string{"claude-sonnet-4-6"},
 			},
@@ -958,7 +959,7 @@ func TestGatewayModels_AnthropicCustomModelsListIncludesOAuthClaudeAndMappedDeep
 		Group: &service.Group{
 			ID:       groupID,
 			Platform: service.PlatformAnthropic,
-			ModelsListConfig: service.GroupModelsListConfig{
+			ModelAllowlist: service.GroupModelAllowlist{
 				Enabled: true,
 				Models:  []string{"claude-fable-5", "claude-opus-4-8", "deepseek-v4-pro"},
 			},
@@ -1009,7 +1010,7 @@ func TestGatewayModels_AnthropicCustomModelsListDisabledKeepsMappedModelList(t *
 		Group: &service.Group{
 			ID:       groupID,
 			Platform: service.PlatformAnthropic,
-			ModelsListConfig: service.GroupModelsListConfig{
+			ModelAllowlist: service.GroupModelAllowlist{
 				Enabled: false,
 				Models:  []string{"claude-fable-5", "deepseek-v4-pro"},
 			},
@@ -1050,7 +1051,7 @@ func TestGatewayModels_AnthropicCustomModelsListIncludesOAuthClaudeWithoutMappin
 		Group: &service.Group{
 			ID:       groupID,
 			Platform: service.PlatformAnthropic,
-			ModelsListConfig: service.GroupModelsListConfig{
+			ModelAllowlist: service.GroupModelAllowlist{
 				Enabled: true,
 				Models:  []string{"claude-opus-4-6-thinking", "claude-sonnet-4-5"},
 			},
@@ -1095,7 +1096,7 @@ func TestGatewayModels_CustomModelsListCanReturnEmptyWhenSelectionsUnavailable(t
 		Group: &service.Group{
 			ID:       groupID,
 			Platform: service.PlatformOpenAI,
-			ModelsListConfig: service.GroupModelsListConfig{
+			ModelAllowlist: service.GroupModelAllowlist{
 				Enabled: true,
 				Models:  []string{"gpt-5.5"},
 			},
@@ -1132,7 +1133,7 @@ func TestGatewayModels_CustomModelsListFiltersDefaultFallbackModels(t *testing.T
 		Group: &service.Group{
 			ID:       groupID,
 			Platform: service.PlatformOpenAI,
-			ModelsListConfig: service.GroupModelsListConfig{
+			ModelAllowlist: service.GroupModelAllowlist{
 				Enabled: true,
 				Models:  []string{"gpt-5.5", "legacy-gpt-2024", "gpt-5.4"},
 			},
@@ -1169,7 +1170,7 @@ func TestGatewayModels_OpenAICustomModelsListKeepsOpenAIResponseShapeForDefaultF
 		Group: &service.Group{
 			ID:       groupID,
 			Platform: service.PlatformOpenAI,
-			ModelsListConfig: service.GroupModelsListConfig{
+			ModelAllowlist: service.GroupModelAllowlist{
 				Enabled: true,
 				Models:  []string{"gpt-5.5", "gpt-5.4"},
 			},

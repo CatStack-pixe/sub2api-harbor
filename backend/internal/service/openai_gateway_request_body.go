@@ -6,9 +6,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/openai"
 	"net/http"
 	"strings"
+	"unicode/utf8"
 
+	"github.com/Wei-Shaw/sub2api/internal/pkg/apicompat"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/ctxkey"
 	"github.com/Wei-Shaw/sub2api/internal/util/urlvalidator"
 	"github.com/gin-gonic/gin"
@@ -18,22 +21,26 @@ import (
 )
 
 func (s *OpenAIGatewayService) validateUpstreamBaseURL(raw string) (string, error) {
-	if s.cfg != nil && !s.cfg.Security.URLAllowlist.Enabled {
-		normalized, err := urlvalidator.ValidateURLFormat(raw, s.cfg.Security.URLAllowlist.AllowInsecureHTTP)
-		if err != nil {
-			return "", fmt.Errorf("invalid base_url: %w", err)
-		}
-		return normalized, nil
-	}
-	normalized, err := urlvalidator.ValidateHTTPSURL(raw, urlvalidator.ValidationOptions{
-		AllowedHosts:     s.cfg.Security.URLAllowlist.UpstreamHosts,
-		RequireAllowlist: true,
-		AllowPrivate:     s.cfg.Security.URLAllowlist.AllowPrivateHosts,
-	})
+	normalized, err := s.validateOutboundURL(raw)
 	if err != nil {
 		return "", fmt.Errorf("invalid base_url: %w", err)
 	}
 	return normalized, nil
+}
+
+// validateOutboundURL 按 security.url_allowlist 策略校验网关主动连接的出站 URL。
+func (s *OpenAIGatewayService) validateOutboundURL(raw string) (string, error) {
+	if s.cfg == nil {
+		return urlvalidator.ValidateURLFormat(raw, false)
+	}
+	if !s.cfg.Security.URLAllowlist.Enabled {
+		return urlvalidator.ValidateURLFormat(raw, s.cfg.Security.URLAllowlist.AllowInsecureHTTP)
+	}
+	return urlvalidator.ValidateHTTPSURL(raw, urlvalidator.ValidationOptions{
+		AllowedHosts:     s.cfg.Security.URLAllowlist.UpstreamHosts,
+		RequireAllowlist: true,
+		AllowPrivate:     s.cfg.Security.URLAllowlist.AllowPrivateHosts,
+	})
 }
 
 // buildOpenAIResponsesURL 组装 OpenAI Responses 端点。
@@ -684,8 +691,11 @@ func appendOpenAIResponsesRequestPathSuffix(baseURL, suffix string) string {
 }
 
 func (s *OpenAIGatewayService) replaceModelInResponseBody(body []byte, fromModel, toModel string) []byte {
-	// 使用 gjson/sjson 精确替换 model 字段，避免全量 JSON 反序列化
-	if m := gjson.GetBytes(body, "model"); m.Exists() && m.Str == fromModel {
+	// A mapped request must retain its public name even when upstream uses an alias.
+	if fromModel == "" || toModel == "" || fromModel == toModel || !gjson.ValidBytes(body) {
+		return body
+	}
+	if m := gjson.GetBytes(body, "model"); m.Type == gjson.String {
 		newBody, err := sjson.SetBytes(body, "model", toModel)
 		if err != nil {
 			return body
@@ -1425,12 +1435,12 @@ func normalizeOpenAIServiceTier(raw string) *string {
 	if value == "fast" {
 		value = "priority"
 	}
-	// 放过 OpenAI 官方文档定义的所有合法 tier 值：priority/flex/auto/default/scale。
-	// 对 Codex 客户端零影响（Codex 只发 priority 或 flex，见 codex-rs/core/src/client.rs），
-	// 但能让直连 OpenAI SDK 的用户透传 auto/default/scale 以便抓包/调试。
-	// 真未知值仍返回 nil，由 normalizeResponsesBodyServiceTier 从 body 中删除。
+	// 放过 OpenAI 官方文档定义的合法 tier 值，以及 Codex/API 新增的 ultrafast。
+	// Codex 客户端会发 priority、flex 或 ultrafast；直连 OpenAI SDK 的用户还会
+	// 透传 auto/default/scale。真未知值仍返回 nil，由
+	// normalizeResponsesBodyServiceTier 从 body 中删除。
 	switch value {
-	case "priority", "flex", "auto", "default", "scale":
+	case "priority", "flex", "auto", "default", "scale", OpenAIFastTierUltrafast:
 		return &value
 	default:
 		return nil
@@ -1504,7 +1514,7 @@ func (e *OpenAIFastBlockedError) Error() string { return e.Message }
 // Matching rules:
 //   - Scope filters by account type (all / oauth / apikey / bedrock)
 //   - UserIDs, when present, filters by the trusted Sub2API user that owns the API key
-//   - ServiceTier must be empty (= any), "all", or equal the normalized tier
+//   - ServiceTier must be empty (= any), "all", "missing", or equal the normalized tier
 //   - ModelWhitelist narrows the rule to specific models; FallbackAction
 //     handles the non-matching case (default: pass)
 //   - User-specific rules take precedence over global rules; each group keeps
@@ -1537,6 +1547,18 @@ func (s *OpenAIGatewayService) evaluateOpenAIFastPolicy(ctx context.Context, acc
 	return evaluateOpenAIFastPolicyWithSettings(settings, openAIFastPolicyUserID(ctx), account, model, tier)
 }
 
+// shouldForceOpenAIFastPriorityForMissingTier reports whether a request that
+// omitted service_tier should be upgraded to priority. This is opt-in through
+// the dedicated "missing" tier matcher; legacy "all" rules continue to apply
+// only to requests that explicitly selected a recognized tier.
+func (s *OpenAIGatewayService) shouldForceOpenAIFastPriorityForMissingTier(ctx context.Context, account *Account, model string) bool {
+	if account == nil || account.Platform != PlatformOpenAI {
+		return false
+	}
+	action, _ := s.evaluateOpenAIFastPolicy(ctx, account, model, OpenAIFastTierMissing)
+	return action == OpenAIFastPolicyActionForcePriority
+}
+
 // evaluateOpenAIFastPolicyWithSettings is the pure-function core extracted so
 // long-lived sessions (e.g. WS) can prefetch settings once and avoid hitting
 // the settingService on every frame. See WSSession entry and
@@ -1559,7 +1581,11 @@ func evaluateOpenAIFastPolicyWithSettings(settings *OpenAIFastPolicySettings, us
 				continue
 			}
 			ruleTier := strings.ToLower(strings.TrimSpace(rule.ServiceTier))
-			if ruleTier != "" && ruleTier != OpenAIFastTierAny && ruleTier != tier {
+			if tier == OpenAIFastTierMissing {
+				if ruleTier != OpenAIFastTierMissing {
+					continue
+				}
+			} else if ruleTier != "" && ruleTier != OpenAIFastTierAny && ruleTier != tier {
 				continue
 			}
 			eff := BetaPolicyRule{
@@ -1664,6 +1690,13 @@ func (s *OpenAIGatewayService) applyOpenAIFastPolicyToBody(ctx context.Context, 
 	}
 	rawTier := gjson.GetBytes(body, "service_tier").String()
 	if rawTier == "" {
+		if s.shouldForceOpenAIFastPriorityForMissingTier(ctx, account, model) {
+			updated, err := sjson.SetBytes(body, "service_tier", OpenAIFastTierPriority)
+			if err != nil {
+				return body, fmt.Errorf("force missing service_tier priority on body: %w", err)
+			}
+			return updated, nil
+		}
 		return body, nil
 	}
 	normTier := normalizedOpenAIServiceTierValue(rawTier)
@@ -1783,6 +1816,13 @@ func (s *OpenAIGatewayService) applyOpenAIFastPolicyToWSResponseCreate(
 	}
 	rawTier := gjson.GetBytes(frame, "service_tier").String()
 	if rawTier == "" {
+		if s.shouldForceOpenAIFastPriorityForMissingTier(ctx, account, model) {
+			updated, err := sjson.SetBytes(frame, "service_tier", OpenAIFastTierPriority)
+			if err != nil {
+				return frame, nil, fmt.Errorf("force missing service_tier priority in ws frame: %w", err)
+			}
+			return updated, nil, nil
+		}
 		return frame, nil, nil
 	}
 	normTier := normalizedOpenAIServiceTierValue(rawTier)
@@ -2133,9 +2173,7 @@ func normalizeOpenAIReasoningEffort(raw string) string {
 	value = strings.NewReplacer("-", "", "_", "", " ", "").Replace(value)
 
 	switch value {
-	case "none", "minimal":
-		return ""
-	case "low", "medium", "high":
+	case "none", "minimal", "low", "medium", "high":
 		return value
 	case "xhigh", "extrahigh", "max":
 		return "xhigh"

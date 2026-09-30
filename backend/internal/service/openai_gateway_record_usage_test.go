@@ -1463,9 +1463,8 @@ func TestNormalizeOpenAIServiceTier(t *testing.T) {
 
 	t.Run("openai official tiers preserved", func(t *testing.T) {
 		// OpenAI 官方文档定义的合法 tier 值都应被透传保留，避免因白名单过窄
-		// 静默剥离客户端显式发送的合法字段。Codex 客户端只发 priority/flex，
-		// 所以扩大白名单对 Codex 流量零影响（见 codex-rs/core/src/client.rs）。
-		for _, tier := range []string{"priority", "flex", "auto", "default", "scale"} {
+		// 静默剥离客户端显式发送的合法字段。Codex 会发 priority/flex/ultrafast。
+		for _, tier := range []string{"priority", "flex", "auto", "default", "scale", "ultrafast"} {
 			got := normalizeOpenAIServiceTier(tier)
 			require.NotNil(t, got, "tier %q should not be normalized to nil", tier)
 			require.Equal(t, tier, *got)
@@ -1484,6 +1483,7 @@ func TestExtractOpenAIServiceTier(t *testing.T) {
 	require.Equal(t, "auto", *extractOpenAIServiceTier(map[string]any{"service_tier": "auto"}))
 	require.Equal(t, "default", *extractOpenAIServiceTier(map[string]any{"service_tier": "default"}))
 	require.Equal(t, "scale", *extractOpenAIServiceTier(map[string]any{"service_tier": "scale"}))
+	require.Equal(t, "ultrafast", *extractOpenAIServiceTier(map[string]any{"service_tier": "ultrafast"}))
 	require.Nil(t, extractOpenAIServiceTier(map[string]any{"service_tier": 1}))
 	require.Nil(t, extractOpenAIServiceTier(nil))
 }
@@ -1494,6 +1494,7 @@ func TestExtractOpenAIServiceTierFromBody(t *testing.T) {
 	require.Equal(t, "auto", *extractOpenAIServiceTierFromBody([]byte(`{"service_tier":"auto"}`)))
 	require.Equal(t, "default", *extractOpenAIServiceTierFromBody([]byte(`{"service_tier":"default"}`)))
 	require.Equal(t, "scale", *extractOpenAIServiceTierFromBody([]byte(`{"service_tier":"scale"}`)))
+	require.Equal(t, "ultrafast", *extractOpenAIServiceTierFromBody([]byte(`{"service_tier":"ultrafast"}`)))
 	require.Nil(t, extractOpenAIServiceTierFromBody([]byte(`{"service_tier":"turbo"}`)))
 	require.Nil(t, extractOpenAIServiceTierFromBody(nil))
 }
@@ -2059,8 +2060,11 @@ func TestOpenAIGatewayServiceRecordUsage_OutputImageSizeWinsBeforeBillingAndPers
 
 	err := svc.RecordUsage(context.Background(), &OpenAIRecordUsageInput{
 		Result: &OpenAIForwardResult{
-			RequestID:        "resp_image_output_size",
-			Model:            "gpt-image-2",
+			RequestID: "resp_image_output_size",
+			Model:     "gpt-image-2",
+			Usage: OpenAIUsage{
+				ImageCacheReadTokens: 40,
+			},
 			ImageCount:       1,
 			ImageInputSize:   "1024x1024",
 			ImageOutputSizes: []string{"3840x2160"},
@@ -2090,7 +2094,7 @@ func TestOpenAIGatewayServiceRecordUsage_OutputImageSizeWinsBeforeBillingAndPers
 	require.Equal(t, "3840x2160", *usageRepo.lastLog.ImageOutputSize)
 	require.NotNil(t, usageRepo.lastLog.ImageSizeSource)
 	require.Equal(t, ImageSizeSourceOutput, *usageRepo.lastLog.ImageSizeSource)
-	require.Equal(t, map[string]int{ImageBillingSize4K: 1}, usageRepo.lastLog.ImageSizeBreakdown)
+	require.Equal(t, map[string]int{ImageBillingSize4K: 1, "image_cache_read_tokens": 40}, usageRepo.lastLog.ImageSizeBreakdown)
 	require.InDelta(t, 0.44, usageRepo.lastLog.TotalCost, 1e-12)
 	require.InDelta(t, 0.44, usageRepo.lastLog.ActualCost, 1e-12)
 }

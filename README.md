@@ -109,14 +109,6 @@ Please read the following carefully before using this project:
 </tr>
 
 <tr>
-<td width="180"><a href="http://www.fastaitoken.com/register"><img src="assets/partners/logos/fastaitoken.jpg" alt="fastaitoken" width="150"></a></td>
-<td>🎉 Thanks to FastAIToken for sponsoring this project! <a href="http://www.fastaitoken.com/register">FastAIToken</a> is an AI API aggregation platform for developers, supporting mainstream large models such as OpenAI, Claude, and Gemini. Top-up at 1:1 — 1 CNY = 1 USD of API credit — letting developers use the world's leading large model services at lower cost and with greater convenience.<br>
-
-🚀 The platform offers a variety of channels to choose from: an ultra-low-price 0.02x OpenAI promotional group (limited time), groups as low as 0.25x OpenAI, 0.7x Claude with 95% fixed cache, and a 1.2x Claude Max channel. It also provides a public status page showing real-time availability, latency, and operating status of each group for transparent and reliable service, plus 7×24 human technical support (not bots) with fast responses to developer needs.
-</td>
-</tr>
-
-<tr>
 <td width="180"><a href="http://aimzoon.com"><img src="assets/partners/logos/aimzoon.jpg" alt="aimzoon" width="150"></a></td>
 <td>Thanks to Aimzoon for sponsoring this project! <a href="http://aimzoon.com">Aimzoon</a> provides stable, cost-effective AI API access services, enabling developers to quickly connect popular AI services to coding tools such as Codex, Claude Code, and Gemini CLI. No complex configuration — faster onboarding, more stable calls, and lower costs. Ongoing promotions including discounted Codex rates and special pricing, with free trial credits upon registration, bringing AI coding into your daily workflow. <a href="http://aimzoon.com">Click here</a> to register and try it out!
 </td>
@@ -729,7 +721,10 @@ go generate ./cmd/server
 Simple Mode is designed for individual developers or internal teams who want quick access without full SaaS features.
 
 - Enable: Set environment variable `RUN_MODE=simple`
+- Default groups are seeded on each startup. Set `SIMPLE_MODE_AUTO_CREATE_DEFAULT_GROUPS=false` (or YAML `simple_mode.auto_create_default_groups: false`) to manage groups yourself. The default is `true`; disabling it does not delete existing groups or change runtime auto-binding or admin concurrency setup.
 - Difference: Hides SaaS-related features and skips billing process
+- Optional key windows: Set `SIMPLE_MODE_KEY_RATE_LIMIT_ENABLED=true` to enforce each API key's configured 5-hour, daily, and 7-day spending windows. The default is `false`; balance and subscription debit remain bypassed when enabled.
+- Window enforcement uses the database as its source of truth and records only API-key window usage. It is a post-request soft cap, so concurrent in-flight requests can overshoot by their final costs. Historical simple-mode usage is not backfilled.
 - Security note: In production, you must also set `SIMPLE_MODE_CONFIRM=true` to allow startup
 
 ---
@@ -822,7 +817,7 @@ xAI quota is passive. Sub2API does not invent subscription quota values; it reco
 
 `401` responses temporarily remove accounts with invalid credentials from scheduling. `403` responses are treated as access or entitlement failures instead of token-refresh loops. `429` responses use `Retry-After` or a short cooldown to temporarily remove the account from scheduling.
 
-New Grok image and video generation requests use a media-specific eligibility check. API-key accounts remain eligible. OAuth accounts require positive paid-entitlement evidence from the xAI billing probe; Free, forbidden, missing, malformed, and inconclusive billing observations are excluded from new media generation. Unobserved OAuth accounts are probed before the first media request is forwarded, and imports run the billing-first quota probe proactively. Chat requests and video status lookups are not affected by this media-only quarantine. If no eligible account remains, the media endpoint returns HTTP `503` with error type `grok_media_no_eligible_account`.
+New Grok image and video generation requests use a media-specific eligibility check. API-key accounts remain eligible. OAuth accounts with explicit Free or forbidden billing evidence are excluded from new media generation. Missing or malformed observations are probed before dispatch; a successful but incomplete billing response is treated as `billing_inconclusive` and remains eligible for backwards compatibility, because an unknown billing schema is not proof that the account lacks media entitlement. Operators can quarantine a known-bad account with `extra.grok_media_eligible=false` or force-enable a verified account with `true`. Imports run the billing-first quota probe proactively. Chat requests and video status lookups are not affected by this media-only quarantine. If no eligible account remains, the media endpoint returns HTTP `503` with error type `grok_media_no_eligible_account`.
 
 Administrators can override automatic media eligibility through the account create/update API by setting `extra.grok_media_eligible` to `false` (exclude) or `true` (force eligible). On update, set it to `null` to remove the override and return to automatic probe-based behavior; omitting the field preserves the current override. A weekly allowance period alone is not treated as a paid tier signal. Successful image responses must contain at least one actual image output; empty HTTP `200` responses trigger account failover instead of being counted and returned as successful generations.
 

@@ -1075,6 +1075,11 @@ func (s *OpenAIGatewayService) proxyResponsesWebSocketV2Passthrough(
 						return payload, nil, err
 					}
 				}
+				if hooks != nil && hooks.BeforeTurn != nil {
+					if err := hooks.BeforeTurn(turnNo); err != nil {
+						return payload, nil, err
+					}
+				}
 				if hooks != nil && hooks.MapRequestModel != nil {
 					upstreamModel, err := hooks.MapRequestModel(turnNo, requestModelForThisFrame)
 					if err != nil {
@@ -1423,10 +1428,15 @@ func (s *OpenAIGatewayService) proxyResponsesWebSocketV2Passthrough(
 	var firstOutputTimeoutErr *openAIWSPassthroughFirstOutputTimeoutError
 	if errors.As(relayErr, &firstOutputTimeoutErr) {
 		deadline := firstOutputTimeoutErr.deadline
+		// The relay ran over the WebSocket transport, so a missing managed
+		// proxy is an unknown route (http.DefaultClient), not a direct one.
+		wsProxyID, wsProxyName := opsUpstreamWSProxyAttribution(account)
 		failoverErr := s.newOpenAIFirstOutputTimeoutError(
 			ctx,
 			c,
 			account,
+			wsProxyID,
+			wsProxyName,
 			deadline.startedAt,
 			deadline.requestModel,
 			deadline.reasoningEffort,

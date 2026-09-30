@@ -215,6 +215,7 @@ func (s *SettingService) GetPublicSettings(ctx context.Context) (*PublicSettings
 		SettingKeyWeChatConnectFrontendRedirectURL,
 		SettingKeyBackendModeEnabled,
 		SettingPaymentEnabled,
+		SettingBalancePayDisabled,
 		SettingKeyOIDCConnectEnabled,
 		SettingKeyOIDCConnectProviderName,
 		SettingKeyGitHubOAuthEnabled,

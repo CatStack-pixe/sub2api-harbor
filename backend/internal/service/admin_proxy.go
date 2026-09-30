@@ -113,22 +113,25 @@ func (s *adminServiceImpl) UpdateProxy(ctx context.Context, id int64, input *Upd
 	if input.BackupProxyID != nil && *input.BackupProxyID == id {
 		return nil, infraerrors.BadRequest("PROXY_BACKUP_SELF", "backup proxy cannot be itself")
 	}
-	// 规范化 fallback_mode
-	mode := input.FallbackMode
-	if mode == "" {
-		mode = FallbackModeNone
-	}
-	// 校验：mode=proxy 必须有 backup
-	if mode == FallbackModeProxy && input.BackupProxyID == nil {
-		return nil, infraerrors.BadRequest("PROXY_BACKUP_REQUIRED", "backup proxy required when fallback_mode=proxy")
-	}
-	if input.ExpiryWarnDays < 0 {
-		return nil, infraerrors.BadRequest("PROXY_WARN_DAYS_INVALID", "expiry_warn_days must be >= 0")
-	}
-
 	proxy, err := s.proxyRepo.GetByID(ctx, id)
 	if err != nil {
 		return nil, err
+	}
+
+	// Merge only supplied fields, then validate the resulting fallback configuration.
+	mode := proxy.FallbackMode
+	if input.FallbackMode != "" {
+		mode = input.FallbackMode
+	}
+	backupID := proxy.BackupProxyID
+	if input.BackupProxyID != nil || input.ClearBackupID {
+		backupID = input.BackupProxyID
+	}
+	if mode == FallbackModeProxy && backupID == nil {
+		return nil, infraerrors.BadRequest("PROXY_BACKUP_REQUIRED", "backup proxy required when fallback_mode=proxy")
+	}
+	if input.ExpiryWarnDays != nil && *input.ExpiryWarnDays < 0 {
+		return nil, infraerrors.BadRequest("PROXY_WARN_DAYS_INVALID", "expiry_warn_days must be >= 0")
 	}
 
 	if input.Name != "" {
@@ -143,17 +146,18 @@ func (s *adminServiceImpl) UpdateProxy(ctx context.Context, id int64, input *Upd
 	if input.Port != 0 {
 		proxy.Port = input.Port
 	}
-	if input.Username != "" {
-		proxy.Username = input.Username
+	if input.Username != nil {
+		proxy.Username = *input.Username
 	}
-	if input.Password != "" {
-		proxy.Password = input.Password
+	if input.Password != nil {
+		proxy.Password = *input.Password
 	}
 	if input.Status != "" {
 		proxy.Status = input.Status
 	}
-	// 透传有效期与回退字段
-	proxy.ExpiresAt = input.ExpiresAt
+	if input.ExpiresAt != nil || input.ClearExpiresAt {
+		proxy.ExpiresAt = input.ExpiresAt
+	}
 	proxy.FallbackMode = mode
 	proxy.BackupProxyID = input.BackupProxyID
 	proxy.ExpiryWarnDays = input.ExpiryWarnDays

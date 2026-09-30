@@ -954,7 +954,9 @@ func filterSchedulerCredentials(credentials map[string]any) map[string]any {
 	if len(credentials) == 0 {
 		return nil
 	}
-	keys := []string{"model_mapping", "compact_model_mapping", "api_key", "project_id", "oauth_type", "plan_type"}
+	// Candidate-list admission evaluates the account override before hydrating
+	// the full account. Dropping it silently falls back to the platform threshold.
+	keys := []string{"model_mapping", "compact_model_mapping", "api_key", "project_id", "oauth_type", "plan_type", "account_scheduling_threshold"}
 	filtered := make(map[string]any)
 	for _, key := range keys {
 		if value, ok := credentials[key]; ok && value != nil {
@@ -972,6 +974,13 @@ func filterSchedulerExtra(extra map[string]any) map[string]any {
 		return nil
 	}
 	keys := []string{
+		// Anthropic shared-window and Fable-only threshold checks run on this
+		// projection. UpdateExtra refreshes both payloads without a bucket rebuild.
+		"session_window_utilization",
+		"passive_usage_7d_utilization",
+		"passive_usage_7d_reset",
+		"passive_usage_7d_oi_utilization",
+		"passive_usage_7d_oi_reset",
 		"quota_limit",
 		"quota_used",
 		"quota_daily_limit",
@@ -989,6 +998,11 @@ func filterSchedulerExtra(extra map[string]any) map[string]any {
 		"mixed_scheduling",
 		"window_cost_limit",
 		"window_cost_sticky_reserve",
+		// RPM 门与窗口费用门一样跑在本投影上：isAccountSchedulableForRPM 读 base_rpm，
+		// 缺失时 GetBaseRPM() 返回 0 并直接放行，已配置限流的账号会被超额调度。
+		"base_rpm",
+		"rpm_strategy",
+		"rpm_sticky_buffer",
 		"max_sessions",
 		"session_idle_timeout_minutes",
 		"openai_passthrough",
@@ -1015,6 +1029,13 @@ func filterSchedulerExtra(extra map[string]any) map[string]any {
 		"auto_pause_7d_threshold",
 		"auto_pause_5h_disabled",
 		"auto_pause_7d_disabled",
+		// 自动用卡：卡可用的 OpenAI 号在暂停阈值与用卡阈值之间继续调度。
+		// 候选过滤读的是本投影，缺这几个键时放行分支永远不会生效，
+		// 账号会在暂停阈值处被一刀切停调，直到窗口自然重置。
+		service.OpenAIAutoResetCreditEnabledExtraKey,
+		service.OpenAIAutoResetCredit5hThresholdExtraKey,
+		service.OpenAIAutoResetCredit7dThresholdExtraKey,
+		service.OpenAIAutoResetCreditStateExtraKey,
 		"model_rate_limits",
 		service.UpstreamBillingProbeEnabledExtraKey,
 		service.UpstreamBillingProbeExtraKey,

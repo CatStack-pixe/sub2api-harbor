@@ -10,6 +10,7 @@ import (
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/apicompat"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/openai"
 	"github.com/Wei-Shaw/sub2api/internal/util/responseheaders"
 	"github.com/gin-gonic/gin"
 	"github.com/tidwall/gjson"
@@ -63,6 +64,15 @@ func (s *OpenAIGatewayService) forwardAnthropicViaRawChatCompletions(
 		billingModel = fallbackModel
 	}
 	upstreamModel := normalizeOpenAIModelForUpstream(account, billingModel)
+	if err := validateGPT61SolCompatRequest(body, upstreamModel); err != nil {
+		writeAnthropicError(c, http.StatusBadRequest, "invalid_request_error", err.Error())
+		return nil, err
+	}
+	if openai.IsGPT61SolModelSpelling(upstreamModel) && len(anthropicReq.Tools) > 0 {
+		err := fmt.Errorf("gpt-6.1-sol requires Responses for tool calls; this account only supports Chat Completions")
+		writeAnthropicError(c, http.StatusBadRequest, "invalid_request_error", err.Error())
+		return nil, err
+	}
 	chatReq.Model = upstreamModel
 	chatReq.ReasoningEffort = openAICompatAnthropicReasoningEffort(&anthropicReq, upstreamModel, chatReq.ReasoningEffort)
 	chatReq.Stream = clientStream
@@ -70,9 +80,6 @@ func (s *OpenAIGatewayService) forwardAnthropicViaRawChatCompletions(
 		chatReq.StreamOptions = &apicompat.ChatStreamOptions{IncludeUsage: true}
 	}
 
-	convertedEffort := chatReq.ReasoningEffort
-	reasoningEffort := &convertedEffort
-	reasoningEffort = ApplyThinkingEnabledFallback(reasoningEffort, body, billingModel)
 	serviceTier := extractOpenAIServiceTierFromBody(body)
 
 	chatBody, err := json.Marshal(chatReq)
@@ -219,17 +226,19 @@ func (s *OpenAIGatewayService) streamChatCompletionsAsAnthropic(
 		// masks the truncation, and surface the error to flag usage incomplete
 		// (mirrors forwardResponsesViaRawChatCompletions).
 		return &OpenAIForwardResult{
-			RequestID:        requestID,
-			Usage:            usage,
-			Model:            originalModel,
-			BillingModel:     billingModel,
-			UpstreamModel:    upstreamModel,
-			ReasoningEffort:  reasoningEffort,
-			ServiceTier:      serviceTier,
-			Stream:           true,
-			Duration:         time.Since(startTime),
-			FirstTokenMs:     scan.FirstTokenMs,
-			ClientDisconnect: clientDisconnected,
+			RequestID:                   requestID,
+			UpstreamHeaders:             resp.Header,
+			Usage:                       usage,
+			Model:                       originalModel,
+			BillingModel:                billingModel,
+			UpstreamModel:               upstreamModel,
+			ReasoningEffort:             reasoningEffort,
+			UpstreamResponseServiceTier: observedUpstreamResponseServiceTier(c),
+			ServiceTier:                 resolvedOpenAIUpstreamServiceTier(c, serviceTier),
+			Stream:                      true,
+			Duration:                    time.Since(startTime),
+			FirstTokenMs:                scan.FirstTokenMs,
+			ClientDisconnect:            clientDisconnected,
 		}, fmt.Errorf("stream usage incomplete: %w", scan.Err)
 	}
 
@@ -254,16 +263,18 @@ func (s *OpenAIGatewayService) streamChatCompletionsAsAnthropic(
 	}
 
 	return &OpenAIForwardResult{
-		RequestID:        requestID,
-		Usage:            usage,
-		Model:            originalModel,
-		BillingModel:     billingModel,
-		UpstreamModel:    upstreamModel,
-		ReasoningEffort:  reasoningEffort,
-		ServiceTier:      serviceTier,
-		Stream:           true,
-		Duration:         time.Since(startTime),
-		FirstTokenMs:     scan.FirstTokenMs,
-		ClientDisconnect: clientDisconnected,
+		RequestID:                   requestID,
+		UpstreamHeaders:             resp.Header,
+		Usage:                       usage,
+		Model:                       originalModel,
+		BillingModel:                billingModel,
+		UpstreamModel:               upstreamModel,
+		ReasoningEffort:             reasoningEffort,
+		UpstreamResponseServiceTier: observedUpstreamResponseServiceTier(c),
+		ServiceTier:                 resolvedOpenAIUpstreamServiceTier(c, serviceTier),
+		Stream:                      true,
+		Duration:                    time.Since(startTime),
+		FirstTokenMs:                scan.FirstTokenMs,
+		ClientDisconnect:            clientDisconnected,
 	}, nil
 }

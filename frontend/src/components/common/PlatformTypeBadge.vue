@@ -68,6 +68,8 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { AccountPlatform, AccountType } from '@/types'
+import { platformLabel as sharedPlatformLabel } from '@/utils/platformColors'
+import { normalizePlanType, openAIPlanTypeLabel } from '@/utils/planType'
 import GrokFreeIcon from './GrokFreeIcon.vue'
 import PlatformIcon from './PlatformIcon.vue'
 import Icon from '@/components/icons/Icon.vue'
@@ -131,12 +133,16 @@ const typeLabel = computed(() => {
   }
 })
 
-const normalizedPlanType = computed(() =>
-  (props.planType || '').trim().toLowerCase().replace(/[\s_-]+/g, '')
-)
+const normalizedPlanType = computed(() => normalizePlanType(props.planType))
 
 const planLabel = computed(() => {
   if (!normalizedPlanType.value) return ''
+  // ChatGPT 档位命名（Pro 100 / Pro 200 / Pro 500、Business / Business Premium）只适用于
+  // OpenAI：Antigravity 与 Grok 各自的 pro/team 沿用下面的通用标签。
+  if (props.platform === 'openai') {
+    const label = openAIPlanTypeLabel(props.planType)
+    if (label) return label
+  }
   switch (normalizedPlanType.value) {
     case 'plus':
       return 'Plus'

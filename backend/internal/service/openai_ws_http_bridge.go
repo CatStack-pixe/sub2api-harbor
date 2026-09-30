@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 
@@ -222,8 +223,39 @@ func (c *openAIWSToolCallReplayCollector) AddEvent(eventType string, message []b
 	}
 }
 
+// Items/AllItems 返回浅拷贝头数组；正文由 collector 独立分配且此后不可变，
+// 调用方按 replay 所有权不变式共享持有。
 func (c *openAIWSToolCallReplayCollector) Items() []json.RawMessage {
-	return cloneOpenAIWSRawMessages(c.items)
+	return slices.Clone(c.items)
+}
+
+func (c *openAIWSToolCallReplayCollector) AllItems() []json.RawMessage {
+	return slices.Clone(c.allItems)
+}
+
+func (c *openAIWSToolCallReplayCollector) addAllItem(item gjson.Result) {
+	if !item.Exists() || item.Type != gjson.JSON {
+		return
+	}
+	raw := strings.TrimSpace(item.Raw)
+	if raw == "" || !strings.HasPrefix(raw, "{") || strings.TrimSpace(item.Get("type").String()) == "" {
+		return
+	}
+	key := strings.TrimSpace(item.Get("id").String())
+	if key == "" {
+		key = strings.TrimSpace(item.Get("call_id").String())
+	}
+	if key == "" {
+		key = raw
+	}
+	if c.allSeen == nil {
+		c.allSeen = make(map[string]struct{})
+	}
+	if _, ok := c.allSeen[key]; ok {
+		return
+	}
+	c.allSeen[key] = struct{}{}
+	c.allItems = append(c.allItems, json.RawMessage(raw))
 }
 
 func (c *openAIWSToolCallReplayCollector) AllItems() []json.RawMessage {
@@ -292,8 +324,9 @@ func buildOpenAIWSHTTPBridgeErrorEvent(statusCode int, message string) []byte {
 		message = "upstream request failed"
 	}
 	event := map[string]any{
-		"type":   "error",
-		"status": statusCode,
+		"type":            "error",
+		"sequence_number": 0,
+		"status":          statusCode,
 		"error": map[string]any{
 			"type":    "upstream_error",
 			"message": message,
@@ -301,7 +334,44 @@ func buildOpenAIWSHTTPBridgeErrorEvent(statusCode int, message string) []byte {
 	}
 	body, err := json.Marshal(event)
 	if err != nil {
-		return []byte(`{"type":"error","error":{"type":"upstream_error","message":"upstream request failed"}}`)
+		return []byte(`{"type":"error","sequence_number":0,"error":{"type":"upstream_error","message":"upstream request failed"}}`)
+	}
+	return body
+}
+
+func buildOpenAIWSHTTPBridgeFailedEvent(responseID, model string, source []byte, fallbackMessage string) []byte {
+	errorType := strings.TrimSpace(gjson.GetBytes(source, "error.type").String())
+	if errorType == "" {
+		errorType = strings.TrimSpace(gjson.GetBytes(source, "response.error.type").String())
+	}
+	code := strings.TrimSpace(gjson.GetBytes(source, "error.code").String())
+	if code == "" {
+		code = strings.TrimSpace(gjson.GetBytes(source, "response.error.code").String())
+	}
+	if code == "" {
+		code = "upstream_error"
+	}
+	message := extractOpenAISSEErrorMessage(source)
+	if message == "" {
+		message = strings.TrimSpace(fallbackMessage)
+	}
+	if message == "" {
+		message = "Upstream response failed"
+	}
+	errorBody := map[string]any{"code": code, "message": message}
+	if errorType != "" {
+		errorBody["type"] = errorType
+	}
+	response := map[string]any{
+		"id": responseID, "object": "response", "status": "failed",
+		"output": []any{}, "error": errorBody,
+	}
+	if model = strings.TrimSpace(model); model != "" {
+		response["model"] = model
+	}
+	body, err := json.Marshal(map[string]any{"type": "response.failed", "sequence_number": 0, "response": response})
+	if err != nil {
+		return []byte(`{"type":"response.failed","sequence_number":0,"response":{"status":"failed","output":[],"error":{"code":"upstream_error","message":"Upstream response failed"}}}`)
 	}
 	return body
 }
@@ -522,7 +592,7 @@ func (s *OpenAIGatewayService) proxyOpenAIWSHTTPBridgeTurn(
 		if upstreamMsg == "" {
 			upstreamMsg = http.StatusText(resp.StatusCode)
 		}
-		shouldFailover := s.shouldFailoverOpenAIUpstreamResponse(resp.StatusCode, upstreamMsg, respBody)
+		shouldFailover := s.shouldFailoverOpenAIUpstreamResponse(account, resp.StatusCode, upstreamMsg, respBody)
 		if account.Platform == PlatformGrok {
 			shouldFailover = s.shouldFailoverGrokUpstreamError(resp.StatusCode, respBody)
 			s.handleGrokAccountUpstreamError(withGrokTeamRateLimitModel(ctx, resolveGrokWSUpstreamModel(account, body, originalModel)), account, resp.StatusCode, resp.Header, respBody)
@@ -708,6 +778,9 @@ func (s *OpenAIGatewayService) proxyOpenAIWSHTTPBridgeTurn(
 		if openAIWSMessageShouldParseUsage(eventType, upstreamMessage) {
 			parseOpenAIWSResponseUsageFromCompletedEvent(upstreamMessage, &usage)
 		}
+		if eventType == "error" || eventType == "response.failed" {
+			markOpenAICyberPolicyEvent(c, upstreamMessage, http.StatusOK, &usage)
+		}
 		imageCounter.AddSSEData(upstreamMessage)
 
 		if needModelReplace && len(mappedModelBytes) > 0 && openAIWSEventMayContainModel(eventType) && strings.Contains(trimmedData, mappedModel) {
@@ -888,7 +961,7 @@ func (s *OpenAIGatewayService) proxyOpenAIWSHTTPBridgeTurn(
 	}
 	if err := scanner.Err(); err != nil {
 		streamErr := fmt.Errorf("read upstream http bridge stream: %w", err)
-		if turn == 1 && !wroteDownstream {
+		if turn == 1 && !clientDisconnected && !wroteDownstream {
 			return nil, s.handleOpenAIUpstreamTransportError(ctx, c, account, streamErr, true)
 		}
 		return resultWithUsage(), streamErr
@@ -897,7 +970,7 @@ func (s *OpenAIGatewayService) proxyOpenAIWSHTTPBridgeTurn(
 	if sawDone {
 		terminalErr = errors.New("upstream http bridge stream sent [DONE] before terminal event")
 	}
-	if turn == 1 && !wroteDownstream {
+	if turn == 1 && !clientDisconnected && !wroteDownstream {
 		return nil, s.handleOpenAIUpstreamTransportError(ctx, c, account, terminalErr, true)
 	}
 	return resultWithUsage(), terminalErr

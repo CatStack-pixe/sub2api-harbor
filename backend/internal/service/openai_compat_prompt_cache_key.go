@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/apicompat"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/openai"
 )
 
 const compatPromptCacheKeyPrefix = "compat_cc_"
@@ -21,7 +22,6 @@ func shouldAutoInjectPromptCacheKeyForCompat(model string) bool {
 	normalized := strings.TrimSpace(strings.ToLower(normalizeCodexModel(trimmed)))
 	return strings.HasPrefix(normalized, "gpt-5") || strings.Contains(normalized, "codex")
 }
-
 func deriveCompatPromptCacheKey(req *apicompat.ChatCompletionsRequest, mappedModel string) string {
 	if req == nil {
 		return ""

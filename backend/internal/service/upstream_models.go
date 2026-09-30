@@ -813,7 +813,7 @@ func (s *AccountTestService) buildAnthropicUpstreamModelsRequest(ctx context.Con
 	if err != nil {
 		return nil, newUpstreamModelSyncConfigError("Invalid Anthropic model list URL", err)
 	}
-	for key, value := range claude.DefaultHeaders {
+	for key, value := range claude.DefaultHeaders() {
 		req.Header.Set(key, value)
 	}
 	req.Header.Set("Accept", "application/json")
@@ -822,7 +822,9 @@ func (s *AccountTestService) buildAnthropicUpstreamModelsRequest(ctx context.Con
 	if authHeaderName != "" {
 		req.Header.Set(authHeaderName, authHeaderValue)
 	} else {
-		setAnthropicAPIKeyAuthHeader(req.Header, account, apiKeyAuthToken)
+		// Ollama Cloud Anthropic 兼容端点按实际 base_url 强制 Bearer，其余保持
+		// extra/default 行为。
+		setAnthropicAPIKeyAuthHeader(req.Header, account, apiKeyAuthToken, normalizedBaseURL)
 	}
 	// 账号级请求头覆写：模型列表探测与真实转发保持一致的最终头
 	account.ApplyHeaderOverrides(req.Header)
@@ -859,7 +861,7 @@ func (s *AccountTestService) buildAntigravityAPIKeyModelsRequest(ctx context.Con
 	if err != nil {
 		return nil, newUpstreamModelSyncConfigError("Invalid Antigravity model list URL", err)
 	}
-	for key, value := range claude.DefaultHeaders {
+	for key, value := range claude.DefaultHeaders() {
 		req.Header.Set(key, value)
 	}
 	req.Header.Set("Accept", "application/json")
@@ -889,7 +891,7 @@ func (s *AccountTestService) buildOpenAIUpstreamModelsRequest(ctx context.Contex
 	if strings.TrimSpace(baseURL) == "" {
 		baseURL = "https://api.openai.com"
 	}
-	normalizedBaseURL, err := s.validateUpstreamBaseURL(baseURL)
+	normalizedBaseURL, err := validateBaseURL(baseURL)
 	if err != nil {
 		return nil, newUpstreamModelSyncConfigError("Invalid OpenAI base URL", err)
 	}

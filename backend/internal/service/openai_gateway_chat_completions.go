@@ -154,6 +154,7 @@ func (s *OpenAIGatewayService) forwardAsChatCompletions(
 	if shouldForwardOpenAIResponsesViaRawChatCompletions(account) {
 		return s.forwardAsRawChatCompletions(ctx, c, account, body, defaultMappedModel)
 	}
+	SetActualOpenAIUpstreamEndpoint(c, openAIResponsesUpstreamEndpoint)
 
 	startTime := time.Now()
 
@@ -169,6 +170,10 @@ func (s *OpenAIGatewayService) forwardAsChatCompletions(
 	// derive a stable seed from the final upstream model family.
 	billingModel := resolveOpenAIForwardModel(account, originalModel, defaultMappedModel)
 	upstreamModel := normalizeOpenAIModelForUpstream(account, billingModel)
+	if err := validateGPT61SolCompatRequest(body, upstreamModel); err != nil {
+		writeChatCompletionsError(c, http.StatusBadRequest, "invalid_request_error", err.Error())
+		return nil, err
+	}
 
 	promptCacheKey = strings.TrimSpace(promptCacheKey)
 	compatPromptCacheInjected := false
@@ -230,6 +235,7 @@ func (s *OpenAIGatewayService) forwardAsChatCompletions(
 	} else {
 		// Normal path: convert Chat Completions → Responses.
 		// ChatCompletionsToResponses always sets Stream=true (upstream always streams).
+		chatReq.Model = upstreamModel
 		responsesReq, err = apicompat.ChatCompletionsToResponses(&chatReq)
 		if err != nil {
 			return nil, fmt.Errorf("convert chat completions to responses: %w", err)
@@ -311,6 +317,10 @@ func (s *OpenAIGatewayService) forwardAsChatCompletions(
 	}
 
 	// 4b. Apply OpenAI fast policy (may filter service_tier or block the request).
+	responsesBody, _, err = normalizeGPT6ResponsesSampling(responsesBody, upstreamModel)
+	if err != nil {
+		return nil, err
+	}
 	updatedBody, policyErr := s.applyOpenAIFastPolicyToBody(ctx, account, upstreamModel, responsesBody)
 	if policyErr != nil {
 		var blocked *OpenAIFastBlockedError
@@ -331,6 +341,11 @@ func (s *OpenAIGatewayService) forwardAsChatCompletions(
 
 	// 6. Build upstream request
 	upstreamCtx, releaseUpstreamCtx := detachUpstreamContext(ctx)
+	cancelUpstream := func() {}
+	if clientStream {
+		upstreamCtx, cancelUpstream = context.WithCancel(upstreamCtx)
+	}
+	defer cancelUpstream()
 	upstreamReq, err := s.buildUpstreamRequest(upstreamCtx, c, account, responsesBody, token, true, promptCacheKey, false)
 	releaseUpstreamCtx()
 	if err != nil {
@@ -348,14 +363,17 @@ func (s *OpenAIGatewayService) forwardAsChatCompletions(
 
 	// 7. Send request
 	proxyURL := ""
-	if account.Proxy != nil {
+	if account.ProxyID != nil && account.Proxy != nil {
 		proxyURL = account.Proxy.URL()
 	}
 	resp, err := s.doOpenAIUpstream(upstreamReq, proxyURL, account)
 	if err != nil {
 		return nil, s.handleOpenAIUpstreamTransportError(ctx, c, account, err, false)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func() {
+		cancelUpstream()
+		_ = resp.Body.Close()
+	}()
 
 	// 8. Handle error response with failover
 	if resp.StatusCode >= 400 {
@@ -368,6 +386,7 @@ func (s *OpenAIGatewayService) forwardAsChatCompletions(
 			return s.forwardAsChatCompletions(markAgentIdentityTaskRecoveryTried(ctx), c, account, body, promptCacheKey, defaultMappedModel, compatPromptCacheTenantIsolated)
 		}
 		if account.Type == AccountTypeAPIKey &&
+			!account.IsOpenCodeGo() &&
 			openai_compat.ResolveResponsesSupport(account.Extra) == openai_compat.ResponsesSupportUnknown &&
 			!isResponsesEndpointSupportedByStatus(resp.StatusCode) {
 			logger.L().Info("openai chat_completions: /responses unsupported, falling back to raw chat completions",
@@ -391,6 +410,7 @@ func (s *OpenAIGatewayService) forwardAsChatCompletions(
 	} else {
 		result, handleErr = s.handleChatBufferedStreamingResponse(resp, c, account, originalModel, billingModel, upstreamModel, startTime)
 	}
+	stampOpenAIResponsesUpstreamEndpoint(c, result)
 
 	// cyber_policy：标记已设、error 已按 Chat Completions 格式发给客户端。丢弃 result、
 	// 返回哨兵，使 handler 落入 tokens=0 免费用量行（对齐 /v1/responses），不计费、不 failover。
