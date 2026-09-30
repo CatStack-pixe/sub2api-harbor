@@ -66,6 +66,9 @@ func TestCyberAllowlistedUserBypassesExistingBlocksAndContinuesWebSocket(t *test
 	matched, err := store.FindCyberSessionBlocked(ctx, service.CyberSessionTranscriptBlockKeys(harness.apiKey.ID, payload))
 	require.NoError(t, err)
 	require.Empty(t, matched, "the cyber response must not write new transcript blocks")
+	matched, err = store.FindCyberSessionBlocked(ctx, []string{explicitKey})
+	require.NoError(t, err)
+	require.Equal(t, explicitKey, matched, "allowlisting bypasses existing blocks without deleting them")
 	require.NoError(t, harness.clientConn.Write(ctx, coderws.MessageText, payload))
 	_, event, err = harness.clientConn.Read(ctx)
 	require.NoError(t, err)
@@ -76,4 +79,10 @@ func TestCyberAllowlistedUserBypassesExistingBlocksAndContinuesWebSocket(t *test
 	case <-ctx.Done():
 		t.Fatal("handler did not exit")
 	}
+	logs := harness.moderationRepo.logSnapshot()
+	require.Len(t, logs, 1, "the completed follow-up must not inherit the previous turn's cyber mark")
+	require.Equal(t, service.ContentModerationModeCyberLogOnly, logs[0].Mode)
+	matched, err = store.FindCyberSessionBlocked(ctx, service.CyberSessionTranscriptBlockKeys(harness.apiKey.ID, payload))
+	require.NoError(t, err)
+	require.Empty(t, matched, "no turn on an allowlisted connection may write transcript blocks")
 }

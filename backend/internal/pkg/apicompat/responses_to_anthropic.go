@@ -221,6 +221,9 @@ type ResponsesEventToAnthropicState struct {
 	textByPart map[responsesTextPart]*strings.Builder
 	// textDelivered records whether any assistant text reached the client.
 	textDelivered bool
+	// Text waits for active tools to finish so recovery never closes a tool
+	// before its remaining arguments arrive or overlaps text with tool blocks.
+	pendingTextEvents []ResponsesStreamEvent
 
 	InputTokens              int
 	OutputTokens             int
@@ -569,11 +572,11 @@ func resToAnthHandleTextDone(evt *ResponsesStreamEvent, state *ResponsesEventToA
 	if state.MessageStopSent {
 		// The message is already terminated; a late payload cannot be delivered
 		// without emitting a content block after message_stop.
-		return resToAnthHandleBlockDone(state)
+		return resToAnthHandleBlockDone(evt, state)
 	}
 
 	events := resToAnthRecoverText(evt.Text, resToAnthTextPartOf(evt), state)
-	return append(events, resToAnthHandleBlockDone(state)...)
+	return append(events, resToAnthHandleBlockDone(evt, state)...)
 }
 
 func resToAnthHandleFuncArgsDelta(evt *ResponsesStreamEvent, state *ResponsesEventToAnthropicState) []AnthropicStreamEvent {

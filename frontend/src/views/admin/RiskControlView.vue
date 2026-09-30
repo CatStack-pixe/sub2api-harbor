@@ -1845,7 +1845,7 @@ async function loadAll() {
     groups.value = groupItems
     status.value = runtimeStatus
     proxies.value = proxyItems
-    if (Array.isArray(runtimeStatus.api_key_statuses)) {
+    if ((runtimeStatus.engine ?? 'openai') === configForm.engine && Array.isArray(runtimeStatus.api_key_statuses)) {
       configForm.api_key_statuses = [...runtimeStatus.api_key_statuses]
       prunePendingDeleteAPIKeyHashes()
     }

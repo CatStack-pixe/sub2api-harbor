@@ -82,9 +82,9 @@ func TestFilterGrokFreeQuotaAccountsOnlyBlocksExplicitFreeOAuth(t *testing.T) {
 	require.Equal(t, []int64{1, 2, 3, 4}, accountIDs(filtered), "miss fails open on hot path")
 
 	require.Eventually(t, func() bool {
-		repo.mu.Lock()
-		defer repo.mu.Unlock()
-		return repo.calls >= 1
+		cached, ok := scheduler.grokFreeQuotaGateCache.Load(int64(1))
+		entry, valid := cached.(grokFreeQuotaGateCacheEntry)
+		return ok && valid && entry.known && entry.tokens == 475_000
 	}, 2*time.Second, 10*time.Millisecond)
 
 	// Second pass: uses refreshed cache and blocks over-gate free OAuth.

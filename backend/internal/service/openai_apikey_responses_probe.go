@@ -267,9 +267,13 @@ func (s *AccountTestService) ProbeOpenAIAPIKeyResponsesSupport(ctx context.Conte
 // 其余 2xx 一律可下结论——尤其 status=completed 却只回 reasoning 的上游（火山方舟
 // coding/v3 × kimi-k2.6），仍按原逻辑判为不支持。
 //
-// 非 2xx 的结论只看状态码、不依赖响应内容，恒可下结论。
+// 明确指向探测模型不可用的 400/404(model_not_found 等)只说明模型不存在,不说明端点
+// 能力,不下结论;其余非 2xx 的结论只看状态码、不依赖响应内容，恒可下结论。
 // 缺少 status 字段的响应体（含非 JSON）也按可下结论处理，保持既有行为。
 func responsesProbeVerdictIsConclusive(status int, body []byte) bool {
+	if isResponsesProbeModelUnavailable(status, body) {
+		return false
+	}
 	if status < 200 || status >= 300 {
 		return true
 	}

@@ -533,20 +533,6 @@ func (s *adminServiceImpl) CreateGroup(ctx context.Context, input *CreateGroupIn
 		return nil, err
 	}
 
-	profitMinMargin := 0.0
-	if input.ProfitMinMargin != nil {
-		profitMinMargin = *input.ProfitMinMargin
-	}
-	profitSafetyBuffer := 0.0
-	if input.ProfitSafetyBuffer != nil {
-		profitSafetyBuffer = *input.ProfitSafetyBuffer
-	}
-	// 利润控制与高峰倍率同一收口顺序：先按平台归一化（不支持的平台重置），再校验。
-	profitControlEnabled, profitMinMargin, profitSafetyBuffer := NormalizeProfitControlConfig(platform, input.ProfitControlEnabled, profitMinMargin, profitSafetyBuffer)
-	if err := ValidateProfitControlConfig(platform, profitControlEnabled, profitMinMargin, profitSafetyBuffer); err != nil {
-		return nil, err
-	}
-
 	// 校验降级分组
 	if input.FallbackGroupID != nil {
 		if err := s.validateFallbackGroup(ctx, 0, *input.FallbackGroupID); err != nil {
@@ -820,9 +806,6 @@ func (s *adminServiceImpl) UpdateGroup(ctx context.Context, id int64, input *Upd
 	// 渠道缓存里存了 groupID → platform 的映射，改了平台要让它失效（见函数末尾）
 	previousPlatform := group.Platform
 
-	// 渠道缓存里存了 groupID → platform 的映射，改了平台要让它失效（见函数末尾）
-	previousPlatform := group.Platform
-
 	if input.Name != "" {
 		group.Name = input.Name
 	}
@@ -959,21 +942,6 @@ func (s *adminServiceImpl) UpdateGroup(ctx context.Context, id int64, input *Upd
 	if err := ValidateProfitControlConfig(group.Platform, group.ProfitControlEnabled, group.ProfitMinMargin, group.ProfitSafetyBuffer); err != nil {
 		return nil, err
 	}
-	if input.ProfitControlEnabled != nil {
-		group.ProfitControlEnabled = *input.ProfitControlEnabled
-	}
-	if input.ProfitMinMargin != nil {
-		group.ProfitMinMargin = *input.ProfitMinMargin
-	}
-	if input.ProfitSafetyBuffer != nil {
-		group.ProfitSafetyBuffer = *input.ProfitSafetyBuffer
-	}
-	// 利润控制与高峰同一收口：按合并后的最终平台归一化（转到不支持平台时静默重置），
-	// 再对合并后的最终配置统一校验，防止部分字段更新拼出非法组合入库。
-	group.ProfitControlEnabled, group.ProfitMinMargin, group.ProfitSafetyBuffer = NormalizeProfitControlConfig(group.Platform, group.ProfitControlEnabled, group.ProfitMinMargin, group.ProfitSafetyBuffer)
-	if err := ValidateProfitControlConfig(group.Platform, group.ProfitControlEnabled, group.ProfitMinMargin, group.ProfitSafetyBuffer); err != nil {
-		return nil, err
-	}
 	if input.ImagePrice1K != nil {
 		group.ImagePrice1K = normalizePrice(input.ImagePrice1K)
 	}
@@ -1084,15 +1052,8 @@ func (s *adminServiceImpl) UpdateGroup(ctx context.Context, id int64, input *Upd
 	if input.MessagesDispatchModelConfig != nil {
 		group.MessagesDispatchModelConfig = normalizeOpenAIMessagesDispatchModelConfig(*input.MessagesDispatchModelConfig)
 	}
-	if input.ModelAllowlist != nil {
-		modelAllowlist, err := normalizeGroupModelAllowlist(*input.ModelAllowlist)
-		if err != nil {
-			return nil, err
-		}
-		group.ModelAllowlist = modelAllowlist
-	}
-	if input.CodexModelsManifestConfig != nil {
-		group.CodexModelsManifestConfig = *input.CodexModelsManifestConfig
+	if input.ModelsListConfig != nil {
+		group.ModelsListConfig = normalizeGroupModelsListConfig(*input.ModelsListConfig)
 	}
 	if input.ModelAllowlist != nil {
 		modelAllowlist, err := normalizeGroupModelAllowlist(*input.ModelAllowlist)

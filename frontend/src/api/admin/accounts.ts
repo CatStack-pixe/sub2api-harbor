@@ -116,45 +116,6 @@ export async function getUpstreamBillingRatesWithEtag(
   return { notModified: false, etag: etagHeader, data: response.data }
 }
 
-export interface AccountUpstreamBillingRatesWithEtagResult {
-  notModified: boolean
-  etag: string | null
-  data: UpstreamBillingRatesResponse | null
-}
-
-export async function getUpstreamBillingRatesWithEtag(
-  page: number = 1,
-  pageSize: number = 20,
-  filters?: {
-    platform?: string
-    type?: string
-    status?: string
-    group?: string
-    search?: string
-    privacy_mode?: string
-    sort_by?: string
-    sort_order?: 'asc' | 'desc'
-  },
-  options?: {
-    signal?: AbortSignal
-    etag?: string | null
-  }
-): Promise<AccountUpstreamBillingRatesWithEtagResult> {
-  const headers: Record<string, string> = {}
-  if (options?.etag) headers['If-None-Match'] = options.etag
-
-  const response = await apiClient.get<UpstreamBillingRatesResponse>('/admin/accounts/upstream-billing-rates', {
-    params: { page, page_size: pageSize, ...filters },
-    headers,
-    signal: options?.signal,
-    validateStatus: (status) => (status >= 200 && status < 300) || status === 304
-  })
-
-  const etagHeader = typeof response.headers?.etag === 'string' ? response.headers.etag : null
-  if (response.status === 304) return { notModified: true, etag: etagHeader, data: null }
-  return { notModified: false, etag: etagHeader, data: response.data }
-}
-
 export async function listWithEtag(
   page: number = 1,
   pageSize: number = 20,
@@ -1177,6 +1138,7 @@ export interface OpenAIQuotaResetResult {
 /** Usage payload plus whether the reset-credit snapshot was persisted. */
 export interface OpenAIQuotaRefreshResult extends OpenAIQuotaUsage {
   cache_persisted: boolean
+  credits_cache_persisted?: boolean
 }
 
 /**
@@ -1191,6 +1153,23 @@ export interface OpenAIQuotaRefreshResult extends OpenAIQuotaUsage {
 export async function refreshOpenAIQuota(id: number): Promise<OpenAIQuotaRefreshResult> {
   const { data } = await apiClient.post<OpenAIQuotaRefreshResult>(
     `/admin/openai/accounts/${id}/quota/refresh`
+  )
+  return data
+}
+
+export async function refreshOpenAIReferrals(id: number): Promise<OpenAIReferralRefreshResult> {
+  const { data } = await apiClient.post<OpenAIReferralRefreshResult>(
+    `/admin/openai/accounts/${id}/referrals/refresh`
+  )
+  return data
+}
+
+export async function sendOpenAIReferralInvite(
+  id: number,
+  input: { email: string; program_id: string; confirmed: boolean }
+): Promise<OpenAIReferralSendResult> {
+  const { data } = await apiClient.post<OpenAIReferralSendResult>(
+    `/admin/openai/accounts/${id}/referrals/invite`, input, { timeout: 90_000 }
   )
   return data
 }

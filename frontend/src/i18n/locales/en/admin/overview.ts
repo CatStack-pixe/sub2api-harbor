@@ -1168,6 +1168,15 @@ export default {
         empty: 'No displayable models',
         selectedSummary: 'Selected {selected} / {total}',
         selectAll: 'Select all',
+        invertSelection: 'Invert'
+      },
+      modelAllowlist: {
+        title: 'Model Allowlist',
+        hint: 'When enabled, models outside the allowlist are rejected with 404 model_not_found, and model listing endpoints only show allowlisted models. Entries support exact model IDs and * wildcards anywhere (e.g., gpt-*-codex). Note: Claude Code probes with haiku-family models for titles/summaries and /messages/count_tokens is also allowlist-controlled, so make sure the small models you need are selected too.',
+        loading: 'Loading candidate models...',
+        empty: 'No candidate models; add custom entries below',
+        selectedSummary: 'Selected {selected} / {total}',
+        selectAll: 'Select all',
         invertSelection: 'Invert',
         wildcardTag: 'wildcard',
         customPlaceholder: 'Custom entry, e.g. gpt-*-codex or claude-*',
@@ -1175,37 +1184,6 @@ export default {
         emptySelectionError: 'The model allowlist is enabled; select or add at least one model entry',
         errors: {
           empty: 'Please enter a model entry',
-          duplicate: 'This entry already exists'
-        }
-      },
-      codexModelsManifest: {
-        title: 'Pinned Accounts for Model Lists',
-        hint: 'When enabled, ordinary model lists and Codex Model Manifest are discovered from the pinned accounts first, then merged and filtered using account mappings and the group model list. Rate-limited or overloaded pinned accounts are still used.',
-        enable: 'Fetch model lists with specific accounts',
-        enabledHint: 'Accounts are limited to OpenAI accounts bound to this group, at most 10.',
-        disabledHint: 'Disabled: ordinary lists use local mappings or defaults; Codex uses a local catalog when configured, otherwise scheduler discovery.',
-        accounts: 'Pinned accounts',
-        searchPlaceholder: 'Search accounts (OpenAI accounts in this group)',
-        searchEmpty: 'No matching accounts',
-        fallback: 'Fall back to the scheduler when all pinned accounts are unavailable',
-        fallbackHint: 'Off: return 503 / the upstream error. On: fall back to the existing scheduler path.',
-        selectAtLeastOne: 'Select at least one account after enabling pinned accounts'
-      },
-      modelAllowlist: {
-        title: 'Model Allowlist',
-        hint: 'When enabled, models outside the allowlist are rejected with 404 model_not_found, and model listing endpoints only show allowlisted models. Entries support exact model IDs and trailing * wildcards. Note: Claude Code probes with haiku-family models for titles/summaries and /messages/count_tokens is also allowlist-controlled, so make sure the small models you need are selected too.',
-        loading: 'Loading candidate models...',
-        empty: 'No candidate models; add custom entries below',
-        selectedSummary: 'Selected {selected} / {total}',
-        selectAll: 'Select all',
-        invertSelection: 'Invert',
-        wildcardTag: 'wildcard',
-        customPlaceholder: 'Custom entry, e.g. claude-* or gpt-5.5-codex',
-        addCustom: 'Add',
-        emptySelectionError: 'The model allowlist is enabled; select or add at least one model entry',
-        errors: {
-          empty: 'Please enter a model entry',
-          invalidWildcard: 'Wildcard * is only allowed at the end of an entry',
           duplicate: 'This entry already exists'
         }
       },

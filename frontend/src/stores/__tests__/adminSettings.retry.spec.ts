@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
+import { flushPromises } from '@vue/test-utils'
 import { useAdminSettingsStore } from '../adminSettings'
 
 const mocks = vi.hoisted(() => ({ getSettings: vi.fn(), getConfig: vi.fn() }))
@@ -39,6 +40,44 @@ describe('admin settings fetch retry', () => {
     expect(store.opsMonitoringEnabled).toBe(false)
     expect(store.paymentEnabled).toBe(true)
     expect(localStorage.getItem('payment_enabled_cached')).toBe('true')
+  })
+
+  it('keeps a payment failure retryable when it arrives before settings finish', async () => {
+    let resolveSettings!: (value: { ops_monitoring_enabled: boolean }) => void
+    mocks.getSettings.mockReturnValueOnce(new Promise(resolve => { resolveSettings = resolve }))
+    mocks.getConfig.mockRejectedValueOnce(new Error('Payment temporarily unavailable'))
+    const store = useAdminSettingsStore()
+    const fetching = store.fetch()
+    await flushPromises()
+    expect(store.loading).toBe(true)
+    resolveSettings({ ops_monitoring_enabled: true })
+    await fetching
+    expect(store.loaded).toBe(false)
+    expect(store.loading).toBe(false)
+    expect(store.opsMonitoringEnabled).toBe(true)
+    await store.fetch()
+    expect(mocks.getSettings).toHaveBeenCalledTimes(2)
+    expect(mocks.getConfig).toHaveBeenCalledTimes(2)
+    expect(store.loaded).toBe(true)
+    expect(store.paymentEnabled).toBe(true)
+  })
+
+  it('does not block settings readiness and retries a later payment failure', async () => {
+    let rejectPayment!: (error: Error) => void
+    mocks.getConfig.mockReturnValueOnce(new Promise((_resolve, reject) => { rejectPayment = reject }))
+    const store = useAdminSettingsStore()
+    await store.fetch()
+    expect(store.loaded).toBe(true)
+    expect(store.loading).toBe(false)
+    expect(store.customMenuItems).toEqual([{ id: 'custom', title: 'Custom' }])
+    rejectPayment(new Error('Payment temporarily unavailable'))
+    await flushPromises()
+    expect(store.loaded).toBe(false)
+    await store.fetch()
+    expect(mocks.getSettings).toHaveBeenCalledTimes(2)
+    expect(mocks.getConfig).toHaveBeenCalledTimes(2)
+    expect(store.loaded).toBe(true)
+    expect(store.paymentEnabled).toBe(true)
   })
 
   it('still reuses successfully loaded settings', async () => {

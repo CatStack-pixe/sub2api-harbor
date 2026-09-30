@@ -185,13 +185,6 @@ describe('isHeaderOverrideCapable', () => {
     }
   })
 
-  it('kimi/zhipu/deepseek only support apikey accounts', () => {
-    for (const platform of ['kimi', 'zhipu', 'deepseek', 'minimax', 'opencode_go']) {
-      expect(isHeaderOverrideCapable(platform, 'apikey')).toBe(true)
-      expect(isHeaderOverrideCapable(platform, 'oauth')).toBe(false)
-    }
-  })
-
   it('grok supports both apikey and oauth accounts', () => {
     expect(isHeaderOverrideCapable('grok', 'apikey')).toBe(true)
     expect(isHeaderOverrideCapable('grok', 'oauth')).toBe(true)
@@ -560,5 +553,16 @@ describe('plan_type helpers', () => {
       expect(out).toEqual({ email: 'a@b.c' })
       expect('plan_type' in out).toBe(false)
     })
+  })
+})
+
+describe('Codex subscription analytics labels', () => {
+  it.each([
+    ['business', 'Business'], ['self_serve_business_prolite', 'Business'],
+    ['enterprise_cbp_automation', 'Enterprise'], ['ent26', 'Enterprise'],
+    ['edu', 'Education'], ['edu_plus', 'Education'], ['edu_pro', 'Education'],
+    ['unknown', 'Account'], ['promax', 'Pro 500']
+  ])('groups %s without changing its status label', (sku, label) => {
+    expect(openAIPlanTypeLabel(sku, 'analytics')).toBe(label)
   })
 })

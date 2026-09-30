@@ -16,7 +16,7 @@ func TestRecordUsage_ImageReasoningPricing(t *testing.T) {
 		for _, source := range []string{PricingSourceChannel, PricingSourceGroup} {
 			for _, mode := range []BillingMode{BillingModeImage, BillingModePerRequest} {
 				for _, independent := range []bool{false, true} {
-					for _, effort := range []string{"high", "low", ""} {
+					for _, effort := range []string{"high", "medium", "low", ""} {
 						name := fmt.Sprintf("%s/%s/%s/independent=%t/effort=%s", platform, source, mode, independent, effort)
 						t.Run(name, func(t *testing.T) {
 							usageRepo := &openAIRecordUsageLogRepoStub{inserted: true}
@@ -27,7 +27,7 @@ func TestRecordUsage_ImageReasoningPricing(t *testing.T) {
 							price := 0.25
 							pricing := ChannelModelPricing{
 								Models: []string{model}, BillingMode: mode, PerRequestPrice: &price,
-								ReasoningEffortMultipliers: map[string]float64{"high": 2},
+								ReasoningEffortMultipliers: map[string]float64{"high": 2, "medium": 0.5},
 							}
 							resolver := newOpenAIImageChannelPricingResolverForTest(t, groupID, model, price)
 							cache := resolver.channelService.cache.Load().(*channelCache)
@@ -39,7 +39,7 @@ func TestRecordUsage_ImageReasoningPricing(t *testing.T) {
 							if source == PricingSourceGroup {
 								group.ModelPricing = []ChannelModelPricing{pricing}
 								// A matching group card owns the multiplier; the channel must not stack on top.
-								pricing.ReasoningEffortMultipliers = map[string]float64{"high": 3}
+								pricing.ReasoningEffortMultipliers = map[string]float64{"high": 3, "medium": 0.25}
 							}
 							apiKey := &APIKey{ID: 10, GroupID: &groupID, Group: group}
 							account := &Account{ID: 30, Platform: platform, Type: AccountTypeAPIKey}
@@ -72,6 +72,8 @@ func TestRecordUsage_ImageReasoningPricing(t *testing.T) {
 							wantTotal := 0.5
 							if effort == "high" {
 								wantTotal *= 2
+							} else if effort == "medium" {
+								wantTotal *= 0.5
 							}
 							wantRate := 0.5
 							if independent {
@@ -120,7 +122,7 @@ func TestCalculateRecordUsageCost_MediaReasoningPricing(t *testing.T) {
 					svc := &GatewayService{billingService: resolver.billingService, resolver: resolver}
 					cost = svc.calculateRecordUsageCost(context.Background(), &ForwardResult{
 						ReasoningEffort: &effort, AudioUsage: &AudioUsage{Mode: "tts", DurationOrUnits: 2},
-					}, apiKey, model, 0.5, 0.5, time.Time{})
+					}, apiKey, model, 0.5, 0.5, time.Time{}, nil)
 				} else {
 					svc := &OpenAIGatewayService{billingService: resolver.billingService, resolver: resolver}
 					result := &OpenAIForwardResult{ReasoningEffort: &effort}

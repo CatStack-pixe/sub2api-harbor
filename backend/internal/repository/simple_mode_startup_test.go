@@ -34,11 +34,11 @@ func TestEnsureSimpleModeStartup(t *testing.T) {
 					// The first seeding operation backfills auto-created Grok groups.
 					mock.ExpectExec(`UPDATE "groups"`).WillReturnResult(sqlmock.NewResult(0, 0))
 					// Existing groups exercise the complete seeding path without inserts.
-					for i := 0; i < 5; i++ {
+					for i := 0; i < 14; i++ {
 						mock.ExpectQuery(`SELECT COUNT\(.*FROM "groups"`).WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(2))
 					}
 					// Antigravity only counts; other platforms check the default name.
-					for i := 0; i < 4; i++ {
+					for i := 0; i < 13; i++ {
 						mock.ExpectQuery(`SELECT "groups"\."id" FROM "groups"`).WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(1))
 					}
 					// Platform map iteration order is unspecified.

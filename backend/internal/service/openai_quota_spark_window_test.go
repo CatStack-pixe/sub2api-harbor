@@ -27,9 +27,10 @@ import (
 // stubQuotaAccountRepo 是多账号 AccountRepository stub，仅实现 GetByID。
 type stubQuotaAccountRepo struct {
 	AccountRepository
-	accounts       map[int64]*Account
-	extraUpdates   map[int64]map[string]any
-	extraUpdateErr error
+	accounts         map[int64]*Account
+	extraUpdates     map[int64]map[string]any
+	extraUpdateCalls int
+	extraUpdateErr   error
 }
 
 func (r *stubQuotaAccountRepo) GetByID(_ context.Context, id int64) (*Account, error) {
@@ -50,6 +51,7 @@ func (r *stubQuotaAccountRepo) UpdateCredentials(_ context.Context, id int64, cr
 }
 
 func (r *stubQuotaAccountRepo) UpdateExtra(_ context.Context, id int64, updates map[string]any) error {
+	r.extraUpdateCalls++
 	if r.extraUpdateErr != nil {
 		return r.extraUpdateErr
 	}
@@ -206,7 +208,7 @@ func TestResetCreditTargetedSendsStableCreditAndRedeemIDs(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	svc := NewOpenAIQuotaService(repo, nil, tokenProvider, newQuotaRedirectingFactory(srv))
+	svc := NewOpenAIQuotaService(repo, nil, tokenProvider, newQuotaRedirectingFactory(srv), nil)
 	result, err := svc.ResetCreditTargeted(context.Background(), account.ID, "credit-123", "redeem-456")
 	require.NoError(t, err)
 	require.Equal(t, "ok", result.Code)

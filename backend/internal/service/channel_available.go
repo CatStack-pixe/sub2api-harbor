@@ -118,7 +118,7 @@ func (s *ChannelService) ListAvailable(ctx context.Context) ([]AvailableChannel,
 //  1. Pricing == nil（渠道完全没声明该模型的定价条目）
 //  2. Pricing 非 nil 但所有价格字段为空（admin UI 建了条目但没填价格）
 //
-// 当 pricingService 为 nil（测试场景），跳过价格回落，但仍补充内置模型倍率。
+// 当 pricingService 为 nil（测试场景），跳过价格回落。
 // 可用渠道与模型广场共用。
 func fillGlobalPricingFallback(pricingService *PricingService, models []SupportedModel) {
 	for i := range models {
@@ -127,7 +127,6 @@ func fillGlobalPricingFallback(pricingService *PricingService, models []Supporte
 				models[i].Pricing = synthesizePricingFromLiteLLM(lp, models[i].Pricing)
 			}
 		}
-		models[i].Pricing = withDefaultMaxReasoningEffortMultiplier(models[i].Pricing, models[i].Name)
 	}
 }
 
@@ -186,14 +185,14 @@ func synthesizePricingFromLiteLLM(lp *LiteLLMModelPricing, existing *ChannelMode
 		}
 	}
 	return &ChannelModelPricing{
-		BillingMode:                  mode,
-		InputPrice:                   nonZeroPtr(lp.InputCostPerToken),
-		OutputPrice:                  nonZeroPtr(lp.OutputCostPerToken),
-		CacheWritePrice:              nonZeroPtr(lp.CacheCreationInputTokenCost),
-		CacheWrite1hPrice:            nonZeroPtr(lp.CacheCreationInputTokenCostAbove1hr),
-		CacheReadPrice:               nonZeroPtr(lp.CacheReadInputTokenCost),
-		ImageOutputPrice:             nonZeroPtr(lp.OutputCostPerImageToken),
-		MaxReasoningEffortMultiplier: maxReasoningEffortMultiplierFromPricing(existing),
+		BillingMode:                mode,
+		InputPrice:                 nonZeroPtr(lp.InputCostPerToken),
+		OutputPrice:                nonZeroPtr(lp.OutputCostPerToken),
+		CacheWritePrice:            nonZeroPtr(lp.CacheCreationInputTokenCost),
+		CacheWrite1hPrice:          nonZeroPtr(lp.CacheCreationInputTokenCostAbove1hr),
+		CacheReadPrice:             nonZeroPtr(lp.CacheReadInputTokenCost),
+		ImageOutputPrice:           nonZeroPtr(lp.OutputCostPerImageToken),
+		ReasoningEffortMultipliers: reasoningEffortMultipliersFromPricing(existing),
 	}
 }
 

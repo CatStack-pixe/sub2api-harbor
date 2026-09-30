@@ -11,21 +11,24 @@ import (
 )
 
 type dashboardAggregationRepoTestStub struct {
-	aggregateCalls       int
-	recomputeCalls       int
-	cleanupUsageCalls    int
-	cleanupDedupCalls    int
-	ensurePartitionCalls int
-	lastStart            time.Time
-	lastEnd              time.Time
-	watermark            time.Time
-	aggregateErr         error
-	cleanupAggregatesErr error
-	cleanupUsageErr      error
-	cleanupDedupErr      error
-	ensurePartitionErr   error
-	aggregateCtx         context.Context
-	events               *[]string
+	aggregateCalls        int
+	recomputeCalls        int
+	cleanupUsageCalls     int
+	cleanupUsageCutoff    time.Time
+	cleanupDedupCutoff    time.Time
+	cleanupAggregateCalls int
+	cleanupDedupCalls     int
+	ensurePartitionCalls  int
+	lastStart             time.Time
+	lastEnd               time.Time
+	watermark             time.Time
+	aggregateErr          error
+	cleanupAggregatesErr  error
+	cleanupUsageErr       error
+	cleanupDedupErr       error
+	ensurePartitionErr    error
+	aggregateCtx          context.Context
+	events                *[]string
 }
 
 type dashboardAggregationRollupRepoTestStub struct {

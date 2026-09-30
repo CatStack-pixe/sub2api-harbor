@@ -56,7 +56,19 @@ export const useAdminSettingsStore = defineStore('adminSettings', () => {
     if (loading.value) return
 
     loading.value = true
-    const paymentConfigPromise = adminAPI.payment.getConfig()
+    // Handle the optional request immediately, including failures that arrive
+    // before settings finish. Payment must not block monitoring readiness.
+    let paymentConfigFailed = false
+    void adminAPI.payment.getConfig()
+      .then((paymentConfigResp) => {
+        paymentEnabled.value = paymentConfigResp.data?.enabled ?? false
+        writeCachedBool('payment_enabled_cached', paymentEnabled.value)
+      })
+      .catch((err) => {
+        paymentConfigFailed = true
+        loaded.value = false
+        console.error('[adminSettings] Failed to fetch payment config:', err)
+      })
     try {
       // The ops dashboard only needs system settings. Payment configuration is
       // optional for navigation and must not hold the whole admin shell open.
@@ -72,25 +84,15 @@ export const useAdminSettingsStore = defineStore('adminSettings', () => {
 
       customMenuItems.value = Array.isArray(settings.custom_menu_items) ? settings.custom_menu_items : []
 
-      loaded.value = true
+      // A failed optional request stays retryable, but a pending one does not
+      // hold the settings/UI loading state open.
+      loaded.value = !paymentConfigFailed
     } catch (err) {
       // Keep cached/default value: do not "flip" the UI based on a transient fetch failure.
       console.error('[adminSettings] Failed to fetch settings:', err)
     } finally {
       loading.value = false
     }
-
-    // Finish the optional payment request independently. Keeping this promise
-    // handled prevents a slow or unavailable payment service from blocking the
-    // monitoring page or producing an unhandled rejection.
-    void paymentConfigPromise
-      .then((paymentConfigResp) => {
-        paymentEnabled.value = paymentConfigResp.data?.enabled ?? false
-        writeCachedBool('payment_enabled_cached', paymentEnabled.value)
-      })
-      .catch((err) => {
-        console.error('[adminSettings] Failed to fetch payment config:', err)
-      })
   }
 
   function setOpsMonitoringEnabledLocal(value: boolean) {

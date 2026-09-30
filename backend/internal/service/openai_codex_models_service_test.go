@@ -343,6 +343,12 @@ func TestNewConfiguredCodexModelDescriptorUsesProviderMetadataAndSafeFallback(t 
 
 	claudeOpus5 := newConfiguredCodexModelDescriptor("claude-opus-5")
 	require.Equal(t, []string{"low", "medium", "high", "xhigh", "max"}, effortsFromConfiguredCodexLevels(claudeOpus5.SupportedReasoningLevels))
+	claudeSonnet55 := newConfiguredCodexModelDescriptor("anthropic/claude-sonnet-5-5")
+	require.Equal(t, "Claude Sonnet 5.5", claudeSonnet55.DisplayName)
+	require.Equal(t, int64(1_000_000), claudeSonnet55.ContextWindow)
+	require.Equal(t, int64(1_000_000), claudeSonnet55.MaxContextWindow)
+	require.Equal(t, "high", *claudeSonnet55.DefaultReasoningLevel)
+	require.Equal(t, []string{"low", "medium", "high", "xhigh", "max"}, effortsFromConfiguredCodexLevels(claudeSonnet55.SupportedReasoningLevels))
 
 	providerQualifiedClaude := newConfiguredCodexModelDescriptor("anthropic/claude-sonnet-4-6")
 	require.Equal(t, "Claude Sonnet 4.6", providerQualifiedClaude.DisplayName)
@@ -1124,6 +1130,7 @@ func TestBuildCodexModelsManifestForGroupLoadsAccountsOnce(t *testing.T) {
 	require.Contains(t, repo.platforms, PlatformGrok)
 	require.Contains(t, repo.platforms, PlatformDeepseek)
 	require.Contains(t, repo.platforms, PlatformMiniMax)
+	require.Contains(t, repo.platforms, PlatformOpenCodeGo)
 	require.NotContains(t, repo.platforms, PlatformComposite)
 }
 
@@ -3882,4 +3889,384 @@ func TestGPT61SolAPIKeyCatalogUsesFullResponses(t *testing.T) {
 	require.NoError(t, json.Unmarshal(body, &catalog))
 	require.Equal(t, false, catalog.Models[0]["use_responses_lite"])
 	require.Equal(t, "low", catalog.Models[0]["default_reasoning_level"])
+}
+
+func TestConfiguredCodexServiceTierHelpersKeepStandaloneCatalogAccountScoped(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		model string
+		tiers []string
+	}{
+		{"openai/gpt-5.4-mini", []string{"priority"}},
+		{"gpt-5.5", []string{"priority"}},
+		{"gpt-5.6-sol", []string{"priority", "ultrafast"}},
+		{"gpt-5.6", []string{"priority", "ultrafast"}},
+		{"gpt-6", []string{"priority"}},
+		{"openai/gpt-6-astra", []string{"priority"}},
+		{"gpt-6-sol", []string{"priority"}},
+		{"gpt-6-luna", []string{"priority"}},
+		{"openai/gpt-6.1-sol", []string{"priority"}},
+		{"gpt-4o", []string{}},
+		{"claude-sonnet-5-5", []string{}},
+		{"company-coding-model", []string{}},
+	}
+	for _, tc := range tests {
+		t.Run(tc.model, func(t *testing.T) {
+			tiers := configuredCodexServiceTiersForModel(tc.model)
+			require.NotNil(t, tiers)
+			ids := make([]string, 0, len(tiers))
+			for _, tier := range tiers {
+				ids = append(ids, tier.ID)
+				require.NotEmpty(t, tier.Name)
+				require.NotEmpty(t, tier.Description)
+			}
+			require.Equal(t, tc.tiers, ids)
+			if !openai.IsGPT61SolModelSpelling(tc.model) {
+				// GPT-6.1 has bundled official metadata, not inferred tier hints.
+				require.Empty(t, newConfiguredCodexModelDescriptor(tc.model).ServiceTiers)
+			}
+		})
+	}
+}
+
+func TestGPT61SolCodexCatalogRetainsOfficialExtensionFieldsAndPublicSlug(t *testing.T) {
+	t.Parallel()
+
+	var official map[string]any
+	require.NoError(t, json.Unmarshal(openai.CodexGPT61SolMetadata, &official))
+	for _, slug := range []string{"gpt-6.1-sol", "openai/gpt-6.1-sol"} {
+		t.Run(slug, func(t *testing.T) {
+			body, err := BuildCodexModelsManifest([]string{slug})
+			require.NoError(t, err)
+			models := decodeCodexManifestModels(t, body)
+			require.Len(t, models, 1)
+			model := models[0]
+			require.Equal(t, slug, model["slug"])
+			for _, field := range []string{
+				"prefer_websockets", "minimal_client_version", "available_in_plans",
+				"supports_reasoning_summaries", "supports_reasoning_effort_updates",
+				"requires_sandboxed_review", "guardian", "service_tiers",
+				"multi_agent_reasoning_effort", "multi_agent_version",
+			} {
+				require.Contains(t, official, field)
+				require.Contains(t, model, field)
+				require.Equal(t, official[field], model[field], field)
+			}
+			require.Equal(t, official["model_messages"], model["model_messages"])
+		})
+	}
+}
+
+func TestClaude55CodexCatalogKeepsMetadataAndNonGPTInstructions(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		model, displayName, defaultEffort string
+	}{
+		{"claude-opus-5-5", "Claude Opus 5.5", "medium"},
+		{"anthropic/claude-opus-5-5", "Claude Opus 5.5", "medium"},
+		{"claude-sonnet-5-5", "Claude Sonnet 5.5", "high"},
+		{"anthropic/claude-sonnet-5-5", "Claude Sonnet 5.5", "high"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.model, func(t *testing.T) {
+			body, err := BuildCodexModelsManifest([]string{tc.model})
+			require.NoError(t, err)
+			models := decodeCodexManifestModels(t, body)
+			require.Len(t, models, 1)
+			model := models[0]
+			require.Equal(t, tc.displayName, model["display_name"])
+			require.Equal(t, tc.defaultEffort, model["default_reasoning_level"])
+			require.EqualValues(t, 1_000_000, model["context_window"])
+			require.EqualValues(t, 1_000_000, model["max_context_window"])
+			require.Equal(t, []string{"low", "medium", "high", "xhigh", "max"}, effortsFromManifestModel(t, model))
+			messages, ok := model["model_messages"].(map[string]any)
+			require.True(t, ok)
+			require.NotContains(t, messages["instructions_template"], "GPT-")
+		})
+	}
+}
+
+func TestBuildGroupConfiguredCodexModelsManifestPreservesLocalProviderContracts(t *testing.T) {
+	t.Parallel()
+
+	for _, platform := range []string{
+		PlatformAgnes, PlatformNvidia, PlatformTokenRhythm, PlatformChatAnywhere,
+		PlatformGLM, PlatformModelScope, PlatformDashScope, PlatformVolcengine,
+		PlatformSenseNova, PlatformSenseAudio, PlatformTierflow,
+		PlatformKimi, PlatformZhipu, PlatformDeepseek, PlatformMiniMax, PlatformOpenCodeGo,
+	} {
+		t.Run(platform, func(t *testing.T) {
+			const groupID int64 = 95
+			account := Account{
+				ID: 501, Platform: platform, Type: AccountTypeAPIKey,
+				Status: StatusActive, Schedulable: true,
+				Credentials: map[string]any{
+					"model_mapping": map[string]any{"public-*": "gpt-6.1-sol"},
+				},
+			}
+			reasoning := true
+			account.SetUpstreamModelMetadataSnapshot(UpstreamModelMetadataSnapshot{
+				Models: map[string]UpstreamModelMetadata{
+					"gpt-6.1-sol": {
+						ID: "gpt-6.1-sol", Reasoning: &reasoning,
+						DefaultReasoningLevel: "high", SupportedReasoningLevels: []string{"low", "high"},
+						ContextWindow: 160_000, InputModalities: []string{"text", "image"},
+						CodexToolCapabilities: map[string]json.RawMessage{
+							"service_tiers":        json.RawMessage(`[{"id":"provider-fast","name":"Provider Fast","provider_extension":{"kept":true}}]`),
+							"supports_search_tool": json.RawMessage("false"),
+							"use_responses_lite":   json.RawMessage("false"),
+						},
+					},
+				},
+			})
+			svc := &OpenAIGatewayService{accountRepo: codexModelsVisibilityAccountRepo{
+				byGroup: map[int64][]Account{groupID: {account}},
+			}}
+			group := &Group{
+				ID: groupID, Platform: PlatformOpenAI,
+				ModelsListConfig: GroupModelsListConfig{Enabled: true, Models: []string{"public-coder"}},
+				ModelAllowlist:   GroupModelAllowlist{Enabled: true, Models: []string{"public-coder"}},
+			}
+			manifest, configured, err := svc.BuildGroupConfiguredCodexModelsManifest(context.Background(), group, "")
+			require.NoError(t, err)
+			require.True(t, configured)
+			models := decodeCodexManifestModels(t, manifest.Body)
+			require.Len(t, models, 1)
+			model := models[0]
+			require.Equal(t, "public-coder", model["slug"])
+			require.Equal(t, "public-coder", model["display_name"])
+			require.Equal(t, configuredCodexCustomDescription, model["description"])
+			require.Equal(t, []string{"low", "high"}, effortsFromManifestModel(t, model))
+			require.Equal(t, "high", model["default_reasoning_level"])
+			require.EqualValues(t, 160_000, model["context_window"])
+			require.EqualValues(t, 160_000, model["max_context_window"])
+			if platform == PlatformChatAnywhere {
+				require.Equal(t, []any{"text"}, model["input_modalities"])
+			} else {
+				require.Equal(t, []any{"text", "image"}, model["input_modalities"])
+			}
+			require.Equal(t, false, model["supports_search_tool"])
+			require.Equal(t, false, model["use_responses_lite"])
+			require.Equal(t, []any{map[string]any{
+				"id": "provider-fast", "name": "Provider Fast",
+				"provider_extension": map[string]any{"kept": true},
+			}}, model["service_tiers"])
+			require.NotContains(t, string(manifest.Body), "public-*")
+			require.Equal(t, codexModelsManifestBodyETag(manifest.Body), manifest.ETag)
+			cached, configured, err := svc.BuildGroupConfiguredCodexModelsManifest(context.Background(), group, manifest.ETag)
+			require.NoError(t, err)
+			require.True(t, configured)
+			require.True(t, cached.NotModified)
+			require.Empty(t, cached.Body)
+		})
+	}
+}
+
+func TestCompleteAPIKeyCodexManifestKeepsRemoteCatalogTierAndMessageExtensions(t *testing.T) {
+	t.Parallel()
+
+	account := newCodexModelsAPIKeyTestAccount("https://provider.example/v1")
+	manifest := &OpenAIModelsResponse{Body: []byte(`{
+		"metadata":{"remote_catalog":"kept"},
+		"models":[{
+			"slug":"gpt-6.1-sol",
+			"service_tiers":[{"id":"provider-fast","provider_extension":{"kept":true}}],
+			"default_service_tier":"provider-fast",
+			"input_modalities":["text"],
+			"use_responses_lite":false,
+			"model_messages":{
+				"instructions_template":"Provider instructions",
+				"tools":{"remote_tool":"kept"},
+				"confirmation_policies":{"remote_policy":"kept"}
+			}
+		}]
+	}`)}
+	svc := &OpenAIGatewayService{}
+	require.NoError(t, svc.CompleteAPIKeyCodexModelsManifestForClient(manifest, account))
+	models := decodeCodexManifestModels(t, manifest.Body)
+	require.Len(t, models, 1)
+	model := models[0]
+	require.Equal(t, []any{map[string]any{
+		"id": "provider-fast", "provider_extension": map[string]any{"kept": true},
+	}}, model["service_tiers"])
+	require.Equal(t, "provider-fast", model["default_service_tier"])
+	require.Equal(t, []any{"text"}, model["input_modalities"])
+	require.Equal(t, false, model["use_responses_lite"])
+	messages, ok := model["model_messages"].(map[string]any)
+	require.True(t, ok)
+	require.Equal(t, "Provider instructions", messages["instructions_template"])
+	require.Equal(t, map[string]any{"remote_tool": "kept"}, messages["tools"])
+	confirmationPolicies, ok := messages["confirmation_policies"].(map[string]any)
+	require.True(t, ok)
+	require.Equal(t, "kept", confirmationPolicies["remote_policy"])
+	require.Contains(t, messages, "persistent_instructions")
+	var envelope map[string]any
+	require.NoError(t, json.Unmarshal(manifest.Body, &envelope))
+	require.Equal(t, map[string]any{"remote_catalog": "kept"}, envelope["metadata"])
+	require.Equal(t, codexModelsManifestBodyETag(manifest.Body), manifest.ETag)
+}
+
+func TestGPT61CodexAccountCatalogDoesNotGrantOfflineCapabilitiesWithoutSnapshots(t *testing.T) {
+	t.Parallel()
+
+	for _, platform := range []string{PlatformOpenAI, PlatformSenseNova, PlatformSenseAudio, PlatformTierflow, PlatformChatAnywhere} {
+		for _, partialSnapshot := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/partial=%t", platform, partialSnapshot), func(t *testing.T) {
+				const groupID int64 = 96
+				account := Account{
+					ID: 502, Platform: platform, Type: AccountTypeAPIKey,
+					Status: StatusActive, Schedulable: true,
+					Credentials: map[string]any{
+						"base_url":      "https://provider.example/v1",
+						"model_mapping": map[string]any{"public-coder": "gpt-6.1-sol"},
+					},
+				}
+				if partialSnapshot {
+					reasoning := true
+					account.SetUpstreamModelMetadataSnapshot(UpstreamModelMetadataSnapshot{
+						Models: map[string]UpstreamModelMetadata{
+							"gpt-6.1-sol": {ID: "gpt-6.1-sol", Reasoning: &reasoning, SupportedReasoningLevels: []string{"high"}},
+						},
+					})
+				}
+				svc := &OpenAIGatewayService{accountRepo: codexModelsVisibilityAccountRepo{
+					byGroup: map[int64][]Account{groupID: {account}},
+				}}
+				group := &Group{
+					ID: groupID, Platform: PlatformOpenAI,
+					ModelsListConfig: GroupModelsListConfig{Enabled: true, Models: []string{"public-coder"}},
+				}
+				manifest, configured, err := svc.BuildGroupConfiguredCodexModelsManifest(context.Background(), group, "")
+				require.NoError(t, err)
+				require.True(t, configured)
+				models := decodeCodexManifestModels(t, manifest.Body)
+				require.Len(t, models, 1)
+				require.Equal(t, "public-coder", models[0]["slug"])
+				require.Equal(t, []any{"text"}, models[0]["input_modalities"])
+				require.Equal(t, false, models[0]["supports_image_detail_original"])
+				require.Equal(t, []any{}, models[0]["service_tiers"])
+				require.Equal(t, []any{}, models[0]["additional_speed_tiers"])
+				require.Equal(t, false, models[0]["use_responses_lite"])
+				require.Nil(t, models[0]["tool_mode"])
+			})
+		}
+	}
+
+	account := newCodexModelsAPIKeyTestAccount("https://provider.example/v1")
+	svc := &OpenAIGatewayService{}
+	for _, body := range [][]byte{
+		[]byte(`{"models":[{"slug":"gpt-6.1-sol"}]}`),
+		convertOpenAIModelListToCodexManifestForAccount([]byte(`{"data":[{"id":"gpt-6.1-sol"}]}`), account),
+	} {
+		manifest := &OpenAIModelsResponse{Body: body}
+		require.NoError(t, svc.CompleteAPIKeyCodexModelsManifestForClient(manifest, account))
+		models := decodeCodexManifestModels(t, manifest.Body)
+		require.Len(t, models, 1)
+		require.Equal(t, []any{"text"}, models[0]["input_modalities"])
+		require.Equal(t, false, models[0]["supports_image_detail_original"])
+		require.Equal(t, []any{}, models[0]["service_tiers"])
+		require.Equal(t, false, models[0]["use_responses_lite"])
+		require.Nil(t, models[0]["tool_mode"])
+	}
+}
+
+func TestGPT61CodexMixedProviderCatalogIntersectsMissingImageCapabilities(t *testing.T) {
+	t.Parallel()
+
+	const groupID int64 = 97
+	mapping := map[string]any{"gpt-6.1-sol": "gpt-6.1-sol"}
+	accounts := []Account{
+		{
+			ID: 503, Platform: PlatformOpenAI, Type: AccountTypeOAuth,
+			Credentials: map[string]any{"model_mapping": mapping},
+		},
+		{
+			ID: 504, Platform: PlatformSenseNova, Type: AccountTypeAPIKey,
+			Credentials: map[string]any{"model_mapping": mapping},
+		},
+	}
+	svc := &OpenAIGatewayService{accountRepo: codexModelsVisibilityAccountRepo{
+		byGroup: map[int64][]Account{groupID: accounts},
+	}}
+	manifest, configured, err := svc.BuildGroupConfiguredCodexModelsManifest(
+		context.Background(), &Group{ID: groupID, Platform: PlatformOpenAI}, "",
+	)
+	require.NoError(t, err)
+	require.True(t, configured)
+	models := decodeCodexManifestModels(t, manifest.Body)
+	require.Len(t, models, 1)
+	require.Equal(t, []any{"text"}, models[0]["input_modalities"])
+	require.Equal(t, false, models[0]["supports_image_detail_original"])
+	require.Equal(t, []any{}, models[0]["service_tiers"])
+}
+
+func TestGPT61CodexResponsesLiteGuardCoversEquivalentSpellingAndMappedAliases(t *testing.T) {
+	t.Parallel()
+
+	for _, target := range []string{
+		"gpt-6.1-sol", "openai/gpt-6.1-sol", "gpt_6.1_sol",
+		"gpt-6.1-sol-high", "openai/gpt-6.1-sol-xhigh", "gpt-6.1-sol-openai-compact",
+	} {
+		for _, mapped := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/mapped=%t", target, mapped), func(t *testing.T) {
+				slug := target
+				account := newCodexModelsAPIKeyTestAccount("https://provider.example/v1")
+				if mapped {
+					slug = "public-coder"
+					account.Credentials["model_mapping"] = map[string]any{slug: target}
+				}
+				body, err := json.Marshal(map[string]any{
+					"models":         []map[string]any{{"slug": slug, "use_responses_lite": true}},
+					"remote_catalog": map[string]any{"kept": true},
+				})
+				require.NoError(t, err)
+				adjusted, err := adjustAPIKeyCodexModelsManifest(body, account)
+				require.NoError(t, err)
+				models := decodeCodexManifestModels(t, adjusted)
+				require.Len(t, models, 1)
+				require.Equal(t, slug, models[0]["slug"])
+				require.Equal(t, false, models[0]["use_responses_lite"])
+				var envelope map[string]any
+				require.NoError(t, json.Unmarshal(adjusted, &envelope))
+				require.Equal(t, map[string]any{"kept": true}, envelope["remote_catalog"])
+			})
+		}
+	}
+}
+
+func TestCompleteAPIKeyCodexManifestPreservesNullableRemoteMessageExtensions(t *testing.T) {
+	t.Parallel()
+
+	svc := &OpenAIGatewayService{}
+	account := newCodexModelsAPIKeyTestAccount("https://provider.example/v1")
+	for _, tiers := range []json.RawMessage{json.RawMessage("null"), json.RawMessage("[]")} {
+		body, err := json.Marshal(map[string]any{
+			"models": []map[string]any{{
+				"slug": "gpt-6.1-sol", "service_tiers": tiers,
+				"model_messages": map[string]any{
+					"instructions_template": nil, "persistent_instructions": nil,
+					"confirmation_policies": nil, "tools": nil,
+					"approvals": nil, "guardian_v2": nil,
+				},
+			}},
+		})
+		require.NoError(t, err)
+		manifest := &OpenAIModelsResponse{Body: body}
+		require.NoError(t, svc.CompleteAPIKeyCodexModelsManifestForClient(manifest, account))
+		models := decodeCodexManifestModels(t, manifest.Body)
+		require.Len(t, models, 1)
+		messages, ok := models[0]["model_messages"].(map[string]any)
+		require.True(t, ok)
+		// The required template is repaired, but optional explicit nulls stay null.
+		require.NotEmpty(t, messages["instructions_template"])
+		for _, field := range []string{"persistent_instructions", "confirmation_policies", "tools", "approvals", "guardian_v2"} {
+			require.Contains(t, messages, field)
+			require.Nil(t, messages[field], field)
+		}
+		var expectedTiers any
+		require.NoError(t, json.Unmarshal(tiers, &expectedTiers))
+		require.Equal(t, expectedTiers, models[0]["service_tiers"])
+	}
 }

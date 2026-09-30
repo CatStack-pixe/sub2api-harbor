@@ -317,7 +317,7 @@ func anthToResHandleContentBlockStart(evt *AnthropicStreamEvent, state *Anthropi
 	var events []ResponsesStreamEvent
 
 	switch evt.ContentBlock.Type {
-	case "thinking":
+	case "thinking", "redacted_thinking":
 		// 开新 item 前必须先关掉在开的那个，与下面的 tool_use 分支一致。
 		// 一个 message item 在它的 text 块 content_block_stop 时是刻意保持打开的
 		// （同一 item 里可能还有后续 text 块），所以 thinking 块到来时它仍然开着：

@@ -1028,8 +1028,7 @@
     "supports_reasoning": true,
     "supports_response_schema": true,
     "supports_system_messages": true,
-    "supports_tool_choice": true,
-    "supports_vision": true
+    "supports_tool_choice": true
   },
   "deepseek-v4-flash-vision-exp": {
     "cache_read_input_token_cost": 3e-09,

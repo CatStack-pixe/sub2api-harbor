@@ -69,24 +69,6 @@ export interface BackupDownloadResponse {
   parts?: BackupDownloadPart[]
 }
 
-export interface BackupPart {
-  index: number
-  s3_key: string
-  size_bytes: number
-  sha256?: string
-}
-
-export interface BackupDownloadPart {
-  index: number
-  size_bytes: number
-  url: string
-}
-
-export interface BackupDownloadResponse {
-  url?: string
-  parts?: BackupDownloadPart[]
-}
-
 export interface CreateBackupRequest {
   expire_days?: number
 }

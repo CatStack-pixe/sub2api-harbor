@@ -1,3 +1,4 @@
+-- Preserve the fork platform and SenseNova monitor constraints when upgrading.
 -- Add OpenCode as a first-class platform (account types Zen / GO).
 --
 -- 1. user_platform_quotas.platform CHECK
@@ -12,16 +13,14 @@ ALTER TABLE user_platform_quotas
 
 ALTER TABLE user_platform_quotas
     ADD CONSTRAINT user_platform_quotas_platform_check
-    CHECK (platform IN ('anthropic', 'openai', 'gemini', 'antigravity', 'grok',
-                        'kimi', 'zhipu', 'deepseek', 'minimax', 'opencode_go'));
+    CHECK (platform IN ('anthropic', 'openai', 'gemini', 'antigravity', 'grok', 'agnes', 'deepseek', 'nvidia', 'tokenrhythm', 'kimi', 'zhipu', 'chatanywhere', 'glm', 'modelscope', 'dashscope', 'minimax', 'volcengine', 'sensenova', 'opencode_go'));
 
 ALTER TABLE composite_model_routes
     DROP CONSTRAINT IF EXISTS composite_model_routes_target_platform_check;
 
 ALTER TABLE composite_model_routes
     ADD CONSTRAINT composite_model_routes_target_platform_check
-    CHECK (target_platform IN ('anthropic', 'openai', 'gemini', 'antigravity', 'grok',
-                               'kimi', 'zhipu', 'deepseek', 'minimax', 'opencode_go'));
+    CHECK (target_platform IN ('anthropic', 'openai', 'gemini', 'antigravity', 'grok', 'agnes', 'deepseek', 'nvidia', 'tokenrhythm', 'kimi', 'zhipu', 'chatanywhere', 'glm', 'modelscope', 'dashscope', 'minimax', 'volcengine', 'sensenova', 'opencode_go'));
 
 DO $$
 DECLARE
@@ -40,8 +39,7 @@ BEGIN
             DROP CONSTRAINT IF EXISTS channel_monitors_provider_check;
         ALTER TABLE channel_monitors
             ADD CONSTRAINT channel_monitors_provider_check
-            CHECK (provider IN ('openai', 'anthropic', 'gemini', 'grok',
-                                'antigravity', 'kimi', 'zhipu', 'deepseek', 'minimax', 'opencode_go'));
+            CHECK (provider IN ('openai', 'anthropic', 'gemini', 'grok', 'antigravity', 'kimi', 'zhipu', 'deepseek', 'sensenova', 'minimax', 'opencode_go'));
     END IF;
 
     SELECT pg_get_constraintdef(c.oid)
@@ -56,7 +54,6 @@ BEGIN
             DROP CONSTRAINT IF EXISTS channel_monitor_request_templates_provider_check;
         ALTER TABLE channel_monitor_request_templates
             ADD CONSTRAINT channel_monitor_request_templates_provider_check
-            CHECK (provider IN ('openai', 'anthropic', 'gemini', 'grok',
-                                'antigravity', 'kimi', 'zhipu', 'deepseek', 'minimax', 'opencode_go'));
+            CHECK (provider IN ('openai', 'anthropic', 'gemini', 'grok', 'antigravity', 'kimi', 'zhipu', 'deepseek', 'sensenova', 'minimax', 'opencode_go'));
     END IF;
 END $$;
