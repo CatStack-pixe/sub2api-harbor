@@ -51,7 +51,6 @@ func (r *tokenRefreshCandidateRepo) ListOAuthRefreshCandidatePage(_ context.Cont
 			}
 		}
 		if options.ActiveOnly && account.Status != StatusActive ||
-			!account.Schedulable ||
 			account.Type != AccountTypeOAuth ||
 			!platformAllowed ||
 			options.RequireRefreshToken && strings.TrimSpace(refreshToken) == "" ||
@@ -176,7 +175,7 @@ func TestTokenRefreshService_ProcessRefreshUsesOAuthRefreshCandidates(t *testing
 				Type:        AccountTypeOAuth,
 				Status:      StatusActive,
 				Schedulable: false,
-				Credentials: map[string]any{"refresh_token": "permanently-rejected-token"},
+				Credentials: map[string]any{"refresh_token": "paused-account-token"},
 			},
 		},
 	}

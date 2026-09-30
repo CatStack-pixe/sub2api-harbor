@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/Wei-Shaw/sub2api/internal/config"
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
 	"github.com/stretchr/testify/require"
@@ -592,21 +593,26 @@ func TestAdminService_CreateGroup_DefaultsGrokMediaGenerationEnabled(t *testing.
 	require.True(t, group.AllowImageGeneration)
 }
 
-func TestAdminService_CreateGroup_LongContextPricingDefaultsEnabled(t *testing.T) {
+func TestAdminService_CreateGroup_LongContextPricingHonorsRunModeAndExplicitValue(t *testing.T) {
 	disabled := false
+	enabled := true
 	tests := []struct {
 		name  string
+		cfg   *config.Config
 		value *bool
 		want  bool
 	}{
 		{name: "omitted defaults enabled", want: true},
 		{name: "explicit false remains disabled", value: &disabled, want: false},
+		{name: "explicit true remains enabled", value: &enabled, want: true},
+		{name: "simple omitted defaults disabled", cfg: &config.Config{RunMode: config.RunModeSimple}, want: false},
+		{name: "simple ignores explicit true", cfg: &config.Config{RunMode: config.RunModeSimple}, value: &enabled, want: false},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			repo := &groupRepoStubForAdmin{}
-			svc := &adminServiceImpl{groupRepo: repo}
+			svc := &adminServiceImpl{cfg: tt.cfg, groupRepo: repo}
 
 			group, err := svc.CreateGroup(context.Background(), &CreateGroupInput{
 				Name:                      "long-context",

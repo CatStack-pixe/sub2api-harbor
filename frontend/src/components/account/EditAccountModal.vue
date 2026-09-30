@@ -60,6 +60,10 @@
                         ? 'https://apihub.agnes-ai.com/v1'
                           : account.platform === 'tokenrhythm'
                             ? 'https://tokenrhythm.studio/v1'
+                          : account.platform === 'tierflow'
+                            ? 'https://tierflow.cn/v1'
+                          : account.platform === 'senseaudio'
+                            ? 'https://api.senseaudio.cn/v1'
                           : account.platform === 'nvidia'
                             ? 'https://integrate.api.nvidia.com/v1'
                           : account.platform === 'deepseek'
@@ -86,7 +90,7 @@
             @select="editBaseUrl = $event"
           />
           <CnBaseUrlPresets
-            v-if="isCNApiKeyAccount"
+            v-if="isCNApiKeyAccount && account.platform !== 'opencode_go'"
             class="mt-2"
             :platform="cnPresetPlatform"
             :mode="editAccountMode"
@@ -105,12 +109,64 @@
               <input v-model="editAdaptiveBaseUrls[item.value]" type="text" class="input" />
             </div>
           </div>
-          <p v-if="account.platform !== 'deepseek'" class="input-hint">
+          <p v-if="!cnSupportsNativeResponses(account.platform)" class="input-hint">
             {{ t('admin.accounts.cnProviders.apiProtocol.responsesFallbackDesc') }}
           </p>
         </div>
+        <!-- OpenCode Zen vs GO -->
+        <div v-if="isCNApiKeyAccount && account.platform === 'opencode_go'">
+          <label class="input-label">{{ t('admin.accounts.cnProviders.accountMode.title') }}</label>
+          <div class="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <button
+              type="button"
+              @click="editOpenCodeAccountMode = 'zen'"
+              :class="[
+                'flex items-center gap-3 rounded-lg border-2 p-3 text-left transition-all',
+                editOpenCodeAccountMode === 'zen'
+                  ? 'border-amber-500 bg-amber-50 dark:bg-amber-900/20'
+                  : 'border-gray-200 hover:border-gray-400 dark:border-dark-600 dark:hover:border-gray-600'
+              ]"
+            >
+              <div
+                :class="[
+                  'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg',
+                  editOpenCodeAccountMode === 'zen' ? 'bg-amber-500 text-white' : 'bg-gray-100 text-gray-500 dark:bg-dark-600 dark:text-gray-400'
+                ]"
+              >
+                <Icon name="creditCard" size="sm" />
+              </div>
+              <div>
+                <span class="block text-sm font-medium text-gray-900 dark:text-white">{{ t('admin.accounts.opencodeGo.accountMode.zen') }}</span>
+                <span class="text-xs text-gray-500 dark:text-gray-400">{{ t('admin.accounts.opencodeGo.accountMode.zenDesc') }}</span>
+              </div>
+            </button>
+            <button
+              type="button"
+              @click="editOpenCodeAccountMode = 'go'"
+              :class="[
+                'flex items-center gap-3 rounded-lg border-2 p-3 text-left transition-all',
+                editOpenCodeAccountMode === 'go'
+                  ? 'border-amber-500 bg-amber-50 dark:bg-amber-900/20'
+                  : 'border-gray-200 hover:border-gray-400 dark:border-dark-600 dark:hover:border-gray-600'
+              ]"
+            >
+              <div
+                :class="[
+                  'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg',
+                  editOpenCodeAccountMode === 'go' ? 'bg-amber-500 text-white' : 'bg-gray-100 text-gray-500 dark:bg-dark-600 dark:text-gray-400'
+                ]"
+              >
+                <Icon name="bolt" size="sm" />
+              </div>
+              <div>
+                <span class="block text-sm font-medium text-gray-900 dark:text-white">{{ t('admin.accounts.opencodeGo.accountMode.go') }}</span>
+                <span class="text-xs text-gray-500 dark:text-gray-400">{{ t('admin.accounts.opencodeGo.accountMode.goDesc') }}</span>
+              </div>
+            </button>
+          </div>
+        </div>
         <!-- Account Mode Selection (CN providers) -->
-        <div v-if="isCNApiKeyAccount">
+        <div v-if="isCNApiKeyAccount && account.platform !== 'opencode_go'">
           <label class="input-label">{{ t('admin.accounts.cnProviders.accountMode.title') }}</label>
           <div class="mt-2 flex flex-wrap gap-2">
             <button
@@ -130,7 +186,33 @@
           </div>
           <p class="input-hint">{{ t(`admin.accounts.cnProviders.accountMode.${editAccountMode}Desc`) }}</p>
         </div>
-        <!-- Zhipu team Coding Plan organization/project identifiers -->
+        <!-- API Protocol Selection (CN providers / OpenCode) -->
+        <div v-if="isCNApiKeyAccount">
+          <label class="input-label">{{ t('admin.accounts.cnProviders.apiProtocol.title') }}</label>
+          <div class="mt-2 flex flex-wrap gap-2">
+            <button
+              v-for="opt in cnProtocolOptions"
+              :key="opt.value"
+              type="button"
+              :class="[
+                'rounded-lg border-2 px-3 py-1.5 text-xs transition-all',
+                editApiProtocol === opt.value
+                  ? 'border-primary-500 bg-primary-50 font-medium text-primary-700 dark:bg-primary-900/30 dark:text-primary-300'
+                  : 'border-gray-200 text-gray-700 hover:border-gray-400 dark:border-dark-600 dark:text-gray-300 dark:hover:border-gray-600'
+              ]"
+              @click="editApiProtocol = opt.value"
+            >
+              {{ t(`admin.accounts.cnProviders.apiProtocol.${opt.labelKey}`) }}
+            </button>
+          </div>
+          <p class="input-hint">{{ t(`admin.accounts.cnProviders.apiProtocol.${cnProtocolDescKey}Desc`) }}</p>
+        </div>
+        <OpenCodeGoProtocolRulesEditor
+          v-if="account.platform === 'opencode_go' && editApiProtocol === 'adaptive'"
+          v-model:rows="editOpenCodeGoProtocolRules"
+          :plan="editOpenCodeAccountMode"
+        />
+        <!-- Zhipu 团队版 Coding Plan：组织/项目 ID（可选，填写后用量查询走团队版端点） -->
         <div v-if="account.platform === 'zhipu' && editAccountMode === 'coding'">
           <div class="flex items-center">
             <label class="input-label">{{ t('admin.accounts.cnProviders.zhipuTeam.title') }}</label>
@@ -159,27 +241,6 @@
           </div>
           <p class="input-hint mt-2">{{ t('admin.accounts.cnProviders.zhipuTeam.hint') }}</p>
         </div>
-        <!-- API Protocol Selection (CN providers) -->
-        <div v-if="isCNApiKeyAccount">
-          <label class="input-label">{{ t('admin.accounts.cnProviders.apiProtocol.title') }}</label>
-          <div class="mt-2 flex flex-wrap gap-2">
-            <button
-              v-for="opt in cnProtocolOptions"
-              :key="opt.value"
-              type="button"
-              :class="[
-                'rounded-lg border-2 px-3 py-1.5 text-xs transition-all',
-                editApiProtocol === opt.value
-                  ? 'border-primary-500 bg-primary-50 font-medium text-primary-700 dark:bg-primary-900/30 dark:text-primary-300'
-                  : 'border-gray-200 text-gray-700 hover:border-gray-400 dark:border-dark-600 dark:text-gray-300 dark:hover:border-gray-600'
-              ]"
-              @click="editApiProtocol = opt.value"
-            >
-              {{ t(`admin.accounts.cnProviders.apiProtocol.${opt.labelKey}`) }}
-            </button>
-          </div>
-          <p class="input-hint">{{ t(`admin.accounts.cnProviders.apiProtocol.${cnProtocolDescKey}Desc`) }}</p>
-        </div>
         <div>
           <label class="input-label">{{ t('admin.accounts.apiKey') }}</label>
           <input
@@ -206,6 +267,8 @@
                           : account.platform === 'deepseek'
                           ? 'sk-...'
                           : account.platform === 'kimi'
+                             ? 'sk-...'
+                          : account.platform === 'tierflow'
                             ? 'sk-...'
                           : account.platform === 'chatanywhere'
                             ? 'sk-...'
@@ -226,6 +289,13 @@
           />
           <p class="input-hint">{{ t('admin.accounts.leaveEmptyToKeep') }}</p>
         </div>
+
+        <TierflowCredentialsFields
+          v-if="account.platform === 'tierflow'"
+          v-model:cookie="tierflowCookie"
+          v-model:user-id="tierflowUserId"
+          editing
+        />
 
         <div v-if="account.platform === 'sensenova'">
           <label class="input-label">{{ t('admin.accounts.sensenova.quotaAccessToken') }}</label>
@@ -1760,6 +1830,14 @@
       <div class="border-t border-gray-200 pt-4 dark:border-dark-600">
         <label class="input-label">{{ t('admin.accounts.expiresAt') }}</label>
         <input v-model="expiresAtInput" type="datetime-local" class="input" />
+        <div class="mt-2 flex gap-2">
+          <button type="button" class="btn btn-secondary btn-sm" @click="form.expires_at = getAccountExpiryTimestamp(1)">
+            {{ t('payment.oneMonth') }}
+          </button>
+          <button type="button" class="btn btn-secondary btn-sm" @click="form.expires_at = getAccountExpiryTimestamp(12)">
+            {{ t('payment.oneYear') }}
+          </button>
+        </div>
         <p class="input-hint">
           {{ t('admin.accounts.expiresAtHint') }}
           {{ t('admin.accounts.expiresAtTimezoneHint', { timezone: browserTimeZone }) }}
@@ -3156,8 +3234,11 @@ import BaseDialog from '@/components/common/BaseDialog.vue'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import Select from '@/components/common/Select.vue'
 import HelpTooltip from '@/components/common/HelpTooltip.vue'
+import UpstreamRequestIdHeaderField from '@/components/account/UpstreamRequestIdHeaderField.vue'
 import Toggle from '@/components/common/Toggle.vue'
 import TokenRhythmSessionResolver from '@/components/account/TokenRhythmSessionResolver.vue'
+import TierflowCredentialsFields from '@/components/account/TierflowCredentialsFields.vue'
+import { applyTierflowConsoleCredentials } from '@/components/account/tierflowCredentials'
 import Icon from '@/components/icons/Icon.vue'
 import ProxySelector from '@/components/common/ProxySelector.vue'
 import ProxyAdBanner from '@/components/common/ProxyAdBanner.vue'
@@ -3166,6 +3247,7 @@ import ModelWhitelistSelector from '@/components/account/ModelWhitelistSelector.
 import QuotaLimitCard from '@/components/account/QuotaLimitCard.vue'
 import GrokBaseUrlPresets from '@/components/account/GrokBaseUrlPresets.vue'
 import CnBaseUrlPresets from '@/components/account/CnBaseUrlPresets.vue'
+import OpenCodeGoProtocolRulesEditor from '@/components/account/OpenCodeGoProtocolRulesEditor.vue'
 import HeaderOverrideEditor from '@/components/account/HeaderOverrideEditor.vue'
 import OllamaCloudUsageSettings from '@/components/account/OllamaCloudUsageSettings.vue'
 import {
@@ -3186,12 +3268,16 @@ import {
   validateHeaderOverrideRows,
   defaultCNAdaptiveBaseUrls,
   defaultCNBaseUrl,
+  isCNProviderPlatform,
   HEADER_OVERRIDE_ENABLED_CREDENTIAL_KEY,
   HEADER_OVERRIDES_CREDENTIAL_KEY,
   type CnAccountMode,
   type CnApiProtocol,
   type CnNativeApiProtocol,
-  type HeaderOverrideRow
+  type CnProviderPlatform,
+  type HeaderOverrideRow,
+  type OpenCodeAccountMode,
+  type OpenCodeGoProtocolRule
 } from '@/components/account/credentialsBuilder'
 import {
   formatDateTime,
@@ -3200,6 +3286,7 @@ import {
   parseDateTimeLocalInput
 } from '@/utils/format'
 import { createStableObjectKeyResolver } from '@/utils/stableObjectKey'
+import { getAccountExpiryTimestamp } from '@/components/account/accountExpiry'
 import { allSelectedGroupsEnableLongContextPricing } from '@/components/account/longContextBilling'
 import { VERTEX_LOCATION_OPTIONS } from '@/constants/account'
 import {
@@ -3235,8 +3322,18 @@ const emit = defineEmits<{
 
 const { t } = useI18n()
 const appStore = useAppStore()
-const authStore = useAuthStore()
 const browserTimeZone = getBrowserTimeZone()
+
+const selectableGroups = computed(() => {
+  const groups = new Map<number, Group>(props.groups.map(group => [group.id, group]))
+  const assignedIds = new Set(props.account?.group_ids ?? [])
+  for (const group of props.account?.groups ?? []) {
+    if (assignedIds.has(group.id) && !groups.has(group.id)) {
+      groups.set(group.id, group)
+    }
+  }
+  return Array.from(groups.values())
+})
 
 // Spark 影子账号(parent_account_id 非空):代理恒继承母账号,不可独立编辑(外审 B/P1),
 // 故隐藏代理选择器。
@@ -3342,6 +3439,8 @@ const baseUrlHint = computed(() => {
   if (props.account.platform === 'deepseek') return t('admin.accounts.deepseek.baseUrlHint')
   if (props.account.platform === 'kimi') return t('admin.accounts.kimi.baseUrlHint')
   if (props.account.platform === 'tokenrhythm') return t('admin.accounts.tokenrhythm.baseUrlHint')
+  if (props.account.platform === 'tierflow') return t('admin.accounts.tierflow.baseUrlHint')
+  if (props.account.platform === 'senseaudio') return t('admin.accounts.senseaudio.baseUrlHint')
   if (props.account.platform === 'chatanywhere') return t('admin.accounts.chatanywhere.baseUrlHint')
   if (props.account.platform === 'glm') return t('admin.accounts.glm.baseUrlHint')
   if (props.account.platform === 'nvidia') return t('admin.accounts.nvidia.baseUrlHint')
@@ -3375,6 +3474,8 @@ const editBaseUrl = ref('https://api.anthropic.com')
 const editApiKey = ref('')
 const editSenseNovaAccessToken = ref('')
 const tokenRhythmCookie = ref('')
+const tierflowCookie = ref('')
+const tierflowUserId = ref('')
 
 // ── 国产供应商（Kimi / Zhipu / DeepSeek）account_mode / api_protocol 编辑 ──
 // account_mode 决定额度/余额监控路径，api_protocol 决定转发端点与格式；
@@ -3382,21 +3483,29 @@ const tokenRhythmCookie = ref('')
 const isCNApiKeyAccount = computed(
   () =>
     props.account?.type === 'apikey' &&
-    (props.account.platform === 'kimi' ||
-      props.account.platform === 'zhipu' ||
-      props.account.platform === 'deepseek')
+    (isCNProviderPlatform(props.account.platform) || props.account.platform === 'opencode_go')
 )
 // CnBaseUrlPresets 的 platform prop 是平台字面量联合类型，模板里不能写
 // `as` 断言（其中的 `|` 会被 eslint 误判为 Vue2 filter 语法），经此 computed 传递。
-const cnPresetPlatform = computed<'kimi' | 'zhipu' | 'deepseek'>(() => {
+const cnPresetPlatform = computed<CnProviderPlatform>(() => {
   const platform = props.account?.platform
-  if (platform === 'kimi' || platform === 'zhipu' || platform === 'deepseek') {
-    return platform
+  if (isCNProviderPlatform(platform ?? '')) {
+    return platform as CnProviderPlatform
   }
   return 'kimi'
 })
+const adaptivePresetPlatform = computed<CnProviderPlatform | 'opencode_go'>(() => {
+  if (props.account?.platform === 'opencode_go') return 'opencode_go'
+  return cnPresetPlatform.value
+})
 const editApiProtocol = ref<CnApiProtocol>('adaptive')
+const editOpenCodeGoProtocolRules = ref<OpenCodeGoProtocolRule[]>(cloneOpenCodeGoProtocolRules())
 const editAccountMode = ref<CnAccountMode>('payg')
+const editOpenCodeAccountMode = ref<OpenCodeAccountMode>('go')
+function currentOpenCodeOrCNMode(): CnAccountMode | OpenCodeAccountMode {
+  return props.account?.platform === 'opencode_go' ? editOpenCodeAccountMode.value : editAccountMode.value
+}
+// 智谱团队版 Coding Plan：组织/项目 ID，写入 credentials 供额度探测切换团队端点
 const editZhipuOrganization = ref('')
 const editZhipuProject = ref('')
 const editAdaptiveBaseUrls = ref<Record<CnNativeApiProtocol, string>>({
@@ -3427,7 +3536,7 @@ const cnProtocolOptions = computed<Array<{ value: CnApiProtocol; labelKey: strin
     { value: 'chat_completions', labelKey: 'chatCompletions' },
     { value: 'anthropic', labelKey: 'anthropic' }
   ]
-  if (props.account?.platform === 'deepseek') {
+  if (cnSupportsNativeResponses(props.account?.platform ?? '')) {
     opts.push({ value: 'responses', labelKey: 'responses' })
   }
   return opts
@@ -3437,13 +3546,13 @@ const editAdaptiveProtocolOptions = computed<Array<{ value: CnNativeApiProtocol;
     { value: 'chat_completions', labelKey: 'chatCompletions' },
     { value: 'anthropic', labelKey: 'anthropic' }
   ]
-  if (props.account?.platform === 'deepseek') opts.push({ value: 'responses', labelKey: 'responses' })
+  if (cnSupportsNativeResponses(props.account?.platform ?? '')) opts.push({ value: 'responses', labelKey: 'responses' })
   return opts
 })
 watch(editApiProtocol, (protocol, previousProtocol) => {
   if (!isCNApiKeyAccount.value || syncingForm.value) return
   if (protocol === 'adaptive') {
-    const defaults = defaultCNAdaptiveBaseUrls(cnPresetPlatform.value, editAccountMode.value)
+    const defaults = defaultCNAdaptiveBaseUrls(adaptivePresetPlatform.value, currentOpenCodeOrCNMode())
     for (const item of editAdaptiveProtocolOptions.value) {
       if (!editAdaptiveBaseUrls.value[item.value]) editAdaptiveBaseUrls.value[item.value] = defaults[item.value]
     }
@@ -3455,13 +3564,14 @@ watch(editApiProtocol, (protocol, previousProtocol) => {
   }
   if (previousProtocol === 'adaptive') {
     editBaseUrl.value = editAdaptiveBaseUrls.value[protocol] ||
-      defaultCNBaseUrl(props.account!.platform, editAccountMode.value, protocol)
+      defaultCNBaseUrl(props.account!.platform, currentOpenCodeOrCNMode(), protocol)
     return
   }
-  editBaseUrl.value = defaultCNBaseUrl(props.account!.platform, editAccountMode.value, protocol)
+  editBaseUrl.value = defaultCNBaseUrl(props.account!.platform, currentOpenCodeOrCNMode(), protocol)
 })
 watch(editAccountMode, (mode, previousMode) => {
   if (!isCNApiKeyAccount.value || syncingForm.value) return
+  if (props.account?.platform === 'opencode_go') return
   // deepseek 无 coding 套餐：防御性回退（UI 已隐藏该选项）。
   const effectiveMode = props.account!.platform === 'deepseek' && mode === 'coding' ? 'payg' : mode
   if (effectiveMode !== mode) {
@@ -3469,8 +3579,8 @@ watch(editAccountMode, (mode, previousMode) => {
     return
   }
   if (editApiProtocol.value === 'adaptive') {
-    const previousDefaults = defaultCNAdaptiveBaseUrls(cnPresetPlatform.value, previousMode)
-    const nextDefaults = defaultCNAdaptiveBaseUrls(cnPresetPlatform.value, mode)
+    const previousDefaults = defaultCNAdaptiveBaseUrls(adaptivePresetPlatform.value, previousMode)
+    const nextDefaults = defaultCNAdaptiveBaseUrls(adaptivePresetPlatform.value, mode)
     for (const item of editAdaptiveProtocolOptions.value) {
       if (!editAdaptiveBaseUrls.value[item.value] || editAdaptiveBaseUrls.value[item.value] === previousDefaults[item.value]) {
         editAdaptiveBaseUrls.value[item.value] = nextDefaults[item.value]
@@ -3480,6 +3590,25 @@ watch(editAccountMode, (mode, previousMode) => {
     return
   }
   editBaseUrl.value = defaultCNBaseUrl(props.account!.platform, mode, editApiProtocol.value)
+})
+watch(editOpenCodeAccountMode, (mode, previousMode) => {
+  if (!isCNApiKeyAccount.value || props.account?.platform !== 'opencode_go' || syncingForm.value) return
+  if (editApiProtocol.value === 'adaptive') {
+    const previousDefaults = defaultCNAdaptiveBaseUrls('opencode_go', previousMode)
+    const nextDefaults = defaultCNAdaptiveBaseUrls('opencode_go', mode)
+    for (const item of editAdaptiveProtocolOptions.value) {
+      if (!editAdaptiveBaseUrls.value[item.value] || editAdaptiveBaseUrls.value[item.value] === previousDefaults[item.value]) {
+        editAdaptiveBaseUrls.value[item.value] = nextDefaults[item.value]
+      }
+    }
+    editBaseUrl.value = editAdaptiveBaseUrls.value.chat_completions
+  } else {
+    editBaseUrl.value = defaultCNBaseUrl('opencode_go', mode, editApiProtocol.value)
+  }
+  const previousRules = JSON.stringify(defaultOpenCodeProtocolRules(previousMode))
+  if (JSON.stringify(editOpenCodeGoProtocolRules.value) === previousRules) {
+    editOpenCodeGoProtocolRules.value = cloneOpenCodeGoProtocolRules(defaultOpenCodeProtocolRules(mode))
+  }
 })
 const cnProtocolDescKey = computed(
   () => cnProtocolOptions.value.find(o => o.value === editApiProtocol.value)?.labelKey ?? 'chatCompletions'
@@ -3625,7 +3754,9 @@ const genericUpstreamBillingProbeExcludedPlatforms = new Set([
   'dashscope',
   'minimax',
   'volcengine',
-  'sensenova'
+  'sensenova',
+  'tierflow',
+  'senseaudio'
 ])
 const supportsGenericUpstreamBillingProbe = computed(() => {
   const platform = props.account?.platform
@@ -4006,6 +4137,8 @@ const defaultBaseUrl = computed(() => {
   if (props.account?.platform === 'agnes') return 'https://apihub.agnes-ai.com/v1'
   if (props.account?.platform === 'nvidia') return 'https://integrate.api.nvidia.com/v1'
   if (props.account?.platform === 'tokenrhythm') return 'https://tokenrhythm.studio/v1'
+  if (props.account?.platform === 'tierflow') return 'https://tierflow.cn/v1'
+  if (props.account?.platform === 'senseaudio') return 'https://api.senseaudio.cn/v1'
   if (props.account?.platform === 'chatanywhere') return 'https://api.chatanywhere.tech/v1'
   if (props.account?.platform === 'glm') return 'https://open.bigmodel.cn/api/paas/v4'
   if (props.account?.platform === 'modelscope') return 'https://api-inference.modelscope.cn/v1'
@@ -4018,9 +4151,10 @@ const defaultBaseUrl = computed(() => {
   if (
     props.account?.platform === 'kimi' ||
     props.account?.platform === 'zhipu' ||
-    props.account?.platform === 'deepseek'
+    props.account?.platform === 'deepseek' ||
+    props.account?.platform === 'opencode_go'
   ) {
-    return defaultCNBaseUrl(props.account.platform, editAccountMode.value, editApiProtocol.value)
+    return defaultCNBaseUrl(props.account.platform, currentOpenCodeOrCNMode(), editApiProtocol.value)
   }
   return 'https://api.anthropic.com'
 })
@@ -4396,8 +4530,12 @@ const syncFormFromAccount = (newAccount: Account | null) => {
     const credentials = newAccount.credentials as Record<string, unknown>
     // 国产供应商：读取 account_mode 与 api_protocol 作为可编辑初始值
     // （编辑弹窗允许修正两者，用于修复早期存错默认值的账号）。
-    if (newAccount.platform === 'kimi' || newAccount.platform === 'zhipu' || newAccount.platform === 'deepseek') {
-      editAccountMode.value = credentials.account_mode === 'coding' ? 'coding' : 'payg'
+    if (isCNProviderPlatform(newAccount.platform) || newAccount.platform === 'opencode_go') {
+      if (newAccount.platform === 'opencode_go') {
+        editOpenCodeAccountMode.value = resolveOpenCodeAccountMode(credentials.account_mode)
+      } else {
+        editAccountMode.value = credentials.account_mode === 'coding' ? 'coding' : 'payg'
+      }
       const storedProtocol = credentials.api_protocol
       editApiProtocol.value =
         storedProtocol === 'adaptive' ||
@@ -4406,10 +4544,10 @@ const syncFormFromAccount = (newAccount: Account | null) => {
         storedProtocol === 'responses'
           ? storedProtocol
           : 'chat_completions'
-      if (newAccount.platform !== 'deepseek' && editApiProtocol.value === 'responses') {
+      if (!cnSupportsNativeResponses(newAccount.platform) && editApiProtocol.value === 'responses') {
         editApiProtocol.value = 'chat_completions'
       }
-      const adaptiveDefaults = defaultCNAdaptiveBaseUrls(newAccount.platform, editAccountMode.value)
+      const adaptiveDefaults = defaultCNAdaptiveBaseUrls(newAccount.platform, currentOpenCodeOrCNMode())
       const storedBaseUrls = (credentials.api_base_urls as Record<string, unknown> | undefined) || {}
       const legacyBaseUrl = typeof credentials.base_url === 'string' ? credentials.base_url.trim() : ''
       const storedChatBaseUrl = typeof storedBaseUrls.chat_completions === 'string'
@@ -4447,9 +4585,14 @@ const syncFormFromAccount = (newAccount: Account | null) => {
         editZhipuOrganization.value = ''
         editZhipuProject.value = ''
       }
+      if (newAccount.platform === 'opencode_go') {
+        editOpenCodeGoProtocolRules.value =
+          parseOpenCodeGoProtocolRules(credentials.protocol_rules) ??
+          cloneOpenCodeGoProtocolRules(defaultOpenCodeProtocolRules(editOpenCodeAccountMode.value))
+      }
     }
     const cnPlatform =
-      newAccount.platform === 'kimi' || newAccount.platform === 'zhipu' || newAccount.platform === 'deepseek'
+      newAccount.platform === 'kimi' || newAccount.platform === 'zhipu' || newAccount.platform === 'deepseek' || newAccount.platform === 'opencode_go'
         ? newAccount.platform
         : null
     const platformDefaultUrls: Record<string, string> = {
@@ -4458,6 +4601,8 @@ const syncFormFromAccount = (newAccount: Account | null) => {
       grok: 'https://api.x.ai/v1',
       agnes: 'https://apihub.agnes-ai.com/v1',
       tokenrhythm: 'https://tokenrhythm.studio/v1',
+      tierflow: 'https://tierflow.cn/v1',
+      senseaudio: 'https://api.senseaudio.cn/v1',
       chatanywhere: 'https://api.chatanywhere.tech/v1',
       glm: 'https://open.bigmodel.cn/api/paas/v4',
       nvidia: 'https://integrate.api.nvidia.com/v1',
@@ -4468,7 +4613,7 @@ const syncFormFromAccount = (newAccount: Account | null) => {
       sensenova: 'https://token.sensenova.cn/v1'
     }
     const platformDefaultUrl = cnPlatform
-      ? defaultCNBaseUrl(cnPlatform, editAccountMode.value, editApiProtocol.value)
+      ? defaultCNBaseUrl(cnPlatform, currentOpenCodeOrCNMode(), editApiProtocol.value)
       : platformDefaultUrls[newAccount.platform] || 'https://api.anthropic.com'
     editBaseUrl.value = isCNApiKeyAccount.value && editApiProtocol.value === 'adaptive'
       ? editAdaptiveBaseUrls.value.chat_completions
@@ -4546,6 +4691,10 @@ const syncFormFromAccount = (newAccount: Account | null) => {
               ? 'https://apihub.agnes-ai.com/v1'
               : newAccount.platform === 'tokenrhythm'
                 ? 'https://tokenrhythm.studio/v1'
+              : newAccount.platform === 'tierflow'
+                ? 'https://tierflow.cn/v1'
+              : newAccount.platform === 'senseaudio'
+                ? 'https://api.senseaudio.cn/v1'
               : newAccount.platform === 'chatanywhere'
                 ? 'https://api.chatanywhere.tech/v1'
               : newAccount.platform === 'glm'
@@ -4587,6 +4736,8 @@ const syncFormFromAccount = (newAccount: Account | null) => {
   editApiKey.value = ''
   editSenseNovaAccessToken.value = ''
   tokenRhythmCookie.value = ''
+  tierflowCookie.value = ''
+  tierflowUserId.value = ''
 }
 
 async function loadTLSProfiles() {
@@ -4676,7 +4827,14 @@ const syncAntigravityUpstreamModels = async () => {
       }
     }
 
-    if (result.warnings?.some((warning) => warning.code === 'upstream_model_metadata_incomplete')) {
+    const warnings = result.warnings ?? []
+    const hasPartialMetadata = warnings.some(
+      (warning) => warning.code === 'upstream_model_metadata_partial'
+    )
+    const hasIncompleteMetadata = warnings.some(
+      (warning) => warning.code === 'upstream_model_metadata_incomplete'
+    )
+    if (hasIncompleteMetadata) {
       appStore.showWarning(t('admin.accounts.syncUpstreamModelsMetadataIncomplete'))
       return
     }
@@ -5206,6 +5364,11 @@ const handleSubmit = async () => {
       }
     }
 
+    if (props.account.platform === 'tierflow') {
+      // Console balance probes do not provide a model-price multiplier.
+      updatePayload.upstream_billing_rate_sync_enabled = false
+    }
+
     // For apikey type, handle credentials update
     if (props.account.type === 'apikey') {
       const currentCredentials = (props.account.credentials as Record<string, unknown>) || {}
@@ -5220,10 +5383,10 @@ const handleSubmit = async () => {
 
       // 国产供应商：模式与协议写入凭据（决定额度/余额探测与转发端点/格式）。
       if (isCNApiKeyAccount.value) {
-        newCredentials.account_mode = editAccountMode.value
+        newCredentials.account_mode = currentOpenCodeOrCNMode()
         newCredentials.api_protocol = editApiProtocol.value
         if (editApiProtocol.value === 'adaptive') {
-          const defaults = defaultCNAdaptiveBaseUrls(cnPresetPlatform.value, editAccountMode.value)
+          const defaults = defaultCNAdaptiveBaseUrls(adaptivePresetPlatform.value, currentOpenCodeOrCNMode())
           const protocolBaseUrls: Record<string, string> = {}
           for (const item of editAdaptiveProtocolOptions.value) {
             protocolBaseUrls[item.value] = (editAdaptiveBaseUrls.value[item.value] || defaults[item.value]).trim()
@@ -5233,6 +5396,10 @@ const handleSubmit = async () => {
         } else {
           delete newCredentials.api_base_urls
         }
+        if (props.account.platform === 'opencode_go') {
+          applyOpenCodeGoProtocolRules(newCredentials, editOpenCodeGoProtocolRules.value, 'edit')
+        }
+        // 智谱团队版 Coding Plan：组织/项目 ID 写入凭据（非空才写，清空即移除回落个人版路径）
         if (props.account.platform === 'zhipu') {
           const organization = editZhipuOrganization.value.trim()
           const project = editZhipuProject.value.trim()
@@ -5259,6 +5426,10 @@ const handleSubmit = async () => {
       } else if (!hasExistingApiKey) {
         appStore.showError(t('admin.accounts.apiKeyIsRequired'))
         return
+      }
+
+      if (props.account.platform === 'tierflow') {
+        applyTierflowConsoleCredentials(newCredentials, tierflowCookie.value, tierflowUserId.value)
       }
 
       if (props.account.platform === 'sensenova' && editSenseNovaAccessToken.value.trim()) {
@@ -5746,6 +5917,11 @@ const handleSubmit = async () => {
         } else {
           newExtra.openai_responses_mode = openAIResponsesMode.value
         }
+        if (openAIImagesUrlToB64JsonEnabled.value) {
+          newExtra.images_url_to_b64_json = true
+        } else {
+          delete newExtra.images_url_to_b64_json
+        }
 		}
 		if (autoPause5hThreshold.value != null && autoPause5hThreshold.value > 0) {
 			newExtra.auto_pause_5h_threshold = autoPause5hThreshold.value / 100
@@ -5830,7 +6006,7 @@ const handleSubmit = async () => {
       // 上游倍率自动探测对全部 API-key 平台开放（sub2api 上游即可应答），
       // Bedrock 凭证无静态 Key 不参与。
       if (props.account.type === 'apikey') {
-        delete newExtra.upstream_billing_probe_enabled
+        if (props.account.platform !== 'tierflow') delete newExtra.upstream_billing_probe_enabled
         delete newExtra.upstream_billing_rate_sync_enabled
       }
       // Total quota

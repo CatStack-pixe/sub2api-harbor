@@ -110,6 +110,8 @@ export default {
         deepseek: 'DeepSeek',
         nvidia: 'NVIDIA',
         tokenrhythm: 'TokenRhythm',
+        tierflow: 'Tierflow',
+        senseaudio: 'SenseAudio',
         chatanywhere: 'ChatAnywhere',
         glm: 'GLM',
         modelscope: 'ModelScope',
@@ -117,8 +119,25 @@ export default {
         minimax: 'MiniMax',
         volcengine: 'Volcengine Ark',
         sensenova: 'SenseNova',
+        opencode_go: 'OpenCode',
       },
       cnProviders: {
+        zhipuTeam: {
+          title: 'Zhipu team Coding Plan',
+          organization: 'Organization ID',
+          organizationPlaceholder: 'Organization ID from the team console',
+          project: 'Project ID',
+          projectPlaceholder: 'Project ID from the team console',
+          hint: 'Optional. Both identifiers enable the team quota query; leave empty for a personal plan.',
+          help: {
+            title: 'Find your team identifiers',
+            step1: 'Open the Zhipu team Coding Plan console.',
+            step2: 'Select your organization and project.',
+            step3: 'Inspect the quota request in browser developer tools.',
+            step4: 'Copy its organization and project identifiers into these fields.',
+            example: 'organization_id: ORGANIZATION_ID; project_id: PROJECT_ID'
+          }
+        },
         accountMode: {
           title: 'Account Type',
           payg: 'Pay-as-you-go',
@@ -142,12 +161,30 @@ export default {
         balance: 'Balance --',
         window5h: '5-hour window',
         windowWeekly: 'Weekly window',
+        windowMonthly: '30d',
         probe: 'Query',
         probeTooltip: 'Query the provider quota endpoint for 5-hour / weekly rolling window usage',
         balanceProbeTooltip: 'Query the provider balance endpoint for the account balance',
         balanceLow: 'Insufficient balance',
         noBalanceEndpoint: 'This platform has no balance query endpoint',
         resetSoon: 'reset soon',
+      },
+      opencodeGo: {
+        accountMode: {
+          zen: 'Zen',
+          zenDesc: 'Pay-as-you-go gateway. Consumes account credits, billed per token.',
+          go: 'GO',
+          goDesc: 'Subscription gateway, rate-limited by 5-hour / weekly / monthly usage windows.',
+        },
+        protocolRules: {
+          title: 'Model protocol routing',
+          hint: 'In adaptive mode, each model is sent to a native upstream protocol. Use an exact ID or a trailing * glob (e.g. grok-*, qwen*). The first matching rule wins; unmatched models use Chat Completions.',
+          patternPlaceholder: 'grok-* or deepseek-v4-flash',
+          add: 'Add rule',
+          remove: 'Remove rule',
+          restoreDefaults: 'Restore defaults',
+          fallback: 'Unmatched models → Chat Completions (/v1/chat/completions)',
+        },
       },
       types: {
         oauth: 'OAuth',
@@ -686,6 +723,27 @@ export default {
         chinaRegion: 'China: api.moonshot.cn',
         internationalRegion: 'International: api.moonshot.ai'
       },
+      tierflow: {
+        remainingBalance: 'Upstream balance',
+        usedBalance: 'Upstream used',
+        noBalance: 'No available balance data',
+        refreshBalance: 'Refresh balance',
+        baseUrlHint: 'OpenAI-compatible Tierflow endpoint (default: https://tierflow.cn/v1). Sync the model catalog from upstream.',
+        apiKeyHint: 'Enter an API key created in the Tierflow console. A phone number or login password is not required.',
+        cookie: 'Console Session Cookie (optional)',
+        cookiePlaceholder: 'session=… or the raw Session Cookie value',
+        cookieHint: 'Used only to query the upstream balance, never for model inference. Leave blank when editing to keep the saved value.',
+        userId: 'Console user ID / TF-User (optional)',
+        userIdPlaceholder: 'Numeric console user ID',
+        userIdHint: 'Enter the numeric user ID from the console TF-User request header. Balance queries use it together with the Session Cookie.'
+      },
+      senseaudio: {
+        baseUrlHint: 'SenseAudio OpenAI-compatible endpoint (default: https://api.senseaudio.cn/v1). Sync available models from upstream.',
+        apiKeyHint: 'Your SenseAudio API key.',
+        initialBalance: 'Balance at import',
+        noInitialBalance: 'No import balance recorded',
+        initialBalanceHint: 'Recorded at import; not a live balance.'
+      },
       tokenrhythm: {
         baseUrlHint: 'TokenRhythm uses its fixed official OpenAI-compatible endpoint.',
         apiKeyHint: 'Your TokenRhythm API Key',
@@ -868,7 +926,9 @@ export default {
       syncUpstreamModelsFailed: 'Failed to sync upstream models',
       syncUpstreamModelsError: 'Failed to sync upstream models: {message}',
       syncUpstreamModelsMetadataIncomplete:
-        'Model IDs were synced, but capability metadata is incomplete and was not updated.',
+        'Model IDs were synced, but no capability metadata could be updated.',
+      syncUpstreamModelsMetadataPartial:
+        'Some model capabilities were updated; remaining models are still incomplete.',
       clearAllModels: 'Clear all models',
       customModelName: 'Custom model name',
       enterCustomModelName: 'Enter custom model name',

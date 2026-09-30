@@ -82,6 +82,9 @@ type OpenAIAccountScheduleRequest struct {
 	StickyWeighted          bool
 	SubscriptionPriority    bool
 	PreserveStickyBinding   bool
+	// DisableStickyEscape keeps task-owner lookups on their account even when
+	// generic sticky health or concurrency heuristics would prefer another.
+	DisableStickyEscape     bool
 	RequirePrivacySet       bool
 	PreviousResponseID      string
 	PreviousResponseCanMove bool
@@ -427,11 +430,10 @@ func newDefaultOpenAIAccountScheduler(service *OpenAIGatewayService, stats *open
 func (s *defaultOpenAIAccountScheduler) Select(
 	ctx context.Context,
 	req OpenAIAccountScheduleRequest,
-) (*AccountSelectionResult, OpenAIAccountScheduleDecision, error) {
+) (selection *AccountSelectionResult, decision OpenAIAccountScheduleDecision, err error) {
 	if s != nil && s.service != nil && s.service.openAIGroupRequiresPrivacySet(ctx, req.GroupID) {
 		req.RequirePrivacySet = true
 	}
-	decision := OpenAIAccountScheduleDecision{}
 	start := time.Now()
 	// 命名返回值保证 defer 写入的耗时同时返回给调用方。
 	defer func() {
@@ -1883,6 +1885,9 @@ func (s *defaultOpenAIAccountScheduler) isAccountRequestCompatibleReason(ctx con
 	}
 	if !tokenRhythmBalanceProbeAllowsScheduling(account, time.Now()) {
 		return false, "tokenrhythm_balance_unavailable"
+	}
+	if !tierflowBalanceProbeAllowsScheduling(account, time.Now()) {
+		return false, "tierflow_balance_unavailable"
 	}
 	// Quota auto-pause must be evaluated during the initial filter too. Without it the
 	// TopK candidate pool can be filled with paused accounts and the later fresh/DB

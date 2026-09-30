@@ -87,26 +87,7 @@ interface Props {
 
 const props = defineProps<Props>()
 
-const platformLabel = computed(() => {
-  if (props.platform === 'anthropic') return 'Anthropic'
-  if (props.platform === 'openai') return 'OpenAI'
-  if (props.platform === 'antigravity') return 'Antigravity'
-  if (props.platform === 'grok') return 'Grok'
-  if (props.platform === 'agnes') return 'Agnes'
-  if (props.platform === 'nvidia') return 'NVIDIA'
-  if (props.platform === 'tokenrhythm') return 'TokenRhythm'
-  if (props.platform === 'kimi') return 'Kimi'
-  if (props.platform === 'zhipu') return 'Zhipu GLM'
-  if (props.platform === 'deepseek') return 'DeepSeek'
-  if (props.platform === 'chatanywhere') return 'ChatAnywhere'
-  if (props.platform === 'glm') return 'GLM'
-  if (props.platform === 'modelscope') return 'ModelScope'
-  if (props.platform === 'dashscope') return 'DashScope'
-  if (props.platform === 'minimax') return 'MiniMax'
-  if (props.platform === 'volcengine') return 'Volcengine Ark'
-  if (props.platform === 'sensenova') return 'SenseNova'
-  return 'Gemini'
-})
+const platformLabel = computed(() => sharedPlatformLabel(props.platform))
 
 const normalizedAuthMode = computed(() =>
   (props.authMode || '').trim().toLowerCase().replace(/[\s_-]+/g, '')
@@ -210,6 +191,8 @@ const platformClass = computed(() => {
   if (props.platform === 'agnes') return 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300'
   if (props.platform === 'nvidia') return 'bg-lime-100 text-lime-700 dark:bg-lime-900/30 dark:text-lime-300'
   if (props.platform === 'tokenrhythm') return 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300'
+  if (props.platform === 'tierflow') return 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300'
+  if (props.platform === 'senseaudio') return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
   if (props.platform === 'kimi') {
     return 'bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-400'
   }
@@ -245,6 +228,8 @@ const typeClass = computed(() => {
   if (props.platform === 'agnes') return 'bg-cyan-100 text-cyan-600 dark:bg-cyan-900/30 dark:text-cyan-300'
   if (props.platform === 'nvidia') return 'bg-lime-100 text-lime-600 dark:bg-lime-900/30 dark:text-lime-300'
   if (props.platform === 'tokenrhythm') return 'bg-teal-100 text-teal-600 dark:bg-teal-900/30 dark:text-teal-300'
+  if (props.platform === 'tierflow') return 'bg-cyan-100 text-cyan-600 dark:bg-cyan-900/30 dark:text-cyan-300'
+  if (props.platform === 'senseaudio') return 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-300'
   if (props.platform === 'kimi') {
     return 'bg-pink-100 text-pink-600 dark:bg-pink-900/30 dark:text-pink-400'
   }
@@ -292,10 +277,14 @@ const planBadgeClass = computed(() => {
   if (normalizedPlanType.value === 'plus') {
     return 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300'
   }
-  if (normalizedPlanType.value === 'team') {
+  if (normalizedPlanType.value === 'team' || normalizedPlanType.value === 'selfservebusinessprolite') {
     return 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300'
   }
-  if (normalizedPlanType.value === 'pro' || normalizedPlanType.value === 'chatgptpro') {
+  if (
+    normalizedPlanType.value === 'pro' ||
+    normalizedPlanType.value === 'chatgptpro' ||
+    normalizedPlanType.value === 'prolite'
+  ) {
     return 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300'
   }
   return typeClass.value

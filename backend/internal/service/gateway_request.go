@@ -976,6 +976,22 @@ const anthropicBetaContextManagementToken = "context-management-2025-06-27"
 //     FullClaudeCodeMimicryBetas 覆盖客户端 beta（该列表不含 fallback beta），
 //     若不 strip，body 字段与 header 不对称 → 所有模型 400
 //
+// thinking.block_binding 场景：
+//   - Claude Fable 5.1 的会话前缀绑定控制受
+//     `thinking-binding-controls-2026-08-01` beta 保护
+//   - 缺 token 时上游拒收：
+//     "thinking.adaptive.block_binding: Extra inputs are not permitted"
+//
+// message-level output_config 场景：
+//   - pi-ai（Harness 使用的 Anthropic provider）会为 opus5 生成形如
+//     `{"role":"system","content":[],"output_config":{"effort":"high"}}` 的控制消息，
+//     并请求 `mid-conversation-output-config-2026-07-01` beta
+//   - 该 output_config 是 **message 级**字段，只有该 beta 保护；顶层 output_config/effort
+//     不受它约束
+//   - OAuth mimic 用 FullClaudeCodeMimicryBetas 覆盖客户端 beta；固定列表漏该 beta 时
+//     body 字段与 header 不对称 → 上游报 "output_config: Extra inputs are not permitted"
+//   - 缺 token 时净化消息级 output_config（详见 stripAnthropicMessageOutputConfigUnlessBeta）
+//
 // 本函数按最终发送的 anthropic-beta header 决定是否保留 body 中的上述字段：
 // 缺对应 beta token → strip；客户端 header 已带对应 beta → 保留（不过度删除）。
 // 这将限制完全建立在 "能力维度" 上，与 model 名 / token type / mimicry 子路径无关。
@@ -999,6 +1015,13 @@ func sanitizeAnthropicBodyForBetaTokens(body []byte, anthropicBetaHeader string)
 		body, changed = b, true
 	}
 
+	// thinking.block_binding：需要 thinking-binding-controls beta。
+	if b, deleted := stripAnthropicBodyFieldUnlessBeta(
+		body, "thinking.block_binding", anthropicBetaHeader, claude.BetaThinkingBindingControls,
+	); deleted {
+		body, changed = b, true
+	}
+
 	// fallbacks：server-side refusal fallback，仅接受 server-side-fallback beta。
 	if b, deleted := stripAnthropicBodyFieldUnlessBeta(
 		body, "fallbacks", anthropicBetaHeader, claude.BetaServerSideFallback,
@@ -1012,6 +1035,12 @@ func sanitizeAnthropicBodyForBetaTokens(body []byte, anthropicBetaHeader string)
 		body, "fallback_credit_token", anthropicBetaHeader,
 		claude.BetaServerSideFallback, claude.BetaFallbackCredit, claude.BetaFallbackCreditLegacy,
 	); deleted {
+		body, changed = b, true
+	}
+
+	// messages[].output_config：mid-conversation-output-config beta 专属字段。
+	// 顶层 output_config / effort 不受该 beta 约束，本分支只净化消息内字段。
+	if b, deleted := stripAnthropicMessageOutputConfigUnlessBeta(body, anthropicBetaHeader); deleted {
 		body, changed = b, true
 	}
 

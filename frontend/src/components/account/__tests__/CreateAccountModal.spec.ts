@@ -212,6 +212,115 @@ describe('CreateAccountModal OpenAI long-context billing', () => {
     createOpenAICodexPATMock.mockReset().mockResolvedValue({})
   })
 
+  afterEach(() => vi.useRealTimers())
+
+  it('creates a Tierflow API-key account with optional independent console credentials', async () => {
+    const wrapper = mountModal()
+    await wrapper.get('[data-testid="tierflow-platform"]').trigger('click')
+    await wrapper.get('form#create-account-form input[type="text"]').setValue('Tierflow account')
+    await wrapper.get('form#create-account-form input[type="password"]').setValue('test-api-key')
+    await wrapper.get('[data-testid="tierflow-cookie"]').setValue(' session=test-cookie ')
+    await wrapper.get('[data-testid="tierflow-user-id"]').setValue(' 12345 ')
+    await wrapper.get('form#create-account-form').trigger('submit.prevent')
+    await flushPromises()
+
+    expect(createAccountMock).toHaveBeenCalledTimes(1)
+    const payload = createAccountMock.mock.calls[0]?.[0]
+    expect(payload).toMatchObject({
+      platform: 'tierflow',
+      type: 'apikey',
+      credentials: {
+        base_url: 'https://tierflow.cn/v1',
+        api_key: 'test-api-key',
+        tierflow_cookie: 'session=test-cookie',
+        tierflow_user_id: '12345'
+      }
+    })
+    expect(payload.credentials).not.toHaveProperty('api_protocol')
+    expect(payload.credentials).not.toHaveProperty('model_mapping')
+    expect(payload.upstream_billing_probe_enabled).toBeUndefined()
+    expect(wrapper.find('[data-testid="upstream-billing-auto-probe"]').exists()).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('creates a Tierflow API-key account without requiring console credentials', async () => {
+    const wrapper = mountModal()
+    await wrapper.get('[data-testid="tierflow-platform"]').trigger('click')
+    await wrapper.get('form#create-account-form input[type="text"]').setValue('Tierflow API only')
+    await wrapper.get('form#create-account-form input[type="password"]').setValue('test-api-key')
+    await wrapper.get('form#create-account-form').trigger('submit.prevent')
+    await flushPromises()
+    expect(createAccountMock).toHaveBeenCalledTimes(1)
+    const credentials = createAccountMock.mock.calls[0]?.[0]?.credentials
+    expect(credentials.base_url).toBe('https://tierflow.cn/v1')
+    expect(credentials).not.toHaveProperty('tierflow_cookie')
+    expect(credentials).not.toHaveProperty('tierflow_user_id')
+    expect(createAccountMock.mock.calls[0]?.[0]?.upstream_billing_probe_enabled).toBeUndefined()
+    wrapper.unmount()
+  })
+
+  it('creates a SenseAudio API-key account without offering an unsupported balance probe', async () => {
+    const wrapper = mountModal()
+    await wrapper.get('[data-testid="senseaudio-platform"]').trigger('click')
+    await wrapper.get('form#create-account-form input[type="text"]').setValue('SenseAudio account')
+    await wrapper.get('form#create-account-form input[type="password"]').setValue('test-api-key')
+    expect(wrapper.find('[data-testid="upstream-billing-auto-probe"]').exists()).toBe(false)
+    await wrapper.get('form#create-account-form').trigger('submit.prevent')
+    await flushPromises()
+
+    expect(createAccountMock).toHaveBeenCalledTimes(1)
+    const payload = createAccountMock.mock.calls[0]?.[0]
+    expect(payload).toMatchObject({
+      platform: 'senseaudio',
+      type: 'apikey',
+      credentials: { base_url: 'https://api.senseaudio.cn/v1', api_key: 'test-api-key' }
+    })
+    expect(payload.upstream_billing_probe_enabled).toBeUndefined()
+    wrapper.unmount()
+  })
+
+  it('sets month and year expiry presets without submitting the account form', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-01-31T12:34:00'))
+    const wrapper = mountModal()
+    await selectButtonByText(wrapper, 'OpenAI')
+    await selectButtonByText(wrapper, 'API Key')
+    await wrapper.get('form#create-account-form input[type="text"]').setValue('expiry account')
+    await wrapper.get('form#create-account-form input[type="password"]').setValue('test-api-key')
+    const input = wrapper.get<HTMLInputElement>('input[type="datetime-local"]')
+
+    for (const [label, expected] of [
+      ['payment.oneMonth', '2026-02-28T12:34'],
+      ['payment.oneYear', '2027-01-31T12:34'],
+    ]) {
+      const button = wrapper.findAll('button').find((candidate) => candidate.text() === label)!
+      expect(button.attributes('type')).toBe('button')
+      await button.trigger('click')
+      expect(input.element.value).toBe(expected)
+      expect(createAccountMock).not.toHaveBeenCalled()
+    }
+
+    await wrapper.get('form#create-account-form').trigger('submit.prevent')
+    await flushPromises()
+    expect(createAccountMock.mock.calls[0]?.[0]?.expires_at).toBe(new Date('2027-01-31T12:34:00').getTime() / 1000)
+    wrapper.unmount()
+  })
+
+  it('allows a manually entered expiry to override a preset before account creation', async () => {
+    const wrapper = mountModal()
+    await selectButtonByText(wrapper, 'OpenAI')
+    await selectButtonByText(wrapper, 'API Key')
+    await wrapper.get('form#create-account-form input[type="text"]').setValue('custom expiry account')
+    await wrapper.get('form#create-account-form input[type="password"]').setValue('test-api-key')
+    await selectButtonByText(wrapper, 'payment.oneMonth')
+    await wrapper.get('input[type="datetime-local"]').setValue('2030-04-15T09:20')
+
+    await wrapper.get('form#create-account-form').trigger('submit.prevent')
+    await flushPromises()
+    expect(createAccountMock.mock.calls[0]?.[0]?.expires_at).toBe(new Date('2030-04-15T09:20:00').getTime() / 1000)
+    wrapper.unmount()
+  })
+
   it('hides only the redundant account toggle when every selected group enables tier pricing', async () => {
     authIsSimpleMode.value = false
     const wrapper = mountModal([
@@ -245,6 +354,48 @@ describe('CreateAccountModal OpenAI long-context billing', () => {
 
     expect(createAccountMock).toHaveBeenCalledTimes(1)
     expect(createAccountMock.mock.calls[0]?.[0]?.extra?.openai_long_context_billing_enabled).toBe(false)
+  })
+
+  it('omits the upstream request id header from extra when left empty', async () => {
+    await submitApiKeyAccount('openai')
+
+    expect(createAccountMock).toHaveBeenCalledTimes(1)
+    expect(createAccountMock.mock.calls[0]?.[0]?.extra).not.toHaveProperty('upstream_request_id_header')
+  })
+
+  it('sends the trimmed upstream request id header in extra when filled', async () => {
+    const wrapper = mountModal()
+    await selectButtonByText(wrapper, 'OpenAI')
+    await selectButtonByText(wrapper, 'API Key')
+    await wrapper.get('form#create-account-form input[type="text"]').setValue('openai account')
+    await wrapper.get('form#create-account-form input[type="password"]').setValue('test-api-key')
+    await wrapper.get('[data-testid="upstream-request-id-header"]').setValue('  X-Oneapi-Request-Id  ')
+    await wrapper.get('form#create-account-form').trigger('submit.prevent')
+    await flushPromises()
+
+    expect(createAccountMock).toHaveBeenCalledTimes(1)
+    expect(createAccountMock.mock.calls[0]?.[0]?.extra?.upstream_request_id_header).toBe('X-Oneapi-Request-Id')
+  })
+
+  it('omits images_url_to_b64_json from extra by default', async () => {
+    await submitApiKeyAccount('openai')
+
+    expect(createAccountMock).toHaveBeenCalledTimes(1)
+    expect(createAccountMock.mock.calls[0]?.[0]?.extra).not.toHaveProperty('images_url_to_b64_json')
+  })
+
+  it('sends images_url_to_b64_json in extra when the toggle is enabled', async () => {
+    const wrapper = mountModal()
+    await selectButtonByText(wrapper, 'OpenAI')
+    await selectButtonByText(wrapper, 'API Key')
+    await wrapper.get('form#create-account-form input[type="text"]').setValue('openai account')
+    await wrapper.get('form#create-account-form input[type="password"]').setValue('test-api-key')
+    await wrapper.get('[data-testid="openai-images-url-to-b64-json-toggle"]').trigger('click')
+    await wrapper.get('form#create-account-form').trigger('submit.prevent')
+    await flushPromises()
+
+    expect(createAccountMock).toHaveBeenCalledTimes(1)
+    expect(createAccountMock.mock.calls[0]?.[0]?.extra?.images_url_to_b64_json).toBe(true)
   })
 
   it('persists upstream model metadata after creating an account from preview', async () => {
@@ -359,6 +510,65 @@ describe('CreateAccountModal OpenAI long-context billing', () => {
     expect(probeUpstreamBillingMock).not.toHaveBeenCalled()
   })
 
+  it('submits OpenCode Zen default protocol rules with adaptive endpoints', async () => {
+    const wrapper = mountModal()
+    await selectButtonByText(wrapper, 'OpenCode')
+    await wrapper.get('form#create-account-form input[type="text"]').setValue('oc')
+    await wrapper.get('form#create-account-form input[type="password"]').setValue('sk-opencode-zen')
+
+    await wrapper.get('form#create-account-form').trigger('submit.prevent')
+    await flushPromises()
+
+    expect(createAccountMock).toHaveBeenCalledTimes(1)
+    expect(createAccountMock.mock.calls[0]?.[0]?.credentials).toMatchObject({
+      account_mode: 'zen',
+      api_protocol: 'adaptive',
+      base_url: 'https://opencode.ai/zen/v1',
+      api_base_urls: {
+        chat_completions: 'https://opencode.ai/zen/v1',
+        anthropic: 'https://opencode.ai/zen',
+        responses: 'https://opencode.ai/zen/v1'
+      },
+      protocol_rules: [
+        { pattern: 'grok-*', protocol: 'responses' },
+        { pattern: 'gpt-*', protocol: 'responses' },
+        { pattern: 'muse-spark-*', protocol: 'responses' },
+        { pattern: 'claude-*', protocol: 'anthropic' },
+        { pattern: 'qwen*', protocol: 'anthropic' }
+      ]
+    })
+  })
+
+  it('submits OpenCode GO endpoints after switching account type', async () => {
+    const wrapper = mountModal()
+    await selectButtonByText(wrapper, 'OpenCode')
+    await selectButtonByText(wrapper, 'admin.accounts.opencodeGo.accountMode.go')
+    await wrapper.get('form#create-account-form input[type="text"]').setValue('oc-go')
+    await wrapper.get('form#create-account-form input[type="password"]').setValue('sk-opencode-go')
+
+    await wrapper.get('form#create-account-form').trigger('submit.prevent')
+    await flushPromises()
+
+    expect(createAccountMock).toHaveBeenCalledTimes(1)
+    expect(createAccountMock.mock.calls[0]?.[0]?.credentials).toMatchObject({
+      account_mode: 'go',
+      api_protocol: 'adaptive',
+      base_url: 'https://opencode.ai/zen/go/v1',
+      api_base_urls: {
+        chat_completions: 'https://opencode.ai/zen/go/v1',
+        anthropic: 'https://opencode.ai/zen/go',
+        responses: 'https://opencode.ai/zen/go/v1'
+      },
+      protocol_rules: [
+        { pattern: 'grok-*', protocol: 'responses' },
+        { pattern: 'gpt-*', protocol: 'responses' },
+        { pattern: 'muse-spark-*', protocol: 'responses' },
+        { pattern: 'minimax-*', protocol: 'anthropic' },
+        { pattern: 'qwen*', protocol: 'anthropic' }
+      ]
+    })
+  })
+
   it('submits adaptive Kimi protocol endpoints', async () => {
     const wrapper = mountModal()
     await selectButtonByText(wrapper, 'Kimi')
@@ -376,6 +586,28 @@ describe('CreateAccountModal OpenAI long-context billing', () => {
       api_base_urls: {
         chat_completions: 'https://api.moonshot.cn/v1',
         anthropic: 'https://api.moonshot.cn/anthropic'
+      }
+    })
+  })
+
+  it('submits adaptive MiniMax protocol endpoints', async () => {
+    const wrapper = mountModal()
+    await selectButtonByText(wrapper, 'MiniMax')
+    await wrapper.get('form#create-account-form input[type="text"]').setValue('MiniMax adaptive')
+    await wrapper.get('form#create-account-form input[type="password"]').setValue('sk-minimax')
+
+    await wrapper.get('form#create-account-form').trigger('submit.prevent')
+    await flushPromises()
+
+    expect(createAccountMock).toHaveBeenCalledTimes(1)
+    expect(createAccountMock.mock.calls[0]?.[0]?.credentials).toMatchObject({
+      account_mode: 'payg',
+      api_protocol: 'adaptive',
+      base_url: 'https://api.minimaxi.com/v1',
+      api_base_urls: {
+        chat_completions: 'https://api.minimaxi.com/v1',
+        anthropic: 'https://api.minimaxi.com/anthropic',
+        responses: 'https://api.minimaxi.com/v1'
       }
     })
   })

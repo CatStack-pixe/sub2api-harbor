@@ -171,6 +171,9 @@ const labelClass = computed(() => {
   if (props.platform === 'tokenrhythm') {
     return `${base} bg-teal-200/70 text-teal-900 dark:bg-teal-900/50 dark:text-teal-300`
   }
+  if (props.platform === 'tierflow') {
+    return `${base} bg-cyan-200/70 text-cyan-900 dark:bg-cyan-900/50 dark:text-cyan-300`
+  }
   if (props.platform === 'kimi') {
     return `${base} bg-pink-200/60 text-pink-800 dark:bg-pink-800/40 dark:text-pink-300`
   }
@@ -239,6 +242,11 @@ const badgeClass = computed(() => {
     return isSubscription.value
       ? 'bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-300'
       : 'bg-teal-50 text-teal-800 dark:bg-teal-900/20 dark:text-teal-300'
+  }
+  if (props.platform === 'tierflow') {
+    return isSubscription.value
+      ? 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-300'
+      : 'bg-cyan-50 text-cyan-800 dark:bg-cyan-900/20 dark:text-cyan-300'
   }
   if (props.platform === 'kimi') {
     return isSubscription.value

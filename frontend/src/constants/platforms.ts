@@ -20,6 +20,8 @@ export const CONCRETE_PLATFORM_OPTIONS = [
   { value: 'deepseek', label: 'DeepSeek' },
   { value: 'nvidia', label: 'NVIDIA' },
   { value: 'tokenrhythm', label: 'TokenRhythm' },
+  { value: 'tierflow', label: 'Tierflow / 清枢智汇' },
+  { value: 'senseaudio', label: 'SenseAudio' },
   { value: 'kimi', label: 'Kimi' },
   { value: 'zhipu', label: 'Zhipu GLM' },
   { value: 'chatanywhere', label: 'ChatAnywhere' },
@@ -28,7 +30,8 @@ export const CONCRETE_PLATFORM_OPTIONS = [
   { value: 'dashscope', label: 'DashScope' },
   { value: 'minimax', label: 'MiniMax' },
   { value: 'volcengine', label: 'Volcengine Ark' },
-  { value: 'sensenova', label: 'SenseNova' }
+  { value: 'sensenova', label: 'SenseNova' },
+  { value: 'opencode_go', label: 'OpenCode' }
 ] as const satisfies readonly PlatformOption<AccountPlatform>[]
 
 /** Platforms that can own a group. */

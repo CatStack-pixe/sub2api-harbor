@@ -16,6 +16,8 @@ describe('admin group platform translations', () => {
       'kimi',
       'nvidia',
       'tokenrhythm',
+      'tierflow',
+      'senseaudio',
       'chatanywhere',
       'glm',
       'modelscope',

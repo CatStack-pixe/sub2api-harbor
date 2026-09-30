@@ -366,6 +366,7 @@ func TestOpenAIHandleStreamingAwareError_ResponsesStreamingCarriesCreatedAt(t *t
 	assert.Greater(t, int64(createdAt), int64(0), "created_at 必须是有效的 unix 时间戳")
 }
 
+// Synthesized response.failed id falls back to uuid when no request_id is present.
 func TestSynthesizeResponseID_FallbackUUID(t *testing.T) {
 	c, _ := newGinContextForEndpoint(t, EndpointResponses)
 	id := synthesizeResponseID(c)

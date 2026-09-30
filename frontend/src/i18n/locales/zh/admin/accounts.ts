@@ -313,6 +313,8 @@ export default {
         deepseek: 'DeepSeek',
         nvidia: 'NVIDIA',
         tokenrhythm: 'TokenRhythm',
+        tierflow: 'Tierflow / 清枢智汇',
+        senseaudio: 'SenseAudio',
         chatanywhere: 'ChatAnywhere',
         glm: 'GLM',
         modelscope: 'ModelScope',
@@ -320,8 +322,25 @@ export default {
         minimax: 'MiniMax',
         volcengine: 'Volcengine Ark',
         sensenova: 'SenseNova',
+        opencode_go: 'OpenCode',
       },
       cnProviders: {
+        zhipuTeam: {
+          title: '智谱团队版 Coding Plan',
+          organization: '组织 ID',
+          organizationPlaceholder: '团队控制台的组织 ID',
+          project: '项目 ID',
+          projectPlaceholder: '团队控制台的项目 ID',
+          hint: '选填。填写组织和项目 ID 后使用团队额度查询；留空使用个人套餐查询。',
+          help: {
+            title: '查找团队标识',
+            step1: '打开智谱团队版 Coding Plan 控制台。',
+            step2: '选择所属组织和项目。',
+            step3: '在浏览器开发者工具中查看额度查询请求。',
+            step4: '将请求中的组织和项目标识复制到这两个输入框。',
+            example: 'organization_id: ORGANIZATION_ID; project_id: PROJECT_ID'
+          }
+        },
         accountMode: {
           title: '账号类型',
           payg: '按量付费',
@@ -345,12 +364,30 @@ export default {
         balance: '余额 --',
         window5h: '5 小时窗口',
         windowWeekly: '每周窗口',
+        windowMonthly: '月',
         probe: '查询',
         probeTooltip: '请求供应商额度端点，查询 5 小时 / 每周滚动窗口用量',
         balanceProbeTooltip: '请求供应商余额端点，查询账户余额',
         balanceLow: '余额不足',
         noBalanceEndpoint: '该平台暂无余额查询接口',
         resetSoon: '即将重置',
+      },
+      opencodeGo: {
+        accountMode: {
+          zen: 'Zen',
+          zenDesc: '按量付费网关，消耗账户余额，按 Token 计费。',
+          go: 'GO',
+          goDesc: '订阅制网关，按 5 小时 / 周 / 月滚动用量窗口限流。',
+        },
+        protocolRules: {
+          title: '模型协议分流',
+          hint: '自适应模式下按模型匹配上游协议。支持精确 ID 或末尾 * 通配（如 grok-*、qwen*）；自上而下第一条命中生效；未命中走 Chat Completions。',
+          patternPlaceholder: 'grok-* 或 deepseek-v4-flash',
+          add: '添加规则',
+          remove: '删除规则',
+          restoreDefaults: '恢复默认',
+          fallback: '未命中以上规则 → Chat Completions（/v1/chat/completions）',
+        },
       },
       types: {
         oauth: 'OAuth',
@@ -810,6 +847,27 @@ export default {
         baseUrlHint: '留空使用官方 DeepSeek API',
         apiKeyHint: '您的 DeepSeek API Key'
       },
+      tierflow: {
+        remainingBalance: '上游余额',
+        usedBalance: '上游已用',
+        noBalance: '暂无可用余额数据',
+        refreshBalance: '刷新余额',
+        baseUrlHint: '清枢智汇 OpenAI 兼容接口，默认地址为 https://tierflow.cn/v1。模型列表请从上游同步。',
+        apiKeyHint: '填写清枢智汇控制台创建的 API Key；不需要填写手机号或登录密码。',
+        cookie: '控制台 Session Cookie（可选）',
+        cookiePlaceholder: 'session=… 或 Session Cookie 原值',
+        cookieHint: '仅用于查询上游余额，不会发送到模型推理接口。编辑时留空保留已保存值。',
+        userId: '控制台用户 ID / TF-User（可选）',
+        userIdPlaceholder: '控制台数字用户 ID',
+        userIdHint: '填写控制台请求头 TF-User 中的数字用户 ID，与 Session Cookie 配合查询余额。'
+      },
+      senseaudio: {
+        baseUrlHint: 'SenseAudio OpenAI 兼容接口，默认地址为 https://api.senseaudio.cn/v1。模型列表请从上游同步。',
+        apiKeyHint: 'SenseAudio API Key。',
+        initialBalance: '导入时余额',
+        noInitialBalance: '暂无导入时余额',
+        initialBalanceHint: '仅为导入时记录，不是实时余额。'
+      },
       tokenrhythm: {
         baseUrlHint: 'TokenRhythm 使用固定的官方 OpenAI 兼容接口。',
         apiKeyHint: '您的 TokenRhythm API Key',
@@ -995,7 +1053,8 @@ export default {
       syncUpstreamModelsFallback: '上游模型列表不可用，已加入内置 TokenRhythm 模型',
       syncUpstreamModelsFailed: '同步上游模型失败',
       syncUpstreamModelsError: '同步上游模型失败：{message}',
-      syncUpstreamModelsMetadataIncomplete: '模型 ID 已同步，但能力元数据不完整，能力信息未更新。',
+      syncUpstreamModelsMetadataIncomplete: '模型 ID 已同步，但未能更新任何能力元数据。',
+      syncUpstreamModelsMetadataPartial: '已更新部分模型的能力元数据；其余模型能力仍不完整。',
       clearAllModels: '清除所有模型',
       customModelName: '自定义模型名称',
       enterCustomModelName: '输入自定义模型名称',

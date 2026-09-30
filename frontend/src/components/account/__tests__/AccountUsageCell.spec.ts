@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import AccountUsageCell from '../AccountUsageCell.vue'
-import type { Account } from '@/types'
+import type { Account, AccountUsageInfo } from '@/types'
 
 const { getUsage } = vi.hoisted(() => ({
   getUsage: vi.fn()
@@ -152,6 +152,92 @@ describe('AccountUsageCell', () => {
     const updatedAccount = wrapper.emitted<Account[]>('account-updated')?.[0]?.[0]
     expect(updatedAccount?.id).toBe(9001)
     expect(updatedAccount?.ollama_cloud_usage?.auto_refresh_enabled).toBe(false)
+  })
+
+  it.each(['kimi', 'zhipu', 'deepseek', 'minimax'] as const)(
+    '%s apikey 账号 Ollama Cloud eligible 时渲染 Ollama 用量单元格并跳过 CN 子单元格',
+    async (platform) => {
+      const wrapper = mount(AccountUsageCell, {
+        props: {
+          account: makeAccount({
+            id: 9002,
+            platform,
+            type: 'apikey',
+            credentials: { account_mode: 'coding' },
+            ollama_cloud_usage: makeOllamaUsage(9002)
+          })
+        },
+        global: {
+          stubs: { ...cnUsageCellStubs, UsageProgressBar: true, AccountQuotaInfo: true }
+        }
+      })
+
+      await flushPromises()
+
+      expect(wrapper.find('[data-test="embedded-ollama"]').exists()).toBe(true)
+      expect(wrapper.find('[data-test="cn-quota-cell"]').exists()).toBe(false)
+      expect(wrapper.find('[data-test="cn-balance-cell"]').exists()).toBe(false)
+      expect(wrapper.find('div[title="admin.accounts.cnProviders.noBalanceEndpoint"]').exists()).toBe(false)
+      expect(getUsage).not.toHaveBeenCalled()
+    }
+  )
+
+  it('CN 平台 Ollama Cloud eligible 账号的用量更新经 account-updated 透传', async () => {
+    const wrapper = mount(AccountUsageCell, {
+      props: {
+        account: makeAccount({
+          id: 9003,
+          platform: 'kimi',
+          type: 'apikey',
+          credentials: { account_mode: 'coding' },
+          ollama_cloud_usage: makeOllamaUsage(9003)
+        })
+      },
+      global: {
+        stubs: {
+          ...cnUsageCellStubs,
+          OllamaCloudUsageCell: {
+            props: ['account'],
+            emits: ['updated'],
+            template: '<button data-test="embedded-ollama" @click="$emit(\'updated\', { ...account.ollama_cloud_usage, auto_refresh_enabled: false })" />'
+          },
+          UsageProgressBar: true,
+          AccountQuotaInfo: true
+        }
+      }
+    })
+
+    await wrapper.get('[data-test="embedded-ollama"]').trigger('click')
+
+    const updatedAccount = wrapper.emitted<Account[]>('account-updated')?.[0]?.[0]
+    expect(updatedAccount?.id).toBe(9003)
+    expect(updatedAccount?.ollama_cloud_usage?.auto_refresh_enabled).toBe(false)
+  })
+
+  it.each([
+    { name: '无 ollama_cloud_usage', usage: undefined },
+    { name: 'eligible=false', usage: makeOllamaUsage(9004, { eligible: false }) }
+  ])('普通 kimi apikey 账号（$name）仍渲染 CN 子单元格', async ({ usage }) => {
+    const wrapper = mount(AccountUsageCell, {
+      props: {
+        account: makeAccount({
+          id: 9004,
+          platform: 'kimi',
+          type: 'apikey',
+          credentials: { account_mode: 'coding' },
+          ollama_cloud_usage: usage
+        })
+      },
+      global: {
+        stubs: { ...cnUsageCellStubs, UsageProgressBar: true, AccountQuotaInfo: true }
+      }
+    })
+
+    await flushPromises()
+
+    expect(wrapper.find('[data-test="cn-quota-cell"]').exists()).toBe(true)
+    expect(wrapper.find('[data-test="cn-balance-cell"]').exists()).toBe(true)
+    expect(wrapper.find('[data-test="embedded-ollama"]').exists()).toBe(false)
   })
 
   it('Antigravity 图片用量会聚合新旧 image 模型', async () => {
@@ -732,6 +818,149 @@ describe('AccountUsageCell', () => {
   expect(getUsage).toHaveBeenCalledWith(2004)
   expect(wrapper.text()).toContain('5h|100|106540000')
   expect(wrapper.text()).toContain('7d|100|106540000')
+  })
+
+  it('Tierflow API key displays the observed currency and refreshes a zero balance', async () => {
+    const balance = {
+      is_available: true,
+      remaining_balance: 0,
+      total_usage: 50,
+      currency: 'USD',
+      quota_per_unit: 500000,
+      request_count: 3,
+      fetched_at: 1790208000
+    }
+    getUsage.mockResolvedValue({ tierflow_balance: balance })
+    const wrapper = mount(AccountUsageCell, {
+      props: { account: makeAccount({ id: 5101, platform: 'tierflow', type: 'apikey' }) }
+    })
+    await flushPromises()
+
+    expect(getUsage).toHaveBeenCalledWith(5101)
+    expect(wrapper.get('[data-testid="tierflow-balance"]').text()).toContain('USD 0.00')
+    expect(wrapper.text()).toContain('USD 50.00')
+    expect(wrapper.text()).not.toContain('CNY')
+    await wrapper.get('[data-testid="tierflow-balance-refresh"]').trigger('click')
+    await flushPromises()
+    expect(getUsage).toHaveBeenLastCalledWith(5101, 'active', true)
+    wrapper.unmount()
+  })
+
+  it('shows SenseAudio import balance without claiming a live probe', async () => {
+    const wrapper = mount(AccountUsageCell, {
+      props: {
+        account: makeAccount({
+          platform: 'senseaudio',
+          type: 'apikey',
+          extra: { senseaudio_initial_balance: { amount: 62, currency: 'CNY', captured_at: '2026-09-25T00:00:00Z' } }
+        })
+      }
+    })
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="senseaudio-initial-balance"]').text()).toContain('CNY 62.00')
+    expect(wrapper.text()).toContain('admin.accounts.senseaudio.initialBalanceHint')
+    expect(getUsage).not.toHaveBeenCalled()
+  })
+
+  it('does not invent a currency for an imported SenseAudio balance', async () => {
+    const wrapper = mount(AccountUsageCell, {
+      props: {
+        account: makeAccount({
+          platform: 'senseaudio',
+          type: 'apikey',
+          extra: { senseaudio_initial_balance: { amount: 62, currency: '', captured_at: '2026-09-25T00:00:00Z' } }
+        })
+      }
+    })
+
+    const balance = wrapper.get('[data-testid="senseaudio-initial-balance"]').text()
+    expect(balance).toContain('62.00')
+    expect(balance).not.toContain('CNY')
+    expect(getUsage).not.toHaveBeenCalled()
+  })
+
+  it('Tierflow uses parent batch usage and delegates forced refresh without another request', async () => {
+    const requestBatchedUsage = vi.fn()
+    const wrapper = mount(AccountUsageCell, {
+      props: {
+        account: makeAccount({ id: 5102, platform: 'tierflow', type: 'apikey' }),
+        requestBatchedUsage,
+        batchedUsage: {
+          tierflow_balance: {
+            is_available: true,
+            remaining_balance: 42.5,
+            total_usage: 7.5,
+            currency: 'CNY',
+            quota_per_unit: 500000,
+            request_count: 2,
+            fetched_at: 1790208000
+          }
+        } as never
+      }
+    })
+    await flushPromises()
+
+    expect(getUsage).not.toHaveBeenCalled()
+    expect(wrapper.text()).toContain('CNY 42.50')
+    await wrapper.get('[data-testid="tierflow-balance-refresh"]').trigger('click')
+    expect(requestBatchedUsage).toHaveBeenLastCalledWith(expect.objectContaining({ id: 5102 }), { force: true })
+    wrapper.unmount()
+  })
+
+  it('Tierflow does not display a fabricated balance when console access is unavailable', async () => {
+    getUsage.mockResolvedValue({ tierflow_balance: { is_available: false, remaining_balance: 0 } })
+    const wrapper = mount(AccountUsageCell, {
+      props: { account: makeAccount({ id: 5103, platform: 'tierflow', type: 'apikey' }) }
+    })
+    await flushPromises()
+    expect(wrapper.text()).toContain('admin.accounts.tierflow.noBalance')
+    expect(wrapper.text()).not.toContain('0.00')
+    wrapper.unmount()
+  })
+
+  it('forces a mobile Tierflow edit refresh and discards a late response from old credentials', async () => {
+    vi.mocked(window.matchMedia).mockImplementation(query => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn()
+    }))
+    let resolveOldRequest!: (value: AccountUsageInfo) => void
+    getUsage.mockReturnValueOnce(new Promise<AccountUsageInfo>(resolve => {
+      resolveOldRequest = resolve
+    }))
+    getUsage.mockResolvedValueOnce({
+      tierflow_balance: {
+        is_available: true,
+        remaining_balance: 42.5,
+        total_usage: 7.5,
+        currency: 'CNY',
+        quota_per_unit: 500000,
+        request_count: 2,
+        fetched_at: 1790208000
+      }
+    })
+    const account = makeAccount({ id: 5104, platform: 'tierflow', type: 'apikey' })
+    const wrapper = mount(AccountUsageCell, { props: { account } })
+    await wrapper.setProps({ manualRefreshToken: 1 })
+    expect(getUsage).toHaveBeenCalledTimes(1)
+
+    await wrapper.setProps({ manualRefreshToken: 2 })
+    await flushPromises()
+    expect(getUsage).toHaveBeenCalledTimes(2)
+    expect(getUsage).toHaveBeenLastCalledWith(5104, 'active', true)
+    expect(wrapper.text()).toContain('CNY 42.50')
+
+    resolveOldRequest({ error: 'obsolete_session' } as AccountUsageInfo)
+    await flushPromises()
+    expect(wrapper.text()).toContain('CNY 42.50')
+    expect(wrapper.text()).not.toContain('obsolete_session')
+    wrapper.unmount()
   })
 
   it('SenseNova API key renders local rolling 5-hour and weekly point windows', async () => {

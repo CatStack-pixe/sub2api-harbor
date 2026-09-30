@@ -20,10 +20,13 @@ import (
 const (
 	openAIWSConnMaxAge          = 60 * time.Minute
 	openAIWSConnHealthCheckIdle = 90 * time.Second
-	// coder/websocket cannot consume pong frames without a reader. Recycle
-	// unsupported idle sockets before the upstream keepalive window expires.
-	openAIWSConnIdleRecycleAfter   = 90 * time.Second
-	openAIWSConnHealthCheckTO      = 2 * time.Second
+	// 仅对没有常驻读循环的连接实现生效：这类连接空闲时无人应答上游 ping，须在
+	// 上游保活窗口到期前回收。coder/websocket 连接由池常驻读循环应答 ping，不受此阈值约束。
+	openAIWSConnIdleRecycleAfter = 90 * time.Second
+	openAIWSConnHealthCheckTO    = 2 * time.Second
+	// 不在请求热路径上的探活（后台巡检、轮次间预检）给经代理链路的 pong 留足余量，
+	// 实测最大往返约 1.7s；误判的代价是换连甚至断会话，比多等几秒重得多。
+	openAIWSProbePingTO            = 10 * time.Second
 	openAIWSConnPrewarmExtraDelay  = 2 * time.Second
 	openAIWSAcquireCleanupInterval = 3 * time.Second
 	openAIWSBackgroundPingInterval = 30 * time.Second
@@ -1335,7 +1338,7 @@ retryAcquire:
 							conn.close()
 							p.evictConn(accountID, conn.id)
 							if retry < 1 {
-								return p.acquire(ctx, req, retry+1)
+								return p.acquire(ctx, req, retry+1, queueWait)
 							}
 							return nil, err
 						}
@@ -1346,6 +1349,7 @@ retryAcquire:
 					p.ensureTargetIdleAsync(accountID)
 					return lease, nil
 				}
+				p.dropDeadConnLocked(ap, conn, &evicted)
 			}
 		}
 	}
@@ -1414,7 +1418,7 @@ retryAcquire:
 				conn.close()
 			}
 			if retry < 1 {
-				return p.acquire(ctx, req, retry+1)
+				return p.acquire(ctx, req, retry+1, queueWait)
 			}
 			return nil, errOpenAIWSConnClosed
 		}
@@ -2150,6 +2154,9 @@ func (p *openAIWSConnPool) dialConn(ctx context.Context, req openAIWSAcquireRequ
 	}
 	id := p.nextConnID(req.Account.ID)
 	pooledConn := newOpenAIWSConn(id, req.Account.ID, conn, handshakeHeaders)
+	accountID := req.Account.ID
+	evict := func() { p.evictConn(accountID, id) }
+	pooledConn.onPeerClosed.Store(&evict)
 	pooledConn.handshakeCompatibility = normalizeOpenAIWSHandshakeCompatibility(req.Account, req.Headers)
 	pooledConn.routingAffinity = normalizeOpenAIWSRoutingAffinity(req.Headers)
 	return pooledConn, nil

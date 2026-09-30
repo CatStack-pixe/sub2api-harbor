@@ -117,12 +117,13 @@ type defaultOpenAIWSStateStore struct {
 // NewOpenAIWSStateStore 创建默认 WS 状态存储。
 func NewOpenAIWSStateStore(cache GatewayCache) OpenAIWSStateStore {
 	store := &defaultOpenAIWSStateStore{
-		cache:              cache,
-		responseToAccount:  make(map[string]openAIWSAccountBinding, 256),
-		responseOwners:     make(map[string]openAIHTTPResponseOwnerBinding, 256),
-		responseToConn:     make(map[string]openAIWSConnBinding, 256),
-		sessionToTurnState: make(map[string]openAIWSTurnStateBinding, 256),
-		sessionToConn:      make(map[string]openAIWSSessionConnBinding, 256),
+		cache:                   cache,
+		responseToAccount:       make(map[string]openAIWSAccountBinding, 256),
+		responseOwners:          make(map[string]openAIHTTPResponseOwnerBinding, 256),
+		responseToConn:          make(map[string]openAIWSConnBinding, 256),
+		sessionToTurnState:      make(map[string]openAIWSTurnStateBinding, 256),
+		sessionToConn:           make(map[string]openAIWSSessionConnBinding, 256),
+		sessionInvalidEncrypted: make(map[string]openAIWSInvalidEncryptedBinding),
 	}
 	store.lastCleanupUnixNano.Store(time.Now().UnixNano())
 	return store

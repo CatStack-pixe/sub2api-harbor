@@ -184,7 +184,7 @@ func sanitizeUpdateGroupRequestForSimpleMode(req *UpdateGroupRequest) {
 type CreateGroupRequest struct {
 	Name                      string                        `json:"name" binding:"required"`
 	Description               string                        `json:"description"`
-	Platform                  string                        `json:"platform" binding:"omitempty,oneof=anthropic openai gemini antigravity grok agnes deepseek nvidia tokenrhythm kimi zhipu chatanywhere glm modelscope dashscope minimax volcengine sensenova composite"`
+	Platform                  string                        `json:"platform" binding:"omitempty,oneof=anthropic openai gemini antigravity grok agnes deepseek nvidia tokenrhythm kimi zhipu chatanywhere glm modelscope dashscope minimax volcengine sensenova senseaudio tierflow opencode_go composite"`
 	RateMultiplier            float64                       `json:"rate_multiplier"`
 	IsExclusive               bool                          `json:"is_exclusive"`
 	SubscriptionType          string                        `json:"subscription_type" binding:"omitempty,oneof=standard subscription"`
@@ -248,7 +248,7 @@ type CreateGroupRequest struct {
 	MaxReasoningEffort string `json:"max_reasoning_effort"`
 	// 超过上限时的访问控制：downgrade（默认）或 deny。
 	MaxReasoningEffortOverLimit string `json:"max_reasoning_effort_over_limit"`
-	// OpenAI/Codex 推理强度映射，可按模型精确名、前缀或后缀限定。
+	// Anthropic/OpenAI 推理强度映射，可按模型精确名、前缀或后缀限定。
 	ReasoningEffortMappings []service.ReasoningEffortMapping `json:"reasoning_effort_mappings"`
 	// 从指定分组复制账号（创建后自动绑定）
 	CopyAccountsFromGroupIDs []int64 `json:"copy_accounts_from_group_ids"`
@@ -258,7 +258,7 @@ type CreateGroupRequest struct {
 type UpdateGroupRequest struct {
 	Name                      string                         `json:"name"`
 	Description               *string                        `json:"description"`
-	Platform                  string                         `json:"platform" binding:"omitempty,oneof=anthropic openai gemini antigravity grok agnes deepseek nvidia tokenrhythm kimi zhipu chatanywhere glm modelscope dashscope minimax volcengine sensenova composite"`
+	Platform                  string                         `json:"platform" binding:"omitempty,oneof=anthropic openai gemini antigravity grok agnes deepseek nvidia tokenrhythm kimi zhipu chatanywhere glm modelscope dashscope minimax volcengine sensenova senseaudio tierflow opencode_go composite"`
 	RateMultiplier            *float64                       `json:"rate_multiplier"`
 	IsExclusive               *bool                          `json:"is_exclusive"`
 	Status                    string                         `json:"status" binding:"omitempty,oneof=active inactive"`
@@ -332,7 +332,7 @@ type UpdateGroupRequest struct {
 type CompositeRouteRequest struct {
 	PublicModel    string `json:"public_model" binding:"required"`
 	MatchType      string `json:"match_type" binding:"omitempty,oneof=exact prefix"`
-	TargetPlatform string `json:"target_platform" binding:"required,oneof=anthropic openai gemini antigravity grok agnes deepseek nvidia tokenrhythm kimi zhipu chatanywhere glm modelscope dashscope minimax volcengine sensenova"`
+	TargetPlatform string `json:"target_platform" binding:"required,oneof=anthropic openai gemini antigravity grok agnes deepseek nvidia tokenrhythm kimi zhipu chatanywhere glm modelscope dashscope minimax volcengine sensenova senseaudio tierflow opencode_go"`
 	UpstreamModel  string `json:"upstream_model"`
 	Endpoint       string `json:"endpoint" binding:"omitempty,oneof=any messages count_tokens responses chat_completions embeddings images gemini"`
 	Priority       int    `json:"priority"`
@@ -931,6 +931,9 @@ func (h *GroupHandler) GetStats(c *gin.Context) {
 // GetUsageSummary returns today's, yesterday's, and cumulative cost for all groups.
 // GET /api/v1/admin/groups/usage-summary
 func (h *GroupHandler) GetUsageSummary(c *gin.Context) {
+	if h.rejectUnsupportedSimpleModeOperation(c, "advanced") {
+		return
+	}
 	todayStart := service.GroupUsageTodayStart(time.Now())
 
 	results, err := h.dashboardService.GetGroupUsageSummary(c.Request.Context(), todayStart)
@@ -1144,3 +1147,26 @@ func (h *GroupHandler) UpdateSortOrder(c *gin.Context) {
 
 	response.Success(c, gin.H{"message": "Sort order updated successfully"})
 }
+
+func (h *GroupHandler) GetModelsListCandidates(c *gin.Context) {
+	groupID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil || groupID < 0 {
+		response.BadRequest(c, "Invalid group ID")
+		return
+	}
+
+	models, err := h.adminService.GetGroupModelsListCandidates(
+		c.Request.Context(),
+		groupID,
+		c.Query("platform"),
+	)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+
+	response.Success(c, gin.H{"models": models})
+}
+
+// Create handles creating a new group
+// POST /api/v1/admin/groups

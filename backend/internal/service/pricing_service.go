@@ -37,7 +37,18 @@ var (
 	// （cache_creation_input_token_cost_above_200k_tokens、cache_read_input_token_cost_above_272k_tokens_priority、
 	// cache_creation_input_token_cost_above_1hr_above_200k_tokens 等）。
 	// 组 1 为基础价字段名主干，组 2 为 1h 缓存时长段（可为空），组 3 为服务档后缀（可为空）。
-	cacheTierPricePattern      = regexp.MustCompile(`^(cache_(?:creation|read)_input_token_cost)(_above_1hr)?_above_\d+k_tokens((?:_[a-z]+)?)$`)
+	cacheTierPricePattern = regexp.MustCompile(`^(cache_(?:creation|read)_input_token_cost)(_above_1hr)?_above_\d+k_tokens((?:_[a-z]+)?)$`)
+	// Official GPT Image 2.5 token rates (2026-09-08):
+	// https://developers.openai.com/api/docs/pricing#image-generation-models
+	openAIGPTImage25FallbackPricing = &LiteLLMModelPricing{
+		InputCostPerToken:       5e-06,
+		CacheReadInputTokenCost: 1.25e-06,
+		InputCostPerImageToken:  8e-06, CacheReadInputImageTokenCost: 2e-06,
+		OutputCostPerImageToken: 3e-05,
+		LiteLLMProvider:         "openai",
+		Mode:                    "image_generation",
+		SupportsPromptCaching:   true,
+	}
 	openAIGPT54FallbackPricing = &LiteLLMModelPricing{
 		InputCostPerToken:       2.5e-06, // $2.5 per MTok
 		OutputCostPerToken:      1.5e-05, // $15 per MTok
@@ -45,6 +56,23 @@ var (
 		LiteLLMProvider:         "openai",
 		Mode:                    "chat",
 		SupportsPromptCaching:   true,
+	}
+	openAIGPT6AstraFallbackPricing = &LiteLLMModelPricing{
+		InputCostPerToken:                   1e-05,
+		InputCostPerTokenPriority:           2e-05,
+		OutputCostPerToken:                  5e-05,
+		OutputCostPerTokenPriority:          1e-04,
+		CacheCreationInputTokenCost:         1.25e-05,
+		CacheCreationInputTokenCostPriority: 2.5e-05,
+		CacheReadInputTokenCost:             1e-06,
+		CacheReadInputTokenCostPriority:     2e-06,
+		LongContextInputTokenThreshold:      272_000,
+		LongContextInputCostMultiplier:      2,
+		LongContextOutputCostMultiplier:     1.5,
+		SupportsServiceTier:                 true,
+		LiteLLMProvider:                     "openai",
+		Mode:                                "chat",
+		SupportsPromptCaching:               true,
 	}
 	openAIGPT56SolFallbackPricing = &LiteLLMModelPricing{
 		InputCostPerToken:                   5e-06,
@@ -518,8 +546,6 @@ func (s *PricingService) downloadPricingData() error {
 	if err != nil {
 		return fmt.Errorf("parse pricing data: %w", err)
 	}
-	data = s.mergeFallbackPricingData(data)
-	data = s.mergeOverrideOnlyModels(data)
 
 	// 保存到本地文件
 	pricingFile := s.getPricingFilePath()
@@ -948,6 +974,20 @@ func (s *PricingService) mergeOverrideOnlyModels(data map[string]*LiteLLMModelPr
 	return data
 }
 
+// buildPricingData 解析目录正文并依次叠加 fallback、override 两层，返回合并结果与
+// 叠加层文件指纹。指纹在合并读取之前采样：并发改文件只会让存下的指纹落后于实际
+// 合并的数据、不会领先，下一轮定时比对因此会再次重建。
+func (s *PricingService) buildPricingData(body []byte) (map[string]*LiteLLMModelPricing, string, error) {
+	fingerprint := s.customPricingFilesFingerprint()
+	data, err := s.parsePricingData(body)
+	if err != nil {
+		return nil, "", err
+	}
+	data = s.mergeFallbackPricingData(data)
+	data = s.mergeOverrideOnlyModels(data)
+	return data, fingerprint, nil
+}
+
 // loadPricingData 从本地文件加载价格数据
 func (s *PricingService) loadPricingData(filePath string) error {
 	data, err := os.ReadFile(filePath)
@@ -959,8 +999,6 @@ func (s *PricingService) loadPricingData(filePath string) error {
 	if err != nil {
 		return fmt.Errorf("parse pricing data: %w", err)
 	}
-	pricingData = s.mergeFallbackPricingData(pricingData)
-	pricingData = s.mergeOverrideOnlyModels(pricingData)
 
 	// 计算哈希
 	hash := sha256.Sum256(data)

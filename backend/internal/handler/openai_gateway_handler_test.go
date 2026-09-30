@@ -1739,6 +1739,40 @@ func TestOpenAIAccountScheduleModelUsesActualOrSharedResolver(t *testing.T) {
 	require.Equal(t, "attempt-actual", openAIAccountScheduleModel(c, account, "public", true, nil))
 }
 
+func TestOpenAIChannelForwardModelForScheduler(t *testing.T) {
+	tests := []struct {
+		name      string
+		mapping   service.ChannelMappingResult
+		requested string
+		want      string
+	}{
+		{
+			name:      "mapped model is used for capability filtering",
+			mapping:   service.ChannelMappingResult{Mapped: true, MappedModel: "  gpt-forward  "},
+			requested: "client-alias",
+			want:      "gpt-forward",
+		},
+		{
+			name:      "unmapped request preserves client model",
+			mapping:   service.ChannelMappingResult{MappedModel: "client-model"},
+			requested: "client-model",
+			want:      "client-model",
+		},
+		{
+			name:      "empty mapped model safely preserves client model",
+			mapping:   service.ChannelMappingResult{Mapped: true, MappedModel: "  "},
+			requested: "client-model",
+			want:      "client-model",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.want, openAIChannelForwardModel(tt.mapping, tt.requested))
+		})
+	}
+}
+
 func TestShouldReportOpenAIWSProxyAccountFailure(t *testing.T) {
 	t.Run("unsupported client model switch does not penalize account", func(t *testing.T) {
 		err := fmt.Errorf("wrapped ingress turn: %w", newOpenAIWSUnsupportedModelSwitchError("gpt-unsupported"))

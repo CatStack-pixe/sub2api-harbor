@@ -112,6 +112,9 @@ export default {
         video: 'Video (Per Second)'
       },
       form: {
+        timeWindows: 'Time windows',
+        timeWindowsHint: 'Set the hours when this pricing entry applies.',
+        addTimeWindow: 'Add time window',
         name: 'Name',
         namePlaceholder: 'Enter channel name',
         description: 'Description',
@@ -142,8 +145,10 @@ export default {
         pricePlaceholder: 'Default',
         fastMultiplier: 'Fast Multiplier',
         flexMultiplier: 'Flex Multiplier',
+        maxReasoningEffortMultiplier: 'Max Effort Multiplier',
+        fable51DefaultMaxReasoningMultiplier: 'Default: 3',
         multiplierPlaceholder: 'Not set',
-        multiplierPositive: 'Fast/Flex multipliers must be greater than 0',
+        multiplierPositive: 'Fast/Flex/Max effort multipliers must be greater than 0',
         inputMultiplier: 'Input Mult.',
         outputMultiplier: 'Output Mult.',
         cacheWriteMultiplier: 'Cache Write Mult.',

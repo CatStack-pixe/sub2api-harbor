@@ -844,6 +844,14 @@ export default {
 
     // Groups Management
     groups: {
+      globalPrompt: {
+        title: '分组全局提示词',
+        enabled: '已启用',
+        disabled: '已停用',
+        hint: '为此分组的请求应用附加提示词。',
+        placeholder: '输入分组提示词',
+        tooLong: '全局提示词最多为 {max} 个 UTF-8 字节。'
+      },
       title: '分组管理',
       description: '管理 API 密钥分组和费率配置',
       searchGroups: '搜索分组...',
@@ -911,9 +919,13 @@ export default {
         rpmLimitHint: '每用户在本分组每分钟最大请求数，0 = 不限制；一旦设置即接管该用户的限流（覆盖用户级 rpm_limit）',
         maxReasoningEffort: '推理强度上限',
         maxReasoningEffortUnlimited: '不限制（跟随请求）',
-        maxReasoningEffortHint: '仅限制客户端主动请求的 OpenAI reasoning effort；Composite 分组仅对解析到 OpenAI 的请求生效。超过上限时自动降档，不会为缺省请求主动开启推理。上限优先级高于推理强度映射。',
+        maxReasoningEffortHint: '仅限制客户端主动请求的 Anthropic/OpenAI 推理强度；Composite 分组按实际目标平台生效。不会为缺省请求主动开启推理。上限优先级高于推理强度映射。',
+        maxReasoningEffortOverLimit: '超限访问控制',
+        maxReasoningEffortOverLimitDowngrade: '超过上限时自动降档',
+        maxReasoningEffortOverLimitDeny: '拒绝访问',
+        maxReasoningEffortOverLimitHint: '设置上限后生效。自动降档会将超过上限的请求改写为上限值后转发；拒绝访问则直接返回错误。',
         reasoningEffortMappings: '推理强度映射',
-        reasoningEffortMappingsHint: '类型和模型均可留空，表示匹配全部模型。同一类型和模型下可添加多条请求值映射，例如前缀 gpt 同时将 high、xhigh 转到 medium。精确优先于前后缀，更长前后缀优先。',
+        reasoningEffortMappingsHint: '类型和模型均可留空，表示匹配全部模型。同一类型和模型下可添加多条请求值映射，例如前缀 gpt 同时将 high、xhigh 转到 medium。转发值可选拒绝，命中对应请求值时直接返回错误。精确优先于前后缀，更长前后缀优先。',
         addReasoningEffortMapping: '添加映射',
         addReasoningEffortPair: '添加请求值',
         removeReasoningEffortMapping: '删除映射',
@@ -974,6 +986,8 @@ export default {
         kimi: 'Kimi',
         nvidia: 'NVIDIA',
         tokenrhythm: 'TokenRhythm',
+        tierflow: 'Tierflow / 清枢智汇',
+        senseaudio: 'SenseAudio',
         chatanywhere: 'ChatAnywhere',
         glm: 'GLM',
         zhipu: 'Zhipu GLM',
@@ -982,6 +996,7 @@ export default {
         minimax: 'MiniMax',
         volcengine: '火山引擎 Ark',
         sensenova: 'SenseNova',
+        opencode_go: 'OpenCode',
         composite: 'Composite',
       },
       saving: '保存中...',
@@ -1157,6 +1172,37 @@ export default {
         emptySelectionError: '模型白名单已开启，请至少选择或添加一个模型条目',
         errors: {
           empty: '请输入模型条目',
+          duplicate: '该条目已存在'
+        }
+      },
+      codexModelsManifest: {
+        title: '固定账号获取模型列表',
+        hint: '开启后，普通模型列表与 Codex Model Manifest 均优先从选定账号获取并合并，再应用账号映射和分组列表过滤；限流/过载中的选定账号仍会被使用。',
+        enable: '使用特定账号获取模型列表',
+        enabledHint: '账号来源限定为当前分组内的 OpenAI 账号，最多选择 10 个。',
+        disabledHint: '未启用：普通列表使用本地映射或默认模型；Codex 优先使用本地目录，无本地目录时由调度器选账。',
+        accounts: '选定账号',
+        searchPlaceholder: '搜索账号（当前分组内 OpenAI 账号）',
+        searchEmpty: '未找到匹配账号',
+        fallback: '选定账号全部不可用时回退调度器',
+        fallbackHint: '关闭时返回 503 / 上游错误；开启时回退到现有调度器选账路径。',
+        selectAtLeastOne: '开启固定账号后至少选择一个账号'
+      },
+      modelAllowlist: {
+        title: '模型白名单',
+        hint: '开启后，不在白名单中的模型会被拒绝（404 model_not_found），模型列表接口也只展示白名单内的模型。条目支持精确模型 ID 与末尾 * 通配。注意：Claude Code 会用 haiku 系小模型做标题/摘要等探测，/messages/count_tokens 同样受白名单控制，请一并勾选所需的小模型。',
+        loading: '正在加载候选模型...',
+        empty: '暂无候选模型，可在下方手工添加条目',
+        selectedSummary: '已选 {selected} / {total}',
+        selectAll: '全选',
+        invertSelection: '反选',
+        wildcardTag: '通配',
+        customPlaceholder: '自定义条目，如 claude-* 或 gpt-5.5-codex',
+        addCustom: '添加',
+        emptySelectionError: '模型白名单已开启，请至少选择或添加一个模型条目',
+        errors: {
+          empty: '请输入模型条目',
+          invalidWildcard: '通配符 * 只能出现在条目末尾',
           duplicate: '该条目已存在'
         }
       },

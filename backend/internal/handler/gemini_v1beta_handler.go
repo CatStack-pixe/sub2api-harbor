@@ -70,17 +70,14 @@ func (h *GatewayHandler) GeminiV1BetaListModels(c *gin.Context) {
 		agModels = append(agModels, gemini.FallbackModel(id))
 	}
 	if forcePlatform == service.PlatformAntigravity {
-		writeFilteredGeminiModelList(c, apiKey, antigravity.FallbackGeminiModelsList())
+		c.JSON(http.StatusOK, gemini.ModelsListResponse{Models: filterGeminiModels(agModels)})
 		return
 	}
 
 	account, err := h.geminiCompatService.SelectAccountForAIStudioEndpoints(c.Request.Context(), apiKey.GroupID)
 	if err != nil {
-		// 没有 gemini 账户，检查是否有 antigravity 账户可用
-		hasAntigravity, _ := h.geminiCompatService.HasAntigravityAccounts(c.Request.Context(), apiKey.GroupID)
-		if hasAntigravity {
-			// antigravity 账户使用静态模型列表
-			writeFilteredGeminiModelList(c, apiKey, gemini.FallbackModelsList())
+		if len(agModels) > 0 {
+			c.JSON(http.StatusOK, gemini.ModelsListResponse{Models: filterGeminiModels(agModels)})
 			return
 		}
 		markOpsRoutingCapacityLimitedIfNoAvailable(c, err)
@@ -94,19 +91,29 @@ func (h *GatewayHandler) GeminiV1BetaListModels(c *gin.Context) {
 		return
 	}
 	if shouldFallbackGeminiModels(res) {
-		writeFilteredGeminiModelList(c, apiKey, gemini.FallbackModelsList())
+		c.JSON(http.StatusOK, gemini.ModelsListResponse{Models: filterGeminiModels(mergeGeminiModelLists(gemini.DefaultModels(), agModels))})
 		return
 	}
+	if res.StatusCode == http.StatusOK && len(agModels) > 0 {
+		if merged, ok := appendUpstreamGeminiModels(res.Body, agModels); ok {
+			res.Body = merged
+		}
+	}
+
+	if apiKey.Group != nil && apiKey.Group.ModelAllowlistEnabled() {
+		if filtered, dropped, ok := filterUpstreamGeminiModelsBody(res.Body, apiKey.Group.ModelAllowlist); ok && dropped {
+			// 只在确有条目被过滤时替换响应体；全命中或解析失败时保持原始响应，
+			// 统一经 writeUpstreamResponse 写出（保留全部上游响应头）。
+			res.Body = filtered
+		}
+	}
 	if len(apiKey.ModelWhitelist) > 0 {
-		filtered, filterErr := filterGeminiModelListBody(res.Body, apiKey)
-		if filterErr != nil {
+		filtered, err := filterGeminiModelListBody(res.Body, apiKey)
+		if err != nil {
 			googleError(c, http.StatusBadGateway, "Invalid Gemini model list response")
 			return
 		}
-		filteredResponse := *res
-		filteredResponse.Body = filtered
-		writeUpstreamResponse(c, &filteredResponse)
-		return
+		res.Body = filtered
 	}
 	if res.StatusCode == http.StatusOK && len(agModels) > 0 {
 		if merged, ok := appendUpstreamGeminiModels(res.Body, agModels); ok {
@@ -908,20 +915,6 @@ func writeUpstreamResponse(c *gin.Context, res *service.UpstreamHTTPResult) {
 		contentType = "application/json"
 	}
 	c.Data(res.StatusCode, contentType, res.Body)
-}
-
-func writeFilteredGeminiModelList(c *gin.Context, apiKey *service.APIKey, response any) {
-	body, err := json.Marshal(response)
-	if err != nil {
-		googleError(c, http.StatusBadGateway, "Failed to encode Gemini model list")
-		return
-	}
-	filtered, err := filterGeminiModelListBody(body, apiKey)
-	if err != nil {
-		googleError(c, http.StatusBadGateway, "Invalid Gemini model list response")
-		return
-	}
-	c.Data(http.StatusOK, "application/json", filtered)
 }
 
 func filterGeminiModelListBody(body []byte, apiKey *service.APIKey) ([]byte, error) {

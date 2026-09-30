@@ -134,6 +134,43 @@ func TestForwardResponses_TokenRhythmUsesChatCompletionsByDefault(t *testing.T) 
 	require.Equal(t, "hi!", gjson.Get(rec.Body.String(), "output.0.content.0.text").String())
 }
 
+func TestForwardResponses_TierflowPreservesRelayModelAndUsesChatBridge(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	for _, model := range []string{"deepseek-v4-flash", "custom/unknown-model"} {
+		t.Run(model, func(t *testing.T) {
+			body := []byte(`{"model":"` + model + `","input":"hello","stream":false}`)
+			rec := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(rec)
+			c.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", bytes.NewReader(body))
+			c.Request.Header.Set("Content-Type", "application/json")
+			upstream := &httpUpstreamRecorder{resp: &http.Response{
+				StatusCode: http.StatusOK,
+				Header:     http.Header{"Content-Type": []string{"application/json"}},
+				Body: io.NopCloser(strings.NewReader(
+					`{"id":"chatcmpl_test","object":"chat.completion","model":"` + model + `","choices":[{"index":0,"message":{"role":"assistant","content":"ok"},"finish_reason":"stop"}],"usage":{"prompt_tokens":2,"completion_tokens":1,"total_tokens":3}}`,
+				)),
+			}}
+			svc := &OpenAIGatewayService{cfg: rawChatCompletionsTestConfig(), httpUpstream: upstream}
+			account := rawChatCompletionsTestAccount()
+			account.Platform = PlatformTierflow
+			account.Extra = nil
+			account.Credentials["session_cookie"] = "private-test-session"
+			result, err := svc.Forward(context.Background(), c, account, body)
+			require.NoError(t, err)
+			require.NotNil(t, result)
+			require.Equal(t, "http://upstream.example/v1/chat/completions", upstream.lastReq.URL.String())
+			require.Equal(t, model, gjson.GetBytes(upstream.lastBody, "model").String())
+			require.Equal(t, "hello", gjson.GetBytes(upstream.lastBody, "messages.0.content").String())
+			require.False(t, gjson.GetBytes(upstream.lastBody, "input").Exists())
+			require.Empty(t, upstream.lastReq.Header.Get("Cookie"))
+			require.Equal(t, "response", gjson.Get(rec.Body.String(), "object").String())
+			require.Equal(t, "ok", gjson.Get(rec.Body.String(), "output.0.content.0.text").String())
+			require.Equal(t, 2, result.Usage.InputTokens)
+			require.Equal(t, 1, result.Usage.OutputTokens)
+		})
+	}
+}
+
 // Scenario: 第三方无推理模型不收到兼容档位。
 func TestForwardResponses_PassthroughFlagWithUnsupportedResponsesUsesAccountMapping(t *testing.T) {
 	gin.SetMode(gin.TestMode)

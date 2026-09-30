@@ -230,12 +230,12 @@ func TestDiagnoseModelAvailabilityForPlatform_GroupIncludesCrossPlatformAccount(
 	repo := &mockAccountRepoForPlatform{
 		accounts: []Account{
 			{
-				ID:          1,
-				Platform:    PlatformTokenRhythm,
-				Status:      StatusActive,
-				Schedulable: true,
+				ID:            1,
+				Platform:      PlatformTokenRhythm,
+				Status:        StatusActive,
+				Schedulable:   true,
 				AccountGroups: []AccountGroup{{GroupID: groupID}},
-				Credentials: map[string]any{"model_mapping": map[string]any{"gpt-5": "gpt-5"}},
+				Credentials:   map[string]any{"model_mapping": map[string]any{"gpt-5": "gpt-5"}},
 			},
 		},
 		accountsByID: map[int64]*Account{},

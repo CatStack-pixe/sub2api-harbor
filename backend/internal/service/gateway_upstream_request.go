@@ -141,7 +141,7 @@ func (s *GatewayService) buildUpstreamRequest(ctx context.Context, c *gin.Contex
 	if tokenType == "oauth" {
 		setHeaderRaw(req.Header, "authorization", "Bearer "+token)
 	} else {
-		setAnthropicAPIKeyAuthHeader(req.Header, account, token)
+		setAnthropicAPIKeyAuthHeader(req.Header, account, token, account.GetBaseURL())
 		if account.IsChatAnywhere() {
 			deleteHeaderAllForms(req.Header, "x-api-key")
 			setHeaderRaw(req.Header, "authorization", "Bearer "+token)

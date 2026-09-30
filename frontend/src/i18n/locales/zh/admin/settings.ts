@@ -86,6 +86,9 @@ export default {
           showQuota: '向用户展示渠道用量/余额',
           showQuotaHint:
             '开启后，配额模式的渠道监控会在用户端渠道状态页展示关联账号的用量滚动窗口/余额。默认关闭；管理员始终可见。',
+          hideUserRanking: '对用户隐藏用户排行',
+          hideUserRankingHint:
+            '开启后，用户端渠道监控 V2 不再显示「用户排行」页，用户 API 也不返回排行数据。管理员仍可查看。',
         },
         availableChannels: {
           title: '可用渠道',
@@ -93,6 +96,21 @@ export default {
           configureLink: '前往 渠道管理 > 渠道定价 配置模型价格',
           enabled: '启用可用渠道',
           enabledHint: '关闭后用户端侧边栏入口隐藏，接口返回空数组。',
+        },
+        siteBillingMode: {
+          title: '站点类型',
+          description: '决定用户端提供哪些购买方式。默认「充值 & 订阅」。',
+          label: '购买方式',
+          options: {
+            rechargeAndSubscription: '充值 & 订阅',
+            rechargeOnly: '仅充值',
+            subscriptionOnly: '仅订阅',
+          },
+          hints: {
+            rechargeAndSubscription: '用户端同时提供余额充值与订阅套餐。',
+            rechargeOnly: '用户端隐藏「我的订阅」、购买页订阅套餐、顶栏订阅进度与用量页「计费类型」筛选，直接访问「我的订阅」会跳回仪表盘；管理端侧边栏同时隐藏「订阅管理」入口（页面仍可通过地址访问）。已有订阅的计费与兑换码发放的订阅不受影响。',
+            subscriptionOnly: '用户端购买页只保留订阅套餐，侧边栏入口显示为「订阅」，余额充值下单会被拒绝；兑换码、返利等余额入账不受影响。',
+          },
         },
         modelPlaza: {
           title: '模型广场',
@@ -524,7 +542,7 @@ export default {
         grokDefaultTextModel: '默认 Grok 文本模型',
         grokDefaultTextModelHint: '用于空模型值；仅在右侧开关开启时也用于其他客户端模型命名空间。允许填写自定义 Grok 模型 ID。',
         grokCrossClientMap: '映射其他客户端模型到 Grok',
-        grokCrossClientMapHint: '默认关闭。开启后，GPT、Codex、o 系列和 Claude 模型 ID 会路由到左侧默认 Grok 文本模型。',
+        grokCrossClientMapHint: '为兼容客户端，默认开启。GPT、Codex、o 系列和 Claude 模型 ID 会路由到左侧默认 Grok 文本模型；关闭后必须使用 Grok 模型 ID。',
         grokDefaultBaseURLMode: '默认 Grok 上游',
         grokDefaultBaseURLModeHint: '仅用于 Grok 账号未配置显式 base URL 的文本请求；媒体和语音仍使用官方 API 主机。',
         grokBaseURLModeCLI: 'CLI 聊天代理',
@@ -1148,6 +1166,7 @@ export default {
         saveHint: '保存时随系统设置一起提交（点击页面底部「保存」按钮）。',
         serviceTier: 'service_tier 匹配',
         tierAll: '全部 tier 值',
+        tierMissing: '省略 tier',
         tierPriority: 'priority（fast）',
         tierUltrafast: 'ultrafast',
         tierFlex: 'flex',

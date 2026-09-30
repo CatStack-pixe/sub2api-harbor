@@ -151,7 +151,12 @@ const sensenovaModels = [
 
 // DeepSeek
 const deepseekModels = [
-  'deepseek-v4-pro', 'deepseek-v4-flash'
+  'deepseek-v4-pro', 'deepseek-v4-flash', 'deepseek-v4-flash-vision-exp', 'deepseek-flash',
+  'deepseek-coder',
+  'deepseek-v3', 'deepseek-v3-0324',
+  'deepseek-r1', 'deepseek-r1-0528',
+  'deepseek-r1-distill-qwen-32b', 'deepseek-r1-distill-qwen-14b', 'deepseek-r1-distill-qwen-7b',
+  'deepseek-r1-distill-llama-70b', 'deepseek-r1-distill-llama-8b'
 ]
 
 // NVIDIA NIM models. The account sync action can add any model returned by
@@ -537,12 +542,27 @@ export function getModelsByPlatform(platform: string): string[] {
     case 'grok': return xaiModels
     case 'agnes': return agnesModels
     case 'tokenrhythm': return tokenRhythmModels
+    // Relay catalogs vary by account; synchronize /models instead of guessing support.
+    case 'tierflow': return []
+    case 'senseaudio': return []
     case 'chatanywhere': return chatAnywhereModels
     case 'glm': return glmModels
     case 'cohere': return cohereModels
     case 'yi': return yiModels
     case 'moonshot':
     case 'kimi': return moonshotModels
+    case 'opencode_go': return [
+      'grok-4.6', 'gpt-5.6-luna',
+      'glm-5.3-flash', 'glm-5.3', 'glm-5.2', 'glm-5.1',
+      'kimi-k3', 'kimi-k2.7-code', 'kimi-k2.6',
+      'longcat-2.0',
+      'deepseek-v4-pro', 'deepseek-v4-flash', 'deepseek-v4-flash-vision-exp',
+      'mimo-v2.5', 'mimo-v2.5-pro',
+      'minimax-m3', 'minimax-m2.7', 'minimax-m2.5',
+      'muse-spark-1.3-contributor', 'muse-spark-1.2-contributor',
+      'qwen3.8-max', 'qwen3.8-flash', 'qwen3.7-max', 'qwen3.7-plus', 'qwen3.6-plus',
+      'hy4-preview', 'hy3', 'omen-alpha'
+    ]
     case 'doubao': return doubaoModels
     case 'volcengine': return volcengineModels
     case 'minimax': return minimaxModels
@@ -556,7 +576,7 @@ export function getModelsByPlatform(platform: string): string[] {
 
 // 按平台获取预设映射
 export function getPresetMappingsByPlatform(platform: string) {
-  if (platform === 'agnes' || platform === 'deepseek' || platform === 'kimi' || platform === 'zhipu' || platform === 'nvidia' || platform === 'tokenrhythm' || platform === 'chatanywhere' || platform === 'glm' || platform === 'modelscope' || platform === 'dashscope' || platform === 'minimax' || platform === 'volcengine' || platform === 'sensenova') return []
+  if (platform === 'agnes' || platform === 'deepseek' || platform === 'kimi' || platform === 'zhipu' || platform === 'nvidia' || platform === 'tokenrhythm' || platform === 'tierflow' || platform === 'senseaudio' || platform === 'chatanywhere' || platform === 'glm' || platform === 'modelscope' || platform === 'dashscope' || platform === 'minimax' || platform === 'volcengine' || platform === 'sensenova') return []
   if (platform === 'openai') return openaiPresetMappings
   if (platform === 'gemini') return geminiPresetMappings
   if (platform === 'grok' || platform === 'xai') return grokPresetMappings

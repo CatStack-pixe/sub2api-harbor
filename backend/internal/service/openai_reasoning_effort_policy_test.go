@@ -149,7 +149,7 @@ func TestNormalizeReasoningEffortMappings(t *testing.T) {
 	t.Run("rejects mappings for non OpenAI platforms", func(t *testing.T) {
 		for _, platform := range []string{PlatformGemini, PlatformAntigravity, PlatformGrok} {
 			_, err := NormalizeReasoningEffortMappings(platform, []ReasoningEffortMapping{{From: "low", To: "high"}})
-			require.ErrorContains(t, err, "only supported for platforms \"openai\" and \"composite\"")
+			require.ErrorContains(t, err, "only supported for platforms")
 		}
 
 		_, err := NormalizeReasoningEffortMappings(PlatformOpenAI, []ReasoningEffortMapping{{From: "ultra", To: "high"}})
@@ -214,39 +214,70 @@ func TestNormalizeMaxReasoningEffortForPlatform(t *testing.T) {
 
 	for _, platform := range []string{PlatformGemini, PlatformAntigravity, PlatformGrok} {
 		_, err = normalizeMaxReasoningEffortForPlatform(platform, "low")
-		require.ErrorContains(t, err, "only supported for platforms \"openai\" and \"composite\"")
+		require.ErrorContains(t, err, "only supported for platforms")
 	}
 
 	_, err = normalizeMaxReasoningEffortForPlatform(PlatformOpenAI, "none")
 	require.ErrorContains(t, err, "not supported")
 }
 
+func TestNormalizeMaxReasoningEffortOverLimit(t *testing.T) {
+	require.Equal(t, ReasoningEffortOverLimitDowngrade, NormalizeMaxReasoningEffortOverLimit(""))
+	require.Equal(t, ReasoningEffortOverLimitDowngrade, NormalizeMaxReasoningEffortOverLimit(" downgrade "))
+	require.Equal(t, ReasoningEffortOverLimitDeny, NormalizeMaxReasoningEffortOverLimit("DENY"))
+	require.Empty(t, NormalizeMaxReasoningEffortOverLimit("block"))
+}
+
+func TestNormalizeMaxReasoningEffortOverLimitForPlatform(t *testing.T) {
+	value, err := normalizeMaxReasoningEffortOverLimitForPlatform(PlatformOpenAI, "")
+	require.NoError(t, err)
+	require.Equal(t, ReasoningEffortOverLimitDowngrade, value)
+
+	value, err = normalizeMaxReasoningEffortOverLimitForPlatform(PlatformComposite, "deny")
+	require.NoError(t, err)
+	require.Equal(t, ReasoningEffortOverLimitDeny, value)
+
+	value, err = normalizeMaxReasoningEffortOverLimitForPlatform(PlatformAnthropic, "")
+	require.NoError(t, err)
+	require.Equal(t, ReasoningEffortOverLimitDowngrade, value)
+
+	value, err = normalizeMaxReasoningEffortOverLimitForPlatform(PlatformAnthropic, "deny")
+	require.NoError(t, err)
+	require.Equal(t, ReasoningEffortOverLimitDeny, value)
+
+	_, err = normalizeMaxReasoningEffortOverLimitForPlatform(PlatformOpenAI, "block")
+	require.ErrorContains(t, err, "not supported")
+}
+
 func TestOpenAIReasoningEffortPolicyContext(t *testing.T) {
 	body := []byte(`{"reasoning":{"effort":"max"}}`)
 
-	unbound, changed := ApplyOpenAIReasoningEffortPolicyFromContext(context.Background(), body)
+	unbound, changed, err := ApplyOpenAIReasoningEffortPolicyFromContext(context.Background(), body)
+	require.NoError(t, err)
 	require.False(t, changed)
 	require.Equal(t, body, unbound)
 
 	mappings := []ReasoningEffortMapping{{From: "max", To: "xhigh"}}
 	ctx := WithOpenAIReasoningEffortPolicy(context.Background(), "medium", mappings)
 	mappings[0].To = "low"
-	got, changed := ApplyOpenAIReasoningEffortPolicyFromContext(ctx, body)
+	got, changed, err := ApplyOpenAIReasoningEffortPolicyFromContext(ctx, body)
+	require.NoError(t, err)
 	require.True(t, changed)
 	require.Equal(t, "medium", gjson.GetBytes(got, "reasoning.effort").String())
 }
 
 func TestApplyOpenAIReasoningEffortPolicy(t *testing.T) {
 	tests := []struct {
-		name      string
-		body      string
-		max       string
-		overLimit string
-		mappings  []ReasoningEffortMapping
-		path      string
-		want      string
-		changed   bool
-		deny      bool
+		name        string
+		body        string
+		max         string
+		overLimit   string
+		mappings    []ReasoningEffortMapping
+		path        string
+		want        string
+		changed     bool
+		deny        bool
+		mappingDeny bool
 	}{
 		{name: "nested caps high", body: `{"reasoning":{"effort":"xhigh"}}`, max: "medium", path: "reasoning.effort", want: "medium", changed: true},
 		{name: "flat caps high", body: `{"reasoning_effort":"high"}`, max: "low", path: "reasoning_effort", want: "low", changed: true},
@@ -402,6 +433,41 @@ func TestApplyOpenAIReasoningEffortPolicy(t *testing.T) {
 		{name: "deny after mapping still over ceiling", body: `{"reasoning":{"effort":"max"}}`, max: "medium", overLimit: ReasoningEffortOverLimitDeny, mappings: []ReasoningEffortMapping{{From: "max", To: "xhigh"}}, path: "reasoning.effort", want: "max", deny: true},
 		{name: "deny allows mapping under ceiling", body: `{"reasoning":{"effort":"max"}}`, max: "medium", overLimit: ReasoningEffortOverLimitDeny, mappings: []ReasoningEffortMapping{{From: "max", To: "low"}}, path: "reasoning.effort", want: "low", changed: true},
 		{name: "deny ignored without ceiling", body: `{"reasoning_effort":"high"}`, overLimit: ReasoningEffortOverLimitDeny, path: "reasoning_effort", want: "high"},
+		{name: "mapping deny rejects matching nested effort", body: `{"reasoning":{"effort":"xhigh"}}`, mappings: []ReasoningEffortMapping{{From: "xhigh", To: ReasoningEffortMappingDeny}}, path: "reasoning.effort", want: "xhigh", mappingDeny: true},
+		{name: "mapping deny rejects matching flat effort", body: `{"reasoning_effort":"X-HIGH"}`, mappings: []ReasoningEffortMapping{{From: "xhigh", To: " DENY "}}, path: "reasoning_effort", want: "X-HIGH", mappingDeny: true},
+		{name: "mapping deny rejects Anthropic output config", body: `{"output_config":{"effort":"max"}}`, mappings: []ReasoningEffortMapping{{From: "max", To: ReasoningEffortMappingDeny}}, path: "output_config.effort", want: "max", mappingDeny: true},
+		{name: "mapping deny rejects none source", body: `{"reasoning_effort":"none"}`, mappings: []ReasoningEffortMapping{{From: "none", To: ReasoningEffortMappingDeny}}, path: "reasoning_effort", want: "none", mappingDeny: true},
+		{
+			name:        "mapping deny respects model scope",
+			body:        `{"model":"gpt-5.6-sol","reasoning":{"effort":"xhigh"}}`,
+			mappings:    []ReasoningEffortMapping{{From: "xhigh", To: ReasoningEffortMappingDeny, MatchType: domain.ReasoningEffortMatchPrefix, Model: "gpt-5.6-sol"}},
+			path:        "reasoning.effort",
+			want:        "xhigh",
+			mappingDeny: true,
+		},
+		{
+			name:     "mapping deny skips non matching model",
+			body:     `{"model":"gpt-5.6-terra","reasoning":{"effort":"xhigh"}}`,
+			mappings: []ReasoningEffortMapping{{From: "xhigh", To: ReasoningEffortMappingDeny, MatchType: domain.ReasoningEffortMatchExact, Model: "gpt-5.6-sol"}},
+			path:     "reasoning.effort",
+			want:     "xhigh",
+		},
+		{
+			name:     "mapping deny leaves other efforts unchanged",
+			body:     `{"reasoning_effort":"high"}`,
+			mappings: []ReasoningEffortMapping{{From: "xhigh", To: ReasoningEffortMappingDeny}},
+			path:     "reasoning_effort",
+			want:     "high",
+		},
+		{
+			name:        "mapping deny takes precedence over ceiling rewrite",
+			body:        `{"reasoning":{"effort":"xhigh"}}`,
+			max:         "medium",
+			mappings:    []ReasoningEffortMapping{{From: "xhigh", To: ReasoningEffortMappingDeny}},
+			path:        "reasoning.effort",
+			want:        "xhigh",
+			mappingDeny: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -410,6 +476,20 @@ func TestApplyOpenAIReasoningEffortPolicy(t *testing.T) {
 				require.Error(t, err)
 				var overLimit *ReasoningEffortOverLimitError
 				require.ErrorAs(t, err, &overLimit)
+				require.True(t, IsReasoningEffortPolicyDenied(err))
+				require.False(t, changed)
+				require.Equal(t, tt.body, string(got))
+				return
+			}
+			if tt.mappingDeny {
+				require.Error(t, err)
+				var mappingDenied *ReasoningEffortMappingDeniedError
+				require.ErrorAs(t, err, &mappingDenied)
+				require.True(t, IsReasoningEffortPolicyDenied(err))
+				require.Contains(t, mappingDenied.Error(), "denied by this group's mapping policy")
+				if requested := normalizeReasoningEffortMappingSource(tt.want); requested != "" {
+					require.Equal(t, requested, mappingDenied.Requested)
+				}
 				require.False(t, changed)
 				require.Equal(t, tt.body, string(got))
 				return

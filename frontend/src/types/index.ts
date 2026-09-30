@@ -274,7 +274,13 @@ export interface PublicSettings {
   channel_monitor_hide_throughput?: boolean
   /** When true, user monitor shows account quota/balance snapshots (default off). */
   channel_monitor_show_quota?: boolean
+  /** When true, user monitor hides the user ranking tab and /users payload. */
+  channel_monitor_hide_user_ranking?: boolean
   available_channels_enabled: boolean
+  /** When false, the whole user-facing subscription surface is hidden. Default true. */
+  subscription_enabled: boolean
+  /** Mirrors payment config BALANCE_PAYMENT_DISABLED; true = balance top-up closed (subscription-only site). */
+  payment_balance_disabled: boolean
   model_plaza_enabled: boolean
   model_plaza_require_auth: boolean
   plugin_management_enabled: boolean
@@ -532,7 +538,7 @@ export interface PaginationConfig {
 
 // ==================== API Key & Group Types ====================
 
-export type GroupPlatform = 'anthropic' | 'openai' | 'gemini' | 'antigravity' | 'grok' | 'agnes' | 'deepseek' | 'kimi' | 'nvidia' | 'tokenrhythm' | 'zhipu' | 'chatanywhere' | 'glm' | 'modelscope' | 'dashscope' | 'minimax' | 'volcengine' | 'sensenova' | 'composite'
+export type GroupPlatform = 'anthropic' | 'openai' | 'gemini' | 'antigravity' | 'grok' | 'agnes' | 'deepseek' | 'kimi' | 'nvidia' | 'tokenrhythm' | 'tierflow' | 'senseaudio' | 'zhipu' | 'chatanywhere' | 'glm' | 'modelscope' | 'dashscope' | 'minimax' | 'volcengine' | 'sensenova' | 'opencode_go' | 'composite'
 
 export type VideoModelPrices = Record<string, Record<string, number>>
 
@@ -561,7 +567,7 @@ export interface Group {
   platform: GroupPlatform
   rate_multiplier: number
   rpm_limit?: number // Group-level RPM cap (0 = unlimited); overrides user-level rpm_limit when set
-  max_reasoning_effort?: string // OpenAI/Codex reasoning ceiling; empty means unlimited
+  max_reasoning_effort?: string // Anthropic/OpenAI reasoning ceiling; empty means unlimited
   max_reasoning_effort_over_limit?: string // downgrade (default) or deny when over the ceiling
   reasoning_effort_mappings?: ReasoningEffortMapping[]
   is_exclusive: boolean
@@ -917,7 +923,7 @@ export interface UpdateGroupRequest {
 
 // ==================== Account & Proxy Types ====================
 
-export type AccountPlatform = 'anthropic' | 'openai' | 'gemini' | 'antigravity' | 'grok' | 'agnes' | 'deepseek' | 'kimi' | 'nvidia' | 'tokenrhythm' | 'zhipu' | 'chatanywhere' | 'glm' | 'modelscope' | 'dashscope' | 'minimax' | 'volcengine' | 'sensenova'
+export type AccountPlatform = 'anthropic' | 'openai' | 'gemini' | 'antigravity' | 'grok' | 'agnes' | 'deepseek' | 'kimi' | 'nvidia' | 'tokenrhythm' | 'tierflow' | 'senseaudio' | 'zhipu' | 'chatanywhere' | 'glm' | 'modelscope' | 'dashscope' | 'minimax' | 'volcengine' | 'sensenova' | 'opencode_go'
 export type AccountType = 'oauth' | 'setup-token' | 'apikey' | 'upstream' | 'bedrock' | 'service_account'
 export type OAuthAddMethod = 'oauth' | 'setup-token'
 export type ProxyProtocol = 'http' | 'https' | 'socks5' | 'socks5h'
@@ -1439,6 +1445,17 @@ export interface GrokBillingSummary {
   failed_windows?: string[]
 }
 
+export interface TierflowBalance {
+  is_available: boolean
+  remaining_balance: number
+  total_usage: number
+  currency: string
+  quota_per_unit: number
+  request_count: number
+  status_code?: number
+  fetched_at: number
+}
+
 export interface AccountUsageInfo {
   source?: 'passive' | 'active' | 'local'
   updated_at: string | null
@@ -1455,6 +1472,7 @@ export interface AccountUsageInfo {
   gemini_flash_minute?: UsageProgress | null
   sensenova_five_hour?: UsageProgress | null
   sensenova_seven_day?: UsageProgress | null
+  tierflow_balance?: TierflowBalance | null
   chatanywhere_daily?: UsageProgress | null
   chatanywhere_weekly?: UsageProgress | null
   chatanywhere_quota_status?: 'weekly_exhausted' | 'error' | string

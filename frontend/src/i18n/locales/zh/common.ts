@@ -32,6 +32,7 @@ export default {
     password: '密码',
     submit: '提交',
     back: '返回',
+    previous: '上一页',
     next: '下一步',
     yes: '是',
     no: '否',

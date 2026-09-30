@@ -34,6 +34,7 @@ type RateLimitService struct {
 	openAIAccountRuntimeStats *openAIAccountRuntimeStats
 	usageCacheMu              sync.RWMutex
 	usageCache                map[int64]*geminiUsageCacheEntry
+	ollamaCloudUsageProbe     ollamaCloudUsageProbeScheduler
 
 	// OpenAI Team 联动熔断的进程内去重：teamID → 去重窗口截止时间
 	openaiTeamLinkedMu     sync.Mutex
@@ -176,6 +177,7 @@ func (s *RateLimitService) ApplyAccountSchedulingThreshold(ctx context.Context, 
 	thresholds := s.settingService.GetAccountSchedulingThresholds(ctx)
 	decision := EvaluateAccountSchedulingThreshold(account, thresholds, now)
 	if !decision.ShouldPause || decision.Until == nil || !decision.Until.After(now) {
+		s.applyAnthropicFableSchedulingThreshold(ctx, account, thresholds, now)
 		return false
 	}
 
@@ -227,6 +229,43 @@ func (s *RateLimitService) ApplyAccountSchedulingThreshold(ctx context.Context, 
 		"used_percent", decision.UsedPercent,
 		"until", decision.Until.UTC())
 	return true
+}
+
+func (s *RateLimitService) applyAnthropicFableSchedulingThreshold(ctx context.Context, account *Account, thresholds map[string]int, now time.Time) {
+	decision := evaluateAnthropicFableSchedulingThreshold(account, thresholds, now)
+	if !decision.ShouldPause || decision.Until == nil || !decision.Until.After(now) {
+		return
+	}
+	if account.isRateLimitActiveForKey(anthropicFableRateLimitKey) {
+		return
+	}
+
+	reason := BuildDetailedAccountSchedulingThresholdReason(AccountSchedulingThresholdReasonInput{
+		Platform:         decision.Platform,
+		Window:           decision.Window,
+		Scope:            decision.Scope,
+		ThresholdPercent: decision.ThresholdPercent,
+		UsedPercent:      decision.UsedPercent,
+		Until:            *decision.Until,
+		Now:              now,
+	})
+	setAccountModelRateLimitSnapshot(account, anthropicFableRateLimitKey, *decision.Until, reason, now)
+	if err := s.accountRepo.SetModelRateLimit(ctx, account.ID, anthropicFableRateLimitKey, *decision.Until, reason); err != nil {
+		slog.Warn("anthropic_fable_scheduling_threshold_set_model_limit_failed",
+			"account_id", account.ID,
+			"threshold_percent", decision.ThresholdPercent,
+			"used_percent", decision.UsedPercent,
+			"until", decision.Until.UTC(),
+			"error", err)
+		return
+	}
+
+	slog.Info("anthropic_fable_scheduling_threshold_model_limited",
+		"account_id", account.ID,
+		"scope", anthropicFableRateLimitKey,
+		"threshold_percent", decision.ThresholdPercent,
+		"used_percent", decision.UsedPercent,
+		"until", decision.Until.UTC())
 }
 
 func accountHasSameSchedulingThresholdPause(account *Account, until time.Time, reason string) bool {
@@ -552,7 +591,7 @@ func (s *RateLimitService) HandleUpstreamError(ctx context.Context, account *Acc
 	case 402:
 		// 国产供应商：余额不足是可恢复状态（充值/检测恢复后由周期任务自动解除），
 		// 不能走 handleAuthError 永久置 status=error。改为可恢复的临时停调。
-		if account.IsCNProvider() {
+		if account.IsCNProvider() || account.IsOpenCodeZen() {
 			s.handleCNProviderInsufficientBalance(ctx, account, upstreamMsg)
 			shouldDisable = true
 			break
@@ -1027,10 +1066,18 @@ func (s *RateLimitService) handle403(ctx context.Context, account *Account, upst
 		s.handleCNProviderConcurrencyLimit403(ctx, account)
 		return true
 	}
+	// Kimi 等 CN 供应商把 Coding Plan 配额窗口耗尽打成 403
+	// （error.type=access_terminated_error），这是窗口到期后自动恢复的限流
+	// 信号而非封禁：按 429 口径冷却到真实窗口重置点，避免落入下方通用 403
+	// 升级计数后被永久 SetError。
+	if isCNProviderQuotaExhausted403(account, responseBody, upstreamMsg) {
+		s.handleCNProviderQuotaExhausted403(ctx, account, upstreamMsg)
+		return true
+	}
 	// 国产供应商与 openai 同口径:HTML 403(CDN/代理拦截页)不构成账号失效证据,
 	// 且 403 在 failover 状态集里会被逐账号重放——直接 SetError 会让一个坏请求/
 	// 一层坏代理连环永久禁用整组账号。走 HTML 豁免 + N 次累计 + 临时冷却。
-	if account.Platform == PlatformOpenAI || IsCNProvider(account.Platform) {
+	if account.Platform == PlatformOpenAI || IsCNProvider(account.Platform) || account.IsOpenCodeGo() {
 		return s.handleOpenAI403(ctx, account, upstreamMsg, responseBody)
 	}
 	// 非 Antigravity 平台：保持原有行为
@@ -1204,9 +1251,17 @@ func (s *RateLimitService) handle429(ctx context.Context, account *Account, head
 		}
 		return
 	}
+	// 真实 Ollama Cloud 用量账号（credentials base_url 指向 ollama.com）的 429 由
+	// ollama.com 的用量窗口驱动。其响应头不得被当作 OpenAI codex / Anthropic /
+	// CN 限流来解析，故在国产供应商分支之前单独处理：先设置永不缩短的临时冷却，
+	// 再调度异步 probe 学习真实重置点（详见 ratelimit_service_ollama_429.go）。
+	if account != nil && IsOllamaCloudUsageAccount(account) {
+		s.handleOllamaCloudUsage429(ctx, account, headers)
+		return
+	}
 	// 国产供应商（kimi/zhipu/deepseek）的 429 走专用可恢复路径：余额不足 → 临时停调，
 	// Coding Plan 窗口耗尽 → 冷却到快照重置点。未命中则继续默认 429 逻辑。
-	if account.IsCNProvider() {
+	if account.IsCNProvider() || account.IsOpenCodeGo() {
 		if s.applyCNProviderReactive429(ctx, account, headers, responseBody) {
 			return
 		}

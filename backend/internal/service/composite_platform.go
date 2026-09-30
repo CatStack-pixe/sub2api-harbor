@@ -116,6 +116,8 @@ func DetectModelPlatform(model string) (string, bool) {
 			return PlatformTokenRhythm, true
 		case "kimi", "moonshot":
 			return PlatformKimi, true
+		case "tierflow":
+			return PlatformTierflow, true
 		case "chatanywhere":
 			return PlatformChatAnywhere, true
 		case "glm":
@@ -132,6 +134,8 @@ func DetectModelPlatform(model string) (string, bool) {
 			return PlatformVolcengine, true
 		case "sensenova", "sensecore", "sensechat":
 			return PlatformSenseNova, true
+		case "senseaudio":
+			return PlatformSenseAudio, true
 		case "z-ai", "zai":
 			// NVIDIA NIM also publishes models under these namespaces. Leave
 			// ambiguous names unresolved unless a composite route is explicit.
@@ -176,19 +180,23 @@ func DetectModelPlatform(model string) (string, bool) {
 		return PlatformNvidia, true
 	case strings.HasPrefix(normalized, "tokenrhythm-"):
 		return PlatformTokenRhythm, true
+	case normalized == "tierflow", strings.HasPrefix(normalized, "tierflow-"), strings.HasPrefix(normalized, "tierflow_"):
+		return PlatformTierflow, true
 	case strings.HasPrefix(normalized, "chatanywhere-"):
 		return PlatformChatAnywhere, true
 	case strings.HasPrefix(normalized, "glm-"):
 		return PlatformGLM, true
 	case strings.HasPrefix(normalized, "qwen-"):
 		return PlatformDashScope, true
-	case strings.HasPrefix(normalized, "minimax-"):
+	case strings.HasPrefix(normalized, "minimax-"), strings.HasPrefix(normalized, "abab5"), strings.HasPrefix(normalized, "abab6"), strings.HasPrefix(normalized, "abab7"):
 		return PlatformMiniMax, true
 	case strings.HasPrefix(normalized, "doubao-"):
 		return PlatformVolcengine, true
 	case strings.HasPrefix(normalized, "sensenova-"),
 		strings.HasPrefix(normalized, "sensechat-"):
 		return PlatformSenseNova, true
+	case strings.HasPrefix(normalized, "senseaudio-"):
+		return PlatformSenseAudio, true
 	default:
 		return "", false
 	}
@@ -238,7 +246,7 @@ func isConcreteRequestPlatform(platform string) bool {
 	case PlatformAnthropic, PlatformOpenAI, PlatformGemini, PlatformAntigravity, PlatformGrok,
 		PlatformAgnes, PlatformDeepSeek, PlatformNvidia, PlatformTokenRhythm, PlatformKimi,
 		PlatformZhipu, PlatformChatAnywhere, PlatformGLM, PlatformModelScope, PlatformDashScope,
-		PlatformMiniMax, PlatformVolcengine, PlatformSenseNova:
+		PlatformMiniMax, PlatformVolcengine, PlatformSenseNova, PlatformSenseAudio, PlatformTierflow, PlatformOpenCodeGo:
 		return true
 	default:
 		return false

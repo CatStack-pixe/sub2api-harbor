@@ -270,6 +270,9 @@ import {
   PROVIDER_ZHIPU,
   PROVIDER_DEEPSEEK,
   PROVIDER_SENSENOVA,
+  PROVIDER_TIERFLOW,
+  PROVIDER_MINIMAX,
+  PROVIDER_OPENCODE_GO,
   API_MODE_CHAT_COMPLETIONS,
   API_MODE_RESPONSES,
   CHECK_MODE_PROBE,
@@ -281,6 +284,9 @@ import {
   DEFAULT_ZHIPU_ENDPOINT,
   DEFAULT_DEEPSEEK_ENDPOINT,
   DEFAULT_SENSENOVA_ENDPOINT,
+  DEFAULT_TIERFLOW_ENDPOINT,
+  DEFAULT_MINIMAX_ENDPOINT,
+  DEFAULT_OPENCODE_GO_ENDPOINT,
   DEFAULT_INTERVAL_SECONDS,
 } from '@/constants/channelMonitor'
 
@@ -476,6 +482,9 @@ const providerOptions = computed<ProviderOption[]>(() => [
   { value: PROVIDER_ZHIPU, label: t('monitorCommon.providers.zhipu') },
   { value: PROVIDER_DEEPSEEK, label: t('monitorCommon.providers.deepseek') },
   { value: PROVIDER_SENSENOVA, label: t('monitorCommon.providers.sensenova') },
+  { value: PROVIDER_TIERFLOW, label: t('monitorCommon.providers.tierflow') },
+  { value: PROVIDER_MINIMAX, label: t('monitorCommon.providers.minimax') },
+  { value: PROVIDER_OPENCODE_GO, label: t('monitorCommon.providers.opencode_go') },
 ])
 
 // 国产 provider 预填的官方 endpoint（仅探活侧；配额模式 endpoint 可留空）。
@@ -484,6 +493,9 @@ const PROVIDER_DEFAULT_ENDPOINTS: Partial<Record<Provider, string>> = {
   [PROVIDER_ZHIPU]: DEFAULT_ZHIPU_ENDPOINT,
   [PROVIDER_DEEPSEEK]: DEFAULT_DEEPSEEK_ENDPOINT,
   [PROVIDER_SENSENOVA]: DEFAULT_SENSENOVA_ENDPOINT,
+  [PROVIDER_TIERFLOW]: DEFAULT_TIERFLOW_ENDPOINT,
+  [PROVIDER_MINIMAX]: DEFAULT_MINIMAX_ENDPOINT,
+  [PROVIDER_OPENCODE_GO]: DEFAULT_OPENCODE_GO_ENDPOINT,
 }
 
 interface CheckModeOption {

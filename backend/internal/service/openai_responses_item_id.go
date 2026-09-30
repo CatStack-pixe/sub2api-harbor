@@ -69,14 +69,14 @@ func sanitizeOpenAIResponsesInputItemIDs(body []byte) ([]byte, bool, error) {
 	}
 
 	type inputItem struct {
-		body        []byte
+		raw         string
 		stripID     bool
 		stripCallID bool
 	}
 
 	items := make([]inputItem, 0)
 	input.ForEach(func(_, item gjson.Result) bool {
-		parsed := inputItem{body: []byte(item.Raw)}
+		parsed := inputItem{raw: item.Raw}
 		if item.IsObject() {
 			itemType := item.Get("type")
 			id := item.Get("id")
@@ -100,9 +100,13 @@ func sanitizeOpenAIResponsesInputItemIDs(body []byte) ([]byte, bool, error) {
 		return body, false, nil
 	}
 
-	rebuiltItems := make([][]byte, 0, len(items))
+	rebuiltItems := make([]string, 0, len(items))
 	for index, item := range items {
-		itemBody := item.body
+		if !item.stripID && !item.stripCallID {
+			rebuiltItems = append(rebuiltItems, item.raw)
+			continue
+		}
+		itemBody := []byte(item.raw)
 		if item.stripID {
 			var err error
 			itemBody, err = sjson.DeleteBytes(itemBody, "id")
@@ -117,7 +121,7 @@ func sanitizeOpenAIResponsesInputItemIDs(body []byte) ([]byte, bool, error) {
 				return nil, false, fmt.Errorf("delete input.%d.call_id: %w", index, err)
 			}
 		}
-		rebuiltItems = append(rebuiltItems, itemBody)
+		rebuiltItems = append(rebuiltItems, string(itemBody))
 	}
 
 	rebuiltInput := make([]byte, 0, len(input.Raw))

@@ -1239,6 +1239,7 @@ func normalizeOpenAIModelForUpstream(account *Account, model string) string {
 	// aliases usable while ensuring the provider never receives the retired
 	// undated IDs (which are rejected as model-closed by the upstream).
 	if account.Platform == PlatformDeepseek {
+		model = normalizeClaudeCodeLongContextModel(model)
 		switch strings.ToLower(model) {
 		case "deepseek-v4-flash":
 			return "deepseek-v4-flash-0731"

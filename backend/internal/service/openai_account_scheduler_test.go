@@ -70,6 +70,17 @@ func TestAccountRequestCompatibilityBlocksTokenRhythmWithoutFreshBalance(t *test
 	require.Equal(t, "tokenrhythm_balance_unavailable", reason)
 }
 
+func TestAccountRequestCompatibilityBlocksTierflowWithoutFreshBalance(t *testing.T) {
+	scheduler := &defaultOpenAIAccountScheduler{service: &OpenAIGatewayService{}}
+	account := &Account{
+		ID: 2, Platform: PlatformTierflow, Type: AccountTypeAPIKey, Schedulable: true,
+		Extra: map[string]any{UpstreamBillingProbeEnabledExtraKey: true},
+	}
+	compatible, reason := scheduler.isAccountRequestCompatibleReason(context.Background(), account, OpenAIAccountScheduleRequest{})
+	require.False(t, compatible)
+	require.Equal(t, "tierflow_balance_unavailable", reason)
+}
+
 func (r schedulerTestOpenAIAccountRepo) GetByID(ctx context.Context, id int64) (*Account, error) {
 	for i := range r.accounts {
 		if r.accounts[i].ID == id {

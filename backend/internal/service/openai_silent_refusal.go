@@ -286,6 +286,8 @@ func newOpenAIResponsesEmptyCompletedFailoverError(c *gin.Context, account *Acco
 
 	setOpsUpstreamError(c, http.StatusBadGateway, openAIResponsesEmptyCompletedMessage, "")
 	appendOpsUpstreamError(c, OpsUpstreamErrorEvent{
+		ProxyID:            opsUpstreamProxyID(account),
+		ProxyName:          opsUpstreamProxyName(account),
 		Platform:           platform,
 		AccountID:          accountID,
 		AccountName:        accountName,

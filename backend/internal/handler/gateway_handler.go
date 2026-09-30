@@ -821,10 +821,15 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 					h.handleStreamingAwareError(c, http.StatusServiceUnavailable, "api_error", profitVetoExhaustedMessage, streamStarted)
 					return
 				}
+				// 尝试被否决（从未转发），立即释放该账号的会话注册
+				h.gatewayService.ReleaseAccountSession(context.Background(), account, sessionKey)
+				delete(sessionSlotAccounts, account.ID)
 				continue
 			}
 			account = latest
 			selection.Account = latest
+			// 记录本请求注册过会话槽的账号（profit 准入后账号已定）
+			sessionSlotAccounts[account.ID] = account
 			// 等待路径保持既有 eager 绑定（无门时 helper 直接绑定）；调度器已
 			// 抢槽的直达路径无门时由选号内部绑定，这里只在门下补准入后绑定。
 			if selection.ProfitGateActive() || !selection.Acquired {
@@ -1101,6 +1106,8 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 				// 不会走到这里重复计费。
 				if result != nil {
 					submitForwardUsage(result)
+					// 上游已接受并计量本次会话（流中断），会话槽保持既有语义
+					upstreamServedSession = true
 				}
 				return
 			}
@@ -1126,6 +1133,8 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 			}
 
 			submitForwardUsage(result)
+			// 转发成功，会话槽保持既有空闲超时语义
+			upstreamServedSession = true
 			return
 		}
 		if !retryWithFallback {
@@ -1166,6 +1175,14 @@ func (h *GatewayHandler) Models(c *gin.Context) {
 			writeCustomModelsList(c, service.PlatformComposite, availableModels)
 			return
 		}
+		if apiKey != nil && apiKey.Group != nil && apiKey.Group.ModelAllowlistEnabled() {
+			source := availableModels
+			if len(source) == 0 {
+				source = defaultModelIDsForPlatform(service.PlatformComposite)
+			}
+			writeAllowlistedModelsList(c, service.PlatformComposite, filterAPIKeyModels(apiKey, apiKey.Group.ModelAllowlist.FilterForListing(source)))
+			return
+		}
 		availableModels = filterAPIKeyModels(apiKey, availableModels)
 		if len(availableModels) > 0 {
 			writeModelsList(c, service.PlatformComposite, availableModels)
@@ -1191,6 +1208,11 @@ func (h *GatewayHandler) Models(c *gin.Context) {
 		availableModels = filterModelsByCustomList(customModelsListSource(platform, availableModels, fallbackModels), fallbackModels, apiKey.Group.ModelsListConfig.Models)
 		availableModels = filterAPIKeyModels(apiKey, availableModels)
 		writeCustomModelsList(c, platform, availableModels)
+		return
+	}
+	if apiKey != nil && apiKey.Group != nil && apiKey.Group.ModelAllowlistEnabled() {
+		source := modelListingSource(platform, availableModels, defaultModelIDsForPlatform(platform))
+		writeAllowlistedModelsList(c, platform, filterAPIKeyModels(apiKey, apiKey.Group.ModelAllowlist.FilterForListing(source)))
 		return
 	}
 
@@ -1219,12 +1241,12 @@ func (h *GatewayHandler) Models(c *gin.Context) {
 }
 
 func filterAPIKeyModels(apiKey *service.APIKey, modelIDs []string) []string {
-	if apiKey == nil || len(apiKey.ModelWhitelist) == 0 {
+	if apiKey == nil {
 		return modelIDs
 	}
 	filtered := make([]string, 0, len(modelIDs))
 	for _, modelID := range modelIDs {
-		if apiKey.AllowsModel(modelID) {
+		if apiKey.AllowsModel(modelID) && (apiKey.Group == nil || apiKey.Group.ModelAllowlist.Allows(modelID)) {
 			filtered = append(filtered, modelID)
 		}
 	}
@@ -1261,7 +1283,7 @@ func (h *GatewayHandler) CodexModels(c *gin.Context) {
 		forcedPlatform = strings.TrimSpace(value)
 	}
 	modelIDs := h.codexModelIDsForGroup(c.Request.Context(), apiKey.Group, forcedPlatform)
-	modelIDs = service.FilterCodexModelIDsForGroup(modelIDs, apiKey.Group)
+	modelIDs = filterAPIKeyModels(apiKey, service.FilterCodexModelIDsForGroup(modelIDs, apiKey.Group))
 	body, err := h.gatewayService.BuildCodexModelsManifestForGroup(
 		c.Request.Context(),
 		apiKey.Group,
@@ -1283,6 +1305,14 @@ func (h *GatewayHandler) CodexModels(c *gin.Context) {
 }
 
 func (h *GatewayHandler) codexModelIDsForGroup(ctx context.Context, group *service.Group, platformOverride string) []string {
+	models := h.forkCodexModelIDsForGroup(ctx, group, platformOverride)
+	if group != nil && group.ModelAllowlistEnabled() {
+		return group.ModelAllowlist.FilterForListing(models)
+	}
+	return models
+}
+
+func (h *GatewayHandler) forkCodexModelIDsForGroup(ctx context.Context, group *service.Group, platformOverride string) []string {
 	if h == nil || h.gatewayService == nil || group == nil {
 		return nil
 	}
@@ -1330,12 +1360,12 @@ func (h *GatewayHandler) compositeAvailableModels(ctx context.Context, groupID *
 		service.PlatformAntigravity, service.PlatformGrok, service.PlatformAgnes, service.PlatformDeepSeek,
 		service.PlatformNvidia, service.PlatformTokenRhythm, service.PlatformKimi, service.PlatformZhipu,
 		service.PlatformChatAnywhere, service.PlatformGLM, service.PlatformModelScope, service.PlatformDashScope,
-		service.PlatformMiniMax, service.PlatformVolcengine, service.PlatformSenseNova} {
+		service.PlatformMiniMax, service.PlatformVolcengine, service.PlatformSenseNova, service.PlatformSenseAudio, service.PlatformTierflow, service.PlatformOpenCodeGo} {
 		platformModels := h.gatewayService.GetAvailableModelsForExactPlatform(ctx, groupID, platform)
 		if len(platformModels) == 0 {
 			// CN 供应商没有静态默认模型列表（defaultModelIDsForPlatform 的
 			// default 分支是 Claude 列表），composite 下只暴露账号映射键。
-			if _, ok := schedulablePlatforms[platform]; ok && !service.IsCNProvider(platform) {
+			if _, ok := schedulablePlatforms[platform]; ok && !service.IsMultiProtocolAPIKeyProvider(platform) {
 				platformModels = defaultModelIDsForPlatform(platform)
 			}
 		}
@@ -1547,7 +1577,9 @@ func customModelsListAllowsModel(availablePatterns []string, model string) bool 
 func defaultCodexModelIDsForPlatform(platform string) []string {
 	switch platform {
 	case service.PlatformDeepseek:
-		return []string{"deepseek-v4-pro", "deepseek-v4-flash"}
+		return []string{"deepseek-v4-pro", "deepseek-v4-flash", "deepseek-flash"}
+	case service.PlatformMiniMax:
+		return []string{"MiniMax-M3", "MiniMax-M2.7", "MiniMax-M2.5"}
 	default:
 		return defaultModelIDsForPlatform(platform)
 	}
@@ -1600,6 +1632,12 @@ func defaultModelIDsForPlatform(platform string) []string {
 		return service.VolcengineDefaultModelIDs()
 	case service.PlatformSenseNova:
 		return service.SenseNovaDefaultModelIDs()
+	case service.PlatformSenseAudio:
+		return nil // The account-specific /v1/models catalog is authoritative.
+	case service.PlatformTierflow:
+		return nil // Use synced account mappings instead of an invented relay catalog.
+	case service.PlatformOpenCodeGo:
+		return service.DefaultOpenCodeGoModelIDs()
 	case service.PlatformComposite:
 		ids := make([]string, 0)
 		seen := make(map[string]struct{})
@@ -1607,7 +1645,7 @@ func defaultModelIDsForPlatform(platform string) []string {
 			service.PlatformAntigravity, service.PlatformGrok, service.PlatformAgnes, service.PlatformDeepSeek,
 			service.PlatformNvidia, service.PlatformTokenRhythm, service.PlatformKimi, service.PlatformZhipu,
 			service.PlatformChatAnywhere, service.PlatformGLM, service.PlatformModelScope, service.PlatformDashScope,
-			service.PlatformMiniMax, service.PlatformVolcengine, service.PlatformSenseNova} {
+			service.PlatformMiniMax, service.PlatformVolcengine, service.PlatformSenseNova, service.PlatformSenseAudio, service.PlatformTierflow, service.PlatformOpenCodeGo} {
 			for _, id := range defaultModelIDsForPlatform(concretePlatform) {
 				if _, ok := seen[id]; ok {
 					continue
@@ -1653,7 +1691,7 @@ func (h *GatewayHandler) AntigravityModels(c *gin.Context) {
 	if apiKey, ok := middleware2.GetAPIKeyFromContext(c); ok {
 		filtered := make([]antigravity.ClaudeModel, 0, len(models))
 		for _, model := range models {
-			if apiKey.AllowsModel(model.ID) {
+			if apiKey.AllowsModel(model.ID) && (apiKey.Group == nil || apiKey.Group.ModelAllowlist.Allows(model.ID)) {
 				filtered = append(filtered, model)
 			}
 		}
@@ -2728,4 +2766,78 @@ func (h *GatewayHandler) getUserMsgQueueMode(account *service.Account, parsed *s
 		mode = h.cfg.Gateway.UserMessageQueue.GetEffectiveMode()
 	}
 	return mode
+}
+
+func writeCustomModelsList(c *gin.Context, platform string, modelIDs []string) {
+	if platform == service.PlatformOpenAI {
+		writeOpenAIModelsList(c, modelIDs)
+		return
+	}
+	writeModelsList(c, platform, modelIDs)
+}
+
+func customModelsListSource(platform string, availableModels, fallbackModels []string) []string {
+	if platform == service.PlatformAnthropic && len(availableModels) > 0 {
+		return mergeModelIDs(availableModels, fallbackModels)
+	}
+	return availableModels
+}
+
+func filterModelsByCustomList(availableModels, fallbackModels, selectedModels []string) []string {
+	if len(selectedModels) == 0 {
+		return availableModels
+	}
+	source := availableModels
+	if len(source) == 0 {
+		source = fallbackModels
+	}
+	if len(source) == 0 {
+		return nil
+	}
+
+	allowed := make([]string, 0, len(source))
+	for _, model := range source {
+		model = strings.TrimSpace(model)
+		if model != "" {
+			allowed = append(allowed, model)
+		}
+	}
+
+	seen := make(map[string]struct{}, len(selectedModels))
+	filtered := make([]string, 0, len(selectedModels))
+	for _, model := range selectedModels {
+		model = strings.TrimSpace(model)
+		if model == "" {
+			continue
+		}
+		if !customModelsListAllowsModel(allowed, model) {
+			continue
+		}
+		if _, ok := seen[model]; ok {
+			continue
+		}
+		seen[model] = struct{}{}
+		filtered = append(filtered, model)
+	}
+	return filtered
+}
+
+func customModelsListAllowsModel(availablePatterns []string, model string) bool {
+	for _, pattern := range availablePatterns {
+		if pattern == model {
+			return true
+		}
+		if strings.HasSuffix(pattern, "*") && strings.HasPrefix(model, strings.TrimSuffix(pattern, "*")) {
+			return true
+		}
+	}
+	normalizedClaudeModel := claude.NormalizeModelID(strings.TrimSuffix(model, "-thinking"))
+	if normalizedClaudeModel != model {
+		for _, pattern := range availablePatterns {
+			if pattern == normalizedClaudeModel {
+				return true
+			}
+		}
+	}
+	return false
 }

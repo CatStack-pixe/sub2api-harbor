@@ -238,6 +238,7 @@ func NewResponsesEventToAnthropicState() *ResponsesEventToAnthropicState {
 		OutputIndexToBlockIdx: make(map[int]int),
 		toolBlocksByOutput:    make(map[int]*responsesAnthropicToolBlockState),
 		toolOutputByCallID:    make(map[string]int),
+		textByPart:            make(map[responsesTextPart]*strings.Builder),
 		Created:               time.Now().Unix(),
 	}
 }
@@ -253,18 +254,18 @@ func ResponsesEventToAnthropicEvents(
 		return resToAnthHandleCreated(evt, state)
 	case "response.output_item.added":
 		return resToAnthHandleOutputItemAdded(evt, state)
-	case "response.output_text.delta":
-		return resToAnthHandleTextDelta(evt, state)
-	case "response.output_text.done":
-		return resToAnthHandleBlockDone(evt, state)
+	case "response.output_text.delta", "response.output_text.done":
+		return resToAnthHandleTextEvent(evt, state)
 	case "response.function_call_arguments.delta",
 		// custom/freeform 工具的输入增量与 function_call 参数增量同形。
 		"response.custom_tool_call_input.delta":
 		return resToAnthHandleFuncArgsDelta(evt, state)
 	case "response.function_call_arguments.done", "response.custom_tool_call_input.done":
-		return resToAnthHandleFuncArgsDone(evt, state)
+		events := resToAnthHandleFuncArgsDone(evt, state)
+		return append(events, resToAnthFlushPendingText(state)...)
 	case "response.output_item.done":
-		return resToAnthHandleOutputItemDone(evt, state)
+		events := resToAnthHandleOutputItemDone(evt, state)
+		return append(events, resToAnthFlushPendingText(state)...)
 	case "response.reasoning_summary_text.delta",
 		// 原始推理文本增量，与 reasoning summary 一样映射为 thinking。
 		"response.reasoning_text.delta":
@@ -292,6 +293,8 @@ func FinalizeResponsesAnthropicStream(state *ResponsesEventToAnthropicState) []A
 
 	var events []AnthropicStreamEvent
 	events = append(events, closeAllOpenBlocks(state)...)
+	events = append(events, resToAnthFlushPendingText(state)...)
+	events = append(events, closeCurrentNonToolBlock(state)...)
 
 	stopReason := "end_turn"
 	if state.HasToolCall {
@@ -439,6 +442,45 @@ func resToAnthHandleOutputItemAdded(evt *ResponsesStreamEvent, state *ResponsesE
 	return nil
 }
 
+func resToAnthHandleTextEvent(evt *ResponsesStreamEvent, state *ResponsesEventToAnthropicState) []AnthropicStreamEvent {
+	if state.MessageStopSent {
+		return nil
+	}
+	if state.hasOpenToolBlocks() {
+		state.pendingTextEvents = append(state.pendingTextEvents, *evt)
+		return nil
+	}
+	if evt.Type == "response.output_text.done" {
+		return resToAnthHandleTextDone(evt, state)
+	}
+	return resToAnthHandleTextDelta(evt, state)
+}
+
+func (state *ResponsesEventToAnthropicState) hasOpenToolBlocks() bool {
+	if state.ContentBlockOpen && state.CurrentBlockType == "tool_use" {
+		return true
+	}
+	for _, tool := range state.toolBlocksByOutput {
+		if tool != nil && tool.Open && !tool.StopSent {
+			return true
+		}
+	}
+	return false
+}
+
+func resToAnthFlushPendingText(state *ResponsesEventToAnthropicState) []AnthropicStreamEvent {
+	if len(state.pendingTextEvents) == 0 || state.hasOpenToolBlocks() {
+		return nil
+	}
+	pending := state.pendingTextEvents
+	state.pendingTextEvents = nil
+	var events []AnthropicStreamEvent
+	for i := range pending {
+		events = append(events, resToAnthHandleTextEvent(&pending[i], state)...)
+	}
+	return events
+}
+
 func resToAnthHandleTextDelta(evt *ResponsesStreamEvent, state *ResponsesEventToAnthropicState) []AnthropicStreamEvent {
 	return resToAnthEmitText(evt.Delta, resToAnthTextPartOf(evt), state)
 }
@@ -461,10 +503,10 @@ func resToAnthEmitText(text string, part responsesTextPart, state *ResponsesEven
 		events = append(events, closeCurrentNonToolBlock(state)...)
 
 		idx := allocateAnthropicContentBlockIndex(state)
-		state.OutputIndexToBlockIdx[evt.OutputIndex] = idx
+		state.OutputIndexToBlockIdx[part.OutputIndex] = idx
 		state.ContentBlockOpen = true
 		state.CurrentBlockIndex = idx
-		state.CurrentOutputIndex = evt.OutputIndex
+		state.CurrentOutputIndex = part.OutputIndex
 		state.CurrentBlockType = "text"
 
 		events = append(events, AnthropicStreamEvent{
@@ -476,6 +518,14 @@ func resToAnthEmitText(text string, part responsesTextPart, state *ResponsesEven
 			},
 		})
 	}
+
+	delivered, ok := state.textByPart[part]
+	if !ok {
+		delivered = &strings.Builder{}
+		state.textByPart[part] = delivered
+	}
+	_, _ = delivered.WriteString(text)
+	state.textDelivered = true
 
 	idx := state.CurrentBlockIndex
 	events = append(events, AnthropicStreamEvent{
@@ -745,6 +795,9 @@ func resToAnthHandleCompleted(evt *ResponsesStreamEvent, state *ResponsesEventTo
 
 	var events []AnthropicStreamEvent
 	events = append(events, closeAllOpenBlocks(state)...)
+	events = append(events, resToAnthFlushPendingText(state)...)
+	events = append(events, closeCurrentNonToolBlock(state)...)
+	events = append(events, resToAnthRecoverTerminalText(evt, state)...)
 
 	stopReason := "end_turn"
 	if evt.Usage != nil {

@@ -102,6 +102,7 @@ type RelayTraceEvent struct {
 type relayState struct {
 	usage                   Usage
 	turnUsage               Usage
+	turnWroteDownstream     atomic.Bool
 	requestModelMu          sync.RWMutex
 	requestModel            string
 	pendingTurnStart        atomic.Pointer[time.Time]
@@ -204,7 +205,8 @@ func Relay(
 		return upstreamConn.WriteFrame(writeCtx, msgType, payload)
 	}
 	writeClientFrameUpstream := func(msgType coderws.MessageType, payload []byte) error {
-		if isClientResponseCreateFrame(msgType, payload) {
+		isResponseCreate := isClientResponseCreateFrame(msgType, payload)
+		if isResponseCreate {
 			state.setRequestModel(strings.TrimSpace(gjson.GetBytes(payload, "model").String()))
 			turnStartedAt := time.Time{}
 			if options.TakeNextTurnStartedAt != nil {
@@ -214,6 +216,10 @@ func Relay(
 				turnStartedAt = nowFn()
 			}
 			state.setPendingTurnStartedAt(turnStartedAt)
+			// The policy-enforcing client connection has accepted this turn.
+			// Reset before the write so an immediate upstream response cannot race
+			// with the transport returning from WriteFrame.
+			state.turnWroteDownstream.Store(false)
 		}
 		err := writeUpstream(msgType, payload)
 		if err != nil && isResponseCreate {
@@ -542,8 +548,9 @@ func runUpstreamToClient(
 			graceful := isDisconnectError(err)
 			// A clean WebSocket close only describes the transport handshake. Once
 			// the upstream has started a Responses turn, success still requires a
-			// terminal protocol event.
-			if graceful && openAIWSRelayActiveTurnID(state) != "" {
+			// terminal protocol event. Treat an early 1000/EOF as a relay failure so
+			// the adapter does not report relay_completed with an active turn.
+			if graceful && state.hasUnfinishedTurn() {
 				graceful = false
 				err = errors.New("upstream websocket closed before terminal event: " + err.Error())
 			}
@@ -1012,6 +1019,13 @@ func (s *relayState) consumePendingTurnStartedAt() time.Time {
 		return time.Time{}
 	}
 	return *startedAt
+}
+
+func (s *relayState) hasUnfinishedTurn() bool {
+	if s == nil {
+		return false
+	}
+	return s.pendingTurnStart.Load() != nil || s.activeTurn != nil
 }
 
 func openAIWSRelayDeleteTurnTiming(state *relayState, responseID string) (relayTurnTiming, bool) {

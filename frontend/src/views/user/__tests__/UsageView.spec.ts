@@ -233,6 +233,93 @@ describe('user UsageView', () => {
     expect(getAvailable).toHaveBeenCalled()
   })
 
+  it('includes API keys after the first page in both record filters and queries by the selected key', async () => {
+    const firstPageKeys = Array.from({ length: 100 }, (_, index) => ({
+      id: index + 1,
+      name: `key-${index + 1}`,
+    }))
+    const laterKey = { id: 101, name: 'key-from-second-page' }
+    list
+      .mockResolvedValueOnce({ items: firstPageKeys, total: 101, page: 1, page_size: 100, pages: 2 })
+      .mockResolvedValueOnce({ items: [laterKey], total: 101, page: 2, page_size: 100, pages: 2 })
+
+    const wrapper = mountUsageView()
+    await flushPromises()
+
+    expect(list.mock.calls).toEqual([[1, 100], [2, 100]])
+    const usageKeySelect = wrapper.findAllComponents(Select).find((select) =>
+      select.props('options').some((option: SelectOption) => option.label === 'All API Keys')
+    )!
+    expect(usageKeySelect.props('options')).toHaveLength(102)
+    expect(usageKeySelect.props('options')).toContainEqual({ value: laterKey.id, label: laterKey.name })
+
+    query.mockClear()
+    usageKeySelect.vm.$emit('update:modelValue', laterKey.id)
+    usageKeySelect.vm.$emit('change', laterKey.id)
+    await flushPromises()
+
+    expect(query).toHaveBeenCalledWith(
+      expect.objectContaining({ api_key_id: laterKey.id, page: 1 }),
+      expect.anything()
+    )
+
+    await wrapper.findAll('button').find((button) => button.text() === 'Error records')!.trigger('click')
+    await flushPromises()
+
+    const errorKeySelect = wrapper.findAllComponents(Select).find((select) =>
+      select.props('options').some((option: SelectOption) => option.label === 'All API Keys')
+    )!
+    expect(errorKeySelect.props('options')).toHaveLength(102)
+    expect(errorKeySelect.props('options')).toContainEqual({ value: laterKey.id, label: laterKey.name })
+
+    listMyErrorRequests.mockClear()
+    errorKeySelect.vm.$emit('update:modelValue', laterKey.id)
+    errorKeySelect.vm.$emit('change', laterKey.id)
+    await flushPromises()
+
+    expect(listMyErrorRequests).toHaveBeenCalledWith(
+      expect.objectContaining({ api_key_id: laterKey.id, page: 1 })
+    )
+    expect(list).toHaveBeenCalledTimes(2)
+    wrapper.unmount()
+  })
+
+  it('does not request another API key page when the user has no keys', async () => {
+    list.mockResolvedValue({ items: [], total: 0, page: 1, page_size: 100, pages: 0 })
+
+    const wrapper = mountUsageView()
+    await flushPromises()
+
+    expect(list.mock.calls).toEqual([[1, 100]])
+    const keySelect = wrapper.findAllComponents(Select).find((select) =>
+      select.props('options').some((option: SelectOption) => option.label === 'All API Keys')
+    )!
+    expect(keySelect.props('options')).toEqual([{ value: null, label: 'All API Keys' }])
+    expect(getAvailable).toHaveBeenCalled()
+    wrapper.unmount()
+  })
+
+  it('stops loading API keys when a later page is empty despite an outdated page count', async () => {
+    const firstPageKeys = Array.from({ length: 100 }, (_, index) => ({
+      id: index + 1,
+      name: `key-${index + 1}`,
+    }))
+    list
+      .mockResolvedValueOnce({ items: firstPageKeys, total: 201, page: 1, page_size: 100, pages: 3 })
+      .mockResolvedValueOnce({ items: [], total: 201, page: 2, page_size: 100, pages: 3 })
+
+    const wrapper = mountUsageView()
+    await flushPromises()
+
+    expect(list.mock.calls).toEqual([[1, 100], [2, 100]])
+    const keySelect = wrapper.findAllComponents(Select).find((select) =>
+      select.props('options').some((option: SelectOption) => option.label === 'All API Keys')
+    )!
+    expect(keySelect.props('options')).toHaveLength(101)
+    expect(keySelect.props('options')).toContainEqual({ value: 100, label: 'key-100' })
+    wrapper.unmount()
+  })
+
   it('propagates and resets the native compaction filter across page requests', async () => {
     const wrapper = mountUsageView()
     await flushPromises()

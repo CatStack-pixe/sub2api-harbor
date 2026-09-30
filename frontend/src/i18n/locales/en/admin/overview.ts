@@ -847,6 +847,14 @@ export default {
 
     // Groups
     groups: {
+      globalPrompt: {
+        title: 'Group global prompt',
+        enabled: 'Enabled',
+        disabled: 'Disabled',
+        hint: 'Apply this additional prompt to requests in this group.',
+        placeholder: 'Enter the group prompt',
+        tooLong: 'The global prompt must be at most {max} UTF-8 bytes.'
+      },
       title: 'Group Management',
       description: 'Manage API key groups and rate multipliers',
       searchGroups: 'Search groups...',
@@ -929,9 +937,13 @@ export default {
         rpmLimitHint: 'Max requests per minute for each user in this group; 0 = unlimited. Once set, it takes over per-user rate limiting in this group (overrides the user-level rpm_limit fallback).',
         maxReasoningEffort: 'Max reasoning effort',
         maxReasoningEffortUnlimited: 'Unlimited (follow request)',
-        maxReasoningEffortHint: 'Limits explicit OpenAI reasoning effort requests only. For Composite groups, it applies only to requests resolved to OpenAI. Higher values are capped; omitted effort stays omitted. The ceiling takes precedence over reasoning effort mappings.',
+        maxReasoningEffortHint: 'Limits explicit Anthropic and OpenAI reasoning effort requests. For Composite groups, it applies to the resolved target platform. Omitted effort stays omitted. The ceiling takes precedence over reasoning effort mappings.',
+        maxReasoningEffortOverLimit: 'Over-limit access control',
+        maxReasoningEffortOverLimitDowngrade: 'Automatically downgrade when over limit',
+        maxReasoningEffortOverLimitDeny: 'Deny access',
+        maxReasoningEffortOverLimitHint: 'Applies after a ceiling is set. Downgrade rewrites values above the ceiling to the ceiling. Deny rejects the request.',
         reasoningEffortMappings: 'Reasoning effort mappings',
-        reasoningEffortMappingsHint: 'Type and model can both be left empty to match every model. One type and model can hold multiple request mappings, for example prefix gpt mapping both high and xhigh to medium. Exact matches beat affixes, and longer affixes beat shorter ones.',
+        reasoningEffortMappingsHint: 'Type and model can both be left empty to match every model. One type and model can hold multiple request mappings, for example prefix gpt mapping both high and xhigh to medium. Choose Deny as the forwarded value to reject that request value. Exact matches beat affixes, and longer affixes beat shorter ones.',
         addReasoningEffortMapping: 'Add mapping',
         addReasoningEffortPair: 'Add request value',
         removeReasoningEffortMapping: 'Remove mapping',
@@ -1041,6 +1053,8 @@ export default {
         kimi: 'Kimi',
         nvidia: 'NVIDIA',
         tokenrhythm: 'TokenRhythm',
+        tierflow: 'Tierflow',
+        senseaudio: 'SenseAudio',
         chatanywhere: 'ChatAnywhere',
         glm: 'GLM',
         zhipu: 'Zhipu GLM',
@@ -1049,6 +1063,7 @@ export default {
         minimax: 'MiniMax',
         volcengine: 'Volcengine Ark',
         sensenova: 'SenseNova',
+        opencode_go: 'OpenCode',
         composite: 'Composite',
       },
       deleteConfirm:
@@ -1160,6 +1175,37 @@ export default {
         emptySelectionError: 'The model allowlist is enabled; select or add at least one model entry',
         errors: {
           empty: 'Please enter a model entry',
+          duplicate: 'This entry already exists'
+        }
+      },
+      codexModelsManifest: {
+        title: 'Pinned Accounts for Model Lists',
+        hint: 'When enabled, ordinary model lists and Codex Model Manifest are discovered from the pinned accounts first, then merged and filtered using account mappings and the group model list. Rate-limited or overloaded pinned accounts are still used.',
+        enable: 'Fetch model lists with specific accounts',
+        enabledHint: 'Accounts are limited to OpenAI accounts bound to this group, at most 10.',
+        disabledHint: 'Disabled: ordinary lists use local mappings or defaults; Codex uses a local catalog when configured, otherwise scheduler discovery.',
+        accounts: 'Pinned accounts',
+        searchPlaceholder: 'Search accounts (OpenAI accounts in this group)',
+        searchEmpty: 'No matching accounts',
+        fallback: 'Fall back to the scheduler when all pinned accounts are unavailable',
+        fallbackHint: 'Off: return 503 / the upstream error. On: fall back to the existing scheduler path.',
+        selectAtLeastOne: 'Select at least one account after enabling pinned accounts'
+      },
+      modelAllowlist: {
+        title: 'Model Allowlist',
+        hint: 'When enabled, models outside the allowlist are rejected with 404 model_not_found, and model listing endpoints only show allowlisted models. Entries support exact model IDs and trailing * wildcards. Note: Claude Code probes with haiku-family models for titles/summaries and /messages/count_tokens is also allowlist-controlled, so make sure the small models you need are selected too.',
+        loading: 'Loading candidate models...',
+        empty: 'No candidate models; add custom entries below',
+        selectedSummary: 'Selected {selected} / {total}',
+        selectAll: 'Select all',
+        invertSelection: 'Invert',
+        wildcardTag: 'wildcard',
+        customPlaceholder: 'Custom entry, e.g. claude-* or gpt-5.5-codex',
+        addCustom: 'Add',
+        emptySelectionError: 'The model allowlist is enabled; select or add at least one model entry',
+        errors: {
+          empty: 'Please enter a model entry',
+          invalidWildcard: 'Wildcard * is only allowed at the end of an entry',
           duplicate: 'This entry already exists'
         }
       },

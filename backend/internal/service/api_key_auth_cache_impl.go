@@ -14,7 +14,7 @@ import (
 	"github.com/dgraph-io/ristretto"
 )
 
-const apiKeyAuthSnapshotVersion = 23 // v23: preserve group global prompt, Fast, and reasoning policy fields
+const apiKeyAuthSnapshotVersion = 25 // v25: preserve independent fork model listings, mappings and upstream allowlist
 
 type apiKeyAuthCacheConfig struct {
 	l1Size        int

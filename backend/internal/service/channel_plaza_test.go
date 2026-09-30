@@ -15,7 +15,7 @@ func newPlazaChannelService(channels []Channel, groups []Group, pricing *Pricing
 	repo := &mockChannelRepository{
 		listAllFn: func(ctx context.Context) ([]Channel, error) { return channels, nil },
 	}
-	svc := NewChannelService(repo, &stubGroupRepoForAvailable{activeGroups: groups}, nil, nil)
+	svc := NewChannelService(repo, &stubGroupRepoForAvailable{activeGroups: groups}, nil, nil, nil)
 	svc.pricingService = pricing
 	return svc
 }
@@ -314,7 +314,7 @@ func TestChannelListPlazaGroups_RepoErrorsPropagate(t *testing.T) {
 	repo := &mockChannelRepository{
 		listAllFn: func(ctx context.Context) ([]Channel, error) { return nil, sentinel },
 	}
-	svc := NewChannelService(repo, &stubGroupRepoForAvailable{}, nil, nil)
+	svc := NewChannelService(repo, &stubGroupRepoForAvailable{}, nil, nil, nil)
 	out, err := svc.ListPlazaGroups(context.Background())
 	require.Nil(t, out)
 	require.ErrorIs(t, err, sentinel)
@@ -322,7 +322,7 @@ func TestChannelListPlazaGroups_RepoErrorsPropagate(t *testing.T) {
 	svc2 := NewChannelService(
 		&mockChannelRepository{listAllFn: func(ctx context.Context) ([]Channel, error) { return nil, nil }},
 		&stubGroupRepoForAvailable{listActiveErr: sentinel},
-		nil, nil,
+		nil, nil, nil,
 	)
 	out2, err2 := svc2.ListPlazaGroups(context.Background())
 	require.Nil(t, out2)

@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -19,6 +20,9 @@ const (
 	ReasoningEffortOverLimitDowngrade = "downgrade"
 	// ReasoningEffortOverLimitDeny rejects the request when the ceiling is exceeded.
 	ReasoningEffortOverLimitDeny = "deny"
+	// ReasoningEffortMappingDeny is a mapping target that rejects the request
+	// when the matching source reasoning effort is present.
+	ReasoningEffortMappingDeny = "deny"
 )
 
 var openAIReasoningEffortValues = []string{"minimal", "low", "medium", "high", "xhigh", "max"}
@@ -141,6 +145,37 @@ func (e *ReasoningEffortOverLimitError) Error() string {
 	return fmt.Sprintf("reasoning effort %q exceeds this group's limit of %q", requested, max)
 }
 
+// ReasoningEffortMappingDeniedError is returned when a group mapping target is
+// set to deny the explicit reasoning effort on the request.
+type ReasoningEffortMappingDeniedError struct {
+	Requested string
+}
+
+func (e *ReasoningEffortMappingDeniedError) Error() string {
+	if e == nil {
+		return "reasoning effort is denied by this group's mapping policy"
+	}
+	requested := strings.TrimSpace(e.Requested)
+	if requested == "" {
+		return "reasoning effort is denied by this group's mapping policy"
+	}
+	return fmt.Sprintf("reasoning effort %q is denied by this group's mapping policy", requested)
+}
+
+// IsReasoningEffortPolicyDenied reports whether err is a local reasoning-effort
+// policy rejection (ceiling deny or mapping deny).
+func IsReasoningEffortPolicyDenied(err error) bool {
+	if err == nil {
+		return false
+	}
+	var overLimit *ReasoningEffortOverLimitError
+	if errors.As(err, &overLimit) {
+		return true
+	}
+	var mappingDenied *ReasoningEffortMappingDeniedError
+	return errors.As(err, &mappingDenied)
+}
+
 // NormalizeMaxReasoningEffort validates and canonicalizes a group policy value.
 // Empty means that the group does not impose a ceiling.
 func NormalizeMaxReasoningEffort(raw string) string {
@@ -167,7 +202,12 @@ func NormalizeMaxReasoningEffort(raw string) string {
 }
 
 func reasoningEffortValuesForPlatform(platform string) []string {
-	if platform != PlatformOpenAI && platform != PlatformComposite {
+	switch platform {
+	case PlatformOpenAI, PlatformComposite:
+		return openAIReasoningEffortValues
+	case PlatformAnthropic:
+		return anthropicReasoningEffortValues
+	default:
 		return nil
 	}
 }
@@ -180,7 +220,8 @@ func normalizeMaxReasoningEffortForPlatform(platform, raw string) (string, error
 	allowedValues := reasoningEffortValuesForPlatform(platform)
 	if len(allowedValues) == 0 {
 		return "", fmt.Errorf(
-			"reasoning effort policy is only supported for platforms %q and %q",
+			"reasoning effort policy is only supported for platforms %q, %q, and %q",
+			PlatformAnthropic,
 			PlatformOpenAI,
 			PlatformComposite,
 		)
@@ -228,7 +269,8 @@ func normalizeMaxReasoningEffortOverLimitForPlatform(platform, raw string) (stri
 	}
 	if len(reasoningEffortValuesForPlatform(platform)) == 0 {
 		return "", fmt.Errorf(
-			"reasoning effort policy is only supported for platforms %q and %q",
+			"reasoning effort policy is only supported for platforms %q, %q, and %q",
+			PlatformAnthropic,
 			PlatformOpenAI,
 			PlatformComposite,
 		)
@@ -303,7 +345,7 @@ func selectReasoningEffortMapping(mappings []ReasoningEffortMapping, from, reque
 	}
 	candidates := make([]candidate, 0, len(mappings))
 	for i, mapping := range mappings {
-		if NormalizeMaxReasoningEffort(mapping.From) != from {
+		if normalizeReasoningEffortMappingSource(mapping.From) != from {
 			continue
 		}
 		model := strings.TrimSpace(mapping.Model)
@@ -355,7 +397,9 @@ func selectReasoningEffortMapping(mappings []ReasoningEffortMapping, from, reque
 }
 
 // NormalizeReasoningEffortMappings validates group mapping rules against the
-// fixed effort values supported by OpenAI routes.
+// fixed effort values supported by the selected platform. Optional model scopes are
+// canonicalized to exact/prefix/suffix match; empty type and model keep the
+// global all-models rule.
 func NormalizeReasoningEffortMappings(platform string, raw []ReasoningEffortMapping) ([]ReasoningEffortMapping, error) {
 	if len(raw) > maxReasoningEffortMappings {
 		return nil, fmt.Errorf("reasoning effort mappings cannot exceed %d entries", maxReasoningEffortMappings)
@@ -467,24 +511,24 @@ func RequestedReasoningEffortFromContext(ctx context.Context) *string {
 
 // ApplyOpenAIReasoningEffortPolicyFromContext applies a policy previously bound
 // to the request. An unbound request is returned byte-for-byte unchanged.
-func ApplyOpenAIReasoningEffortPolicyFromContext(ctx context.Context, body []byte) ([]byte, bool) {
+func ApplyOpenAIReasoningEffortPolicyFromContext(ctx context.Context, body []byte) ([]byte, bool, error) {
 	if ctx == nil {
-		return body, false
+		return body, false, nil
 	}
 	policy, ok := ctx.Value(openAIReasoningEffortPolicyContextKey{}).(openAIReasoningEffortPolicy)
 	if !ok {
-		return body, false
+		return body, false, nil
 	}
 	updated, changed, err := ApplyOpenAIReasoningEffortPolicy(body, policy.maxEffort, policy.mappings, policy.overLimit)
 	if err != nil {
-		return body, false
+		return body, false, err
 	}
-	return updated, changed
+	return updated, changed, nil
 }
 
 func mapReasoningEffort(raw string, mappings []ReasoningEffortMapping, requestModel string) (string, bool) {
 	value := strings.TrimSpace(raw)
-	canonical := NormalizeMaxReasoningEffort(value)
+	canonical := normalizeReasoningEffortMappingSource(value)
 	if canonical == "" {
 		return value, false
 	}
@@ -508,7 +552,7 @@ func sanitizeGroupReasoningEffortPolicy(group *Group) {
 	if mappingsErr != nil {
 		mappings = []ReasoningEffortMapping{}
 	}
-	if overLimit == "" || (group.Platform != PlatformOpenAI && group.Platform != PlatformComposite) {
+	if overLimit == "" || (group.Platform != PlatformAnthropic && group.Platform != PlatformOpenAI && group.Platform != PlatformComposite) {
 		overLimit = ReasoningEffortOverLimitDowngrade
 	}
 	group.MaxReasoningEffort = maxEffort
@@ -516,12 +560,14 @@ func sanitizeGroupReasoningEffortPolicy(group *Group) {
 	group.ReasoningEffortMappings = mappings
 }
 
-// ApplyOpenAIReasoningEffortPolicy applies one mapping (optionally scoped to
+// ApplyReasoningEffortPolicy applies one mapping (optionally scoped to
 // the request model by exact name, prefix, or suffix) and then either caps
 // known effort levels or rejects the request when the group is configured to
-// deny values above the ceiling. Omitted values remain untouched so upstream
-// defaults stay in control.
-func ApplyOpenAIReasoningEffortPolicy(body []byte, maxEffort string, mappings []ReasoningEffortMapping, overLimit ...string) ([]byte, bool, error) {
+// deny values above the ceiling. A mapping whose target is deny rejects the
+// request when that source value is present. Omitted values remain untouched
+// so upstream defaults stay in control. It understands both OpenAI and
+// Anthropic request field shapes.
+func ApplyReasoningEffortPolicy(body []byte, maxEffort string, mappings []ReasoningEffortMapping, overLimit ...string) ([]byte, bool, error) {
 	maxRank, hasMax := reasoningEffortRank(maxEffort)
 	if len(body) == 0 || (!hasMax && len(mappings) == 0) {
 		return body, false, nil
@@ -543,7 +589,14 @@ func ApplyOpenAIReasoningEffortPolicy(body []byte, maxEffort string, mappings []
 			continue
 		}
 
-		effective, _ := mapReasoningEffort(original, mappings, requestModel)
+		effective, mapped := mapReasoningEffort(original, mappings, requestModel)
+		if mapped && isReasoningEffortMappingDeny(effective) {
+			requested := normalizeReasoningEffortMappingSource(original)
+			if requested == "" {
+				requested = original
+			}
+			return body, false, &ReasoningEffortMappingDeniedError{Requested: requested}
+		}
 		if currentRank, recognized := reasoningEffortRank(effective); recognized {
 			effective = NormalizeMaxReasoningEffort(effective)
 			if hasMax && currentRank > maxRank {
@@ -579,4 +632,9 @@ func applyOpenAIWSReasoningEffortPolicy(payload []byte, hooks *OpenAIWSIngressHo
 		return capped, nil
 	}
 	return payload, nil
+}
+
+// ApplyOpenAIReasoningEffortPolicy is retained for OpenAI forwarding callers.
+func ApplyOpenAIReasoningEffortPolicy(body []byte, maxEffort string, mappings []ReasoningEffortMapping, overLimit ...string) ([]byte, bool, error) {
+	return ApplyReasoningEffortPolicy(body, maxEffort, mappings, overLimit...)
 }

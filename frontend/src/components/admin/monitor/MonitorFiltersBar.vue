@@ -76,6 +76,9 @@ import {
   PROVIDER_ZHIPU,
   PROVIDER_DEEPSEEK,
   PROVIDER_SENSENOVA,
+  PROVIDER_TIERFLOW,
+  PROVIDER_MINIMAX,
+  PROVIDER_OPENCODE_GO,
 } from '@/constants/channelMonitor'
 
 defineProps<{
@@ -106,6 +109,9 @@ const providerFilterOptions = computed(() => [
   { value: PROVIDER_ZHIPU, label: t('monitorCommon.providers.zhipu') },
   { value: PROVIDER_DEEPSEEK, label: t('monitorCommon.providers.deepseek') },
   { value: PROVIDER_SENSENOVA, label: t('monitorCommon.providers.sensenova') },
+  { value: PROVIDER_TIERFLOW, label: t('monitorCommon.providers.tierflow') },
+  { value: PROVIDER_MINIMAX, label: t('monitorCommon.providers.minimax') },
+  { value: PROVIDER_OPENCODE_GO, label: t('monitorCommon.providers.opencode_go') },
 ])
 
 const enabledFilterOptions = computed(() => [

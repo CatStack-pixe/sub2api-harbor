@@ -150,6 +150,7 @@ type AccountTestService struct {
 	modelMetadataRegistry     map[string]modelsDevProvider
 	modelMetadataRegistryAt   time.Time
 	pluginManager             *PluginManager
+	openaiGatewayService      *OpenAIGatewayService
 	agentIdentityTaskMu       sync.Mutex
 	agentIdentityWS           agentIdentityWSConnectionInvalidator
 	// grokWSDialer is optional; realtime account tests use the default OpenAI-style
@@ -167,6 +168,65 @@ func (s *AccountTestService) SetPluginManager(pluginManager *PluginManager) {
 	if s != nil {
 		s.pluginManager = pluginManager
 	}
+}
+
+func (s *AccountTestService) SetOpenAIGatewayService(gateway *OpenAIGatewayService) {
+	if s != nil {
+		s.openaiGatewayService = gateway
+	}
+}
+
+// FetchOpenAIAccountModels uses the shared cached discovery path for the test picker.
+// It only fills picker-only gaps (local display-name fallbacks, OAuth image choices)
+// on its own copy; the shared catalog and its cache stay untouched.
+func (s *AccountTestService) FetchOpenAIAccountModels(ctx context.Context, account *Account) ([]openai.Model, error) {
+	if s == nil || s.openaiGatewayService == nil {
+		return nil, errors.New("OpenAI model discovery service is unavailable")
+	}
+	response, err := s.openaiGatewayService.FetchOpenAIModelsList(ctx, account)
+	if err != nil {
+		return nil, err
+	}
+	var payload struct {
+		Data []openai.Model `json:"data"`
+	}
+	if err := json.Unmarshal(response.Body, &payload); err != nil {
+		return nil, fmt.Errorf("decode OpenAI account models: %w", err)
+	}
+	// Every entry in the picker is labelled by the same rule: the upstream display
+	// name when the catalog has one, otherwise the local catalog name for that model
+	// ID, otherwise the raw ID. Without this the picker mixes "GPT-5.6 Sol" with
+	// "gpt-5.6-sol" for the same catalog.
+	for i := range payload.Data {
+		model := &payload.Data[i]
+		if strings.TrimSpace(model.DisplayName) == "" {
+			model.DisplayName = openaiCodexDisplayName(model.ID)
+		}
+		if strings.TrimSpace(model.Type) == "" {
+			model.Type = "model"
+		}
+	}
+	// Codex discovery lists Responses drivers, not image_generation tool models.
+	// Add locally supported image choices only to the OAuth test picker; keep the
+	// shared upstream catalog and API-key discovery authoritative.
+	if account != nil && account.IsOpenAIOAuthLike() {
+		seen := make(map[string]bool, len(payload.Data))
+		for _, model := range payload.Data {
+			seen[model.ID] = true
+		}
+		for _, model := range openai.DefaultModels {
+			if IsGPTImageGenerationModel(model.ID) && account.IsModelSupported(model.ID) && !seen[model.ID] {
+				payload.Data = append(payload.Data, model)
+				seen[model.ID] = true
+			}
+		}
+		for model := range account.GetModelMapping() {
+			if IsGPTImageGenerationModel(model) && !strings.Contains(model, "*") && !seen[model] {
+				payload.Data = append(payload.Data, openai.Model{ID: model, Object: "model", Type: "model", OwnedBy: "openai", DisplayName: openaiCodexDisplayName(model)})
+			}
+		}
+	}
+	return payload.Data, nil
 }
 
 // NewAccountTestService creates a new AccountTestService
@@ -324,6 +384,10 @@ func (s *AccountTestService) TestAccountConnection(c *gin.Context, accountID int
 		return s.testChatAnywhereAccountConnection(c, account, modelID, prompt)
 	}
 
+	if account.IsTierflow() {
+		return s.testTierflowAccountConnection(c, account, modelID, prompt)
+	}
+
 	if account.IsOpenAI() || account.IsAgnes() || account.IsGLM() ||
 		(account.IsDeepSeek() && account.GetAPIProtocol() == APIProtocolResponses) {
 		return s.testOpenAIAccountConnection(c, account, modelID, prompt, normalizeAccountTestMode(mode))
@@ -346,6 +410,49 @@ func (s *AccountTestService) TestAccountConnection(c *gin.Context, accountID int
 	}
 
 	return s.testClaudeAccountConnection(c, account, modelID)
+}
+
+// testOpenCodeGoAccountConnection probes the native endpoint for the selected
+// model. Adaptive accounts (the default) follow OpenCodeGoModelProtocol:
+// grok/gpt/muse-spark → Responses, minimax/qwen → Anthropic, everything else
+// (including deepseek-v4-flash) → Chat Completions. A pinned api_protocol
+// overrides that catalog. Falling through to the generic Claude tester used
+// credentials.base_url + /v1/messages?beta=true, which 404s as HTML on
+// https://opencode.ai/zen/go/v1/v1/messages.
+func (s *AccountTestService) testOpenCodeGoAccountConnection(c *gin.Context, account *Account, modelID string, prompt string) error {
+	testModelID := strings.TrimSpace(modelID)
+	if testModelID == "" {
+		testModelID = DefaultOpenCodeGoTestModel
+	}
+	testModelID = account.GetMappedModel(testModelID)
+	proto := account.GetAPIProtocol()
+	switch proto {
+	case APIProtocolChatCompletions, APIProtocolAnthropic, APIProtocolResponses:
+	default:
+		proto = openCodeGoNativeProtocol(account, testModelID)
+	}
+	switch proto {
+	case APIProtocolAnthropic:
+		return s.testCNProviderAnthropicConnection(c, account, testModelID)
+	case APIProtocolResponses:
+		return s.testOpenCodeGoResponsesConnection(c, account, testModelID)
+	default:
+		return s.testCNProviderChatCompletionsConnection(c, account, testModelID, prompt)
+	}
+}
+
+func (s *AccountTestService) testOpenCodeGoResponsesConnection(c *gin.Context, account *Account, testModelID string) error {
+	authToken := strings.TrimSpace(account.GetOpenAIProtocolAPIKey())
+	if authToken == "" {
+		return s.sendErrorAndEnd(c, "No API key available")
+	}
+	c.Writer.Header().Set("Content-Type", "text/event-stream")
+	c.Writer.Header().Set("Cache-Control", "no-cache")
+	c.Writer.Header().Set("Connection", "keep-alive")
+	c.Writer.Header().Set("X-Accel-Buffering", "no")
+	c.Writer.Flush()
+	s.sendEvent(c, TestEvent{Type: "test_start", Model: testModelID})
+	return s.testCNProviderAdaptiveResponsesConnection(c, account, testModelID, authToken)
 }
 
 func (s *AccountTestService) testCNProviderChatCompletionsConnection(c *gin.Context, account *Account, modelID string, prompt string) error {
@@ -3144,6 +3251,10 @@ func (s *AccountTestService) testOpenAIImageOAuth(c *gin.Context, ctx context.Co
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "text/event-stream")
 	req.Header.Set("OpenAI-Beta", "responses=experimental")
+	if direct {
+		req.Header.Del("OpenAI-Beta")
+		req.Header.Set("Accept", "application/json")
+	}
 	canonical := resolveCodexOutboundIdentity("")
 	req.Header.Set("originator", canonical.originator)
 	if customUA := strings.TrimSpace(credentialAccount.GetOpenAIUserAgent()); customUA != "" {

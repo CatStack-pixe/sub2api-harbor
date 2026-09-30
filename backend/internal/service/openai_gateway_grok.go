@@ -784,7 +784,8 @@ func grokSupportsReasoningEffort(model string) bool {
 	}
 }
 
-var grokResponsesUnsupportedRecursiveFields = map[string]struct{}{
+// grokUnsupportedRecursiveFields 定义 Grok 平台（Responses 和 Chat Completions）不支持的字段
+var grokUnsupportedRecursiveFields = map[string]struct{}{
 	"external_web_access": {},
 }
 

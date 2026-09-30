@@ -1473,6 +1473,10 @@ func (s *GatewayService) getAvailableModels(ctx context.Context, groupID *int64,
 	}
 	sort.Strings(models)
 
+	if platform == PlatformOpenAI {
+		models = supplementUnmappedOpenAIModels(accounts, models)
+	}
+
 	if cacheEnabled {
 		s.modelsListCache.Set(cacheKey, cloneStringSlice(models), s.modelsListCacheTTL)
 		modelsListCacheStoreTotal.Add(1)

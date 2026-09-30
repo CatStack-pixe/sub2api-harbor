@@ -383,7 +383,7 @@ func buildOpenAIImagesResponsesRequest(parsed *OpenAIImagesRequest, toolModel st
 	}
 
 	req := []byte(`{"instructions":"","stream":true,"reasoning":{"effort":"medium","summary":"auto"},"parallel_tool_calls":true,"include":["reasoning.encrypted_content"],"model":"","store":false,"tool_choice":{"type":"image_generation"}}`)
-	req, _ = sjson.SetBytes(req, "model", openAIImagesResponsesMainModel)
+	req, _ = sjson.SetBytes(req, "model", openAIImagesResponsesMainModelValue())
 	req, _ = sjson.SetBytes(req, "instructions", openAIImagesVerbatimPromptInstructions)
 
 	input := []byte(`[{"type":"message","role":"user","content":[{"type":"input_text","text":""}]}]`)
@@ -1843,7 +1843,14 @@ func (s *OpenAIGatewayService) forwardOpenAIImagesOAuth(
 	}
 	upstreamReq.Header.Set("Content-Type", "application/json")
 	upstreamReq.Header.Set("Accept", "text/event-stream")
-	upstreamReq.Header.Set("OpenAI-Beta", "responses=experimental")
+	if direct {
+		upstreamReq.Header.Del("OpenAI-Beta")
+		if !parsed.Stream {
+			upstreamReq.Header.Set("Accept", "application/json")
+		}
+	} else {
+		upstreamReq.Header.Set("OpenAI-Beta", "responses=experimental")
+	}
 
 	proxyURL := ""
 	if account.ProxyID != nil && account.Proxy != nil {
@@ -1901,7 +1908,7 @@ func (s *OpenAIGatewayService) forwardOpenAIImagesOAuth(
 				Kind:               "failover",
 				Message:            upstreamMsg,
 			})
-			shouldDisable := s.handleFailoverSideEffects(upstreamCtx, resp, account, respBody, requestModel)
+			shouldDisable := s.handleFailoverSideEffects(upstreamCtx, resp, account, respBody, upstreamModel)
 			return nil, s.newOpenAIAccountFailoverError(
 				account,
 				resp.StatusCode,
@@ -2006,8 +2013,8 @@ func (s *OpenAIGatewayService) forwardOpenAIImagesOAuth(
 }
 
 const (
-	openAIImagesOAuthUnavailableCooldown = 30 * time.Minute
-	openAIImagesOAuthUnavailableReason   = "openai_images_oauth_tool_unavailable"
+	openAIImagesOAuthUnavailableDefaultCooldown = 30 * time.Minute
+	openAIImagesOAuthUnavailableReason          = "openai_images_oauth_tool_unavailable"
 )
 
 func shouldCoolOpenAIImagesToolForError(upstreamErr *OpenAIImagesUpstreamError) bool {
@@ -2020,7 +2027,16 @@ func (s *OpenAIGatewayService) coolOpenAIImagesOAuthTool(ctx context.Context, ac
 	}
 	stateCtx, cancel := openAIAccountStateContext(ctx)
 	defer cancel()
-	resetAt := time.Now().Add(openAIImagesOAuthUnavailableCooldown)
+	cooldown := openAIImagesOAuthUnavailableDefaultCooldown
+	if s.settingService != nil {
+		settings, err := s.settingService.GetOpenAIImagesOAuthUnavailableCooldownSettings(stateCtx)
+		if err != nil {
+			logger.LegacyPrintf("service.openai_gateway", "[OpenAI] Images OAuth tool cooldown setting read failed error=%v", err)
+		} else {
+			cooldown = time.Duration(settings.CooldownMinutes) * time.Minute
+		}
+	}
+	resetAt := time.Now().Add(cooldown)
 	if err := s.accountRepo.SetModelRateLimit(stateCtx, account.ID, openAIImageGenerationRateLimitKey, resetAt, openAIImagesOAuthUnavailableReason); err != nil {
 		logger.LegacyPrintf("service.openai_gateway", "[OpenAI] Images OAuth tool cooldown write failed account_id=%d error=%v", account.ID, err)
 		return
@@ -2055,7 +2071,9 @@ func (s *OpenAIGatewayService) handleOpenAIImagesOAuthResponseError(
 			kind = "retry_exhausted_failover"
 		}
 		appendOpsUpstreamError(c, OpsUpstreamErrorEvent{
-			Platform: account.Platform, AccountID: account.ID, AccountName: account.Name,
+			ProxyID:   opsUpstreamProxyID(account),
+			ProxyName: opsUpstreamProxyName(account),
+			Platform:  account.Platform, AccountID: account.ID, AccountName: account.Name,
 			UpstreamStatusCode: statusCode, UpstreamRequestID: requestID, UpstreamURL: upstreamURL,
 			Kind: kind, Message: message,
 		})

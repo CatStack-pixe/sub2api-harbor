@@ -234,6 +234,7 @@ func ProvideAccountUsageService(
 	identityCache IdentityCache,
 	tlsFPProfileService *TLSFingerprintProfileService,
 	openAIGatewayService *OpenAIGatewayService,
+	upstreamBillingProbeService *UpstreamBillingProbeService,
 ) *AccountUsageService {
 	service := NewAccountUsageService(
 		accountRepo,
@@ -249,6 +250,7 @@ func ProvideAccountUsageService(
 		tlsFPProfileService,
 	)
 	service.agentIdentityWS = openAIGatewayService
+	service.upstreamBillingProbeService = upstreamBillingProbeService
 	return service
 }
 
@@ -276,6 +278,7 @@ func ProvideAccountTestService(
 		tlsFPProfileService,
 	)
 	service.agentIdentityWS = openAIGatewayService
+	service.SetOpenAIGatewayService(openAIGatewayService)
 	service.SetSettingService(settingService)
 	service.SetPluginManager(pluginManager)
 	return service

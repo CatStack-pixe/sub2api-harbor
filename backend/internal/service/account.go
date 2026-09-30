@@ -312,8 +312,16 @@ func (a *Account) IsVolcengine() bool {
 	return a != nil && a.Platform == PlatformVolcengine
 }
 
+func (a *Account) IsTierflow() bool {
+	return a != nil && a.Platform == PlatformTierflow
+}
+
 func (a *Account) IsSenseNova() bool {
 	return a != nil && a.Platform == PlatformSenseNova
+}
+
+func (a *Account) IsSenseAudio() bool {
+	return a != nil && a.Platform == PlatformSenseAudio
 }
 
 func (a *Account) IsGrokOAuth() bool {
@@ -342,7 +350,7 @@ func (a *Account) IsOpenAICompatible() bool {
 		a.Platform == PlatformTokenRhythm || a.Platform == PlatformKimi || a.Platform == PlatformZhipu ||
 		a.Platform == PlatformChatAnywhere || a.Platform == PlatformGLM || a.Platform == PlatformModelScope ||
 		a.Platform == PlatformDashScope || a.Platform == PlatformMiniMax || a.Platform == PlatformVolcengine ||
-		a.Platform == PlatformSenseNova)
+		a.Platform == PlatformSenseNova || a.Platform == PlatformSenseAudio || a.Platform == PlatformTierflow || a.IsOpenCodeGo())
 }
 
 // ShouldUseOpenAIResponsesAPI reports whether this OpenAI-compatible account
@@ -352,17 +360,12 @@ func (a *Account) ShouldUseOpenAIResponsesAPI() bool {
 	if a == nil {
 		return false
 	}
-	if a.IsCNProvider() {
-		switch a.GetAPIProtocol() {
-		case APIProtocolResponses, APIProtocolAdaptive:
-			return a.IsDeepSeek()
-		default:
-			return false
-		}
+	if a.IsMultiProtocolAPIKey() {
+		return a.UsesNativeCNResponses()
 	}
 	return !a.IsAgnes() && !a.IsDeepSeek() && !a.IsNvidia() && !a.IsTokenRhythm() &&
 		!a.IsKimi() && !a.IsChatAnywhere() && !a.IsGLM() && !a.IsModelScope() &&
-		!a.IsDashScope() && !a.IsMiniMax() && !a.IsVolcengine() && !a.IsSenseNova() &&
+		!a.IsDashScope() && !a.IsMiniMax() && !a.IsVolcengine() && !a.IsSenseNova() && !a.IsSenseAudio() && !a.IsTierflow() &&
 		openai_compat.ShouldUseResponsesAPI(a.Extra)
 }
 
@@ -730,6 +733,16 @@ func (a *Account) resolveModelMapping(rawMapping map[string]any) map[string]stri
 				"gemini-3.6-flash-low",
 				"gemini-3.6-flash-medium",
 				"gemini-3.6-flash-tiered",
+				"gemini-3.7-flash",
+				"gemini-3.7-flash-high",
+				"gemini-3.7-flash-low",
+				"gemini-3.7-flash-medium",
+				"gemini-3.7-flash-tiered",
+				"gemini-3.8-flash",
+				"gemini-3.8-flash-high",
+				"gemini-3.8-flash-low",
+				"gemini-3.8-flash-medium",
+				"gemini-3.8-flash-tiered",
 			})
 			applyAntigravityGemini31ProAliases(result)
 		}
@@ -1424,7 +1437,7 @@ func (a *Account) IsOpenAIApiKey() bool {
 func (a *Account) GetOpenAIBaseURL() string {
 	if a == nil || (!a.IsOpenAI() && !a.IsAgnes() && !a.IsDeepSeek() && !a.IsNvidia() &&
 		!a.IsTokenRhythm() && !a.IsKimi() && !a.IsZhipu() && !a.IsChatAnywhere() &&
-		!a.IsGLM() && !a.IsModelScope() && !a.IsDashScope() && !a.IsMiniMax() && !a.IsVolcengine() && !a.IsSenseNova()) {
+		!a.IsGLM() && !a.IsModelScope() && !a.IsDashScope() && !a.IsMiniMax() && !a.IsVolcengine() && !a.IsSenseNova() && !a.IsSenseAudio() && !a.IsTierflow() && !a.IsOpenCodeGo()) {
 		return ""
 	}
 	if a.IsChatAnywhere() {
@@ -1441,7 +1454,7 @@ func (a *Account) GetOpenAIBaseURL() string {
 		}
 		return GLMDefaultBaseURL
 	}
-	if a.IsCNProvider() {
+	if a.IsMultiProtocolAPIKey() {
 		if a.IsKimi() {
 			_, hasMode := a.Credentials["account_mode"]
 			_, hasProtocol := a.Credentials["api_protocol"]
@@ -1481,6 +1494,8 @@ func (a *Account) GetOpenAIBaseURL() string {
 			return DefaultDeepseekBaseURL
 		case PlatformSenseNova:
 			return SenseNovaDefaultBaseURL
+		case PlatformSenseAudio:
+			return SenseAudioDefaultBaseURL
 		}
 	}
 	if a.Type == AccountTypeAPIKey || a.Type == AccountTypeUpstream {
@@ -1507,6 +1522,12 @@ func (a *Account) GetOpenAIBaseURL() string {
 		return VolcengineDefaultBaseURL
 	case PlatformSenseNova:
 		return SenseNovaDefaultBaseURL
+	case PlatformSenseAudio:
+		return SenseAudioDefaultBaseURL
+	case PlatformTierflow:
+		return TierflowDefaultBaseURL
+	case PlatformOpenCodeGo:
+		return a.openCodeDefaultChatBaseURL()
 	default:
 		return "https://api.openai.com"
 	}
@@ -1532,10 +1553,10 @@ func (a *Account) IsCodingPlan() bool {
 
 // GetAPIProtocol 返回国产供应商账号的上游 API 协议。存储于
 // credentials["api_protocol"]；缺失或与平台不匹配时回退 chat_completions
-// （与既有行为完全一致）。responses 协议仅 deepseek 支持（官方原生 /responses
-// 端点，适配 Codex）；kimi/zhipu 无此端点。
+// （与既有行为完全一致）。responses 协议仅 deepseek / kimi / minimax 支持（官方原生
+// Responses 端点，适配 Codex）；zhipu 无此端点。
 func (a *Account) GetAPIProtocol() string {
-	if a == nil || !a.IsCNProvider() {
+	if a == nil || !a.IsMultiProtocolAPIKey() {
 		return APIProtocolChatCompletions
 	}
 	switch strings.TrimSpace(a.GetCredential("api_protocol")) {
@@ -1550,18 +1571,21 @@ func (a *Account) GetAPIProtocol() string {
 	case APIProtocolChatCompletions:
 		return APIProtocolChatCompletions
 	}
+	if a.IsOpenCodeGo() {
+		return APIProtocolAdaptive
+	}
 	return APIProtocolChatCompletions
 }
 
-// IsAdaptiveAPIProtocol 报告账号是否按入站协议动态选择供应商原生端点。
-// SupportsNativeCNResponses reports whether the provider exposes a native
-// Responses endpoint rather than requiring the Chat Completions bridge.
+// SupportsNativeCNResponses 报告该国产供应商是否提供原生 Responses 端点。
+// DeepSeek 官方为 /responses（无 /v1）；Kimi 按量付费与 Coding Plan 均为
+// /v1/responses（moonshot.cn / kimi.com/coding）；MiniMax 为 /v1/responses。
 func (a *Account) SupportsNativeCNResponses() bool {
 	if a == nil {
 		return false
 	}
 	switch a.Platform {
-	case PlatformDeepseek, PlatformKimi:
+	case PlatformDeepseek, PlatformKimi, PlatformMiniMax, PlatformSenseAudio, PlatformOpenCodeGo:
 		return true
 	default:
 		return false
@@ -1575,7 +1599,16 @@ func (a *Account) UsesNativeCNResponses() bool {
 		return false
 	}
 	switch a.GetAPIProtocol() {
-	case APIProtocolResponses, APIProtocolAdaptive:
+	case APIProtocolResponses:
+		return true
+	case APIProtocolAdaptive:
+		if a.IsKimi() {
+			// Existing adaptive Kimi accounts bridge Responses through their
+			// configured chat endpoint unless native Responses is opted into.
+			baseURLs, _ := a.Credentials["api_base_urls"].(map[string]any)
+			baseURL, _ := baseURLs[APIProtocolResponses].(string)
+			return strings.TrimSpace(baseURL) != ""
+		}
 		return true
 	default:
 		return false
@@ -1590,7 +1623,7 @@ func (a *Account) IsAdaptiveAPIProtocol() bool {
 // adaptive 账号优先使用 api_base_urls 中的分协议地址，缺失时按平台和
 // account_mode 使用官方默认端点。base_url 继续作为 Chat Completions 地址兼容旧字段。
 func (a *Account) GetCNProtocolBaseURL(protocol string) string {
-	if a == nil || !a.IsCNProvider() {
+	if a == nil || !a.IsMultiProtocolAPIKey() {
 		return ""
 	}
 	if a.IsAdaptiveAPIProtocol() {
@@ -1626,6 +1659,12 @@ func (a *Account) defaultCNProtocolBaseURL(protocol string) string {
 			return DefaultZhipuAnthropicBaseURL
 		case PlatformDeepSeek:
 			return DefaultDeepseekAnthropicBaseURL
+		case PlatformSenseAudio:
+			return SenseAudioDefaultBaseURL
+		case PlatformMiniMax:
+			return DefaultMiniMaxAnthropicBaseURL
+		case PlatformOpenCodeGo:
+			return a.openCodeDefaultAnthropicBaseURL()
 		}
 	case APIProtocolChatCompletions, APIProtocolResponses:
 		switch a.Platform {
@@ -1643,6 +1682,12 @@ func (a *Account) defaultCNProtocolBaseURL(protocol string) string {
 			return DefaultDeepseekBaseURL
 		case PlatformSenseNova:
 			return SenseNovaDefaultBaseURL
+		case PlatformSenseAudio:
+			return SenseAudioDefaultBaseURL
+		case PlatformMiniMax:
+			return DefaultMiniMaxBaseURL
+		case PlatformOpenCodeGo:
+			return a.openCodeDefaultChatBaseURL()
 		}
 	}
 	return ""
@@ -1679,6 +1724,12 @@ func (a *Account) GetAnthropicProtocolBaseURL() string {
 		return DefaultZhipuAnthropicBaseURL
 	case PlatformDeepSeek:
 		return DefaultDeepseekAnthropicBaseURL
+	case PlatformSenseAudio:
+		return SenseAudioDefaultBaseURL
+	case PlatformMiniMax:
+		return DefaultMiniMaxAnthropicBaseURL
+	case PlatformOpenCodeGo:
+		return a.openCodeDefaultAnthropicBaseURL()
 	default:
 		return ""
 	}
@@ -1706,6 +1757,12 @@ func (a *Account) GetOpenAIFormatBaseURL() string {
 		return DefaultZhipuPayGBaseURL
 	case PlatformDeepSeek:
 		return DefaultDeepseekBaseURL
+	case PlatformSenseAudio:
+		return SenseAudioDefaultBaseURL
+	case PlatformMiniMax:
+		return DefaultMiniMaxBaseURL
+	case PlatformOpenCodeGo:
+		return a.openCodeDefaultChatBaseURL()
 	default:
 		return a.GetOpenAIBaseURL()
 	}
@@ -1714,17 +1771,23 @@ func (a *Account) GetOpenAIFormatBaseURL() string {
 // GetCNAPIKey 返回国产 OpenAI 兼容供应商账号的 api_key 凭据（kimi/zhipu/deepseek/sensenova）。
 // 与 openai 的 GetOpenAIApiKey 区分：后者仅对 openai 平台返回。
 func (a *Account) GetCNAPIKey() string {
-	if a == nil || !a.IsCNProvider() {
+	if a == nil || !a.IsMultiProtocolAPIKey() {
 		return ""
 	}
 	return a.GetCredential("api_key")
 }
 
-// GetCodingPlanProvider 根据 base_url 识别 Coding Plan 供应商（kimi / zhipu），
+// GetCodingPlanProvider 根据 base_url 识别 Coding Plan 供应商（kimi / zhipu / minimax），
 // 用于路由到对应的额度查询端点。非 coding 模式或无法识别时返回空串。
-// 判定规则与 cc-switch coding_plan.rs::detect_provider 保持一致。
+// 只认官方域名：自定义中转不得把第三方 Key 发往厂商官方额度端点。
 func (a *Account) GetCodingPlanProvider() string {
-	if a == nil || a.GetAccountMode() != AccountModeCoding {
+	if a == nil {
+		return ""
+	}
+	if a.IsOpenCodeGoPlan() {
+		return PlatformOpenCodeGo
+	}
+	if a.GetAccountMode() != AccountModeCoding {
 		return ""
 	}
 	baseURL := strings.ToLower(a.GetOpenAIBaseURL())
@@ -1742,6 +1805,10 @@ func (a *Account) GetCodingPlanProvider() string {
 		return PlatformKimi
 	case strings.Contains(baseURL, "bigmodel.cn"), strings.Contains(baseURL, "api.z.ai"):
 		return PlatformZhipu
+	case strings.Contains(baseURL, "minimax.io"),
+		strings.Contains(baseURL, "minimaxi.com"),
+		strings.Contains(baseURL, "minimax.com"):
+		return PlatformMiniMax
 	default:
 		return ""
 	}
@@ -1851,21 +1918,22 @@ func (a *Account) GetOpenAIIDToken() string {
 }
 
 func (a *Account) GetOpenAIApiKey() string {
-	if a == nil || a.Type != AccountTypeAPIKey || (!a.IsOpenAI() && !a.IsAgnes() && !a.IsDeepSeek() && !a.IsNvidia() && !a.IsTokenRhythm() && !a.IsKimi() && !a.IsChatAnywhere() && !a.IsGLM() && !a.IsSenseNova()) {
+	if a == nil || a.Type != AccountTypeAPIKey || (!a.IsOpenAI() && !a.IsAgnes() && !a.IsDeepSeek() && !a.IsNvidia() && !a.IsTokenRhythm() && !a.IsKimi() && !a.IsChatAnywhere() && !a.IsGLM() && !a.IsSenseNova() && !a.IsSenseAudio() && !a.IsTierflow()) {
 		return ""
 	}
 	return a.GetCredential("api_key")
 }
 
 // GetOpenAIProtocolAPIKey 返回 OpenAI 协议族 APIKey 账号的密钥。
-// 覆盖 openai 原生账号与国产 OpenAI 兼容供应商（kimi/zhipu/deepseek/sensenova）账号，
-// 供转发鉴权、模型列表同步等协议族共用路径使用。注意 IsOpenAIApiKey 语义上
-// 仅指 openai 平台账号，调度倍率/WS 能力门控继续以其为准，不受本方法影响。
+// 覆盖 openai 原生账号、国产 OpenAI 兼容供应商（kimi/zhipu/deepseek）
+// 以及 OpenCode Go 账号，供转发鉴权、模型列表同步等协议族共用路径使用。
+// 注意 IsOpenAIApiKey 语义上仅指 openai 平台账号，调度倍率/WS 能力门控
+// 继续以其为准，不受本方法影响。
 func (a *Account) GetOpenAIProtocolAPIKey() string {
 	if a == nil {
 		return ""
 	}
-	if a.IsCNProvider() || a.IsModelScope() || a.IsDashScope() || a.IsMiniMax() || a.IsVolcengine() || a.IsSenseNova() {
+	if a.IsMultiProtocolAPIKey() || a.IsModelScope() || a.IsDashScope() || a.IsMiniMax() || a.IsVolcengine() || a.IsSenseNova() {
 		if a.Type != AccountTypeAPIKey {
 			return ""
 		}
@@ -1875,7 +1943,7 @@ func (a *Account) GetOpenAIProtocolAPIKey() string {
 }
 
 func (a *Account) GetOpenAIUserAgent() string {
-	if !a.IsOpenAI() && !a.IsAgnes() && !a.IsDeepSeek() && !a.IsNvidia() {
+	if !a.IsOpenAI() && !a.IsAgnes() && !a.IsDeepSeek() && !a.IsNvidia() && !a.IsTierflow() {
 		return ""
 	}
 	return a.GetCredential("user_agent")
@@ -1960,7 +2028,7 @@ func (a *Account) SupportsOpenAIEndpointCapability(capability OpenAIEndpointCapa
 			return false
 		}
 	}
-	if a.IsAgnes() {
+	if a.IsAgnes() || a.IsTierflow() {
 		return capability == OpenAIEndpointCapabilityChatCompletions
 	}
 	if a.IsDeepSeek() && a.GetAPIProtocol() != APIProtocolResponses && !a.IsAdaptiveAPIProtocol() {

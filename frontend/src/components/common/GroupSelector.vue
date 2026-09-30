@@ -91,7 +91,9 @@ const isSearchable = computed(() => {
 
 // Groups are intentionally not filtered by account platform.
 const filteredGroups = computed(() => {
-  let result: AdminGroup[] = props.groups
+  let result = authStore.isSimpleMode
+    ? props.groups.filter((g) => g.platform !== 'composite')
+    : props.groups
   if (isSearchable.value && searchText.value) {
     const q = searchText.value.toLowerCase()
     result = result.filter(

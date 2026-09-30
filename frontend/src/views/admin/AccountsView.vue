@@ -317,7 +317,7 @@
               :account="row"
               :today-stats="todayStatsByAccountId[String(row.id)] ?? null"
               :today-stats-loading="todayStatsLoading"
-              :manual-refresh-token="usageManualRefreshToken"
+              :manual-refresh-token="usageManualRefreshToken + (usageAccountEditRefreshTokens[row.id] ?? 0)"
               :batched-usage="usageBatchByAccountId[String(row.id)] ?? null"
               :batched-usage-error="usageBatchErrorByAccountId[String(row.id)] ?? null"
               :batched-usage-loading="usageBatchLoadingByAccountId[String(row.id)] === true"
@@ -452,7 +452,7 @@
       <template #pagination><Pagination v-if="pagination.total > 0" :page="pagination.page" :total="pagination.total" :page-size="pagination.page_size" @update:page="handlePageChange" @update:pageSize="handlePageSizeChange" /></template>
     </TablePageLayout>
     <CreateAccountModal :show="showCreate" :proxies="proxies" :groups="groups" @close="showCreate = false" @created="reload" />
-    <EditAccountModal :show="showEdit" :account="edAcc" :proxies="proxies" :groups="groups" @close="showEdit = false" @updated="handleAccountUpdated" />
+    <EditAccountModal :show="showEdit" :account="edAcc" :proxies="proxies" :groups="groups" @close="showEdit = false" @updated="handleAccountEdited" />
     <ReAuthAccountModal :show="showReAuth" :account="reAuthAcc" @close="closeReAuthModal" @reauthorized="handleAccountUpdated" />
     <AccountTestModal :show="showTest" :account="testingAcc" @close="closeTestModal" />
     <AccountStatsModal :show="showStats" :account="statsAcc" @close="closeStatsModal" />
@@ -536,7 +536,7 @@ import { extractApiErrorMessage } from '@/utils/apiError'
 import { sanitizeUrl } from '@/utils/url'
 import { getFloatingPanelPosition } from '@/utils/floatingPanel'
 import { formatMultiplier } from '@/utils/formatters'
-import type { Account, AccountPlatform, AccountSchedulerGroupScore, AccountType, AccountUsageInfo, Proxy as AccountProxy, AdminGroup, WindowStats, ClaudeModel, UpstreamBillingProbeSnapshot } from '@/types'
+import type { Account, AccountListItem, AccountPlatform, AccountSchedulerGroupScore, AccountType, AccountUsageInfo, Proxy as AccountProxy, AdminGroup, WindowStats, ClaudeModel, UpstreamBillingProbeSnapshot } from '@/types'
 
 const { t } = useI18n()
 const appStore = useAppStore()
@@ -650,7 +650,10 @@ const DEFAULT_HIDDEN_COLUMNS = ['today_stats', 'proxy', 'notes', 'scheduler_scor
 const HIDDEN_COLUMNS_KEY = 'account-hidden-columns'
 // One-time migration: hide scheduler score for existing admins too, because showing it opt-ins to heavy backend scoring.
 const HIDDEN_COLUMNS_VERSION_KEY = 'account-hidden-columns-version'
-const HIDDEN_COLUMNS_CURRENT_VERSION = 'scheduler-score-hidden-by-default'
+// Keep the usage column visible so Tierflow wallet balances remain discoverable
+// after the account table gained upstream balance support. Older browser layouts
+// may have persisted `usage` as hidden before that support existed.
+const HIDDEN_COLUMNS_CURRENT_VERSION = 'tierflow-balance-visible-v2'
 
 // Sorting settings
 const ACCOUNT_SORT_STORAGE_KEY = 'account-table-sort'
@@ -708,6 +711,7 @@ const todayStatsError = ref<string | null>(null)
 const todayStatsReqSeq = ref(0)
 const pendingTodayStatsRefresh = ref(false)
 const usageManualRefreshToken = ref(0)
+const usageAccountEditRefreshTokens = ref<Record<number, number>>({})
 const documentVisibility = useDocumentVisibility()
 invalidateDeepSeekBalanceCache()
 invalidateTokenRhythmBalanceCache()
@@ -763,6 +767,7 @@ const accountSupportsBatchUsage = (account: Account) => {
   }
   if (account.platform === 'gemini') return true
   if (account.platform === 'sensenova') return true
+  if (account.platform === 'tierflow') return account.type === 'apikey'
   if (account.platform === 'chatanywhere') return true
   if (account.platform === 'antigravity') return account.type === 'oauth'
   if (account.platform === 'openai') return account.type === 'oauth'
@@ -981,9 +986,11 @@ const loadSavedColumns = () => {
       parsed.forEach(key => {
         hiddenColumns.add(key)
       })
-      // Older saved column layouts may have scheduler_score visible; migrate them to the new safe default once.
+      // Older saved column layouts may have scheduler_score visible; migrate them
+      // once and restore the usage column so Tierflow balances are visible.
       if (localStorage.getItem(HIDDEN_COLUMNS_VERSION_KEY) !== HIDDEN_COLUMNS_CURRENT_VERSION) {
         hiddenColumns.add('scheduler_score')
+        hiddenColumns.delete('usage')
         localStorage.setItem(HIDDEN_COLUMNS_KEY, JSON.stringify([...hiddenColumns]))
         localStorage.setItem(HIDDEN_COLUMNS_VERSION_KEY, HIDDEN_COLUMNS_CURRENT_VERSION)
       }
@@ -1177,8 +1184,6 @@ const resetAutoRefreshCache = () => {
   upstreamBillingRateETag.value = null
 }
 
-const isFirstLoad = ref(true)
-
 type AccountLoadOptions = {
   refreshTodayStats?: boolean
 }
@@ -1191,10 +1196,6 @@ const load = async (options: AccountLoadOptions = {}) => {
   pendingTodayStatsRefresh.value = false
   requestParams.lite = '1'
   await baseLoad()
-  if (isFirstLoad.value) {
-    isFirstLoad.value = false
-    delete requestParams.lite
-  }
   if (options.refreshTodayStats !== false) await refreshTodayStatsBatch()
 }
 
@@ -2296,6 +2297,23 @@ const handleAccountUpdated = (updatedAccount: Account) => {
   if (updatedAccount.platform === 'kimi') invalidateKimiBalanceCache(updatedAccount.id)
   patchAccountInList(updatedAccount)
   enterAutoRefreshSilentWindow()
+}
+const handleAccountEdited = (updatedAccount: Account) => {
+  handleAccountUpdated(updatedAccount)
+  if (updatedAccount.platform !== 'tierflow') return
+  // Console credential edits invalidate both desktop batch and mobile cell
+  // caches. Only the explicit editor event advances this token; background
+  // balance snapshots also update updated_at and must not trigger a probe loop.
+  // Invalidate in-flight batches even when the usage cell is hidden or mobile.
+  usageBatchRequestTokenByAccountId.value = {
+    ...usageBatchRequestTokenByAccountId.value,
+    [String(updatedAccount.id)]: ++usageBatchRequestToken
+  }
+  usageBatchCache.delete(updatedAccount.id)
+  setUsageBatchState(updatedAccount.id, null, null)
+  setUsageBatchLoading(updatedAccount.id, false)
+  usageAccountEditRefreshTokens.value[updatedAccount.id] =
+    (usageAccountEditRefreshTokens.value[updatedAccount.id] ?? 0) + 1
 }
 const formatExportTimestamp = () => {
   const now = new Date()

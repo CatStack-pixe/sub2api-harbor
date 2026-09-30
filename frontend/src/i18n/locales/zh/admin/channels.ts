@@ -112,6 +112,9 @@ export default {
         video: '视频（按秒）'
       },
       form: {
+        timeWindows: '时间窗口',
+        timeWindowsHint: '设置此价格规则生效的时段。',
+        addTimeWindow: '添加时间窗口',
         name: '名称',
         namePlaceholder: '输入渠道名称',
         description: '描述',
@@ -142,8 +145,10 @@ export default {
         pricePlaceholder: '默认',
         fastMultiplier: 'Fast 倍率',
         flexMultiplier: 'Flex 倍率',
+        maxReasoningEffortMultiplier: 'Max 推理倍率',
+        fable51DefaultMaxReasoningMultiplier: '默认 3',
         multiplierPlaceholder: '未配置',
-        multiplierPositive: 'Fast/Flex 倍率必须大于 0',
+        multiplierPositive: 'Fast/Flex/Max 推理倍率必须大于 0',
         inputMultiplier: '输入倍率',
         outputMultiplier: '输出倍率',
         cacheWriteMultiplier: '缓存写倍率',

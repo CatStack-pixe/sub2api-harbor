@@ -111,9 +111,6 @@ func explicitOpenAIRequestSessionID(c *gin.Context, body []byte) string {
 	if sessionID == "" && isGrokRequestContext(c) && len(body) > 0 {
 		sessionID = grokPreviousResponseSessionSeed(body)
 	}
-	if sessionID == "" && isGrokRequestContext(c) && len(body) > 0 {
-		sessionID = grokPreviousResponseSessionSeed(body)
-	}
 	return sessionID
 }
 
@@ -294,7 +291,7 @@ func NormalizeOpenAICompatiblePlatform(platform string) string {
 	switch platform {
 	case PlatformGrok, PlatformAgnes, PlatformDeepSeek, PlatformNvidia,
 		PlatformTokenRhythm, PlatformKimi, PlatformZhipu, PlatformChatAnywhere,
-		PlatformGLM, PlatformModelScope, PlatformDashScope, PlatformMiniMax, PlatformVolcengine, PlatformSenseNova:
+		PlatformGLM, PlatformModelScope, PlatformDashScope, PlatformMiniMax, PlatformVolcengine, PlatformSenseNova, PlatformSenseAudio, PlatformTierflow, PlatformOpenCodeGo:
 		return platform
 	default:
 		return PlatformOpenAI

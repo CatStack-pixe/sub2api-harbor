@@ -119,6 +119,19 @@ export async function getModelAllowlistCandidates(
   return data.models || []
 }
 
+export async function getModelAllowlistCandidates(
+  id: number,
+  platform?: GroupPlatform
+): Promise<string[]> {
+  const { data } = await apiClient.get<{ models: string[] }>(
+    `/admin/groups/${id}/model-allowlist-candidates`,
+    {
+      params: platform ? { platform } : undefined
+    }
+  )
+  return data.models || []
+}
+
 /**
  * Create new group
  * @param groupData - Group data

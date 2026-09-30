@@ -22,14 +22,15 @@ import (
 // ProxyQuery is the builder for querying Proxy entities.
 type ProxyQuery struct {
 	config
-	ctx             *QueryContext
-	order           []proxy.OrderOption
-	inters          []Interceptor
-	predicates      []predicate.Proxy
-	withAccounts    *AccountQuery
-	withBackupProxy *ProxyQuery
-	withProxyGroup  *ProxyGroupQuery
-	modifiers       []func(*sql.Selector)
+	ctx                *QueryContext
+	order              []proxy.OrderOption
+	inters             []Interceptor
+	predicates         []predicate.Proxy
+	withAccounts       *AccountQuery
+	withPrimaryProxies *ProxyQuery
+	withBackupProxy    *ProxyQuery
+	withProxyGroup     *ProxyGroupQuery
+	modifiers          []func(*sql.Selector)
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -341,14 +342,15 @@ func (_q *ProxyQuery) Clone() *ProxyQuery {
 		return nil
 	}
 	return &ProxyQuery{
-		config:          _q.config,
-		ctx:             _q.ctx.Clone(),
-		order:           append([]proxy.OrderOption{}, _q.order...),
-		inters:          append([]Interceptor{}, _q.inters...),
-		predicates:      append([]predicate.Proxy{}, _q.predicates...),
-		withAccounts:    _q.withAccounts.Clone(),
-		withBackupProxy: _q.withBackupProxy.Clone(),
-		withProxyGroup:  _q.withProxyGroup.Clone(),
+		config:             _q.config,
+		ctx:                _q.ctx.Clone(),
+		order:              append([]proxy.OrderOption{}, _q.order...),
+		inters:             append([]Interceptor{}, _q.inters...),
+		predicates:         append([]predicate.Proxy{}, _q.predicates...),
+		withAccounts:       _q.withAccounts.Clone(),
+		withPrimaryProxies: _q.withPrimaryProxies.Clone(),
+		withBackupProxy:    _q.withBackupProxy.Clone(),
+		withProxyGroup:     _q.withProxyGroup.Clone(),
 		// clone intermediate query.
 		sql:  _q.sql.Clone(),
 		path: _q.path,
@@ -477,7 +479,7 @@ func (_q *ProxyQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Proxy,
 	var (
 		nodes       = []*Proxy{}
 		_spec       = _q.querySpec()
-		loadedTypes = [3]bool{
+		loadedTypes = [4]bool{
 			_q.withAccounts != nil,
 			_q.withPrimaryProxies != nil,
 			_q.withBackupProxy != nil,

@@ -446,6 +446,29 @@ func TestNormalizeOpenAIModelForUpstream(t *testing.T) {
 			account: &Account{Type: AccountTypeAPIKey, Platform: PlatformDeepseek},
 			model:   "deepseek-v4-flash-0731",
 			want:    "deepseek-v4-flash-0731",
+		}, {
+			name:    "deepseek strips claude code long context suffix",
+			account: &Account{Type: AccountTypeAPIKey, Platform: PlatformDeepseek},
+			model:   "deepseek-flash[1m]",
+			want:    "deepseek-flash",
+		},
+		{
+			name:    "deepseek strips duplicated long context suffix",
+			account: &Account{Type: AccountTypeAPIKey, Platform: PlatformDeepseek},
+			model:   "deepseek-flash[1M][1m]",
+			want:    "deepseek-flash",
+		},
+		{
+			name:    "deepseek preserves plain model",
+			account: &Account{Type: AccountTypeAPIKey, Platform: PlatformDeepseek},
+			model:   "deepseek-flash",
+			want:    "deepseek-flash",
+		},
+		{
+			name:    "non deepseek preserves long context suffix",
+			account: &Account{Type: AccountTypeAPIKey, Platform: PlatformOpenAI},
+			model:   "deepseek-flash[1m]",
+			want:    "deepseek-flash[1m]",
 		},
 	}
 

@@ -104,13 +104,13 @@ func TestFetchDeepSeekBalancePreservesProviderStatus(t *testing.T) {
 func TestFetchDeepSeekBalanceDoesNotMutateSchedulingState(t *testing.T) {
 	account := &Account{
 		ID:          902,
-		Platform:     PlatformDeepSeek,
-		Type:         AccountTypeAPIKey,
-		Status:       StatusActive,
-		Schedulable:  true,
-		Credentials:  map[string]any{"api_key": "sk-deepseek"},
-		Extra:        map[string]any{"quota_used": 3.5},
-		Concurrency:  1,
+		Platform:    PlatformDeepSeek,
+		Type:        AccountTypeAPIKey,
+		Status:      StatusActive,
+		Schedulable: true,
+		Credentials: map[string]any{"api_key": "sk-deepseek"},
+		Extra:       map[string]any{"quota_used": 3.5},
+		Concurrency: 1,
 	}
 	repo := &mockAccountRepoForGemini{accountsByID: map[int64]*Account{account.ID: account}}
 	upstream := &httpUpstreamRecorder{resp: &http.Response{
@@ -160,7 +160,7 @@ func TestOpenAIGatewayDeepSeekChatCompletionsUsesRawEndpoint(t *testing.T) {
 	upstream := &httpUpstreamRecorder{resp: &http.Response{
 		StatusCode: http.StatusOK,
 		Header:     http.Header{"Content-Type": []string{"application/json"}},
-		Body: io.NopCloser(bytes.NewBufferString(`{"id":"chatcmpl_deepseek","object":"chat.completion","model":"deepseek-reasoner","choices":[{"index":0,"message":{"role":"assistant","reasoning_content":"thinking","content":"done"},"finish_reason":"stop"}],"usage":{"prompt_tokens":3,"completion_tokens":2,"total_tokens":5}}`)),
+		Body:       io.NopCloser(bytes.NewBufferString(`{"id":"chatcmpl_deepseek","object":"chat.completion","model":"deepseek-reasoner","choices":[{"index":0,"message":{"role":"assistant","reasoning_content":"thinking","content":"done"},"finish_reason":"stop"}],"usage":{"prompt_tokens":3,"completion_tokens":2,"total_tokens":5}}`)),
 	}}
 	svc := &OpenAIGatewayService{cfg: rawChatCompletionsTestConfig(), httpUpstream: upstream}
 	account := &Account{

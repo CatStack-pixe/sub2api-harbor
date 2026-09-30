@@ -192,7 +192,7 @@ func TestCompositeRequestModelFromMultipartLiveSession(t *testing.T) {
 	require.NoError(t, writer.WriteField("session", `{"model":"live-alias"}`))
 	require.NoError(t, writer.Close())
 
-	require.Equal(t, "live-alias", compositeRequestModelFromBody(writer.FormDataContentType(), body.Bytes()))
+	require.Equal(t, "live-alias", requestmodel.FromBody(writer.FormDataContentType(), body.Bytes()))
 }
 
 func TestCompositeCodexControlPathsUseResponsesRoutes(t *testing.T) {

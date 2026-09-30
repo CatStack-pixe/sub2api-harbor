@@ -177,9 +177,7 @@ func (s *OpsSystemLogSink) shouldIndex(event *logger.LogEvent) bool {
 		}
 	}
 	if strings.Contains(component, "http.access") {
-		// Routine access logs are high-volume telemetry. Keep warn/error levels
-		// above, but avoid indexing every successful request in PostgreSQL.
-		return false
+		return s.persistAccessLogs.Load()
 	}
 	if strings.Contains(component, "audit") {
 		return true

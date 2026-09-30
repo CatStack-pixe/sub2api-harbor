@@ -87,6 +87,7 @@ const props = withDefaults(
     windowStats?: WindowStats | null
     usageDisplay?: string | null
     usageDisplayTitle?: string
+    estimatedTotalCost?: number | null
     showNowWhenIdle?: boolean
     remainingCapacity?: boolean
     /** fixed: 定宽居中徽章（账号页纵向对齐）；auto: 限宽截断左对齐（监控页组合标签） */
