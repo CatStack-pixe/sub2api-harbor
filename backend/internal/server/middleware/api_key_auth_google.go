@@ -136,6 +136,22 @@ func APIKeyAuthWithSubscriptionGoogle(apiKeyService *service.APIKeyService, subs
 
 		// 简易模式：跳过余额和订阅检查
 		if cfg.RunMode == config.RunModeSimple {
+			if apiKey.Group != nil && apiKey.Group.IsSubscriptionType() {
+				if subscriptionService == nil {
+					abortWithGoogleError(c, 403, "No active subscription found for this group")
+					return
+				}
+				subscription, subErr := subscriptionService.GetActiveSubscription(
+					c.Request.Context(),
+					apiKey.User.ID,
+					apiKey.Group.ID,
+				)
+				if subErr != nil {
+					abortWithGoogleError(c, 403, "No active subscription found for this group")
+					return
+				}
+				c.Set(string(ContextKeySubscription), subscription)
+			}
 			c.Set(string(ContextKeyAPIKey), apiKey)
 			c.Set(string(ContextKeyUser), AuthSubject{
 				UserID:      apiKey.User.ID,

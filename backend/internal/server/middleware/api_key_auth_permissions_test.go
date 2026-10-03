@@ -106,6 +106,56 @@ func TestAPIKeyAuthPermissionMatrix(t *testing.T) {
 	}
 }
 
+func TestAPIKeyAuthSimpleModeRequiresSubscriptionEntitlement(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	for _, google := range []bool{false, true} {
+		protocol := map[bool]string{false: "standard", true: "google"}[google]
+		t.Run(protocol, func(t *testing.T) {
+			for _, active := range []bool{false, true} {
+				name := map[bool]string{false: "missing subscription", true: "active subscription"}[active]
+				t.Run(name, func(t *testing.T) {
+					user := &service.User{
+						ID: 42, Role: service.RoleUser, Status: service.StatusActive, Balance: 12,
+					}
+					group := &service.Group{
+						ID: 7, Status: service.StatusActive,
+						SubscriptionType: service.SubscriptionTypeSubscription, Hydrated: true,
+					}
+					keys := &stubApiKeyRepo{getByKey: func(context.Context, string) (*service.APIKey, error) {
+						return &service.APIKey{
+							ID: 100, UserID: user.ID, Key: "local-permission-key", Status: service.StatusActive,
+							GroupID: &group.ID, Group: group, User: user,
+						}, nil
+					}}
+					subRepo := &stubUserSubscriptionRepo{getActive: func(_ context.Context, userID, groupID int64) (*service.UserSubscription, error) {
+						if !active {
+							return nil, service.ErrSubscriptionNotFound
+						}
+						return &service.UserSubscription{
+							ID: 200, UserID: userID, GroupID: groupID,
+							Status:    service.SubscriptionStatusActive,
+							ExpiresAt: time.Now().Add(time.Hour),
+						}, nil
+					}}
+					cfg := &config.Config{RunMode: config.RunModeSimple}
+					apiKeys := service.NewAPIKeyService(keys, nil, nil, nil, nil, nil, cfg)
+					subscriptions := service.NewSubscriptionService(nil, subRepo, nil, nil, cfg)
+					t.Cleanup(subscriptions.Stop)
+					calls := 0
+					recorder := permissionAuthRequest(permissionAuthRouter(apiKeys, subscriptions, cfg, google, &calls))
+					if active {
+						require.Equal(t, http.StatusOK, recorder.Code, recorder.Body.String())
+						require.Equal(t, 1, calls)
+					} else {
+						require.Equal(t, http.StatusForbidden, recorder.Code, recorder.Body.String())
+						require.Zero(t, calls, "a subscription key without an entitlement must be rejected")
+					}
+				})
+			}
+		})
+	}
+}
+
 func ptrToPermissionTime(value time.Time) *time.Time { return &value }
 
 type permissionAuthUserRepo struct {
