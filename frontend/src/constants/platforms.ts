@@ -31,7 +31,8 @@ export const CONCRETE_PLATFORM_OPTIONS = [
   { value: 'minimax', label: 'MiniMax' },
   { value: 'volcengine', label: 'Volcengine Ark' },
   { value: 'sensenova', label: 'SenseNova' },
-  { value: 'opencode_go', label: 'OpenCode' }
+  { value: 'opencode_go', label: 'OpenCode' },
+  { value: 'typesafe', label: 'TypeSafe / Jev' }
 ] as const satisfies readonly PlatformOption<AccountPlatform>[]
 
 /** Platforms that can own a group. */

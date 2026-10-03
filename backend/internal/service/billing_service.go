@@ -369,6 +369,10 @@ func NewBillingService(cfg *config.Config, pricingService *PricingService) *Bill
 // initFallbackPricing 初始化硬编码回退价格（当动态价格不可用时使用）
 // 价格单位：USD per token（与LiteLLM格式一致）
 func (s *BillingService) initFallbackPricing() {
+	s.fallbackPrices["jev-latest"] = &ModelPricing{
+		InputPricePerToken:  0.042 / 1_000_000,
+		OutputPricePerToken: 0,
+	}
 	// Agnes currently documents agnes-2.0-flash as free for both input and output.
 	s.fallbackPrices[AgnesDefaultModel] = &ModelPricing{SupportsCacheBreakdown: false}
 	// Claude 4.5 Opus
@@ -1011,6 +1015,9 @@ func (s *BillingService) getFallbackPricing(model string) *ModelPricing {
 	modelLower := strings.ToLower(model)
 	if modelLower == AgnesDefaultModel {
 		return s.fallbackPrices[AgnesDefaultModel]
+	}
+	if modelLower == "jev-latest" {
+		return s.fallbackPrices["jev-latest"]
 	}
 
 	// 按模型系列匹配

@@ -24,10 +24,20 @@ const concretePlatforms = [
   'minimax',
   'volcengine',
   'sensenova',
-  'opencode_go'
+  'opencode_go',
+  'typesafe'
 ]
 
 describe('platform option catalogs', () => {
+  it('registers TypeSafe alongside all fork platforms', () => {
+    expect(platformLabel('typesafe')).toBe('TypeSafe / Jev')
+    expect(platformAccentColor('typesafe')).toBe('#0ea5e9')
+    expect(getKeyGroupProvider('typesafe')).toBe('other')
+    for (const platform of ['agnes', 'nvidia', 'tokenrhythm', 'tierflow', 'senseaudio', 'sensenova']) {
+      expect(concretePlatforms).toContain(platform)
+      expect(platformLabel(platform)).not.toBe('API')
+    }
+  })
   it('labels and styles Tierflow as its own relay platform', () => {
     expect(platformLabel('tierflow')).toBe('Tierflow / 清枢智汇')
     expect(platformAccentColor('tierflow')).toBe('#0891b2')

@@ -31,6 +31,7 @@ const allNullQuotas: DefaultPlatformQuotasMap = {
   minimax: { daily: null, weekly: null, monthly: null },
   volcengine: { daily: null, weekly: null, monthly: null },
   sensenova: { daily: null, weekly: null, monthly: null },
+  typesafe: { daily: null, weekly: null, monthly: null },
 }
 
 describe("admin settings auth source defaults helpers", () => {
@@ -266,7 +267,7 @@ describe("normalizePlatformQuotasMap", () => {
 
   it("无参数时返回全平台全 null", () => {
     const result = normalizePlatformQuotasMap();
-    expect(Object.keys(result)).toHaveLength(20);
+    expect(Object.keys(result)).toEqual(Object.keys(allNullQuotas));
     expect(result.senseaudio).toEqual({ daily: null, weekly: null, monthly: null });
     for (const v of Object.values(result)) {
       expect(v).toEqual({ daily: null, weekly: null, monthly: null });
@@ -282,6 +283,24 @@ describe("normalizePlatformQuotasMap", () => {
 });
 
 describe("sanitizePlatformQuotasMap", () => {
+  it("round-trips TypeSafe quotas alongside every fork platform without dropping limits", () => {
+    const quotas: DefaultPlatformQuotasMap = Object.fromEntries(
+      Object.keys(allNullQuotas).map(platform => [
+        platform, { daily: 0, weekly: 12.5, monthly: 100 },
+      ]),
+    );
+    const normalized = normalizePlatformQuotasMap(quotas);
+    expect(normalized).toEqual(quotas);
+    expect(sanitizePlatformQuotasMap(normalized)).toEqual(quotas);
+    const state = buildAuthSourceDefaultsState({
+      auth_source_default_email_platform_quotas: quotas,
+    });
+    const payload: UpdateSettingsRequest = {};
+    appendAuthSourceDefaultsToUpdateRequest(payload, state);
+    expect(payload.auth_source_default_email_platform_quotas).toEqual(quotas);
+    expect(quotas.typesafe).toEqual({ daily: 0, weekly: 12.5, monthly: 100 });
+  });
+
   it("保留合法的正数和零值", () => {
     const result = sanitizePlatformQuotasMap({
       anthropic: { daily: 10.5, weekly: 0, monthly: null },
@@ -315,7 +334,7 @@ describe("sanitizePlatformQuotasMap", () => {
 
   it("缺失平台填充为全 null", () => {
     const result = sanitizePlatformQuotasMap({});
-    expect(Object.keys(result)).toHaveLength(20);
+    expect(Object.keys(result)).toEqual(Object.keys(allNullQuotas));
     for (const v of Object.values(result)) {
       expect(v).toEqual({ daily: null, weekly: null, monthly: null });
     }

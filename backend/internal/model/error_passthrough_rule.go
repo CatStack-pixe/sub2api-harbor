@@ -52,6 +52,7 @@ const (
 	PlatformModelScope   = domain.PlatformModelScope
 	PlatformDashScope    = domain.PlatformDashScope
 	PlatformMiniMax      = domain.PlatformMiniMax
+	PlatformTypeSafe     = domain.PlatformTypeSafe
 	PlatformVolcengine   = domain.PlatformVolcengine
 	PlatformSenseNova    = domain.PlatformSenseNova
 	PlatformSenseAudio   = domain.PlatformSenseAudio
@@ -83,6 +84,7 @@ func AllPlatforms() []string {
 		PlatformSenseAudio,
 		PlatformTierflow,
 		PlatformOpenCodeGo,
+		PlatformTypeSafe,
 	}
 }
 

@@ -331,6 +331,35 @@ describe('EditAccountModal', () => {
 
   afterEach(() => vi.useRealTimers())
 
+  it.each([undefined, 'https://relay.example/typesafe'])('edits TypeSafe without overwriting its URL or model mapping (%s)', async (baseUrl) => {
+    const account = {
+      ...buildAccount(),
+      platform: 'typesafe',
+      credentials: {
+        base_url: baseUrl,
+        model_mapping: { 'public-jev': 'jev-latest' }
+      },
+      credentials_status: { has_api_key: true }
+    }
+    updateAccountMock.mockReset().mockResolvedValue(account)
+    checkMixedChannelRiskMock.mockReset().mockResolvedValue({ has_risk: false })
+    const wrapper = mountModal(account)
+    const expectedUrl = baseUrl || 'https://api.typesafe.ai'
+    const urlInput = wrapper.findAll('input').find(input => input.element.value === expectedUrl)
+    expect(urlInput).toBeDefined()
+    if (!baseUrl) await urlInput!.setValue('')
+    await wrapper.get('form#edit-account-form').trigger('submit.prevent')
+
+    expect(updateAccountMock).toHaveBeenCalledTimes(1)
+    const credentials = updateAccountMock.mock.calls[0]?.[1]?.credentials
+    expect(credentials).toMatchObject({
+      base_url: expectedUrl,
+      model_mapping: { 'public-jev': 'jev-latest' }
+    })
+    expect(credentials).not.toHaveProperty('api_key')
+    wrapper.unmount()
+  })
+
   it('updates Tierflow console credentials while retaining the redacted API key', async () => {
     const account = {
       ...buildAccount(),

@@ -130,6 +130,8 @@ func DetectModelPlatform(model string) (string, bool) {
 			return PlatformDashScope, true
 		case "minimax":
 			return PlatformMiniMax, true
+		case "typesafe", "jev":
+			return PlatformTypeSafe, true
 		case "volcengine", "ark", "doubao":
 			return PlatformVolcengine, true
 		case "sensenova", "sensecore", "sensechat":
@@ -190,6 +192,8 @@ func DetectModelPlatform(model string) (string, bool) {
 		return PlatformDashScope, true
 	case strings.HasPrefix(normalized, "minimax-"), strings.HasPrefix(normalized, "abab5"), strings.HasPrefix(normalized, "abab6"), strings.HasPrefix(normalized, "abab7"):
 		return PlatformMiniMax, true
+	case normalized == "jev-latest" || strings.HasPrefix(normalized, "jev-"):
+		return PlatformTypeSafe, true
 	case strings.HasPrefix(normalized, "doubao-"):
 		return PlatformVolcengine, true
 	case strings.HasPrefix(normalized, "sensenova-"),
@@ -246,7 +250,7 @@ func isConcreteRequestPlatform(platform string) bool {
 	case PlatformAnthropic, PlatformOpenAI, PlatformGemini, PlatformAntigravity, PlatformGrok,
 		PlatformAgnes, PlatformDeepSeek, PlatformNvidia, PlatformTokenRhythm, PlatformKimi,
 		PlatformZhipu, PlatformChatAnywhere, PlatformGLM, PlatformModelScope, PlatformDashScope,
-		PlatformMiniMax, PlatformVolcengine, PlatformSenseNova, PlatformSenseAudio, PlatformTierflow, PlatformOpenCodeGo:
+		PlatformMiniMax, PlatformVolcengine, PlatformSenseNova, PlatformSenseAudio, PlatformTierflow, PlatformOpenCodeGo, PlatformTypeSafe:
 		return true
 	default:
 		return false

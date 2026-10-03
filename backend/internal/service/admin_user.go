@@ -281,6 +281,10 @@ func (s *adminServiceImpl) UpdateUser(ctx context.Context, id int64, input *Upda
 		user.AllowedGroups = *input.AllowedGroups
 		fields.AllowedGroups = true
 	}
+	if input.RestrictPublicGroups != nil {
+		user.RestrictPublicGroups = *input.RestrictPublicGroups
+		fields.RestrictPublicGroups = true
+	}
 
 	if err := s.userRepo.Update(ctx, user, fields); err != nil {
 		return nil, err

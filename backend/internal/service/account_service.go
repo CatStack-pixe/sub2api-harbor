@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -231,6 +232,9 @@ func NewAccountService(accountRepo AccountRepository, groupRepo GroupRepository)
 
 // Create 创建账号
 func (s *AccountService) Create(ctx context.Context, req CreateAccountRequest) (*Account, error) {
+	if req.Platform == PlatformTypeSafe && req.Type != AccountTypeAPIKey {
+		return nil, errors.New("typesafe accounts only support apikey credentials")
+	}
 	if err := validateAccountCredentials(req.Platform, req.Type, req.Credentials); err != nil {
 		return nil, err
 	}
@@ -539,7 +543,7 @@ func (s *AccountService) TestCredentials(ctx context.Context, id int64) error {
 		return nil
 	case PlatformDeepSeek, PlatformNvidia, PlatformTokenRhythm, PlatformKimi,
 		PlatformChatAnywhere, PlatformGLM, PlatformZhipu,
-		PlatformModelScope, PlatformDashScope, PlatformMiniMax, PlatformVolcengine, PlatformSenseNova, PlatformSenseAudio, PlatformTierflow, PlatformOpenCodeGo:
+		PlatformModelScope, PlatformDashScope, PlatformMiniMax, PlatformVolcengine, PlatformSenseNova, PlatformSenseAudio, PlatformTierflow, PlatformOpenCodeGo, PlatformTypeSafe:
 		return validateAccountCredentials(account.Platform, account.Type, account.Credentials)
 	default:
 		return fmt.Errorf("unsupported platform: %s", account.Platform)

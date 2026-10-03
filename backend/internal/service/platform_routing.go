@@ -11,7 +11,7 @@ func accountPlatformsForGroupPlatform(groupPlatform string) []string {
 		return nil
 	}
 	switch groupPlatform {
-	case PlatformAnthropic, PlatformGemini, PlatformAntigravity:
+	case PlatformAnthropic, PlatformGemini, PlatformAntigravity, PlatformTypeSafe:
 		return []string{groupPlatform}
 	case PlatformComposite:
 		platforms := schedulerSnapshotPlatforms()
@@ -45,7 +45,7 @@ func accountPlatformMatchesGroup(groupPlatform, accountPlatform string) bool {
 	// must keep their protocol-specific account pool. Mixed scheduling adds an
 	// explicitly enabled Antigravity account at the call site.
 	switch groupPlatform {
-	case PlatformAnthropic, PlatformGemini, PlatformAntigravity:
+	case PlatformAnthropic, PlatformGemini, PlatformAntigravity, PlatformTypeSafe:
 		return accountPlatform == groupPlatform
 	case PlatformComposite:
 		return true

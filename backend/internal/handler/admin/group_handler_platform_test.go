@@ -71,8 +71,8 @@ func TestGroupPlatformBinding_RejectsInvalidPlatforms(t *testing.T) {
 	}
 }
 
-func TestCompositeRouteTargetPlatform_AllowsCNProviders(t *testing.T) {
-	for _, platform := range []string{"kimi", "zhipu", "deepseek", "minimax", "opencode_go"} {
+func TestCompositeRouteTargetPlatform_AllowsConcreteProviders(t *testing.T) {
+	for _, platform := range []string{"kimi", "zhipu", "deepseek", "minimax", "opencode_go", "typesafe"} {
 		var req CompositeRouteRequest
 		body := fmt.Sprintf(`{"public_model":"m","target_platform":%q}`, platform)
 		require.NoError(t, bindGroupPlatformJSON(t, &req, body))

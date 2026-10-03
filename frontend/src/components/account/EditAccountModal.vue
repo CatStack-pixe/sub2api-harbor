@@ -4136,6 +4136,7 @@ const defaultBaseUrl = computed(() => {
   if (props.account?.platform === 'openai') return 'https://api.openai.com'
   if (props.account?.platform === 'gemini') return 'https://generativelanguage.googleapis.com'
   if (props.account?.platform === 'grok') return 'https://api.x.ai/v1'
+  if (props.account?.platform === 'typesafe') return 'https://api.typesafe.ai'
   if (props.account?.platform === 'agnes') return 'https://apihub.agnes-ai.com/v1'
   if (props.account?.platform === 'nvidia') return 'https://integrate.api.nvidia.com/v1'
   if (props.account?.platform === 'tokenrhythm') return 'https://tokenrhythm.studio/v1'
@@ -4601,6 +4602,7 @@ const syncFormFromAccount = (newAccount: Account | null) => {
       openai: 'https://api.openai.com',
       gemini: 'https://generativelanguage.googleapis.com',
       grok: 'https://api.x.ai/v1',
+      typesafe: 'https://api.typesafe.ai',
       agnes: 'https://apihub.agnes-ai.com/v1',
       tokenrhythm: 'https://tokenrhythm.studio/v1',
       tierflow: 'https://tierflow.cn/v1',
@@ -4689,6 +4691,8 @@ const syncFormFromAccount = (newAccount: Account | null) => {
           ? 'https://generativelanguage.googleapis.com'
           : newAccount.platform === 'grok'
             ? 'https://api.x.ai/v1'
+            : newAccount.platform === 'typesafe'
+              ? 'https://api.typesafe.ai'
             : newAccount.platform === 'agnes'
               ? 'https://apihub.agnes-ai.com/v1'
               : newAccount.platform === 'tokenrhythm'
