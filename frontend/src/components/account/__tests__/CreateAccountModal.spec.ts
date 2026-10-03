@@ -214,6 +214,34 @@ describe('CreateAccountModal OpenAI long-context billing', () => {
 
   afterEach(() => vi.useRealTimers())
 
+  it.each([false, true])('creates TypeSafe after Grok with its default URL and whitelist (clear URL: %s)', async (clearUrl) => {
+    const wrapper = mountModal()
+    await selectButtonByText(wrapper, 'Grok')
+    await selectButtonByText(wrapper, 'TypeSafe / Jev')
+    await wrapper.get('form#create-account-form input[type="text"]').setValue('TypeSafe account')
+    await wrapper.get('form#create-account-form input[type="password"]').setValue('ts-test')
+    const baseUrl = wrapper.findAll('input').find(input =>
+      input.element.value === 'https://api.typesafe.ai'
+    )
+    expect(baseUrl).toBeDefined()
+    expect(baseUrl!.attributes('placeholder')).toBe('https://api.typesafe.ai')
+    if (clearUrl) await baseUrl!.setValue('')
+    await wrapper.get('form#create-account-form').trigger('submit.prevent')
+    await flushPromises()
+
+    expect(createAccountMock).toHaveBeenCalledTimes(1)
+    expect(createAccountMock.mock.calls[0]?.[0]).toMatchObject({
+      platform: 'typesafe',
+      type: 'apikey',
+      credentials: {
+        base_url: 'https://api.typesafe.ai',
+        api_key: 'ts-test',
+        model_mapping: { 'jev-latest': 'jev-latest' }
+      }
+    })
+    wrapper.unmount()
+  })
+
   it('creates a Tierflow API-key account with optional independent console credentials', async () => {
     const wrapper = mountModal()
     await wrapper.get('[data-testid="tierflow-platform"]').trigger('click')

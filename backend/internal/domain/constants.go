@@ -34,6 +34,7 @@ const (
 	PlatformModelScope   = "modelscope"
 	PlatformDashScope    = "dashscope"
 	PlatformMiniMax      = "minimax"
+	PlatformTypeSafe     = "typesafe"
 	PlatformVolcengine   = "volcengine"
 	PlatformSenseNova    = "sensenova"
 	PlatformSenseAudio   = "senseaudio"

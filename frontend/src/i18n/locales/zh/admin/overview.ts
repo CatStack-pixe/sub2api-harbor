@@ -997,6 +997,7 @@ export default {
         volcengine: '火山引擎 Ark',
         sensenova: 'SenseNova',
         opencode_go: 'OpenCode',
+        typesafe: 'TypeSafe / Jev',
         composite: 'Composite',
       },
       saving: '保存中...',

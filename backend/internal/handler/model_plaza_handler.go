@@ -131,10 +131,11 @@ func (h *ModelPlazaHandler) Get(c *gin.Context) {
 	}
 
 	// allowedExclusive == nil 表示匿名；登录用户恒为非 nil（可能为空集合）。
-	var allowedExclusive map[int64]struct{}
+	var allowed map[int64]struct{}
+	var restrictPublicGroups bool
 	var userRates map[int64]float64
 	if authed {
-		allowedExclusive, err = h.apiKeyService.GetUserAllowedGroupIDSet(c.Request.Context(), subject.UserID)
+		allowed, restrictPublicGroups, err = h.apiKeyService.GetUserGroupVisibility(c.Request.Context(), subject.UserID)
 		if err != nil {
 			// 可见性数据拿不到时不能静默降级成匿名视图（会错漏专属分组），直接报错。
 			response.ErrorFrom(c, err)
@@ -148,7 +149,7 @@ func (h *ModelPlazaHandler) Get(c *gin.Context) {
 		}
 	}
 
-	visible := filterPlazaVisibleGroups(groups, allowedExclusive)
+	visible := filterPlazaVisibleGroups(groups, allowed, restrictPublicGroups)
 
 	out := make([]modelPlazaGroup, 0, len(visible))
 	for i := range visible {
@@ -165,15 +166,23 @@ func (h *ModelPlazaHandler) Get(c *gin.Context) {
 // 广场保留橱窗语义，公开订阅分组照常展示，专属订阅分组仍需显式授权。
 func filterPlazaVisibleGroups(
 	groups []service.PlazaGroup,
-	allowedExclusive map[int64]struct{},
+	allowed map[int64]struct{},
+	restrictPublicGroups bool,
 ) []service.PlazaGroup {
 	visible := make([]service.PlazaGroup, 0, len(groups))
 	for _, g := range groups {
 		if g.IsExclusive {
-			if allowedExclusive == nil {
+			if allowed == nil {
 				continue
 			}
-			if _, ok := allowedExclusive[g.ID]; !ok {
+			if _, ok := allowed[g.ID]; !ok {
+				continue
+			}
+		} else if restrictPublicGroups {
+			if allowed == nil {
+				continue
+			}
+			if _, ok := allowed[g.ID]; !ok {
 				continue
 			}
 		}

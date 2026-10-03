@@ -76,7 +76,7 @@ beforeEach(() => {
 })
 
 describe('UserPlatformQuotaModal', () => {
-  it.each([0, 4, 14])('does not turn a negative limit in input %s into unlimited', async (index) => {
+  it.each([0, 4, 14, 17])('does not turn a negative limit in input %s into unlimited', async (index) => {
     const w = await mountAndOpen()
     await w.findAll('input[type=number]')[index].setValue('-1')
     await w.findAll('button').find(b => b.text() === 'admin.users.platformQuota.save')!.trigger('click')
@@ -108,7 +108,7 @@ describe('UserPlatformQuotaModal', () => {
       'anthropic', 'openai', 'gemini', 'antigravity', 'grok', 'agnes',
       'deepseek', 'nvidia', 'tokenrhythm', 'tierflow', 'senseaudio',
       'kimi', 'zhipu', 'chatanywhere', 'glm', 'modelscope', 'dashscope',
-      'minimax', 'volcengine', 'sensenova', 'opencode_go',
+      'minimax', 'volcengine', 'sensenova', 'opencode_go', 'typesafe',
     ]
     expect(PLATFORM_QUOTA_PLATFORMS).toEqual(expectedPlatforms)
     expect(w.findAll('tbody tr').map(row => row.find('td').text())).toEqual(expectedPlatforms)

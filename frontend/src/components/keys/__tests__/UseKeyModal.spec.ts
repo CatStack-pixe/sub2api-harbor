@@ -39,6 +39,46 @@ describe('UseKeyModal', () => {
     vi.unstubAllGlobals()
     saveAsMock.mockClear()
   })
+  it('selects SystemOne by default and renders valid shell examples for TypeSafe', async () => {
+    const wrapper = mount(UseKeyModal, {
+      props: {
+        show: true,
+        apiKey: 'sk-systemone-test',
+        baseUrl: 'https://example.com/v1',
+        platform: 'typesafe'
+      },
+      global: {
+        stubs: {
+          BaseDialog: { template: '<div><slot /><slot name="footer" /></div>' },
+          Icon: { template: '<span />' }
+        }
+      }
+    })
+    const clientTab = wrapper.get('nav[aria-label="Client"] button')
+    expect(clientTab.text()).toContain('keys.useKeyModal.cliTabs.systemOne')
+    expect(clientTab.classes()).toContain('border-primary-500')
+    const unix = wrapper.get('pre code').text()
+    expect(unix).toContain('https://example.com/v1/systemone')
+    expect(unix).not.toContain('/v1/v1/')
+    const payload = JSON.parse(unix.match(/--data '([\s\S]+)'/)![1])
+    expect(payload).toMatchObject({
+      model: 'jev-latest',
+      questions: { safety: { type: 'noul' } }
+    })
+
+    await wrapper.findAll('button').find(button => button.text().trim() === 'Windows CMD')!.trigger('click')
+    const cmd = wrapper.get('pre code').text()
+    expect(cmd).toContain('Authorization: Bearer sk-systemone-test')
+    const cmdPayload = cmd.match(/--data "(.+)"/)![1].replace(/\\"/g, '"')
+    expect(JSON.parse(cmdPayload)).toEqual(payload)
+    expect(cmd).toContain(String.raw`\"model\":\"jev-latest\"`)
+
+    await wrapper.findAll('button').find(button => button.text().trim() === 'PowerShell')!.trigger('click')
+    expect(wrapper.get('pre code').text()).toContain('Invoke-RestMethod -Method Post')
+    expect(wrapper.get('pre code').text()).toContain('https://example.com/v1/systemone')
+    wrapper.unmount()
+  })
+
   it('renders Grok Build and OpenCode setup for Grok groups', async () => {
     const wrapper = mount(UseKeyModal, {
       props: {

@@ -30,7 +30,7 @@ vi.mock('vue-i18n', async () => ({
   useI18n: () => ({ t: (key: string) => key }),
 }))
 
-const platforms = ['deepseek', 'minimax', 'tierflow', 'senseaudio', 'sensenova', 'opencode_go'] as const
+const platforms = ['deepseek', 'minimax', 'agnes', 'nvidia', 'tokenrhythm', 'tierflow', 'senseaudio', 'sensenova', 'opencode_go', 'typesafe'] as const
 
 function createPricing(platform: string): ChannelModelPricing {
   return {

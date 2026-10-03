@@ -719,6 +719,7 @@ var platformToLiteLLMProvider = map[string]string{
 	service.PlatformSenseNova:    "sensenova",
 	service.PlatformSenseAudio:   "senseaudio",
 	service.PlatformTierflow:     "tierflow",
+	service.PlatformTypeSafe:     "typesafe",
 	service.PlatformOpenCodeGo:   "opencode-go",
 }
 

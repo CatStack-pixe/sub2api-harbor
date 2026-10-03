@@ -1064,6 +1064,7 @@ export default {
         volcengine: 'Volcengine Ark',
         sensenova: 'SenseNova',
         opencode_go: 'OpenCode',
+        typesafe: 'TypeSafe / Jev',
         composite: 'Composite',
       },
       deleteConfirm:

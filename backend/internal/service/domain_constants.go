@@ -55,6 +55,7 @@ const (
 	PlatformModelScope        = domain.PlatformModelScope
 	PlatformDashScope         = domain.PlatformDashScope
 	PlatformMiniMax           = domain.PlatformMiniMax
+	PlatformTypeSafe          = domain.PlatformTypeSafe
 	PlatformVolcengine        = domain.PlatformVolcengine
 	PlatformSenseNova         = domain.PlatformSenseNova
 	PlatformSenseAudio        = domain.PlatformSenseAudio
@@ -173,6 +174,7 @@ var AllowedQuotaPlatforms = []string{
 	PlatformSenseAudio,
 	PlatformTierflow,
 	PlatformOpenCodeGo,
+	PlatformTypeSafe,
 }
 
 // Default model IDs keep provider-specific account creation and model sync

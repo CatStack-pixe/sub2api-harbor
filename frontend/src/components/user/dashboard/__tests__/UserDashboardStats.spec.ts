@@ -132,6 +132,25 @@ describe('UserDashboardStats 按平台拆分', () => {
     expect(w.text()).toContain('Kimi')
   })
 
+  it('TypeSafe 使用 Jev 标签并位于未知平台之前', () => {
+    const w = mountStats(
+      makeStats({ total_actual_cost: 0.5, today_actual_cost: 0, by_platform: [usage('unknown-provider', 0.3), usage('typesafe', 0.2)] })
+    )
+    expect(cardPlatforms(w)).toEqual(['typesafe', 'unknown-provider'])
+    expect(w.text()).toContain('TypeSafe / Jev')
+  })
+
+  it('保留 fork 平台顺序，并在其后展示 TypeSafe 配额', () => {
+    const platforms = ['agnes', 'kimi', 'nvidia', 'tokenrhythm', 'tierflow', 'senseaudio', 'sensenova', 'typesafe']
+    const w = mountStats(
+      makeStats(),
+      [...platforms].reverse().map(platform => quota({ platform, daily_limit_usd: 10 }))
+    )
+    expect(cardPlatforms(w)).toEqual(platforms)
+    expect(w.findAll('[data-testid="platform-card"]')).toHaveLength(platforms.length)
+    expect(w.text()).toContain('TypeSafe / Jev')
+  })
+
   it('总值大于各平台之和时追加"其他"卡片，且不计入平台计数', () => {
     const w = mountStats(
       makeStats({ total_actual_cost: 1.0, today_actual_cost: 0, by_platform: [usage('anthropic', 0.4)] })
