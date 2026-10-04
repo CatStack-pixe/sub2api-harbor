@@ -822,6 +822,14 @@ func TestGetAvailableModels_GeminiMixedListingKeepsWireModelBoundary(t *testing.
 						"claude-mixed": "claude-sonnet-4-6",
 					}},
 				},
+				{
+					ID:       2,
+					Platform: PlatformOpenAI,
+					Extra:    map[string]any{"mixed_scheduling": true},
+					Credentials: map[string]any{"model_mapping": map[string]any{
+						"gemini-leak": "gemini-leak",
+					}},
+				},
 			},
 		},
 	}
@@ -830,6 +838,7 @@ func TestGetAvailableModels_GeminiMixedListingKeepsWireModelBoundary(t *testing.
 	got := svc.GetAvailableModels(context.Background(), &groupID, PlatformGemini)
 	require.Contains(t, got, "gemini-mixed")
 	require.NotContains(t, got, "claude-mixed")
+	require.NotContains(t, got, "gemini-leak")
 }
 
 func TestGatewayHotpathHelpers_CacheTTLAndStickyContext(t *testing.T) {
