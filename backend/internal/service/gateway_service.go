@@ -1381,13 +1381,33 @@ func (s *GatewayService) DoGrokNativeResponsesJSON(ctx context.Context, account 
 // GeminiMessagesCompatService.listSchedulableAccountsOnce: a gemini group may be
 // served by antigravity accounts, so model listing must consider them too.
 func mixedListingAccountAllowed(groupPlatform string, account *Account) bool {
-	return groupPlatform == PlatformGemini && account.IsMixedSchedulingEnabled()
+	return groupPlatform == PlatformGemini && account != nil && account.Platform == PlatformAntigravity && account.IsMixedSchedulingEnabled()
 }
 
 // mixedListingModelAllowed limits what a mixed-scheduling account may advertise
 // on the group's platform: only gemini-* wire IDs are meaningful on a gemini group.
 func mixedListingModelAllowed(groupPlatform, model string) bool {
 	return groupPlatform == PlatformGemini && isAntigravityGeminiModel(model)
+}
+
+// modelListingMappingAllowed keeps model-list aggregation aligned with the
+// account candidates selected above. Ordinary OpenAI-compatible groups share
+// compatible account mappings, while Gemini mixed scheduling remains limited
+// to the wire models that its Antigravity adapter can serve.
+func modelListingMappingAllowed(groupPlatform string, account *Account, model string, exactPlatform bool) bool {
+	if account == nil {
+		return false
+	}
+	if exactPlatform {
+		return account.Platform == groupPlatform
+	}
+	if account.Platform == groupPlatform {
+		return true
+	}
+	if mixedListingAccountAllowed(groupPlatform, account) {
+		return mixedListingModelAllowed(groupPlatform, model)
+	}
+	return accountPlatformMatchesGroup(groupPlatform, account.Platform)
 }
 
 func (s *GatewayService) GetAvailableModels(ctx context.Context, groupID *int64, platform string) []string {
@@ -1463,7 +1483,7 @@ func (s *GatewayService) getAvailableModels(ctx context.Context, groupID *int64,
 			// Accounts pulled in through mixed scheduling only contribute the
 			// models that belong to the listing platform (e.g. an antigravity
 			// account's claude-* mappings must not surface on a gemini group).
-			if platform != "" && acc.Platform != platform && !mixedListingModelAllowed(platform, model) {
+			if platform != "" && !modelListingMappingAllowed(platform, &acc, model, exactPlatform) {
 				continue
 			}
 			modelSet[model] = struct{}{}

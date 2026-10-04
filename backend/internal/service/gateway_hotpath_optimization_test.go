@@ -745,6 +745,102 @@ func TestGetAvailableModels_GlobalListPreservesMappedModelsWithOpenAIPassthrough
 	require.Equal(t, []string{"claude-mapped"}, svc.GetAvailableModels(context.Background(), &groupID, ""))
 }
 
+func TestGetAvailableModels_DeepSeekGroupIncludesCompatibleAccountMappings(t *testing.T) {
+	groupID := int64(12)
+	repo := &modelsListAccountRepoStub{
+		byGroup: map[int64][]Account{
+			groupID: {
+				{
+					ID:       1,
+					Platform: PlatformOpenAI,
+					Credentials: map[string]any{"model_mapping": map[string]any{
+						"deepseek-v4.1-flash": "deepseek-v4.1-flash",
+					}},
+				},
+				{
+					ID:       2,
+					Platform: PlatformSenseAudio,
+					Credentials: map[string]any{"model_mapping": map[string]any{
+						"deepseek-v4.1-pro": "deepseek-v4.1-pro",
+					}},
+				},
+				{
+					ID:       3,
+					Platform: PlatformAnthropic,
+					Credentials: map[string]any{"model_mapping": map[string]any{
+						"claude-sonnet-test": "claude-sonnet-test",
+					}},
+				},
+			},
+		},
+	}
+	svc := &GatewayService{accountRepo: repo}
+
+	got := svc.GetAvailableModels(context.Background(), &groupID, PlatformDeepSeek)
+	require.Equal(t, []string{"deepseek-v4.1-flash", "deepseek-v4.1-pro"}, got)
+}
+
+func TestGetAvailableModelsForExactPlatformKeepsCompatibleGroupIsolation(t *testing.T) {
+	groupID := int64(13)
+	repo := &modelsListAccountRepoStub{
+		byGroup: map[int64][]Account{
+			groupID: {
+				{
+					ID:       1,
+					Platform: PlatformOpenAI,
+					Credentials: map[string]any{"model_mapping": map[string]any{
+						"openai-model": "openai-model",
+					}},
+				},
+				{
+					ID:       2,
+					Platform: PlatformDeepSeek,
+					Credentials: map[string]any{"model_mapping": map[string]any{
+						"deepseek-model": "deepseek-model",
+					}},
+				},
+			},
+		},
+	}
+	svc := &GatewayService{accountRepo: repo}
+
+	got := svc.GetAvailableModelsForExactPlatform(context.Background(), &groupID, PlatformDeepSeek)
+	require.Equal(t, []string{"deepseek-model"}, got)
+}
+
+func TestGetAvailableModels_GeminiMixedListingKeepsWireModelBoundary(t *testing.T) {
+	groupID := int64(14)
+	repo := &modelsListAccountRepoStub{
+		byGroup: map[int64][]Account{
+			groupID: {
+				{
+					ID:       1,
+					Platform: PlatformAntigravity,
+					Extra:    map[string]any{"mixed_scheduling": true},
+					Credentials: map[string]any{"model_mapping": map[string]any{
+						"gemini-mixed": "gemini-3.8-flash-high",
+						"claude-mixed": "claude-sonnet-4-6",
+					}},
+				},
+				{
+					ID:       2,
+					Platform: PlatformOpenAI,
+					Extra:    map[string]any{"mixed_scheduling": true},
+					Credentials: map[string]any{"model_mapping": map[string]any{
+						"gemini-leak": "gemini-leak",
+					}},
+				},
+			},
+		},
+	}
+	svc := &GatewayService{accountRepo: repo}
+
+	got := svc.GetAvailableModels(context.Background(), &groupID, PlatformGemini)
+	require.Contains(t, got, "gemini-mixed")
+	require.NotContains(t, got, "claude-mixed")
+	require.NotContains(t, got, "gemini-leak")
+}
+
 func TestGatewayHotpathHelpers_CacheTTLAndStickyContext(t *testing.T) {
 	t.Run("resolve_user_group_rate_cache_ttl", func(t *testing.T) {
 		require.Equal(t, defaultUserGroupRateCacheTTL, resolveUserGroupRateCacheTTL(nil))
