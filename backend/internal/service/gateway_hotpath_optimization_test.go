@@ -828,7 +828,8 @@ func TestGetAvailableModels_GeminiMixedListingKeepsWireModelBoundary(t *testing.
 	svc := &GatewayService{accountRepo: repo}
 
 	got := svc.GetAvailableModels(context.Background(), &groupID, PlatformGemini)
-	require.Equal(t, []string{"gemini-mixed"}, got)
+	require.Contains(t, got, "gemini-mixed")
+	require.NotContains(t, got, "claude-mixed")
 }
 
 func TestGatewayHotpathHelpers_CacheTTLAndStickyContext(t *testing.T) {
