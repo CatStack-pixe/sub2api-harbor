@@ -196,7 +196,7 @@ func (s *AccountTestService) RunUpstreamTrace(ctx context.Context, accountID int
 	response, responseValue, err := s.traceRequest(ctx, http.MethodPost, traceDataURL(base, path), apiKey, body)
 	responseModel, usage := traceResponseFields(responseValue)
 	result.ResponseModel = responseModel
-	result.Usage = usage
+	result.Usage = redactTraceMap(usage, apiKey, req.ManagementToken)
 	result.Verdict["model_request"] = map[string]any{
 		"status":                         response.StatusCode,
 		"success":                        err == nil && response.StatusCode >= 200 && response.StatusCode < 300,
@@ -435,7 +435,12 @@ func (s *AccountTestService) traceRequest(ctx context.Context, method, rawURL, t
 	}
 	request.Header.Set("Accept", "application/json")
 	request.Header.Set("User-Agent", "sub2api-upstream-trace/1.0")
-	request.Header.Set("Authorization", "Bearer "+token)
+		if protocol := normalizeTraceProtocolFromPath(rawURL); protocol == "messages" {
+			request.Header.Set("x-api-key", token)
+			request.Header.Set("anthropic-version", "2023-06-01")
+		} else {
+			request.Header.Set("Authorization", "Bearer "+token)
+		}
 	if body != nil {
 		request.Header.Set("Content-Type", "application/json")
 	}
@@ -473,6 +478,20 @@ func normalizeTraceProtocol(value string) string {
 	default:
 		return "chat_completions"
 	}
+}
+
+func normalizeTraceProtocolFromPath(rawURL string) string {
+	parsed, err := url.Parse(rawURL)
+	if err != nil {
+		return "chat_completions"
+	}
+	if strings.HasSuffix(parsed.Path, "/messages") {
+		return "messages"
+	}
+	if strings.HasSuffix(parsed.Path, "/responses") {
+		return "responses"
+	}
+	return "chat_completions"
 }
 
 func traceRequestBody(protocol, model, prompt string) ([]byte, string) {
@@ -714,6 +733,14 @@ func redactTraceValueWithSecrets(value any, secrets []string) any {
 	default:
 		return value
 	}
+}
+
+func redactTraceMap(value map[string]any, secrets ...string) map[string]any {
+	if value == nil {
+		return nil
+	}
+	redacted, _ := redactTraceValueWithSecrets(value, secrets).(map[string]any)
+	return redacted
 }
 
 func (s *AccountTestService) traceReadManagementKey(ctx context.Context, base, token string, id int64, apiKey string) (map[string]any, error) {

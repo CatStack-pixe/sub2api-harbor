@@ -162,6 +162,7 @@ const authorizationError = ref('')
 const authorizationResult = ref<unknown>(null)
 const authorizationStepUp = useStepUp()
 const configLoaded = ref(false)
+const configEnabled = ref(false)
 const configSaving = ref(false)
 const configMessage = ref('')
 const configError = ref('')
@@ -178,7 +179,7 @@ watch(
       result.value = null
       authorizationResult.value = null
       authorizationError.value = ''
-      form.request_model = ''
+      resetSensitiveForm()
       configLoaded.value = false
       configMessage.value = ''
       configError.value = ''
@@ -197,6 +198,7 @@ async function loadConfig() {
     form.protocol = config.protocol || 'chat_completions'
     form.expected_group_name = config.expected_group_name || ''
     form.prompt = config.prompt || 'trace probe'
+    configEnabled.value = config.enabled === true
     configLoaded.value = true
   } catch (cause: any) {
     configError.value = cause?.response?.data?.message || cause?.message || '持久化配置读取失败'
@@ -219,6 +221,7 @@ async function saveConfig(enabled: boolean) {
       prompt: form.prompt.trim()
     }
     await accountsAPI.saveUpstreamTraceConfig(props.account.id, payload)
+    configEnabled.value = enabled
     configMessage.value = enabled ? '已启用持久化测试入口' : '已停用持久化测试入口'
   } catch (cause: any) {
     configError.value = cause?.response?.data?.message || cause?.message || '持久化配置保存失败'
@@ -228,8 +231,16 @@ async function saveConfig(enabled: boolean) {
 }
 
 function handleClose() {
-  if (loading.value) return
+  if (loading.value || authorizationLoading.value || configSaving.value) return
+  resetSensitiveForm()
   emit('close')
+}
+
+function resetSensitiveForm() {
+  form.api_key = ''
+  form.management_token = ''
+  form.probe_group_id = ''
+  form.upstream_key_id = ''
 }
 
 async function run() {
