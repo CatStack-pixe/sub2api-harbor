@@ -26,8 +26,11 @@
         <div class="font-medium text-gray-900 dark:text-white">第 1 步：连接上游</div>
         <div class="grid gap-3 md:grid-cols-2">
           <Input v-model="form.upstream_base_url" label="上游地址" placeholder="https://example.com 或 https://example.com/v1" />
-          <Input v-model="form.management_token" label="上游管理 Token" type="password" autocomplete="off" hint="用于读取分组 Key；不填时可直接使用 API Key" />
-          <Input v-model="form.api_key" label="指定 API Key（可选）" type="password" autocomplete="off" hint="不填则按目标分组自动尝试可用 Key" />
+          <Input v-model="form.login_email" label="上游登录邮箱（推荐）" autocomplete="username" hint="按工具逻辑登录上游后自动读取分组 Key" />
+          <Input v-model="form.login_password" label="上游登录密码" type="password" autocomplete="current-password" />
+          <Input v-model="form.login_totp" label="上游二次验证码（可选）" type="password" autocomplete="one-time-code" />
+          <Input v-model="form.management_token" label="上游管理 Token（可选）" type="password" autocomplete="off" hint="只用于账单回读或授权回归，不是模型测试必填项" />
+          <Input v-model="form.api_key" label="直接指定 API Key（可选）" type="password" autocomplete="off" hint="填写后跳过登录和自动选 Key" />
           <Input v-model="form.upstream_group_id" label="上游分组 ID（自动选 Key 时填写）" type="number" />
         </div>
       </div>
@@ -144,6 +147,9 @@ const protocolOptions = [
 const form = reactive({
   upstream_base_url: '',
   api_key: '',
+  login_email: '',
+  login_password: '',
+  login_totp: '',
   management_token: '',
   probe_group_id: '',
   upstream_group_id: '',
@@ -168,7 +174,9 @@ const configMessage = ref('')
 const configError = ref('')
 const canRun = computed(() =>
   Boolean(form.upstream_base_url.trim() && form.request_model.trim() &&
-    (form.api_key.trim() || (form.management_token.trim() && form.upstream_group_id)))
+    (form.api_key.trim() ||
+      (form.login_email.trim() && form.login_password && form.upstream_group_id) ||
+      (form.management_token.trim() && form.upstream_group_id)))
 )
 
 watch(
@@ -238,6 +246,9 @@ function handleClose() {
 
 function resetSensitiveForm() {
   form.api_key = ''
+  form.login_email = ''
+  form.login_password = ''
+  form.login_totp = ''
   form.management_token = ''
   form.probe_group_id = ''
   form.upstream_key_id = ''
@@ -254,6 +265,9 @@ async function run() {
       accountsAPI.traceUpstream(accountId, {
         upstream_base_url: form.upstream_base_url.trim(),
         api_key: form.api_key,
+        login_email: form.login_email.trim() || undefined,
+        login_password: form.login_password || undefined,
+        login_totp: form.login_totp || undefined,
         management_token: form.management_token || undefined,
         upstream_key_id: form.upstream_key_id ? Number(form.upstream_key_id) : undefined,
         upstream_group_id: form.upstream_group_id ? Number(form.upstream_group_id) : undefined,

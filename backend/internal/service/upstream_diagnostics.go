@@ -21,6 +21,9 @@ import (
 type UpstreamTraceRequest struct {
 	UpstreamBaseURL   string `json:"upstream_base_url"`
 	APIKey            string `json:"api_key"`
+	LoginEmail        string `json:"login_email,omitempty"`
+	LoginPassword     string `json:"login_password,omitempty"`
+	LoginTOTP         string `json:"login_totp,omitempty"`
 	ManagementToken   string `json:"management_token,omitempty"`
 	UpstreamKeyID     *int64 `json:"upstream_key_id,omitempty"`
 	UpstreamGroupID   *int64 `json:"upstream_group_id,omitempty"`
@@ -97,8 +100,10 @@ func (s *AccountTestService) RunUpstreamTrace(ctx context.Context, accountID int
 	if model == "" {
 		return nil, errors.New("请填写请求模型")
 	}
-	if len(apiKey) > 8192 || len(strings.TrimSpace(req.ManagementToken)) > 8192 {
-		return nil, errors.New("API Key 或管理 Token 超过长度限制")
+	if len(apiKey) > 8192 || len(strings.TrimSpace(req.LoginEmail)) > 320 ||
+		len(req.LoginPassword) > 8192 || len(req.LoginTOTP) > 32 ||
+		len(strings.TrimSpace(req.ManagementToken)) > 8192 {
+		return nil, errors.New("登录凭据或 API Key 超过长度限制")
 	}
 	if len(model) > 256 || len(req.Prompt) > 2000 {
 		return nil, errors.New("请求模型或提示词超过长度限制")
@@ -136,7 +141,25 @@ func (s *AccountTestService) RunUpstreamTrace(ctx context.Context, accountID int
 		})
 	}
 
-	if apiKey == "" && strings.TrimSpace(req.ManagementToken) != "" &&
+	if apiKey == "" && strings.TrimSpace(req.LoginEmail) != "" && req.LoginPassword != "" &&
+		req.UpstreamGroupID != nil && *req.UpstreamGroupID > 0 {
+		selectedKey, selectedID, loginEvent, selectErr := s.selectTraceKeyByLogin(
+			ctx, base, req.LoginEmail, req.LoginPassword, req.LoginTOTP, *req.UpstreamGroupID,
+		)
+		if loginEvent != nil {
+			result.Events = append(result.Events, *loginEvent)
+		}
+		if selectErr != nil {
+			result.ErrorClass = "authentication"
+			result.Verdict["key_selection"] = "failed"
+			return result, nil
+		}
+		apiKey = selectedKey
+		if selectedID > 0 {
+			req.UpstreamKeyID = &selectedID
+		}
+		result.Verdict["key_selection"] = "passed"
+	} else if apiKey == "" && strings.TrimSpace(req.ManagementToken) != "" &&
 		req.UpstreamGroupID != nil && *req.UpstreamGroupID > 0 {
 		selectedKey, selectedID, keyEvent, selectErr := s.selectTraceKey(
 			ctx, base, req.ManagementToken, *req.UpstreamGroupID,
@@ -156,7 +179,7 @@ func (s *AccountTestService) RunUpstreamTrace(ctx context.Context, accountID int
 		result.Verdict["key_selection"] = "passed"
 	}
 	if apiKey == "" {
-		return nil, errors.New("请填写 API Key，或同时填写管理 Token 和上游分组 ID")
+		return nil, errors.New("请填写 API Key，或填写上游邮箱、密码和分组 ID")
 	}
 
 	modelsResponse, modelsValue, err := s.traceRequest(ctx, http.MethodGet, traceDataURL(base, "/v1/models"), apiKey, nil)
@@ -228,6 +251,85 @@ func (s *AccountTestService) RunUpstreamTrace(ctx context.Context, accountID int
 		addEvent("billing_after", http.StatusOK, keyAfter != nil, "read-only key and usage snapshot after probe", observation)
 	}
 	return result, nil
+}
+
+func (s *AccountTestService) selectTraceKeyByLogin(
+	ctx context.Context,
+	base, email, password, totp string,
+	groupID int64,
+) (string, int64, *UpstreamTraceEvent, error) {
+	auth, authValue, err := s.traceRequest(
+		ctx, http.MethodPost, traceAuthURL(base, "/auth/login"), "",
+		[]byte(fmt.Sprintf(`{"email":%q,"password":%q}`, email, password)),
+	)
+	if err != nil {
+		return "", 0, &UpstreamTraceEvent{
+			At: time.Now().UTC(), Phase: "login", Status: auth.StatusCode,
+			Success: false, Message: "上游登录失败",
+			Details: traceResponseDetails(auth, authValue, password),
+		}, err
+	}
+	loginToken := traceStringField(authValue, "access_token")
+	if loginToken == "" && strings.TrimSpace(totp) != "" {
+		temp := traceStringField(authValue, "temp_token")
+		if temp == "" {
+			return "", 0, nil, errors.New("上游要求二次验证，但未返回临时 Token")
+		}
+		body := []byte(fmt.Sprintf(`{"temp_token":%q,"totp_code":%q}`, temp, totp))
+		second, secondValue, secondErr := s.traceRequest(ctx, http.MethodPost, traceAuthURL(base, "/auth/login/2fa"), "", body)
+		if secondErr != nil {
+			return "", 0, &UpstreamTraceEvent{
+				At: time.Now().UTC(), Phase: "login_2fa", Status: second.StatusCode,
+				Success: false, Message: "上游二次验证失败",
+				Details: traceResponseDetails(second, secondValue, totp),
+			}, secondErr
+		}
+		loginToken = traceStringField(secondValue, "access_token")
+	}
+	if loginToken == "" {
+		return "", 0, nil, errors.New("上游登录未返回 access_token")
+	}
+	response, value, err := s.traceRequest(
+		ctx, http.MethodGet, traceManagementURL(base, "/keys?page=1&page_size=100&status=active"),
+		loginToken, nil,
+	)
+	if err != nil {
+		return "", 0, nil, err
+	}
+	var failures []string
+	for _, item := range extractTraceKeyItems(value) {
+		if traceInt64(item["group_id"]) != groupID {
+			continue
+		}
+		secret, _ := item["key"].(string)
+		if strings.TrimSpace(secret) == "" {
+			continue
+		}
+		keyID := traceInt64(item["id"])
+		modelsResponse, modelsValue, modelsErr := s.traceRequest(
+			ctx, http.MethodGet, traceDataURL(base, "/v1/models"), secret, nil,
+		)
+		models := extractTraceModels(modelsValue)
+		if modelsErr == nil && len(models) > 0 {
+			return secret, keyID, &UpstreamTraceEvent{
+				At: time.Now().UTC(), Phase: "key_selection", Status: modelsResponse.StatusCode,
+				Success: true, Message: "已通过上游登录自动选择分组 Key",
+				Details: map[string]any{"key_id": keyID, "group_id": groupID, "model_count": len(models)},
+			}, nil
+		}
+		if modelsErr == nil {
+			modelsErr = errors.New("模型列表为空")
+		}
+		failures = append(failures, fmt.Sprintf("key %d: %s", keyID, modelsErr))
+	}
+	message := "登录成功，但目标分组没有可用 Key"
+	if len(failures) > 0 {
+		message += "；" + strings.Join(failures, "；")
+	}
+	return "", 0, &UpstreamTraceEvent{
+		At: time.Now().UTC(), Phase: "key_selection", Status: response.StatusCode,
+		Success: false, Message: message,
+	}, errors.New(message)
 }
 
 func (s *AccountTestService) selectTraceKey(
@@ -435,10 +537,13 @@ func (s *AccountTestService) traceRequest(ctx context.Context, method, rawURL, t
 	}
 	request.Header.Set("Accept", "application/json")
 	request.Header.Set("User-Agent", "sub2api-upstream-trace/1.0")
-	if protocol := normalizeTraceProtocolFromPath(rawURL); protocol == "messages" {
+	if token != "" && (strings.HasSuffix(request.URL.Path, "/auth/login") ||
+		strings.HasSuffix(request.URL.Path, "/auth/login/2fa")) {
+		request.Header.Set("Authorization", "Bearer "+token)
+	} else if protocol := normalizeTraceProtocolFromPath(rawURL); protocol == "messages" {
 		request.Header.Set("x-api-key", token)
 		request.Header.Set("anthropic-version", "2023-06-01")
-	} else {
+	} else if token != "" {
 		request.Header.Set("Authorization", "Bearer "+token)
 	}
 	if body != nil {
@@ -469,6 +574,17 @@ func (s *AccountTestService) traceRequest(ctx context.Context, method, rawURL, t
 	return result, value, nil
 }
 
+func traceAuthURL(base, suffix string) string {
+	parsed, _ := url.Parse(base)
+	path := strings.TrimRight(parsed.Path, "/")
+	for _, tail := range []string{"/v1", "/api"} {
+		path = strings.TrimSuffix(path, tail)
+	}
+	parsed.Path = strings.TrimRight(path, "/") + "/api/v1" + suffix
+	parsed.RawQuery, parsed.Fragment = "", ""
+	return parsed.String()
+}
+
 func normalizeTraceProtocol(value string) string {
 	switch strings.ToLower(strings.TrimSpace(value)) {
 	case "responses":
@@ -478,6 +594,18 @@ func normalizeTraceProtocol(value string) string {
 	default:
 		return "chat_completions"
 	}
+}
+
+func traceStringField(value any, key string) string {
+	object, ok := value.(map[string]any)
+	if !ok {
+		return ""
+	}
+	if data, exists := object["data"].(map[string]any); exists {
+		object = data
+	}
+	result, _ := object[key].(string)
+	return strings.TrimSpace(result)
 }
 
 func normalizeTraceProtocolFromPath(rawURL string) string {
