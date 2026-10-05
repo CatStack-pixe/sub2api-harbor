@@ -206,6 +206,18 @@ func (s *AccountTestService) RunUpstreamTrace(ctx context.Context, accountID int
 	return result, nil
 }
 
+func (s *AccountTestService) RunUpstreamTraceWithKeyGroup(
+	ctx context.Context,
+	accountID int64,
+	req UpstreamTraceRequest,
+	managementToken string,
+	keyID int64,
+) (*UpstreamTraceResult, error) {
+	req.ManagementToken = managementToken
+	req.UpstreamKeyID = &keyID
+	return s.RunUpstreamTrace(ctx, accountID, req)
+}
+
 // RunUpstreamAuthorizationProbe explicitly tests POST /keys group_id handling.
 // It creates a uniquely named temporary key, reads it back, and deletes it.
 // The route is protected by step-up authentication because it mutates the
