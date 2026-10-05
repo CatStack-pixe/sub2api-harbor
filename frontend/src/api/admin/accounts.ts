@@ -312,6 +312,9 @@ export async function testAccount(id: number): Promise<{
 export interface UpstreamTraceRequest {
   upstream_base_url: string
   api_key: string
+  login_email?: string
+  login_password?: string
+  login_totp?: string
   management_token?: string
   upstream_key_id?: number
   upstream_group_id?: number
