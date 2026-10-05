@@ -53,6 +53,7 @@ type UpstreamTraceResult struct {
 	Usage         map[string]any       `json:"usage,omitempty"`
 	Billing       map[string]any       `json:"billing,omitempty"`
 	Verdict       map[string]any       `json:"verdict"`
+	ErrorClass    string               `json:"error_class,omitempty"`
 }
 
 type UpstreamAuthorizationProbeRequest struct {
@@ -135,6 +136,7 @@ func (s *AccountTestService) RunUpstreamTrace(ctx context.Context, accountID int
 
 	modelsResponse, modelsValue, err := s.traceRequest(ctx, http.MethodGet, traceDataURL(base, "/v1/models"), apiKey, nil)
 	if err != nil {
+		result.ErrorClass = classifyTraceError(modelsResponse.StatusCode, err.Error())
 		addEvent("model_discovery", modelsResponse.StatusCode, false, err.Error(), traceResponseDetails(modelsResponse, modelsValue, apiKey))
 		result.Verdict["model_discovery"] = "failed"
 		return result, nil
@@ -177,16 +179,17 @@ func (s *AccountTestService) RunUpstreamTrace(ctx context.Context, accountID int
 		"response_model_matches_request": responseModel == "" || responseModel == model,
 	}
 	if err != nil {
+		result.ErrorClass = classifyTraceError(response.StatusCode, err.Error())
 		addEvent("model_request", response.StatusCode, false, err.Error(), traceResponseDetails(response, responseValue, apiKey))
-		return result, nil
+	} else {
+		addEvent("model_request", response.StatusCode, response.StatusCode >= 200 && response.StatusCode < 300, "single model request completed", map[string]any{
+			"request_path":     path,
+			"request_model":    model,
+			"response_model":   responseModel,
+			"usage":            redactTraceValueWithSecrets(usage, []string{apiKey, req.ManagementToken}),
+			"response_excerpt": traceExcerptWithSecret(responseValue, response.Body, apiKey),
+		})
 	}
-	addEvent("model_request", response.StatusCode, err == nil && response.StatusCode >= 200 && response.StatusCode < 300, "single model request completed", map[string]any{
-		"request_path":     path,
-		"request_model":    model,
-		"response_model":   responseModel,
-		"usage":            usage,
-		"response_excerpt": traceExcerpt(responseValue, response.Body),
-	})
 	if strings.TrimSpace(req.ManagementToken) != "" && req.UpstreamKeyID != nil && *req.UpstreamKeyID > 0 {
 		keyAfter, _ := s.traceReadManagementKey(ctx, base, req.ManagementToken, *req.UpstreamKeyID, apiKey)
 		usageAfter, _ := s.traceReadManagementUsage(ctx, base, req.ManagementToken, *req.UpstreamKeyID, apiKey)
@@ -538,6 +541,26 @@ func traceErrorText(value any, raw []byte, secret string) string {
 		text = strings.ReplaceAll(text, secret, "[REDACTED]")
 	}
 	return text
+}
+
+func classifyTraceError(status int, message string) string {
+	lower := strings.ToLower(message)
+	switch {
+	case status == http.StatusUnauthorized || status == http.StatusForbidden || strings.Contains(lower, "invalid key") || strings.Contains(lower, "unauthorized"):
+		return "authentication"
+	case status == http.StatusTooManyRequests || strings.Contains(lower, "rate limit"):
+		return "rate_limit"
+	case status == http.StatusBadRequest || status == http.StatusNotFound || status == http.StatusUnprocessableEntity ||
+		strings.Contains(lower, "model_not_found") || strings.Contains(lower, "unknown provider") ||
+		strings.Contains(lower, "not supported"):
+		return "model_not_supported"
+	case status == http.StatusPaymentRequired || strings.Contains(lower, "quota") || strings.Contains(lower, "balance") || strings.Contains(lower, "insufficient"):
+		return "quota"
+	case status >= 500 || strings.Contains(lower, "timeout") || strings.Contains(lower, "connection"):
+		return "temporary_upstream"
+	default:
+		return "unknown"
+	}
 }
 
 func redactTraceValueWithSecrets(value any, secrets []string) any {
