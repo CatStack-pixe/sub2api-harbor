@@ -137,6 +137,9 @@ func RegisterAdminRoutes(
 
 		// 操作审计日志
 		registerAuditLogRoutes(admin, h, stepUpAuth)
+
+		// 上游诊断的远程写回归（POST /keys）必须经过 step-up。
+		admin.POST("/upstream-diagnostics/authorization-probe", gin.HandlerFunc(stepUpAuth), h.Admin.Account.ProbeUpstreamAuthorization)
 	}
 }
 
@@ -440,6 +443,7 @@ func registerAccountRoutes(admin *gin.RouterGroup, h *handler.Handlers, stepUpAu
 		accounts.POST("/:id/opencode-go-usage/refresh", h.Admin.Account.RefreshOpenCodeGoUsage)
 		accounts.DELETE("/:id", h.Admin.Account.Delete)
 		accounts.POST("/:id/test", h.Admin.Account.Test)
+		accounts.POST("/:id/upstream-trace", h.Admin.Account.TraceUpstream)
 		accounts.POST("/:id/recover-state", h.Admin.Account.RecoverState)
 		accounts.POST("/:id/refresh", h.Admin.Account.Refresh)
 		accounts.POST("/:id/apply-oauth-credentials", h.Admin.Account.ApplyOAuthCredentials)

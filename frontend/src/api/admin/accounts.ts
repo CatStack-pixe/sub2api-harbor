@@ -309,6 +309,87 @@ export async function testAccount(id: number): Promise<{
   return data
 }
 
+export interface UpstreamTraceRequest {
+  upstream_base_url: string
+  api_key: string
+  management_token?: string
+  upstream_key_id?: number
+  request_model: string
+  protocol?: 'chat_completions' | 'responses' | 'messages'
+  prompt?: string
+  expected_group_name?: string
+}
+
+export interface UpstreamTraceEvent {
+  at: string
+  phase: string
+  status?: number
+  success: boolean
+  message?: string
+  details?: Record<string, unknown>
+}
+
+export interface UpstreamTraceResult {
+  trace_id: string
+  account_id: number
+  local_account?: Record<string, unknown>
+  started_at: string
+  finished_at: string
+  events: UpstreamTraceEvent[]
+  models?: string[]
+  request_model: string
+  protocol: string
+  request_path?: string
+  response_model?: string
+  usage?: Record<string, unknown>
+  billing?: Record<string, unknown>
+  verdict: Record<string, unknown>
+}
+
+export async function traceUpstream(
+  id: number,
+  payload: UpstreamTraceRequest
+): Promise<UpstreamTraceResult> {
+  const { data } = await apiClient.post<UpstreamTraceResult>(
+    `/admin/accounts/${id}/upstream-trace`,
+    payload,
+    { timeout: 120000 }
+  )
+  return data
+}
+
+export interface UpstreamAuthorizationProbeRequest {
+  upstream_base_url: string
+  management_token: string
+  probe_group_id: number
+}
+
+export interface UpstreamAuthorizationProbeResult {
+  trace_id: string
+  created_key_id?: number
+  requested_group_id: number
+  created_group_id?: number
+  readback_group_id?: number
+  create_status?: number
+  readback_status?: number
+  cleanup_status?: number
+  cleanup_ok: boolean
+  group_id_applied: boolean
+  authorization_test: 'passed' | 'failed' | 'inconclusive' | string
+  error?: string
+}
+
+export async function probeUpstreamAuthorization(
+  payload: UpstreamAuthorizationProbeRequest
+): Promise<UpstreamAuthorizationProbeResult> {
+  const { data } = await apiClient.post<UpstreamAuthorizationProbeResult>(
+    '/admin/upstream-diagnostics/authorization-probe',
+    payload,
+    { timeout: 120000 }
+  )
+  return data
+}
+
 /**
  * Refresh account credentials
  * @param id - Account ID
@@ -1325,6 +1406,8 @@ export const accountsAPI = {
   delete: deleteAccount,
   toggleStatus,
   testAccount,
+  traceUpstream,
+  probeUpstreamAuthorization,
   refreshCredentials,
   applyOAuthCredentials,
   getStats,
