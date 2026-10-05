@@ -17,28 +17,70 @@
         </div>
       </div>
 
-      <div class="grid gap-3 md:grid-cols-2">
-        <Input v-model="form.upstream_base_url" label="上游 Sub2API 地址" placeholder="https://example.com" />
-        <Input v-model="form.api_key" label="上游 API Key" type="password" autocomplete="off" />
-        <Input v-model="form.management_token" label="管理 Token（可选，用于 Key/usage 回读）" type="password" autocomplete="off" />
-        <Input v-model="form.upstream_key_id" label="上游 Key ID（可选）" type="number" />
-        <Input v-model="form.request_model" label="实际请求模型" placeholder="astra / gpt-6.1-sol / luna" />
-        <Input v-model="form.expected_group_name" label="期望计费组名（可选）" placeholder="Luna" />
+      <div class="rounded-lg border border-blue-200 bg-blue-50/70 p-3 text-sm text-blue-800 dark:border-blue-900 dark:bg-blue-950/20 dark:text-blue-200">
+        按工具的顺序操作：先填地址和凭证，再选择分组并拉取模型，最后只发一次测试请求。
+        上游返回的模型、分组和 usage 会分别记录，本站用户计费规则不会被改变。
+      </div>
+
+      <div class="space-y-3 rounded-lg border border-gray-200 p-3 dark:border-dark-600">
+        <div class="font-medium text-gray-900 dark:text-white">第 1 步：连接上游</div>
+        <div class="grid gap-3 md:grid-cols-2">
+          <Input v-model="form.upstream_base_url" label="上游地址" placeholder="https://example.com 或 https://example.com/v1" />
+          <Input v-model="form.management_token" label="上游管理 Token" type="password" autocomplete="off" hint="用于读取分组 Key；不填时可直接使用 API Key" />
+          <Input v-model="form.api_key" label="指定 API Key（可选）" type="password" autocomplete="off" hint="不填则按目标分组自动尝试可用 Key" />
+          <Input v-model="form.upstream_group_id" label="上游分组 ID（自动选 Key 时填写）" type="number" />
+        </div>
+      </div>
+
+      <div class="space-y-3 rounded-lg border border-gray-200 p-3 dark:border-dark-600">
+        <div class="font-medium text-gray-900 dark:text-white">第 2 步：选择真实请求</div>
+        <div class="grid gap-3 md:grid-cols-2">
+          <Input v-model="form.request_model" label="实际请求模型" placeholder="例如 astra、gpt-6.1-sol" />
+          <Input v-model="form.expected_group_name" label="预期上游计费组（仅用于比对）" placeholder="例如 Luna" />
+        </div>
         <div>
           <label class="input-label mb-1.5 block">协议</label>
           <Select v-model="form.protocol" :options="protocolOptions" />
         </div>
+        <Input v-model="form.prompt" label="测试提示词" hint="建议填写短文本，工具只请求一次且最多返回 1 token。" />
       </div>
 
-      <Input v-model="form.prompt" label="探测提示词" />
+      <details class="rounded-lg border border-gray-200 p-3 text-sm dark:border-dark-600">
+        <summary class="cursor-pointer font-medium text-gray-700 dark:text-dark-200">高级账单回读（可选）</summary>
+        <div class="mt-3 grid gap-3 md:grid-cols-2">
+          <Input v-model="form.upstream_key_id" label="上游 Key ID" type="number" hint="填写后会读取该 Key 的 usage 前后快照。" />
+        </div>
+      </details>
+
+      <div class="flex flex-wrap items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50/70 p-3 text-sm text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/20 dark:text-emerald-200">
+        <span class="font-medium">持久化测试入口</span>
+        <span class="text-xs">只供管理员 Trace，不加入本站用户流量，本站计费保持原规则。</span>
+        <button
+          class="btn btn-secondary ml-auto"
+          type="button"
+          :disabled="configSaving || !configLoaded"
+          @click="saveConfig(true)"
+        >
+          {{ configSaving ? '保存中…' : '启用测试入口' }}
+        </button>
+        <button
+          class="btn btn-secondary"
+          type="button"
+          :disabled="configSaving || !configLoaded"
+          @click="saveConfig(false)"
+        >
+          停用
+        </button>
+        <span v-if="configMessage" class="basis-full text-xs">{{ configMessage }}</span>
+        <span v-if="configError" class="basis-full text-xs text-red-700 dark:text-red-300">{{ configError }}</span>
+      </div>
 
       <div class="space-y-3 rounded-lg border border-red-200 bg-red-50/60 p-3 dark:border-red-900 dark:bg-red-950/20">
         <div class="text-sm font-medium text-red-800 dark:text-red-200">方法 2：POST /keys group_id 授权回归</div>
         <div class="text-xs text-red-700 dark:text-red-300">
-          需要上游管理 Token 和目标 group_id；创建的临时 Key 会自动删除，接口受二次验证保护。
+          这是独立的授权回归，会创建并删除临时 Key；只用于验证 group_id 是否被上游接受。
         </div>
         <div class="grid gap-3 md:grid-cols-2">
-          <Input v-model="form.management_token" label="上游管理 Token" type="password" autocomplete="off" />
           <Input v-model="form.probe_group_id" label="目标 group_id" type="number" />
         </div>
         <button
@@ -72,8 +114,8 @@
     <template #footer>
       <div class="flex justify-end gap-2">
         <button class="btn btn-secondary" type="button" @click="handleClose">关闭</button>
-        <button class="btn btn-primary" type="button" :disabled="loading" @click="run">
-          {{ loading ? '探测中…' : '开始 Trace' }}
+        <button class="btn btn-primary" type="button" :disabled="loading || !canRun" @click="run">
+          {{ loading ? '第 3 步：请求中…' : '第 3 步：开始 Trace' }}
         </button>
       </div>
     </template>
@@ -81,14 +123,14 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, ref, watch } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import Input from '@/components/common/Input.vue'
 import Select from '@/components/common/Select.vue'
 import TotpStepUpDialog from '@/components/auth/TotpStepUpDialog.vue'
 import { useStepUp, isStepUpCancelled, isStepUpBlocked, stepUpBlockReason } from '@/composables/useStepUp'
 import type { Account } from '@/types'
-import { accountsAPI, type UpstreamTraceResult } from '@/api/admin/accounts'
+import { accountsAPI, type UpstreamTraceConfig, type UpstreamTraceResult } from '@/api/admin/accounts'
 
 const props = defineProps<{ show: boolean; account: Account | null }>()
 const emit = defineEmits<{ (e: 'close'): void }>()
@@ -104,6 +146,7 @@ const form = reactive({
   api_key: '',
   management_token: '',
   probe_group_id: '',
+  upstream_group_id: '',
   upstream_key_id: '',
   request_model: '',
   expected_group_name: '',
@@ -118,6 +161,14 @@ const authorizationLoading = ref(false)
 const authorizationError = ref('')
 const authorizationResult = ref<unknown>(null)
 const authorizationStepUp = useStepUp()
+const configLoaded = ref(false)
+const configSaving = ref(false)
+const configMessage = ref('')
+const configError = ref('')
+const canRun = computed(() =>
+  Boolean(form.upstream_base_url.trim() && form.request_model.trim() &&
+    (form.api_key.trim() || (form.management_token.trim() && form.upstream_group_id)))
+)
 
 watch(
   () => props.show,
@@ -128,9 +179,53 @@ watch(
       authorizationResult.value = null
       authorizationError.value = ''
       form.request_model = ''
+      configLoaded.value = false
+      configMessage.value = ''
+      configError.value = ''
+      void loadConfig()
     }
   }
 )
+
+async function loadConfig() {
+  if (!props.account) return
+  try {
+    const config = await accountsAPI.getUpstreamTraceConfig(props.account.id)
+    form.upstream_base_url = config.upstream_base_url || ''
+    form.upstream_group_id = config.upstream_group_id ? String(config.upstream_group_id) : ''
+    form.request_model = config.request_model || ''
+    form.protocol = config.protocol || 'chat_completions'
+    form.expected_group_name = config.expected_group_name || ''
+    form.prompt = config.prompt || 'trace probe'
+    configLoaded.value = true
+  } catch (cause: any) {
+    configError.value = cause?.response?.data?.message || cause?.message || '持久化配置读取失败'
+  }
+}
+
+async function saveConfig(enabled: boolean) {
+  if (!props.account) return
+  configSaving.value = true
+  configMessage.value = ''
+  configError.value = ''
+  try {
+    const payload: UpstreamTraceConfig = {
+      enabled,
+      upstream_base_url: form.upstream_base_url.trim(),
+      upstream_group_id: form.upstream_group_id ? Number(form.upstream_group_id) : undefined,
+      request_model: form.request_model.trim(),
+      protocol: form.protocol as UpstreamTraceConfig['protocol'],
+      expected_group_name: form.expected_group_name.trim() || undefined,
+      prompt: form.prompt.trim()
+    }
+    await accountsAPI.saveUpstreamTraceConfig(props.account.id, payload)
+    configMessage.value = enabled ? '已启用持久化测试入口' : '已停用持久化测试入口'
+  } catch (cause: any) {
+    configError.value = cause?.response?.data?.message || cause?.message || '持久化配置保存失败'
+  } finally {
+    configSaving.value = false
+  }
+}
 
 function handleClose() {
   if (loading.value) return
@@ -150,6 +245,7 @@ async function run() {
         api_key: form.api_key,
         management_token: form.management_token || undefined,
         upstream_key_id: form.upstream_key_id ? Number(form.upstream_key_id) : undefined,
+        upstream_group_id: form.upstream_group_id ? Number(form.upstream_group_id) : undefined,
         request_model: form.request_model.trim(),
         protocol: form.protocol as 'chat_completions' | 'responses' | 'messages',
         prompt: form.prompt.trim(),

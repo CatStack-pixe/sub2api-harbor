@@ -23,6 +23,7 @@ type UpstreamTraceRequest struct {
 	APIKey            string `json:"api_key"`
 	ManagementToken   string `json:"management_token,omitempty"`
 	UpstreamKeyID     *int64 `json:"upstream_key_id,omitempty"`
+	UpstreamGroupID   *int64 `json:"upstream_group_id,omitempty"`
 	RequestModel      string `json:"request_model"`
 	Protocol          string `json:"protocol,omitempty"`
 	Prompt            string `json:"prompt,omitempty"`
@@ -85,7 +86,7 @@ const upstreamTraceMaxResponseBytes = 1 << 20
 // blacklist, or production routing state.
 func (s *AccountTestService) RunUpstreamTrace(ctx context.Context, accountID int64, req UpstreamTraceRequest) (*UpstreamTraceResult, error) {
 	if s == nil || s.httpUpstream == nil {
-		return nil, errors.New("upstream diagnostic service is unavailable")
+		return nil, errors.New("诊断服务未初始化：上游 HTTP 客户端不可用")
 	}
 	base, err := s.validateTraceBaseURL(req.UpstreamBaseURL)
 	if err != nil {
@@ -93,14 +94,14 @@ func (s *AccountTestService) RunUpstreamTrace(ctx context.Context, accountID int
 	}
 	apiKey := strings.TrimSpace(req.APIKey)
 	model := strings.TrimSpace(req.RequestModel)
-	if apiKey == "" || model == "" {
-		return nil, errors.New("api_key and request_model are required")
+	if model == "" {
+		return nil, errors.New("请填写请求模型")
 	}
 	if len(apiKey) > 8192 || len(strings.TrimSpace(req.ManagementToken)) > 8192 {
-		return nil, errors.New("credential exceeds maximum allowed length")
+		return nil, errors.New("API Key 或管理 Token 超过长度限制")
 	}
 	if len(model) > 256 || len(req.Prompt) > 2000 {
-		return nil, errors.New("request_model or prompt exceeds maximum allowed length")
+		return nil, errors.New("请求模型或提示词超过长度限制")
 	}
 	protocol := normalizeTraceProtocol(req.Protocol)
 	result := &UpstreamTraceResult{
@@ -133,6 +134,29 @@ func (s *AccountTestService) RunUpstreamTrace(ctx context.Context, accountID int
 			At: time.Now().UTC(), Phase: phase, Status: status,
 			Success: success, Message: message, Details: details,
 		})
+	}
+
+	if apiKey == "" && strings.TrimSpace(req.ManagementToken) != "" &&
+		req.UpstreamGroupID != nil && *req.UpstreamGroupID > 0 {
+		selectedKey, selectedID, keyEvent, selectErr := s.selectTraceKey(
+			ctx, base, req.ManagementToken, *req.UpstreamGroupID,
+		)
+		if keyEvent != nil {
+			result.Events = append(result.Events, *keyEvent)
+		}
+		if selectErr != nil {
+			result.ErrorClass = "authentication"
+			result.Verdict["key_selection"] = "failed"
+			return result, nil
+		}
+		apiKey = selectedKey
+		if selectedID > 0 {
+			req.UpstreamKeyID = &selectedID
+		}
+		result.Verdict["key_selection"] = "passed"
+	}
+	if apiKey == "" {
+		return nil, errors.New("请填写 API Key，或同时填写管理 Token 和上游分组 ID")
 	}
 
 	modelsResponse, modelsValue, err := s.traceRequest(ctx, http.MethodGet, traceDataURL(base, "/v1/models"), apiKey, nil)
@@ -206,6 +230,87 @@ func (s *AccountTestService) RunUpstreamTrace(ctx context.Context, accountID int
 	return result, nil
 }
 
+func (s *AccountTestService) selectTraceKey(
+	ctx context.Context,
+	base, managementToken string,
+	groupID int64,
+) (string, int64, *UpstreamTraceEvent, error) {
+	response, value, err := s.traceRequest(
+		ctx, http.MethodGet, traceManagementURL(base, "/keys?page=1&page_size=100"),
+		managementToken, nil,
+	)
+	if err != nil {
+		event := UpstreamTraceEvent{
+			At: time.Now().UTC(), Phase: "key_selection", Status: response.StatusCode,
+			Success: false, Message: "读取上游 Key 列表失败",
+			Details: traceResponseDetails(response, value, managementToken),
+		}
+		return "", 0, &event, err
+	}
+	keys := extractTraceKeyItems(value)
+	var failures []string
+	for _, item := range keys {
+		if traceInt64(item["group_id"]) != groupID {
+			continue
+		}
+		secret, _ := item["key"].(string)
+		if strings.TrimSpace(secret) == "" {
+			continue
+		}
+		keyID := traceInt64(item["id"])
+		modelsResponse, modelsValue, modelsErr := s.traceRequest(
+			ctx, http.MethodGet, traceDataURL(base, "/v1/models"), secret, nil,
+		)
+		models := extractTraceModels(modelsValue)
+		if modelsErr == nil && len(models) > 0 {
+			event := UpstreamTraceEvent{
+				At: time.Now().UTC(), Phase: "key_selection", Status: modelsResponse.StatusCode,
+				Success: true, Message: "已自动选择可用上游 Key",
+				Details: map[string]any{
+					"key_id": keyID, "group_id": groupID,
+					"model_count": len(models),
+				},
+			}
+			return secret, keyID, &event, nil
+		}
+		if modelsErr == nil {
+			modelsErr = errors.New("模型列表为空")
+		}
+		failures = append(failures, fmt.Sprintf("key %d: %s", keyID, modelsErr))
+	}
+	message := "目标分组没有可用 Key"
+	if len(failures) > 0 {
+		message += "；" + strings.Join(failures, "；")
+	}
+	return "", 0, &UpstreamTraceEvent{
+		At: time.Now().UTC(), Phase: "key_selection", Status: http.StatusUnauthorized,
+		Success: false, Message: message,
+	}, errors.New(message)
+}
+
+func extractTraceKeyItems(value any) []map[string]any {
+	var result []map[string]any
+	var walk func(any)
+	walk = func(node any) {
+		switch typed := node.(type) {
+		case []any:
+			for _, item := range typed {
+				if object, ok := item.(map[string]any); ok {
+					result = append(result, object)
+				}
+			}
+		case map[string]any:
+			for _, key := range []string{"data", "items", "keys", "list"} {
+				if child, ok := typed[key]; ok {
+					walk(child)
+				}
+			}
+		}
+	}
+	walk(value)
+	return result
+}
+
 func (s *AccountTestService) RunUpstreamTraceWithKeyGroup(
 	ctx context.Context,
 	accountID int64,
@@ -224,7 +329,7 @@ func (s *AccountTestService) RunUpstreamTraceWithKeyGroup(
 // upstream user's data even though cleanup is attempted automatically.
 func (s *AccountTestService) RunUpstreamAuthorizationProbe(ctx context.Context, req UpstreamAuthorizationProbeRequest) (*UpstreamAuthorizationProbeResult, error) {
 	if s == nil || s.httpUpstream == nil {
-		return nil, errors.New("upstream diagnostic service is unavailable")
+		return nil, errors.New("诊断服务未初始化：上游 HTTP 客户端不可用")
 	}
 	base, err := s.validateTraceBaseURL(req.UpstreamBaseURL)
 	if err != nil {
@@ -232,7 +337,7 @@ func (s *AccountTestService) RunUpstreamAuthorizationProbe(ctx context.Context, 
 	}
 	token := strings.TrimSpace(req.ManagementToken)
 	if token == "" || req.ProbeGroupID <= 0 {
-		return nil, errors.New("management_token and probe_group_id are required")
+		return nil, errors.New("请填写上游管理 Token 和待检查的分组 ID")
 	}
 	result := &UpstreamAuthorizationProbeResult{
 		TraceID:           uuid.NewString(),
@@ -311,11 +416,11 @@ type traceHTTPResponse struct {
 func (s *AccountTestService) validateTraceBaseURL(raw string) (string, error) {
 	base, err := s.validateUpstreamBaseURL(strings.TrimSpace(raw))
 	if err != nil {
-		return "", fmt.Errorf("invalid upstream base URL: %w", err)
+		return "", fmt.Errorf("上游地址无效：%w", err)
 	}
 	parsed, err := url.Parse(base)
 	if err != nil || parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" {
-		return "", errors.New("upstream base URL must not contain credentials, query, or fragment")
+		return "", errors.New("上游地址不能包含用户名、密码、查询参数或片段")
 	}
 	return strings.TrimRight(base, "/"), nil
 }
@@ -412,13 +517,15 @@ func traceDataURL(base, suffix string) string {
 
 func traceManagementURL(base, suffix string) string {
 	parsed, _ := url.Parse(base)
+	suffixURL, _ := url.Parse(suffix)
 	path := strings.TrimRight(parsed.Path, "/")
 	path = strings.TrimSuffix(path, "/v1")
 	if !strings.HasSuffix(path, "/api") {
 		path += "/api"
 	}
-	parsed.Path = strings.TrimRight(path, "/") + "/v1" + suffix
-	parsed.RawQuery, parsed.Fragment = "", ""
+	parsed.Path = strings.TrimRight(path, "/") + "/v1" + suffixURL.Path
+	parsed.RawQuery = suffixURL.RawQuery
+	parsed.Fragment = ""
 	return parsed.String()
 }
 
