@@ -143,17 +143,24 @@ async function run() {
   result.value = null
   loading.value = true
   try {
-    result.value = await accountsAPI.traceUpstream(props.account.id, {
-      upstream_base_url: form.upstream_base_url.trim(),
-      api_key: form.api_key,
-      management_token: form.management_token || undefined,
-      upstream_key_id: form.upstream_key_id ? Number(form.upstream_key_id) : undefined,
-      request_model: form.request_model.trim(),
-      protocol: form.protocol as 'chat_completions' | 'responses' | 'messages',
-      prompt: form.prompt.trim(),
-      expected_group_name: form.expected_group_name.trim() || undefined
-    })
+    result.value = await authorizationStepUp.run(() =>
+      accountsAPI.traceUpstream(props.account.id, {
+        upstream_base_url: form.upstream_base_url.trim(),
+        api_key: form.api_key,
+        management_token: form.management_token || undefined,
+        upstream_key_id: form.upstream_key_id ? Number(form.upstream_key_id) : undefined,
+        request_model: form.request_model.trim(),
+        protocol: form.protocol as 'chat_completions' | 'responses' | 'messages',
+        prompt: form.prompt.trim(),
+        expected_group_name: form.expected_group_name.trim() || undefined
+      })
+    )
   } catch (cause: any) {
+    if (isStepUpCancelled(cause)) return
+    if (isStepUpBlocked(cause)) {
+      error.value = stepUpBlockReason(cause) || '需要启用二次验证'
+      return
+    }
     error.value = cause?.response?.data?.message || cause?.message || 'Trace failed'
   } finally {
     loading.value = false
