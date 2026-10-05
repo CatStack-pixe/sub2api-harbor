@@ -75,6 +75,7 @@ type UpstreamAuthorizationProbeResult struct {
 	GroupIDApplied    bool   `json:"group_id_applied"`
 	AuthorizationTest string `json:"authorization_test"`
 	Error             string `json:"error,omitempty"`
+	CleanupWarning    string `json:"cleanup_warning,omitempty"`
 }
 
 const upstreamTraceMaxResponseBytes = 1 << 20
@@ -246,7 +247,8 @@ func (s *AccountTestService) RunUpstreamAuthorizationProbe(ctx context.Context, 
 	result.GroupIDApplied = result.CreatedGroupID == req.ProbeGroupID
 	if result.CreatedKeyID <= 0 {
 		result.AuthorizationTest = "inconclusive"
-		result.Error = "create response did not contain a key id"
+		result.Error = "create response did not contain a key id; temporary key cleanup cannot be verified"
+		result.CleanupWarning = "upstream returned no temporary key id; manual cleanup review required"
 		return result, nil
 	}
 
@@ -274,6 +276,9 @@ func (s *AccountTestService) RunUpstreamAuthorizationProbe(ctx context.Context, 
 	result.CleanupOK = deleteErr == nil && deleted.StatusCode >= 200 && deleted.StatusCode < 300
 	if deleteErr != nil && result.Error == "" {
 		result.Error = deleteErr.Error()
+	}
+	if !result.CleanupOK {
+		result.CleanupWarning = "temporary key deletion was not confirmed; manual cleanup review required"
 	}
 	if result.GroupIDApplied {
 		result.AuthorizationTest = "failed"
