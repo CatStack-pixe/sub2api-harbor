@@ -499,10 +499,6 @@ func traceResponseDetails(response traceHTTPResponse, value any, secret string) 
 	}
 }
 
-func traceExcerpt(value any, raw []byte) any {
-	return traceExcerptWithSecret(value, raw, "")
-}
-
 func traceExcerptWithSecret(value any, raw []byte, secret string) any {
 	if value != nil {
 		return redactTraceValueWithSecrets(value, []string{secret})

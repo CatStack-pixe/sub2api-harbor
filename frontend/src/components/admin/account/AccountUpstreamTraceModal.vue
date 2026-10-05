@@ -139,12 +139,13 @@ function handleClose() {
 
 async function run() {
   if (!props.account) return
+  const accountId = props.account.id
   error.value = ''
   result.value = null
   loading.value = true
   try {
     result.value = await authorizationStepUp.run(() =>
-      accountsAPI.traceUpstream(props.account.id, {
+      accountsAPI.traceUpstream(accountId, {
         upstream_base_url: form.upstream_base_url.trim(),
         api_key: form.api_key,
         management_token: form.management_token || undefined,
