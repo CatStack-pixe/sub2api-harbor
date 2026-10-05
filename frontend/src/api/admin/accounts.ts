@@ -314,7 +314,6 @@ export interface UpstreamTraceRequest {
   api_key: string
   management_token?: string
   upstream_key_id?: number
-  upstream_group_id?: number
   request_model: string
   protocol?: 'chat_completions' | 'responses' | 'messages'
   prompt?: string
@@ -345,17 +344,6 @@ export interface UpstreamTraceResult {
   usage?: Record<string, unknown>
   billing?: Record<string, unknown>
   verdict: Record<string, unknown>
-  error_class?: string
-}
-
-export interface UpstreamTraceConfig {
-  enabled: boolean
-  upstream_base_url?: string
-  upstream_group_id?: number
-  request_model?: string
-  protocol?: 'chat_completions' | 'responses' | 'messages'
-  expected_group_name?: string
-  prompt?: string
 }
 
 export async function traceUpstream(
@@ -366,22 +354,6 @@ export async function traceUpstream(
     `/admin/accounts/${id}/upstream-trace`,
     payload,
     { timeout: 120000 }
-  )
-  return data
-}
-
-export async function getUpstreamTraceConfig(id: number): Promise<UpstreamTraceConfig> {
-  const { data } = await apiClient.get<UpstreamTraceConfig>(`/admin/accounts/${id}/upstream-trace-config`)
-  return data
-}
-
-export async function saveUpstreamTraceConfig(
-  id: number,
-  payload: UpstreamTraceConfig
-): Promise<UpstreamTraceConfig> {
-  const { data } = await apiClient.put<UpstreamTraceConfig>(
-    `/admin/accounts/${id}/upstream-trace-config`,
-    payload
   )
   return data
 }
@@ -1435,8 +1407,6 @@ export const accountsAPI = {
   toggleStatus,
   testAccount,
   traceUpstream,
-  getUpstreamTraceConfig,
-  saveUpstreamTraceConfig,
   probeUpstreamAuthorization,
   refreshCredentials,
   applyOAuthCredentials,

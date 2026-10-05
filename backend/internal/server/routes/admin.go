@@ -444,8 +444,6 @@ func registerAccountRoutes(admin *gin.RouterGroup, h *handler.Handlers, stepUpAu
 		accounts.DELETE("/:id", h.Admin.Account.Delete)
 		accounts.POST("/:id/test", h.Admin.Account.Test)
 		accounts.POST("/:id/upstream-trace", gin.HandlerFunc(stepUpAuth), h.Admin.Account.TraceUpstream)
-		accounts.GET("/:id/upstream-trace-config", h.Admin.Account.GetUpstreamTraceConfig)
-		accounts.PUT("/:id/upstream-trace-config", gin.HandlerFunc(stepUpAuth), h.Admin.Account.SaveUpstreamTraceConfig)
 		accounts.POST("/:id/recover-state", h.Admin.Account.RecoverState)
 		accounts.POST("/:id/refresh", h.Admin.Account.Refresh)
 		accounts.POST("/:id/apply-oauth-credentials", h.Admin.Account.ApplyOAuthCredentials)
