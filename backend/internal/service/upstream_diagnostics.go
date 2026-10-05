@@ -420,7 +420,7 @@ func (s *AccountTestService) validateTraceBaseURL(raw string) (string, error) {
 	}
 	parsed, err := url.Parse(base)
 	if err != nil || parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" {
-		return "", errors.New("上游地址不能包含用户名、密码、查询参数或片段")
+		return "", errors.New("上游地址不能包含 credentials（用户名、密码、查询参数或片段）")
 	}
 	return strings.TrimRight(base, "/"), nil
 }
