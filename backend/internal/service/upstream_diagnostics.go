@@ -19,13 +19,13 @@ import (
 // UpstreamTraceRequest is intentionally single-shot and non-streaming.
 // Credentials are held only for the duration of the request.
 type UpstreamTraceRequest struct {
-	UpstreamBaseURL string `json:"upstream_base_url"`
-	APIKey          string `json:"api_key"`
-	ManagementToken string `json:"management_token,omitempty"`
-	UpstreamKeyID   *int64 `json:"upstream_key_id,omitempty"`
-	RequestModel    string `json:"request_model"`
-	Protocol        string `json:"protocol,omitempty"`
-	Prompt          string `json:"prompt,omitempty"`
+	UpstreamBaseURL   string `json:"upstream_base_url"`
+	APIKey            string `json:"api_key"`
+	ManagementToken   string `json:"management_token,omitempty"`
+	UpstreamKeyID     *int64 `json:"upstream_key_id,omitempty"`
+	RequestModel      string `json:"request_model"`
+	Protocol          string `json:"protocol,omitempty"`
+	Prompt            string `json:"prompt,omitempty"`
 	ExpectedGroupName string `json:"expected_group_name,omitempty"`
 }
 
@@ -39,20 +39,20 @@ type UpstreamTraceEvent struct {
 }
 
 type UpstreamTraceResult struct {
-	TraceID       string              `json:"trace_id"`
-	AccountID     int64               `json:"account_id"`
-	LocalAccount  map[string]any      `json:"local_account,omitempty"`
-	StartedAt     time.Time           `json:"started_at"`
-	FinishedAt    time.Time           `json:"finished_at"`
+	TraceID       string               `json:"trace_id"`
+	AccountID     int64                `json:"account_id"`
+	LocalAccount  map[string]any       `json:"local_account,omitempty"`
+	StartedAt     time.Time            `json:"started_at"`
+	FinishedAt    time.Time            `json:"finished_at"`
 	Events        []UpstreamTraceEvent `json:"events"`
-	Models        []string            `json:"models,omitempty"`
-	RequestModel  string              `json:"request_model"`
-	Protocol      string              `json:"protocol"`
-	RequestPath   string              `json:"request_path,omitempty"`
-	ResponseModel string              `json:"response_model,omitempty"`
-	Usage         map[string]any      `json:"usage,omitempty"`
-	Billing       map[string]any      `json:"billing,omitempty"`
-	Verdict       map[string]any      `json:"verdict"`
+	Models        []string             `json:"models,omitempty"`
+	RequestModel  string               `json:"request_model"`
+	Protocol      string               `json:"protocol"`
+	RequestPath   string               `json:"request_path,omitempty"`
+	ResponseModel string               `json:"response_model,omitempty"`
+	Usage         map[string]any       `json:"usage,omitempty"`
+	Billing       map[string]any       `json:"billing,omitempty"`
+	Verdict       map[string]any       `json:"verdict"`
 }
 
 type UpstreamAuthorizationProbeRequest struct {
@@ -143,9 +143,9 @@ func (s *AccountTestService) RunUpstreamTrace(ctx context.Context, accountID int
 	result.Verdict["model_discovery"] = "passed"
 	result.Verdict["model_list_contains_request_model"] = traceContainsModel(result.Models, model)
 	addEvent("model_discovery", modelsResponse.StatusCode, true, "model catalog retrieved", map[string]any{
-		"models":                     result.Models,
-		"contains_request_model":     result.Verdict["model_list_contains_request_model"],
-		"request_model":              model,
+		"models":                    result.Models,
+		"contains_request_model":    result.Verdict["model_list_contains_request_model"],
+		"request_model":             model,
 		"request_body_was_not_sent": true,
 	})
 
@@ -155,12 +155,12 @@ func (s *AccountTestService) RunUpstreamTrace(ctx context.Context, accountID int
 		keyBefore, _ = s.traceReadManagementKey(ctx, base, req.ManagementToken, *req.UpstreamKeyID, apiKey)
 		usageBefore, _ = s.traceReadManagementUsage(ctx, base, req.ManagementToken, *req.UpstreamKeyID, apiKey)
 		result.Billing = map[string]any{
-			"key_before":        summarizeTraceKey(keyBefore),
+			"key_before":         summarizeTraceKey(keyBefore),
 			"usage_before_count": len(usageBefore),
 		}
 		addEvent("billing_before", http.StatusOK, keyBefore != nil, "read-only key and usage baseline", map[string]any{
-			"key":              summarizeTraceKey(keyBefore),
-			"usage_row_count":  len(usageBefore),
+			"key":             summarizeTraceKey(keyBefore),
+			"usage_row_count": len(usageBefore),
 		})
 	}
 
@@ -181,10 +181,10 @@ func (s *AccountTestService) RunUpstreamTrace(ctx context.Context, accountID int
 		return result, nil
 	}
 	addEvent("model_request", response.StatusCode, err == nil && response.StatusCode >= 200 && response.StatusCode < 300, "single model request completed", map[string]any{
-		"request_path":   path,
-		"request_model":  model,
-		"response_model": responseModel,
-		"usage":          usage,
+		"request_path":     path,
+		"request_model":    model,
+		"response_model":   responseModel,
+		"usage":            usage,
 		"response_excerpt": traceExcerpt(responseValue, response.Body),
 	})
 	if strings.TrimSpace(req.ManagementToken) != "" && req.UpstreamKeyID != nil && *req.UpstreamKeyID > 0 {
@@ -219,8 +219,8 @@ func (s *AccountTestService) RunUpstreamAuthorizationProbe(ctx context.Context, 
 		return nil, errors.New("management_token and probe_group_id are required")
 	}
 	result := &UpstreamAuthorizationProbeResult{
-		TraceID:          uuid.NewString(),
-		RequestedGroupID: req.ProbeGroupID,
+		TraceID:           uuid.NewString(),
+		RequestedGroupID:  req.ProbeGroupID,
 		AuthorizationTest: "pending",
 	}
 	name := "sub2api_trace_probe_" + strings.ReplaceAll(uuid.NewString(), "-", "")
@@ -318,7 +318,7 @@ func (s *AccountTestService) traceRequest(ctx context.Context, method, rawURL, t
 	if err != nil {
 		return result, nil, err
 	}
-	defer response.Body.Close()
+	defer func() { _ = response.Body.Close() }()
 	result.StatusCode = response.StatusCode
 	for _, name := range []string{"content-type", "x-request-id", "request-id", "retry-after"} {
 		if value := response.Header.Get(name); value != "" {
@@ -384,7 +384,8 @@ func traceDataURL(base, suffix string) string {
 	if !strings.HasSuffix(path, "/v1") {
 		path += "/v1"
 	}
-	parsed.Path = strings.TrimRight(path, "/") + suffix
+	suffix = strings.TrimPrefix(suffix, "/v1")
+	parsed.Path = strings.TrimRight(path, "/") + "/v1" + suffix
 	parsed.RawQuery, parsed.Fragment = "", ""
 	return parsed.String()
 }
@@ -406,10 +407,14 @@ func unwrapTraceMap(value any) (map[string]any, bool) {
 	if !ok {
 		return nil, false
 	}
-	if data, ok := object["data"]; ok {
-		object, ok = data.(map[string]any)
+	if data, exists := object["data"]; exists {
+		dataObject, dataOK := data.(map[string]any)
+		if !dataOK {
+			return nil, false
+		}
+		return dataObject, true
 	}
-	return object, ok
+	return object, true
 }
 
 func traceInt64(value any) int64 {
@@ -517,7 +522,7 @@ func traceErrorText(value any, raw []byte, secret string) string {
 		}
 		if text == "" {
 			if nested, ok := object["error"].(map[string]any); ok {
-			if message, ok := nested["message"]; ok {
+				if message, ok := nested["message"]; ok {
 					text = fmt.Sprint(message)
 				}
 			}
@@ -533,10 +538,6 @@ func traceErrorText(value any, raw []byte, secret string) string {
 		text = strings.ReplaceAll(text, secret, "[REDACTED]")
 	}
 	return text
-}
-
-func redactTraceValue(value any) any {
-	return redactTraceValueWithSecrets(value, nil)
 }
 
 func redactTraceValueWithSecrets(value any, secrets []string) any {
@@ -619,20 +620,20 @@ func summarizeTraceKey(key map[string]any) map[string]any {
 		groupName = name
 	}
 	return map[string]any{
-		"id":        traceInt64(key["id"]),
-		"group_id":  groupID,
+		"id":         traceInt64(key["id"]),
+		"group_id":   groupID,
 		"group_name": groupName,
-		"status":    key["status"],
+		"status":     key["status"],
 	}
 }
 
 func compareTraceBilling(before, after map[string]any, beforeRows, afterRows []map[string]any, requestModel, expectedGroup string) map[string]any {
 	result := map[string]any{
-		"request_model":            requestModel,
-		"usage_rows_before":        len(beforeRows),
-		"usage_rows_after":         len(afterRows),
-		"new_usage_rows":           len(afterRows) - len(beforeRows),
-		"accounting_confirmation":  "unavailable",
+		"request_model":           requestModel,
+		"usage_rows_before":       len(beforeRows),
+		"usage_rows_after":        len(afterRows),
+		"new_usage_rows":          len(afterRows) - len(beforeRows),
+		"accounting_confirmation": "unavailable",
 	}
 	beforeSummary := summarizeTraceKey(before)
 	afterSummary := summarizeTraceKey(after)
