@@ -385,7 +385,7 @@ func traceDataURL(base, suffix string) string {
 		path += "/v1"
 	}
 	suffix = strings.TrimPrefix(suffix, "/v1")
-	parsed.Path = strings.TrimRight(path, "/") + "/v1" + suffix
+	parsed.Path = strings.TrimRight(path, "/") + suffix
 	parsed.RawQuery, parsed.Fragment = "", ""
 	return parsed.String()
 }
