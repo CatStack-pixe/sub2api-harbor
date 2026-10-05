@@ -435,12 +435,12 @@ func (s *AccountTestService) traceRequest(ctx context.Context, method, rawURL, t
 	}
 	request.Header.Set("Accept", "application/json")
 	request.Header.Set("User-Agent", "sub2api-upstream-trace/1.0")
-		if protocol := normalizeTraceProtocolFromPath(rawURL); protocol == "messages" {
-			request.Header.Set("x-api-key", token)
-			request.Header.Set("anthropic-version", "2023-06-01")
-		} else {
-			request.Header.Set("Authorization", "Bearer "+token)
-		}
+	if protocol := normalizeTraceProtocolFromPath(rawURL); protocol == "messages" {
+		request.Header.Set("x-api-key", token)
+		request.Header.Set("anthropic-version", "2023-06-01")
+	} else {
+		request.Header.Set("Authorization", "Bearer "+token)
+	}
 	if body != nil {
 		request.Header.Set("Content-Type", "application/json")
 	}
