@@ -12,6 +12,24 @@ import (
 )
 
 const upstreamTraceConfigExtraKey = "upstream_trace_config"
+const upstreamTraceAccountExtraKey = "upstream_trace_account"
+
+func upstreamTraceFalsePointer() *bool {
+	value := false
+	return &value
+}
+
+type CreateUpstreamTraceAccountRequest struct {
+	Name            string         `json:"name" binding:"required"`
+	Platform        string         `json:"platform" binding:"required"`
+	Type            string         `json:"type" binding:"required,oneof=oauth apikey"`
+	Credentials     map[string]any `json:"credentials"`
+	UpstreamBaseURL string         `json:"upstream_base_url" binding:"required"`
+	UpstreamGroupID *int64         `json:"upstream_group_id"`
+	RequestModel    string         `json:"request_model"`
+	Protocol        string         `json:"protocol"`
+	Enabled         bool           `json:"enabled"`
+}
 
 type UpstreamTraceConfig struct {
 	Enabled         bool   `json:"enabled"`
@@ -54,6 +72,51 @@ func (h *AccountHandler) GetUpstreamTraceConfig(c *gin.Context) {
 		}
 	}
 	response.Success(c, config)
+}
+
+func (h *AccountHandler) CreateUpstreamTraceAccount(c *gin.Context) {
+	var req CreateUpstreamTraceAccountRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "Invalid test account: "+err.Error())
+		return
+	}
+	if req.Type != service.AccountTypeOAuth && req.Type != service.AccountTypeAPIKey {
+		response.BadRequest(c, "test account type must be oauth or apikey")
+		return
+	}
+	if strings.TrimSpace(req.Name) == "" || strings.TrimSpace(req.UpstreamBaseURL) == "" {
+		response.BadRequest(c, "name and upstream_base_url are required")
+		return
+	}
+	extra := map[string]any{
+		upstreamTraceAccountExtraKey: true,
+		upstreamTraceConfigExtraKey: map[string]any{
+			"enabled":           req.Enabled,
+			"upstream_base_url": strings.TrimSpace(req.UpstreamBaseURL),
+			"upstream_group_id": req.UpstreamGroupID,
+			"request_model":     strings.TrimSpace(req.RequestModel),
+			"protocol":          strings.TrimSpace(req.Protocol),
+		},
+	}
+	account, err := h.adminService.CreateAccount(c.Request.Context(), &service.CreateAccountInput{
+		Name:                 "[测试账户] " + strings.TrimSpace(req.Name),
+		Platform:             strings.TrimSpace(req.Platform),
+		Type:                 req.Type,
+		Credentials:          req.Credentials,
+		Extra:                extra,
+		SkipDefaultGroupBind: true,
+		InitialSchedulable:   upstreamTraceFalsePointer(),
+	})
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, gin.H{
+		"account":      account,
+		"enabled":      req.Enabled,
+		"account_type": req.Type,
+		"test_account": true,
+	})
 }
 
 func (h *AccountHandler) SaveUpstreamTraceConfig(c *gin.Context) {

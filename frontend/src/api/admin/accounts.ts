@@ -361,6 +361,29 @@ export interface UpstreamTraceConfig {
   prompt?: string
 }
 
+export interface CreateUpstreamTraceAccountRequest {
+  name: string
+  platform: string
+  type: 'oauth' | 'apikey'
+  credentials: Record<string, unknown>
+  upstream_base_url: string
+  upstream_group_id?: number
+  request_model?: string
+  protocol?: 'chat_completions' | 'responses' | 'messages'
+  enabled: boolean
+}
+
+export async function createUpstreamTraceAccount(
+  payload: CreateUpstreamTraceAccountRequest
+): Promise<Record<string, unknown>> {
+  const { data } = await apiClient.post<Record<string, unknown>>(
+    '/admin/accounts/upstream-trace-accounts',
+    payload,
+    { timeout: 120000 }
+  )
+  return data
+}
+
 export async function traceUpstream(
   id: number,
   payload: UpstreamTraceRequest
@@ -1440,6 +1463,7 @@ export const accountsAPI = {
   traceUpstream,
   getUpstreamTraceConfig,
   saveUpstreamTraceConfig,
+  createUpstreamTraceAccount,
   probeUpstreamAuthorization,
   refreshCredentials,
   applyOAuthCredentials,
