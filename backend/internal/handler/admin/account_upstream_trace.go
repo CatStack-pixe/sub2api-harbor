@@ -105,15 +105,15 @@ func (h *AccountHandler) CreateUpstreamTraceAccount(c *gin.Context) {
 		Credentials:          req.Credentials,
 		Extra:                extra,
 		SkipDefaultGroupBind: true,
-		InitialSchedulable:  upstreamTraceFalsePointer(),
+		InitialSchedulable:   upstreamTraceFalsePointer(),
 	})
 	if err != nil {
 		response.ErrorFrom(c, err)
 		return
 	}
 	response.Success(c, gin.H{
-		"account": account,
-		"enabled": req.Enabled,
+		"account":      account,
+		"enabled":      req.Enabled,
 		"account_type": req.Type,
 		"test_account": true,
 	})
