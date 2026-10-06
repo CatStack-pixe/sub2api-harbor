@@ -14,7 +14,10 @@ import (
 const upstreamTraceConfigExtraKey = "upstream_trace_config"
 const upstreamTraceAccountExtraKey = "upstream_trace_account"
 
-func boolPtr(value bool) *bool { return &value }
+func upstreamTraceFalsePointer() *bool {
+	value := false
+	return &value
+}
 
 type CreateUpstreamTraceAccountRequest struct {
 	Name            string         `json:"name" binding:"required"`
@@ -102,7 +105,7 @@ func (h *AccountHandler) CreateUpstreamTraceAccount(c *gin.Context) {
 		Credentials:          req.Credentials,
 		Extra:                extra,
 		SkipDefaultGroupBind: true,
-		InitialSchedulable:  boolPtr(false),
+		InitialSchedulable:  upstreamTraceFalsePointer(),
 	})
 	if err != nil {
 		response.ErrorFrom(c, err)
