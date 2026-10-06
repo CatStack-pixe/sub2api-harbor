@@ -96,11 +96,11 @@ func (h *AccountHandler) CreateUpstreamTraceAccount(c *gin.Context) {
 		},
 	}
 	account, err := h.adminService.CreateAccount(c.Request.Context(), &service.CreateAccountInput{
-		Name:              "[测试账户] " + strings.TrimSpace(req.Name),
-		Platform:          strings.TrimSpace(req.Platform),
-		Type:              req.Type,
-		Credentials:       req.Credentials,
-		Extra:             extra,
+		Name:                 "[测试账户] " + strings.TrimSpace(req.Name),
+		Platform:             strings.TrimSpace(req.Platform),
+		Type:                 req.Type,
+		Credentials:          req.Credentials,
+		Extra:                extra,
 		SkipDefaultGroupBind: true,
 		InitialSchedulable:  boolPtr(false),
 	})
