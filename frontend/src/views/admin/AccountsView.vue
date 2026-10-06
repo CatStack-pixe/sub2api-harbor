@@ -17,6 +17,9 @@
             @create="showCreate = true"
           >
             <template #after>
+              <button class="btn btn-secondary" type="button" @click="showCreateTraceAccount = true">
+                创建测试账户
+              </button>
               <!-- Auto Refresh Dropdown -->
               <div class="relative" ref="autoRefreshDropdownRef">
                 <button
@@ -249,6 +252,12 @@
               >
                 {{ accountDisplayEmail(row) }}
               </span>
+              <span
+                v-if="row.extra?.upstream_trace_account === true"
+                class="mt-1 inline-flex w-fit items-center rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-800 dark:bg-amber-900/30 dark:text-amber-200"
+              >
+                测试账户 · {{ row.extra?.upstream_trace_config?.enabled === true ? '已启用' : '已停用' }}
+              </span>
             </div>
           </template>
           <template #cell-notes="{ value }">
@@ -460,6 +469,7 @@
     <ReAuthAccountModal :show="showReAuth" :account="reAuthAcc" @close="closeReAuthModal" @reauthorized="handleAccountUpdated" />
     <AccountTestModal :show="showTest" :account="testingAcc" @close="closeTestModal" />
     <AccountUpstreamTraceModal :show="showTrace" :account="traceAcc" @close="closeTraceModal" />
+    <CreateUpstreamTraceAccountModal :show="showCreateTraceAccount" @close="showCreateTraceAccount = false" @created="reload" />
     <AccountStatsModal :show="showStats" :account="statsAcc" @close="closeStatsModal" />
     <ScheduledTestsPanel :show="showSchedulePanel" :account-id="scheduleAcc?.id ?? null" :model-options="scheduleModelOptions" @close="closeSchedulePanel" />
     <AccountActionMenu :show="menu.show" :account="menu.acc" :anchor-rect="menu.anchorRect" @close="menu.show = false" @test="handleTest" @trace="handleTrace" @stats="handleViewStats" @schedule="handleSchedule" @duplicate="handleDuplicateAccount" @reauth="handleReAuth" @refresh-token="handleRefresh" @recover-state="handleRecoverState" @reset-quota="handleResetQuota" @set-privacy="handleSetPrivacy" @create-spark-shadow="handleCreateSparkShadow" />
@@ -518,6 +528,7 @@ import ImportDataModal from '@/components/admin/account/ImportDataModal.vue'
 import ReAuthAccountModal from '@/components/admin/account/ReAuthAccountModal.vue'
 import AccountTestModal from '@/components/admin/account/AccountTestModal.vue'
 import AccountUpstreamTraceModal from '@/components/admin/account/AccountUpstreamTraceModal.vue'
+import CreateUpstreamTraceAccountModal from '@/components/admin/account/CreateUpstreamTraceAccountModal.vue'
 import AccountStatsModal from '@/components/admin/account/AccountStatsModal.vue'
 import ScheduledTestsPanel from '@/components/admin/account/ScheduledTestsPanel.vue'
 import type { SelectOption } from '@/components/common/Select.vue'
@@ -612,6 +623,7 @@ const showCreateShadowDialog = ref(false)
 const showReAuth = ref(false)
 const showTest = ref(false)
 const showTrace = ref(false)
+const showCreateTraceAccount = ref(false)
 const showStats = ref(false)
 const showErrorPassthrough = ref(false)
 const showTLSFingerprintProfiles = ref(false)

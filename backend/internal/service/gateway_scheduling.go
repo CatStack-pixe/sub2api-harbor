@@ -1155,6 +1155,11 @@ func (s *GatewayService) isAccountSchedulableForSelection(account *Account) bool
 	if account == nil {
 		return false
 	}
+	if account.Extra != nil {
+		if testAccount, ok := account.Extra["upstream_trace_account"].(bool); ok && testAccount {
+			return false
+		}
+	}
 	return account.IsSchedulable()
 }
 

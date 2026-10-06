@@ -19,6 +19,9 @@
               <Icon name="search" size="sm" class="text-amber-500" />
               上游 Trace / 计费复现
             </button>
+            <span v-if="account.extra?.upstream_trace_account === true" class="mx-4 mb-1 block text-[10px] font-medium text-amber-600">
+              测试账户 · {{ account.extra?.upstream_trace_config?.enabled === true ? '已启用' : '已停用' }}
+            </span>
             <button @click="$emit('stats', account); $emit('close')" class="flex w-full items-center gap-2 px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-dark-700">
               <Icon name="chart" size="sm" class="text-indigo-500" />
               {{ t('admin.accounts.viewStats') }}
