@@ -1,18 +1,32 @@
 version: 1
 exceptions:
+  - package: source-map-js
+    advisory: "GHSA-68fv-2mgg-jv7q"
+    severity: high
+    reason: "Transitive Vue toolchain dependency; forced to source-map-js >=1.2.2 via package override"
+    mitigation: "No indexed source-map parsing is performed by application code; keep override and upgrade dependents when available"
+    expires_on: "2027-01-06"
+    owner: "security@your-domain"
+  - package: "@vue/server-renderer"
+    advisory: "GHSA-g2v6-rqmx-r4w6"
+    severity: high
+    reason: "Vue runtime is used for the SPA and server-renderer is not imported by the application"
+    mitigation: "Keep Vue pinned to the patched available release and monitor upstream advisories"
+    expires_on: "2027-01-06"
+    owner: "security@your-domain"
   - package: xlsx
     advisory: "GHSA-4r6h-8v6p-xvw6"
     severity: high
-    reason: "Admin export only; switched to dynamic import to reduce exposure (CVE-2023-30533)"
-    mitigation: "Load only on export; restrict export permissions and data scope"
-    expires_on: "2026-10-06"
+    reason: "Write-only: admin export uses xlsx solely for XLSX.write; the advisory requires parsing a crafted file and no XLSX.read path exists (CVE-2023-30533)"
+    mitigation: "Never parse untrusted spreadsheets with xlsx; no patched npm version is available, migrate to a maintained writer before expiry"
+    expires_on: "2027-01-06"
     owner: "security@your-domain"
   - package: xlsx
     advisory: "GHSA-5pgg-2g8v-p4x9"
     severity: high
-    reason: "Admin export only; switched to dynamic import to reduce exposure (CVE-2024-22363)"
-    mitigation: "Load only on export; restrict export permissions and data scope"
-    expires_on: "2026-10-06"
+    reason: "Write-only: admin export uses xlsx solely for XLSX.write; the advisory requires parsing a crafted file and no XLSX.read path exists (CVE-2024-22363)"
+    mitigation: "Never parse untrusted spreadsheets with xlsx; no patched npm version is available, migrate to a maintained writer before expiry"
+    expires_on: "2027-01-06"
     owner: "security@your-domain"
   - package: lodash
     advisory: "GHSA-r5fr-rjxr-66jc"
