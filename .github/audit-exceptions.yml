@@ -7,7 +7,7 @@ exceptions:
     mitigation: "No indexed source-map parsing is performed by application code; keep override and upgrade dependents when available"
     expires_on: "2027-01-06"
     owner: "security@your-domain"
-  - package: vue
+  - package: "@vue/server-renderer"
     advisory: "GHSA-g2v6-rqmx-r4w6"
     severity: high
     reason: "Vue runtime is used for the SPA and server-renderer is not imported by the application"
