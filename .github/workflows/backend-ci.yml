@@ -155,7 +155,7 @@ jobs:
       - uses: actions/setup-go@v6
         with:
           go-version-file: backend/go.mod
-          check-latest: false
+          check-latest: true
           cache: true
           cache-dependency-path: backend/go.sum
       - name: Verify Go version
