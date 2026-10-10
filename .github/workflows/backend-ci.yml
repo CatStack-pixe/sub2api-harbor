@@ -16,7 +16,7 @@ jobs:
       - uses: actions/setup-go@v6
         with:
           go-version-file: backend/go.mod
-          check-latest: false
+          check-latest: true
           cache-dependency-path: backend/go.sum
       - name: Generate Ent
         working-directory: backend
@@ -62,12 +62,12 @@ jobs:
       - uses: actions/setup-go@v6
         with:
           go-version-file: backend/go.mod
-          check-latest: false
+          check-latest: true
           cache: true
           cache-dependency-path: backend/go.sum
       - name: Verify Go version
         run: |
-          go version | grep -q 'go1.27.0'
+          go version | grep -q 'go1.27.2'
       - name: Generate Ent and Wire
         working-directory: backend
         run: go generate ./ent ./cmd/server
@@ -82,12 +82,12 @@ jobs:
       - uses: actions/setup-go@v6
         with:
           go-version-file: backend/go.mod
-          check-latest: false
+          check-latest: true
           cache: true
           cache-dependency-path: backend/go.sum
       - name: Verify Go version
         run: |
-          go version | grep -q 'go1.27.0'
+          go version | grep -q 'go1.27.2'
       - name: Generate Ent and Wire
         working-directory: backend
         run: go generate ./ent ./cmd/server
@@ -104,7 +104,7 @@ jobs:
       - uses: actions/setup-go@v6
         with:
           go-version-file: backend/go.mod
-          check-latest: false
+          check-latest: true
           cache: true
           cache-dependency-path: backend/go.sum
       - name: Build controlled proxy pool importer
@@ -155,12 +155,12 @@ jobs:
       - uses: actions/setup-go@v6
         with:
           go-version-file: backend/go.mod
-          check-latest: false
+          check-latest: true
           cache: true
           cache-dependency-path: backend/go.sum
       - name: Verify Go version
         run: |
-          go version | grep -q 'go1.27.0'
+          go version | grep -q 'go1.27.2'
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v9
         with:
