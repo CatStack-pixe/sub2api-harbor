@@ -1653,6 +1653,7 @@ func TestIsRetryableCodexModelsManifestTransportError(t *testing.T) {
 		},
 		{
 			name:      "typed HTTP2 GOAWAY",
+			//nolint:staticcheck // Exercise the legacy x/net/http2 error classification path.
 			err:       http2.GoAwayError{ErrCode: http2.ErrCodeNo},
 			retryable: true,
 		},
