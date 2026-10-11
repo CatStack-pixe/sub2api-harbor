@@ -54,7 +54,7 @@ func TestEnableHTTP2KeepAlive_EnablesPingHealthCheck(t *testing.T) {
 			h2, err := enableHTTP2KeepAlive(tr, tc.mode)
 			require.NoError(t, err)
 			require.NotNil(t, h2, "必须返回已配置的 *http2.Transport")
-			require.Equal(t, tc.readIdleTimeout, h2.ReadIdleTimeout)
+			require.Equal(t, tc.readIdleTimeout, h2.ReadIdleTimeout) //nolint:staticcheck
 			//nolint:staticcheck // Assert the legacy x/net/http2 keepalive field intentionally used by the adapter.
 			require.Equal(t, tc.pingTimeout, h2.PingTimeout, "各模式应使用独立的 PING 应答期限")
 			requireHTTP2Configured(t, tr, "http2 必须已挂到底层 http.Transport 上")
