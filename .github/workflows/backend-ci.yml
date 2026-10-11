@@ -11,6 +11,8 @@ permissions:
 jobs:
   generated:
     runs-on: ubuntu-latest
+    env:
+      GOTOOLCHAIN: local
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-go@v6
@@ -56,6 +58,8 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
+    env:
+      GOTOOLCHAIN: local
     steps:
       - uses: actions/checkout@v6
       - name: Check Docker Compose simple mode environment
@@ -78,6 +82,8 @@ jobs:
 
   integration:
     runs-on: ubuntu-latest
+    env:
+      GOTOOLCHAIN: local
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-go@v6
@@ -151,6 +157,8 @@ jobs:
 
   golangci-lint:
     runs-on: ubuntu-latest
+    env:
+      GOTOOLCHAIN: local
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-go@v6
