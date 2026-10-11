@@ -136,13 +136,7 @@ func ProvideHTTPServer(cfg *config.Config, router *gin.Engine) *http.Server {
 	// 根据配置决定是否启用 H2C
 	if cfg.Server.H2C.Enabled {
 		h2cConfig := cfg.Server.H2C
-		if err := http2.ConfigureServer(server, &http2.Server{
-			MaxConcurrentStreams:         h2cConfig.MaxConcurrentStreams,
-			IdleTimeout:                  time.Duration(h2cConfig.IdleTimeout) * time.Second,
-			MaxReadFrameSize:             uint32(h2cConfig.MaxReadFrameSize),
-			MaxUploadBufferPerConnection: int32(h2cConfig.MaxUploadBufferPerConnection),
-			MaxUploadBufferPerStream:     int32(h2cConfig.MaxUploadBufferPerStream),
-		}); err != nil {
+		if err := configureH2CServer(server, h2cConfig); err != nil {
 			log.Printf("Failed to configure HTTP/2 Cleartext (h2c): %v", err)
 		} else {
 			protocols := new(http.Protocols)
@@ -161,6 +155,20 @@ func ProvideHTTPServer(cfg *config.Config, router *gin.Engine) *http.Server {
 
 	server.Handler = httpHandler
 	return server
+}
+
+// configureH2CServer keeps the existing cleartext HTTP/2 limits for deployments
+// that enable h2c.
+//
+//nolint:staticcheck // x/net/http2 remains required for configuring the h2c server path.
+func configureH2CServer(server *http.Server, cfg config.H2CConfig) error {
+	return http2.ConfigureServer(server, &http2.Server{
+		MaxConcurrentStreams:         cfg.MaxConcurrentStreams,
+		IdleTimeout:                  time.Duration(cfg.IdleTimeout) * time.Second,
+		MaxReadFrameSize:             uint32(cfg.MaxReadFrameSize),
+		MaxUploadBufferPerConnection: int32(cfg.MaxUploadBufferPerConnection),
+		MaxUploadBufferPerStream:     int32(cfg.MaxUploadBufferPerStream),
+	})
 }
 
 func derefInt64(p *int64) int64 {
