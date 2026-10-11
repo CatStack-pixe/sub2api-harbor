@@ -64,7 +64,7 @@ jobs:
         with:
           go-version-file: backend/go.mod
           check-latest: true
-          cache: true
+          cache: false
           cache-dependency-path: backend/go.sum
       - name: Verify Go version
         run: |
@@ -84,7 +84,7 @@ jobs:
         with:
           go-version-file: backend/go.mod
           check-latest: true
-          cache: true
+          cache: false
           cache-dependency-path: backend/go.sum
       - name: Verify Go version
         run: |
@@ -106,7 +106,7 @@ jobs:
         with:
           go-version-file: backend/go.mod
           check-latest: true
-          cache: true
+          cache: false
           cache-dependency-path: backend/go.sum
       - name: Build controlled proxy pool importer
         working-directory: backend
@@ -157,7 +157,7 @@ jobs:
         with:
           go-version-file: backend/go.mod
           check-latest: true
-          cache: true
+          cache: false
           cache-dependency-path: backend/go.sum
       - name: Verify Go version
         run: |
