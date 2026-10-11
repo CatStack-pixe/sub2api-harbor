@@ -1418,7 +1418,7 @@ func buildUpstreamTransport(settings poolSettings, proxyURL *url.URL, protocolMo
 // 静默掐断的死连接。此处主动设置 ReadIdleTimeout/PingTimeout，让死连接被提前 PING
 // 出并关闭，请求得以重建连接而非挂到 TCP 重传超时。返回底层 *http2.Transport 便于测试。
 //nolint:staticcheck // x/net/http2 is required for explicit PING keepalive compatibility.
-func enableHTTP2KeepAlive(transport *http.Transport, protocolMode string) (*http2.Transport, error) { //nolint:staticcheck
+func enableHTTP2KeepAlive(transport *http.Transport, protocolMode string) (*http2.Transport, error) {
 	h2, err := http2.ConfigureTransports(transport)
 	if err != nil {
 		return nil, err
