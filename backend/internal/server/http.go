@@ -136,17 +136,11 @@ func ProvideHTTPServer(cfg *config.Config, router *gin.Engine) *http.Server {
 	// 根据配置决定是否启用 H2C
 	if cfg.Server.H2C.Enabled {
 		h2cConfig := cfg.Server.H2C
-		//nolint:staticcheck // h2c requires x/net/http2 configuration for the supported HTTP/2 server path.
 		if err := http2.ConfigureServer(server, &http2.Server{
-			//nolint:staticcheck // Preserve the existing h2c limits until the stdlib HTTP/2 config is feature-equivalent.
 			MaxConcurrentStreams:         h2cConfig.MaxConcurrentStreams,
-			//nolint:staticcheck // Preserve the existing h2c limits until the stdlib HTTP/2 config is feature-equivalent.
 			IdleTimeout:                  time.Duration(h2cConfig.IdleTimeout) * time.Second,
-			//nolint:staticcheck // Preserve the existing h2c limits until the stdlib HTTP/2 config is feature-equivalent.
 			MaxReadFrameSize:             uint32(h2cConfig.MaxReadFrameSize),
-			//nolint:staticcheck // Preserve the existing h2c limits until the stdlib HTTP/2 config is feature-equivalent.
 			MaxUploadBufferPerConnection: int32(h2cConfig.MaxUploadBufferPerConnection),
-			//nolint:staticcheck // Preserve the existing h2c limits until the stdlib HTTP/2 config is feature-equivalent.
 			MaxUploadBufferPerStream:     int32(h2cConfig.MaxUploadBufferPerStream),
 		}); err != nil {
 			log.Printf("Failed to configure HTTP/2 Cleartext (h2c): %v", err)
