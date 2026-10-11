@@ -17,6 +17,7 @@ jobs:
         with:
           go-version-file: backend/go.mod
           check-latest: true
+          cache: false
           cache-dependency-path: backend/go.sum
       - name: Generate Ent
         working-directory: backend
