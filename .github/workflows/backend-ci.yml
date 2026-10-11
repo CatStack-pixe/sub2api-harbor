@@ -168,6 +168,7 @@ jobs:
           version: v2.13
           args: --timeout=30m
           working-directory: backend
+          skip-cache: true
 
   release-helpers:
     runs-on: ubuntu-latest
