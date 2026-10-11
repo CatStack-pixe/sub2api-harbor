@@ -37,8 +37,7 @@ jobs:
       - name: Generate Ent and Wire
         working-directory: backend
         run: |
-          rm -rf "${{ runner.temp }}/go-build-cache"
-          GOCACHE="${{ runner.temp }}/go-build-cache" GOMODCACHE="${{ runner.temp }}/go-mod-cache" go generate ./ent ./cmd/server
+          GOCACHE="${{ runner.temp }}/go-build-cache-${{ github.run_id }}" GOMODCACHE="${{ runner.temp }}/go-mod-cache-${{ github.run_id }}" go generate ./ent ./cmd/server
       - name: Unit tests
         working-directory: backend
         run: make test-unit
@@ -59,8 +58,7 @@ jobs:
       - name: Generate Ent and Wire
         working-directory: backend
         run: |
-          rm -rf "${{ runner.temp }}/go-build-cache"
-          GOCACHE="${{ runner.temp }}/go-build-cache" GOMODCACHE="${{ runner.temp }}/go-mod-cache" go generate ./ent ./cmd/server
+          GOCACHE="${{ runner.temp }}/go-build-cache-${{ github.run_id }}" GOMODCACHE="${{ runner.temp }}/go-mod-cache-${{ github.run_id }}" go generate ./ent ./cmd/server
       - name: Integration tests
         working-directory: backend
         run: make test-integration
