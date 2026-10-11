@@ -34,6 +34,9 @@ jobs:
           check-latest: false
           cache: true
           cache-dependency-path: backend/go.sum
+      - name: Generate Ent and Wire
+        working-directory: backend
+        run: go generate ./ent ./cmd/server
       - name: Unit tests
         working-directory: backend
         run: make test-unit
@@ -51,6 +54,12 @@ jobs:
           check-latest: false
           cache: true
           cache-dependency-path: backend/go.sum
+      - name: Generate Ent and Wire
+        working-directory: backend
+        run: go generate ./ent ./cmd/server
+      - name: Integration tests
+        working-directory: backend
+        run: make test-integration
   proxy-pool-import:
     needs: [test, integration, golangci-lint]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
