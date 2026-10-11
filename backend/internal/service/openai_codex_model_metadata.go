@@ -289,9 +289,10 @@ func intersectUpstreamModelMetadata(modelID string, candidates []UpstreamModelMe
 			result.CodexToolCapabilities[field] = value
 		} else if declared {
 			fallback := json.RawMessage("null")
-			if field == "supports_search_tool" || field == "use_responses_lite" {
+			switch field {
+			case "supports_search_tool", "use_responses_lite":
 				fallback = json.RawMessage("false")
-			} else if field == "service_tiers" {
+			case "service_tiers":
 				// Conflicting peers must not advertise any tier, and Codex requires an array.
 				fallback = json.RawMessage("[]")
 			}
