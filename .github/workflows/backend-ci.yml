@@ -3,11 +3,89 @@ name: CI
 on:
   push:
   pull_request:
+  workflow_dispatch:
+    inputs:
+      record_routing_baseline:
+        description: Record the routing baseline from pinned pre-integration main
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
+env:
+  GOTOOLCHAIN: local
+
 jobs:
+  generated:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: backend/go.mod
+          check-latest: false
+          cache-dependency-path: backend/go.sum
+      - name: Verify Go version
+        run: test "$(go env GOVERSION)" = "go1.27.2"
+      # The generation directives use the module graph, including x/tools v0.50.0,
+      # so Ent and Wire read the export format produced by this Go toolchain.
+      - name: Generate Ent
+        working-directory: backend
+        run: go generate ./ent
+      - name: Format Go sources
+        run: git ls-files -z '*.go' | xargs -0 gofmt -w
+      - name: Generate Wire
+        working-directory: backend
+        run: go generate ./cmd/server
+      - name: Export generated source changes
+        if: always()
+        run: |
+          git ls-files -z --others --exclude-standard -- backend/ent backend/cmd/server \
+            | xargs -0 -r git add --intent-to-add --
+          git diff --binary > generated-sources.patch
+      - name: Upload generated source changes
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: generated-sources-${{ github.sha }}
+          path: generated-sources.patch
+          retention-days: 7
+      - name: Verify generated sources are committed
+        run: git diff --exit-code
+
+  record-routing-baseline:
+    if: github.event_name == 'workflow_dispatch' && inputs.record_routing_baseline
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: backend/go.mod
+          check-latest: false
+          cache-dependency-path: backend/go.sum
+      - name: Verify Go version
+        run: test "$(go env GOVERSION)" = "go1.27.2"
+      - name: Record pinned historical routing baseline
+        id: record
+        working-directory: .
+        run: python backend/internal/service/testdata/record_upstream_protocol_routing_main.py
+      # Independent of the normal gates; never publish the checkout's old fixture
+      # if recording the pinned source fails.
+      - name: Upload routing baseline
+        if: ${{ always() && steps.record.outcome == 'success' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: routing-baseline
+          path: backend/internal/service/testdata/upstream_protocol_routing_main_golden.json
+          if-no-files-found: error
+          retention-days: 7
+
   shell:
     runs-on: macos-15
     steps:
@@ -34,10 +112,11 @@ jobs:
           check-latest: false
           cache: true
           cache-dependency-path: backend/go.sum
+      - name: Verify Go version
+        run: test "$(go env GOVERSION)" = "go1.27.2"
       - name: Generate Ent and Wire
         working-directory: backend
-        run: |
-          GOCACHE="${{ runner.temp }}/go-build-cache-${{ github.run_id }}" GOMODCACHE="${{ runner.temp }}/go-mod-cache-${{ github.run_id }}" go generate ./ent ./cmd/server
+        run: go generate ./ent ./cmd/server
       - name: Unit tests
         working-directory: backend
         run: make test-unit
@@ -55,15 +134,16 @@ jobs:
           check-latest: false
           cache: true
           cache-dependency-path: backend/go.sum
+      - name: Verify Go version
+        run: test "$(go env GOVERSION)" = "go1.27.2"
       - name: Generate Ent and Wire
         working-directory: backend
-        run: |
-          GOCACHE="${{ runner.temp }}/go-build-cache-${{ github.run_id }}" GOMODCACHE="${{ runner.temp }}/go-mod-cache-${{ github.run_id }}" go generate ./ent ./cmd/server
+        run: go generate ./ent ./cmd/server
       - name: Integration tests
         working-directory: backend
         run: make test-integration
   proxy-pool-import:
-    needs: [test, integration, golangci-lint]
+    needs: [generated, test, integration, golangci-lint]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
@@ -74,6 +154,11 @@ jobs:
           check-latest: false
           cache: true
           cache-dependency-path: backend/go.sum
+      - name: Verify Go version
+        run: test "$(go env GOVERSION)" = "go1.27.2"
+      - name: Generate Ent and Wire
+        working-directory: backend
+        run: go generate ./ent ./cmd/server
       - name: Build controlled proxy pool importer
         working-directory: backend
         run: |
@@ -106,8 +191,14 @@ jobs:
       - name: Install frontend dependencies
         working-directory: frontend
         run: pnpm install --frozen-lockfile
-      - name: Frontend typecheck and critical vitest
+      - name: Frontend lint, typecheck and critical Vitest
         run: make test-frontend
+      - name: Full frontend regression suite
+        working-directory: frontend
+        run: pnpm run test:run
+      - name: Build frontend
+        working-directory: frontend
+        run: pnpm run build
 
   golangci-lint:
     runs-on: ubuntu-latest
@@ -119,6 +210,11 @@ jobs:
           check-latest: false
           cache: true
           cache-dependency-path: backend/go.sum
+      - name: Verify Go version
+        run: test "$(go env GOVERSION)" = "go1.27.2"
+      - name: Generate Ent and Wire
+        working-directory: backend
+        run: go generate ./ent ./cmd/server
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v9
         with:

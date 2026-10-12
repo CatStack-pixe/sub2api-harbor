@@ -7,6 +7,8 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/tidwall/gjson"
 )
 
 // Cline 上游错误的响应式处理。依据官方错误说明（https://docs.cline.bot/api/errors）与
@@ -22,8 +24,8 @@ import (
 //     cannot use individual model inference subscriptions"：没有可用的 ClinePass 订阅；
 //   - "Free limit reached on model … try again in …"：免费模型的每日额度，只限该模型。
 //
-// 错误码只出现在响应体里（状态码对应关系文档没有写全），按文案分类；未识别的错误交回
-// 默认逻辑（普通频率限制走默认 429）。
+// 只读取结构化 error.code 与错误消息；ClinePass / 免费模型限额兼容官方固定文案。
+// metadata 等字段可能回显请求内容，不能据此冷却钱包；未识别的错误交回默认逻辑。
 //
 // 作用范围：积分与 ClinePass 是同一个 Key 下互不影响的两个钱包，一边超限只冷却该边的
 // 全部模型（模型级冷却键，见 clineWalletRateLimitKey），不停整个账号；钱包按请求模型
@@ -75,24 +77,59 @@ var (
 	clineTryAgainPattern  = regexp.MustCompile(`(?i)\btry\s+again\s+in\s+`)
 )
 
-func classifyClineError(body []byte) clineErrorKind {
-	text := strings.ToLower(string(body))
+// parseClineError 返回错误分类与命中的限额消息，后者用于解析窗口和重试时间。
+func parseClineError(body []byte) (clineErrorKind, string) {
+	if !gjson.ValidBytes(body) {
+		return clineErrorNone, ""
+	}
+	err := gjson.GetBytes(body, "error")
+	if !err.IsObject() {
+		return clineErrorNone, ""
+	}
+	if code := err.Get("code"); code.Type == gjson.String {
+		if kind := classifyClineErrorCode(code.String()); kind != clineErrorNone {
+			return kind, ""
+		}
+	}
+	// 官方客户端也识别 details.code 中的组织花费上限。
+	if code := err.Get("details.code"); code.Type == gjson.String && classifyClineErrorCode(code.String()) == clineSpendLimit {
+		return clineSpendLimit, ""
+	}
+	for _, path := range []string{"message", "details.message"} {
+		message := err.Get(path)
+		if message.Type != gjson.String {
+			continue
+		}
+		if kind := classifyClineLimitMessage(message.String()); kind != clineErrorNone {
+			return kind, message.String()
+		}
+	}
+	return clineErrorNone, ""
+}
+
+func classifyClineErrorCode(code string) clineErrorKind {
+	switch strings.ToLower(strings.TrimSpace(code)) {
+	case "insufficient_credits":
+		return clineCreditsExhausted
+	case "spend_limit_exceeded":
+		return clineSpendLimit
+	case "inference_cap_error":
+		return clineInferenceCap
+	default:
+		return clineErrorNone
+	}
+}
+
+func classifyClineLimitMessage(message string) clineErrorKind {
+	text := strings.ToLower(message)
 	switch {
 	case strings.Contains(text, "organization accounts cannot use individual model inference subscriptions"),
 		strings.Contains(text, "the user is not subscribed to required model plan"):
 		return clinePassUnavailable
 	case strings.Contains(text, "free limit reached on model"):
 		return clineFreeModelLimit
-	case clinePassLimitPattern.Match(body):
+	case clinePassLimitPattern.MatchString(message):
 		return clinePassLimit
-	case strings.Contains(text, "spend_limit_exceeded"):
-		return clineSpendLimit
-	case strings.Contains(text, "inference_cap_error"):
-		return clineInferenceCap
-	case strings.Contains(text, "insufficient_credits"),
-		strings.Contains(text, "insufficient credits"),
-		cnProviderResponseIndicatesInsufficientBalance(body):
-		return clineCreditsExhausted
 	default:
 		return clineErrorNone
 	}
@@ -174,7 +211,7 @@ func (s *RateLimitService) handleClineError(
 	responseBody []byte,
 	upstreamMsg string,
 ) bool {
-	kind := classifyClineError(responseBody)
+	kind, limitMessage := parseClineError(responseBody)
 	if kind == clineErrorNone && statusCode == http.StatusPaymentRequired {
 		// 402 只会来自积分不足（ClinePass 超限走 429 等其他状态码）。
 		kind = clineCreditsExhausted
@@ -208,11 +245,11 @@ func (s *RateLimitService) handleClineError(
 			cooldown = clinePassLimitCooldown(account, "5h", now)
 		}
 	case clinePassLimit:
-		cooldown, reason = clinePassLimitCooldown(account, clinePassWindow(responseBody), now), clinePassLimitReason
+		cooldown, reason = clinePassLimitCooldown(account, clinePassWindow([]byte(limitMessage)), now), clinePassLimitReason
 	case clinePassUnavailable:
 		cooldown, reason = clineLimitRecheck, clinePassUnavailableReason
 	case clineFreeModelLimit:
-		cooldown, reason = clineFreeModelResetAfter(responseBody), clineFreeModelLimitReason
+		cooldown, reason = clineFreeModelResetAfter([]byte(limitMessage)), clineFreeModelLimitReason
 		if cooldown <= 0 {
 			cooldown = clineLimitRecheck
 		}

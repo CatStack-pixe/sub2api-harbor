@@ -421,10 +421,11 @@ func (s *GatewayService) handleCCStreamingFromAnthropic(
 		if event == nil {
 			return false
 		}
-		// Drop Anthropic keepalive pings before OpenAI conversion:
-		// leaking `event: ping` frames crashes OpenAI-stream clients.
-		// Error events must still forward — they carry upstream failures.
 		if event.Type == "ping" {
+			if _, err := fmt.Fprint(c.Writer, ": ping\n\n"); err != nil {
+				return true
+			}
+			c.Writer.Flush()
 			return false
 		}
 		if firstChunk {

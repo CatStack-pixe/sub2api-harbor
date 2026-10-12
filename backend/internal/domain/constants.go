@@ -40,6 +40,7 @@ const (
 	PlatformSenseAudio   = "senseaudio"
 	PlatformTierflow     = "tierflow"
 	PlatformOpenCodeGo   = "opencode_go"
+	PlatformCommandCode  = "command_code"
 	PlatformCline        = "cline"
 	PlatformComposite    = "composite"
 )

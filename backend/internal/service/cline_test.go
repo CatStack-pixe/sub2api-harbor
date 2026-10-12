@@ -152,7 +152,8 @@ func TestClassifyClineError(t *testing.T) {
 		`{"error":{"message":"You have reached your limit. Please try again later."}}`: clineErrorNone,
 	}
 	for body, want := range cases {
-		require.Equal(t, want, classifyClineError([]byte(body)), body)
+		kind, _ := parseClineError([]byte(body))
+		require.Equal(t, want, kind, body)
 	}
 
 	require.Equal(t, "5h", clinePassWindow([]byte(clinePass5hBody)))

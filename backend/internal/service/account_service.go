@@ -543,9 +543,14 @@ func (s *AccountService) TestCredentials(ctx context.Context, id int64) error {
 		return nil
 	case PlatformDeepSeek, PlatformNvidia, PlatformTokenRhythm, PlatformKimi,
 		PlatformChatAnywhere, PlatformGLM, PlatformZhipu,
-		PlatformModelScope, PlatformDashScope, PlatformMiniMax, PlatformVolcengine, PlatformSenseNova, PlatformSenseAudio, PlatformTierflow, PlatformOpenCodeGo, PlatformTypeSafe, PlatformCline:
+		PlatformModelScope, PlatformDashScope, PlatformMiniMax, PlatformVolcengine, PlatformSenseNova, PlatformSenseAudio, PlatformTierflow, PlatformOpenCodeGo, PlatformTypeSafe, PlatformCommandCode, PlatformCline:
 		return validateAccountCredentials(account.Platform, account.Type, account.Credentials)
 	default:
+		if IsMultiProtocolAPIKeyProvider(account.Platform) {
+			// 多协议 API Key 供应商（国产厂商与聚合平台）：凭证为 API Key，实际可用性
+			// 经余额/额度探测与转发路径验证。
+			return nil
+		}
 		return fmt.Errorf("unsupported platform: %s", account.Platform)
 	}
 }

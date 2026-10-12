@@ -625,7 +625,7 @@ func upstreamModelRegistryBaseURL(account *Account) string {
 		return ""
 	}
 	switch {
-	case account.IsOpenAI() || account.IsCNProvider() || account.IsOpenCodeGo():
+	case account.IsOpenAI() || account.IsMultiProtocolAPIKey():
 		return account.GetOpenAIFormatBaseURL()
 	case account.IsGrok():
 		return account.GetGrokBaseURL()
@@ -796,7 +796,7 @@ func (s *AccountTestService) buildUpstreamModelsRequest(ctx context.Context, acc
 		return s.buildDeepSeekUpstreamModelsRequest(ctx, account)
 	case account.IsOpenAI() || account.IsCNProvider() || account.IsAgnes() || account.IsNvidia() ||
 		account.IsTokenRhythm() || account.IsChatAnywhere() || account.IsGLM() || account.IsModelScope() ||
-		account.IsDashScope() || account.IsMiniMax() || account.IsVolcengine() || account.IsSenseNova() || account.IsSenseAudio() || account.IsTierflow() || account.IsOpenCodeGo():
+		account.IsDashScope() || account.IsMiniMax() || account.IsVolcengine() || account.IsSenseNova() || account.IsSenseAudio() || account.IsTierflow() || account.IsOpenCodeGo() || account.IsCommandCode() || account.IsCline():
 		// OpenAI-compatible fork and CN providers reuse the OpenAI /v1/models probe.
 		return s.buildOpenAIUpstreamModelsRequest(ctx, account)
 	case account.IsGemini():

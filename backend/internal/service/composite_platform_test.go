@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/Wei-Shaw/sub2api/internal/domain"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/ctxkey"
 	"github.com/stretchr/testify/require"
 )
@@ -218,14 +219,32 @@ func TestCompositeGroupSchedulerHasAllCanonicalPlatformBuckets(t *testing.T) {
 		platforms = append(platforms, platform)
 	}
 	require.ElementsMatch(t,
-		[]string{PlatformAnthropic, PlatformGemini, PlatformOpenAI, PlatformAntigravity, PlatformGrok, PlatformAgnes, PlatformDeepSeek, PlatformNvidia, PlatformTokenRhythm, PlatformKimi, PlatformZhipu, PlatformChatAnywhere, PlatformGLM, PlatformModelScope, PlatformDashScope, PlatformMiniMax, PlatformVolcengine, PlatformSenseNova, PlatformSenseAudio, PlatformTierflow, PlatformOpenCodeGo, PlatformTypeSafe},
+		[]string{PlatformAnthropic, PlatformGemini, PlatformOpenAI, PlatformAntigravity, PlatformGrok, PlatformAgnes, PlatformDeepSeek, PlatformNvidia, PlatformTokenRhythm, PlatformKimi, PlatformZhipu, PlatformChatAnywhere, PlatformGLM, PlatformModelScope, PlatformDashScope, PlatformMiniMax, PlatformVolcengine, PlatformSenseNova, PlatformSenseAudio, PlatformTierflow, PlatformOpenCodeGo, PlatformTypeSafe, PlatformCommandCode, PlatformCline},
 		platforms,
 	)
 }
 
 func TestCompositeConcretePlatformsIncludeCNProviders(t *testing.T) {
-	for _, platform := range []string{PlatformKimi, PlatformZhipu, PlatformDeepseek, PlatformMiniMax, PlatformOpenCodeGo, PlatformTypeSafe} {
+	for _, platform := range []string{PlatformKimi, PlatformZhipu, PlatformDeepseek, PlatformMiniMax, PlatformOpenCodeGo, PlatformTypeSafe, PlatformCommandCode, PlatformCline} {
 		require.True(t, isConcreteRequestPlatform(platform))
 		require.True(t, canCopyAccountsFromGroupPlatform(PlatformComposite, platform))
+	}
+}
+
+func TestCompositeCatalogProvidersRetainCanonicalSchedulerModes(t *testing.T) {
+	buckets := schedulerCanonicalBuckets(99)
+	require.Len(t, buckets, 2*24+2)
+	require.Equal(t, len(buckets), schedulerCanonicalBucketCount())
+	for _, platform := range domain.ConcretePlatformIDs() {
+		require.True(t, isConcreteRequestPlatform(platform), platform)
+		require.True(t, canCopyAccountsFromGroupPlatform(PlatformComposite, platform), platform)
+		require.Contains(t, buckets, SchedulerBucket{GroupID: 99, Platform: platform, Mode: SchedulerModeSingle})
+		require.Contains(t, buckets, SchedulerBucket{GroupID: 99, Platform: platform, Mode: SchedulerModeForced})
+		mixed := SchedulerBucket{GroupID: 99, Platform: platform, Mode: SchedulerModeMixed}
+		if platform == PlatformAnthropic || platform == PlatformGemini {
+			require.Contains(t, buckets, mixed)
+		} else {
+			require.NotContains(t, buckets, mixed)
+		}
 	}
 }
