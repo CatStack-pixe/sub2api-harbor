@@ -27,7 +27,7 @@ func (a *Account) GetAnthropicAPIKeyAuthScheme() string {
 	if a.IsSenseAudio() {
 		return AnthropicAPIKeyAuthSchemeAuthorizationBearer
 	}
-	if a.Platform != PlatformAnthropic && !a.IsCNProvider() {
+	if a.Platform != PlatformAnthropic && !a.RoutesProtocolByInbound() {
 		return AnthropicAPIKeyAuthSchemeXAPIKey
 	}
 

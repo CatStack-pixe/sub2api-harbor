@@ -11,5 +11,6 @@ func TestAllPlatformsIncludesEveryConcretePlatform(t *testing.T) {
 		"anthropic", "openai", "gemini", "antigravity", "grok", "agnes",
 		"deepseek", "nvidia", "tokenrhythm", "kimi", "zhipu", "chatanywhere",
 		"glm", "modelscope", "dashscope", "minimax", "volcengine", "sensenova", "senseaudio", "opencode_go", "tierflow", "typesafe",
+		"command_code", "cline",
 	}, AllPlatforms())
 }

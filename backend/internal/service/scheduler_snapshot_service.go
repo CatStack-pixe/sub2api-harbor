@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
+	"github.com/Wei-Shaw/sub2api/internal/domain"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
 )
 
@@ -833,11 +834,8 @@ func (s *SchedulerSnapshotService) rebuildByAccount(ctx context.Context, account
 	return s.rebuildBuckets(ctx, buckets, reason)
 }
 
-func schedulerSnapshotPlatforms() [22]string {
-	return [22]string{PlatformAnthropic, PlatformGemini, PlatformOpenAI, PlatformAntigravity,
-		PlatformGrok, PlatformAgnes, PlatformDeepSeek, PlatformNvidia, PlatformTokenRhythm,
-		PlatformKimi, PlatformZhipu, PlatformChatAnywhere, PlatformGLM, PlatformModelScope,
-		PlatformDashScope, PlatformMiniMax, PlatformVolcengine, PlatformSenseNova, PlatformSenseAudio, PlatformTierflow, PlatformOpenCodeGo, PlatformTypeSafe}
+func schedulerSnapshotPlatforms() []string {
+	return domain.CompositePrecedencePlatformIDs()
 }
 
 // schedulerPlatformsForAccount returns each request-platform bucket whose

@@ -4,7 +4,9 @@
  */
 
 import { apiClient } from '../client'
-import type { AdminUser, UpdateUserRequest, PaginatedResponse, ApiKey } from '@/types'
+import { reactive, watchSyncEffect } from 'vue'
+import { listPlatformIds } from '@/constants/platformCatalog'
+import type { AccountPlatform, AdminUser, UpdateUserRequest, PaginatedResponse, ApiKey } from '@/types'
 
 export interface AdminBindAuthIdentityChannelRequest {
   channel: string
@@ -331,13 +333,15 @@ export async function bindUserAuthIdentity(
  * Platform quota types
  */
 // Preserve fork platforms alongside upstream quota platforms.
-export const PLATFORM_QUOTA_PLATFORMS = [
-  'anthropic', 'openai', 'gemini', 'antigravity', 'grok', 'agnes',
-  'deepseek', 'nvidia', 'tokenrhythm', 'tierflow', 'senseaudio',
-  'kimi', 'zhipu', 'chatanywhere', 'glm', 'modelscope', 'dashscope',
-  'minimax', 'volcengine', 'sensenova', 'opencode_go', 'typesafe',
-] as const
-export type PlatformQuotaPlatform = typeof PLATFORM_QUOTA_PLATFORMS[number]
+export function platformQuotaPlatforms(): PlatformQuotaPlatform[] {
+  return listPlatformIds()
+}
+export type PlatformQuotaPlatform = AccountPlatform
+/** Preserve the existing export for callers that consume a platform array. */
+export const PLATFORM_QUOTA_PLATFORMS: PlatformQuotaPlatform[] = reactive([])
+watchSyncEffect(() => {
+  PLATFORM_QUOTA_PLATFORMS.splice(0, PLATFORM_QUOTA_PLATFORMS.length, ...platformQuotaPlatforms())
+})
 export type PlatformQuotaWindow = 'daily' | 'weekly' | 'monthly'
 
 export interface PlatformQuotaItem {

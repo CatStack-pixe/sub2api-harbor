@@ -1371,9 +1371,11 @@ function generateRoutedCodexFiles(
     sensenova: 'SenseNova',
     opencode_go: 'OpenCode',
     typesafe: 'TypeSafe / Jev',
+    command_code: 'Command Code',
+    cline: 'Cline',
     composite: 'Composite'
   }
-  const label = labels[platform]
+  const label = labels[platform] ?? platform
   const envContent = isWindows
     ? `$env:SUB2API_API_KEY="${apiKey}"`
     : `export SUB2API_API_KEY="${apiKey}"`

@@ -132,7 +132,7 @@ func isGrokOAuthAccount(account *Account) bool {
 }
 
 func isOpenAIAccount(account *Account) bool {
-	return account != nil && (account.Platform == PlatformOpenAI || account.Platform == PlatformGrok || account.Platform == PlatformAgnes || account.Platform == PlatformDeepSeek || account.Platform == PlatformNvidia || account.Platform == PlatformTokenRhythm || account.Platform == PlatformKimi || account.Platform == PlatformZhipu || account.Platform == PlatformChatAnywhere || account.Platform == PlatformGLM || account.Platform == PlatformModelScope || account.Platform == PlatformDashScope || account.Platform == PlatformMiniMax || account.Platform == PlatformVolcengine || account.Platform == PlatformSenseNova || account.Platform == PlatformSenseAudio || account.Platform == PlatformTierflow || account.IsOpenCodeGo())
+	return account != nil && account.IsOpenAICompatible()
 }
 
 // handleOpenAIAccountUpstreamError expects canonicalModel to be the model used
@@ -207,7 +207,7 @@ func (s *OpenAIGatewayService) handleOpenAIAccountUpstreamError(ctx context.Cont
 	if s.rateLimitService != nil {
 		s.rateLimitService.maybeHandleOpenAITeamLinkedError(stateCtx, account, statusCode, responseBody)
 	}
-	stateCtx = withTempUnschedulableModel(stateCtx, canonicalModel)
+	stateCtx = withCanonicalTempUnschedulableModel(stateCtx, canonicalModel)
 	if s.rateLimitService != nil && len(canonicalModel) > 0 && s.rateLimitService.HandleUpstreamModelNotFound(stateCtx, account, canonicalModel[0], statusCode, responseBody) {
 		return true
 	}

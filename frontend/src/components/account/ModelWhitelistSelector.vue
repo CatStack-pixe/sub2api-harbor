@@ -146,7 +146,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onBeforeUnmount, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
 import { accountsAPI } from '@/api/admin/accounts'
@@ -155,6 +155,7 @@ import { useClipboard } from '@/composables/useClipboard'
 import ModelIcon from '@/components/common/ModelIcon.vue'
 import Icon from '@/components/icons/Icon.vue'
 import { allModels, getModelsByPlatform } from '@/composables/useModelWhitelist'
+import { supportsUpstreamModelSync } from '@/constants/platformCatalog'
 
 const { t } = useI18n()
 
@@ -202,39 +203,29 @@ const normalizedPlatforms = computed(() => {
   )
 })
 
-const upstreamSyncPlatforms = new Set([
-  'anthropic',
-  'openai',
-  'gemini',
-  'antigravity',
-  'grok',
-  'agnes',
-  'deepseek',
-  'kimi',
-  'nvidia',
-  'tokenrhythm',
-  'tierflow',
-  'senseaudio',
-  'zhipu',
-  'chatanywhere',
-  'glm',
-  'modelscope',
-  'dashscope',
-  'minimax',
-  'volcengine',
-  'sensenova',
-  'opencode_go'
-])
 const canSyncUpstream = computed(() => {
   if (props.accountId) {
     if (normalizedPlatforms.value.length === 0) return true
-    return normalizedPlatforms.value.some(platform => upstreamSyncPlatforms.has(platform.toLowerCase()))
+    return normalizedPlatforms.value.some(supportsUpstreamModelSync)
   }
   if (props.syncCredentials) {
-    return upstreamSyncPlatforms.has(props.syncCredentials.platform.toLowerCase())
+    return supportsUpstreamModelSync(props.syncCredentials.platform)
   }
   return false
 })
+
+// Invalidate pending responses even if a draft switches away and back before they settle.
+const syncIdentity = computed(() => JSON.stringify([
+  props.accountId ?? null,
+  normalizedPlatforms.value,
+  props.syncCredentials ?? null
+]))
+let syncRequestVersion = 0
+watch(syncIdentity, () => {
+  syncRequestVersion += 1
+  isSyncingUpstream.value = false
+}, { flush: 'sync' })
+onBeforeUnmount(() => { syncRequestVersion += 1 })
 
 const isTokenRhythmPlatform = computed(() => {
   if (props.syncCredentials) {
@@ -320,19 +311,24 @@ const fillRelated = () => {
 }
 
 const syncUpstreamModels = async () => {
-  if (isSyncingUpstream.value) return
-  if (!props.accountId && !props.syncCredentials) return
+  if (isSyncingUpstream.value || !canSyncUpstream.value) return
 
+  const version = ++syncRequestVersion
+  const accountId = props.accountId
+  const credentials = props.syncCredentials
+    ? JSON.parse(JSON.stringify(props.syncCredentials)) as SyncUpstreamPreviewParams
+    : undefined
   isSyncingUpstream.value = true
   try {
     let result
-    if (props.accountId) {
-      result = await accountsAPI.syncUpstreamModels(props.accountId)
-    } else if (props.syncCredentials) {
-      result = await accountsAPI.syncUpstreamModelsPreview(props.syncCredentials as SyncUpstreamPreviewParams)
+    if (accountId) {
+      result = await accountsAPI.syncUpstreamModels(accountId)
+    } else if (credentials) {
+      result = await accountsAPI.syncUpstreamModelsPreview(credentials)
     } else {
       return
     }
+    if (version !== syncRequestVersion) return
 
     const upstreamModels = result.models.map(model => model.trim()).filter(Boolean)
     if (upstreamModels.length === 0) {
@@ -352,7 +348,7 @@ const syncUpstreamModels = async () => {
       return
     }
 
-    if (!props.accountId) {
+    if (!accountId) {
       emit('upstream-synced')
     }
 
@@ -386,6 +382,7 @@ const syncUpstreamModels = async () => {
       appStore.showWarning(t('admin.accounts.syncUpstreamModelsMetadataPartial'))
     }
   } catch (error) {
+    if (version !== syncRequestVersion) return
     if (isTokenRhythmPlatform.value) {
       const fallbackModels = getModelsByPlatform('tokenrhythm')
       const newModels = [...props.modelValue]
@@ -401,7 +398,7 @@ const syncUpstreamModels = async () => {
     const message = error instanceof Error ? error.message : t('admin.accounts.syncUpstreamModelsFailed')
     appStore.showError(t('admin.accounts.syncUpstreamModelsError', { message }))
   } finally {
-    isSyncingUpstream.value = false
+    if (version === syncRequestVersion) isSyncingUpstream.value = false
   }
 }
 

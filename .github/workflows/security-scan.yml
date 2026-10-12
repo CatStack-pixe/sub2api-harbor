@@ -10,6 +10,9 @@ on:
 permissions:
   contents: read
 
+env:
+  GOTOOLCHAIN: local
+
 jobs:
   backend-security:
     runs-on: ubuntu-latest
@@ -23,8 +26,10 @@ jobs:
           check-latest: false
           cache-dependency-path: backend/go.sum
       - name: Verify Go version
-        run: |
-          go version | grep -q 'go1.27.2'
+        run: test "$(go env GOVERSION)" = "go1.27.2"
+      - name: Generate Ent and Wire
+        working-directory: backend
+        run: go generate ./ent ./cmd/server
       - name: Run govulncheck
         working-directory: backend
         run: |

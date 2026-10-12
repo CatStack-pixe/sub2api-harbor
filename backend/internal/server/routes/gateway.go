@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
+	"github.com/Wei-Shaw/sub2api/internal/domain"
 	"github.com/Wei-Shaw/sub2api/internal/handler"
 	pkghttputil "github.com/Wei-Shaw/sub2api/internal/pkg/httputil"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/requestmodel"
@@ -62,16 +63,8 @@ func RegisterGatewayRoutes(
 	groupModelAllowlist := middleware.GroupModelAllowlist()
 
 	isOpenAIResponsesCompatibleGatewayPlatform := func(c *gin.Context) bool {
-		switch getGroupPlatform(c) {
-		case service.PlatformOpenAI, service.PlatformGrok, service.PlatformAgnes,
-			service.PlatformDeepSeek, service.PlatformNvidia, service.PlatformTokenRhythm,
-			service.PlatformKimi, service.PlatformZhipu, service.PlatformChatAnywhere,
-			service.PlatformGLM, service.PlatformModelScope, service.PlatformDashScope,
-			service.PlatformMiniMax, service.PlatformVolcengine, service.PlatformSenseNova, service.PlatformSenseAudio, service.PlatformTierflow, service.PlatformOpenCodeGo:
-			return true
-		default:
-			return false
-		}
+		// openai、grok 与多协议 API Key 供应商经 OpenAI 网关转发（平台清单）。
+		return domain.UsesOpenAIGateway(getGroupPlatform(c))
 	}
 	isOpenAIMessagesCompatibleGatewayPlatform := func(c *gin.Context) bool {
 		return isOpenAIMessagesCompatiblePlatform(getGroupPlatform(c))
@@ -83,11 +76,14 @@ func RegisterGatewayRoutes(
 		return getGroupPlatform(c) == service.PlatformNvidia
 	}
 	countTokensHandler := func(c *gin.Context) {
-		switch getGroupPlatform(c) {
-		case service.PlatformOpenAI, service.PlatformKimi, service.PlatformZhipu, service.PlatformDeepseek, service.PlatformMiniMax, service.PlatformOpenCodeGo:
-			h.OpenAIGateway.CountTokens(c)
-		case service.PlatformGrok, service.PlatformAgnes, service.PlatformNvidia, service.PlatformChatAnywhere, service.PlatformGLM, service.PlatformModelScope, service.PlatformDashScope, service.PlatformVolcengine, service.PlatformSenseNova, service.PlatformSenseAudio, service.PlatformTierflow:
+		switch platform := getGroupPlatform(c); {
+		case platform == service.PlatformGrok || platform == service.PlatformAgnes || platform == service.PlatformNvidia ||
+			platform == service.PlatformChatAnywhere || platform == service.PlatformGLM || platform == service.PlatformModelScope ||
+			platform == service.PlatformDashScope || platform == service.PlatformVolcengine || platform == service.PlatformSenseNova ||
+			platform == service.PlatformSenseAudio || platform == service.PlatformTierflow:
 			h.OpenAIGateway.GrokCountTokens(c)
+		case domain.UsesOpenAIGateway(platform):
+			h.OpenAIGateway.CountTokens(c)
 		default:
 			h.Gateway.CountTokens(c)
 		}

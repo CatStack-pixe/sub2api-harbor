@@ -72,7 +72,6 @@ func (a *Account) modelRateLimitKeysForRequest(ctx context.Context, requestedMod
 	if a == nil {
 		return nil
 	}
-
 	modelKey := a.GetMappedModel(requestedModel)
 	if a.Platform == PlatformAntigravity {
 		modelKey = resolveFinalAntigravityModelKey(ctx, a, requestedModel)
@@ -101,6 +100,10 @@ func (a *Account) modelRateLimitKeysForRequest(ctx context.Context, requestedMod
 		}
 	case PlatformChatAnywhere:
 		keys = append(keys, chatAnywhereContextRateLimitKey)
+	case PlatformCline:
+		if walletKey := clineWalletRateLimitKey(modelKey); walletKey != "" && walletKey != modelKey {
+			keys = append(keys, walletKey)
+		}
 	}
 	return keys
 }
@@ -198,6 +201,16 @@ func (a *Account) modelRateLimitResetAt(scope string) *time.Time {
 		return nil
 	}
 	return &resetAt
+}
+
+func (a *Account) modelRateLimitReason(scope string) string {
+	if a == nil || a.Extra == nil {
+		return ""
+	}
+	rawLimits, _ := a.Extra[modelRateLimitsKey].(map[string]any)
+	rawLimit, _ := rawLimits[scope].(map[string]any)
+	reason, _ := rawLimit["reason"].(string)
+	return strings.TrimSpace(reason)
 }
 
 func setAccountModelRateLimitSnapshot(account *Account, scope string, resetAt time.Time, reason string, now time.Time) {

@@ -40,6 +40,8 @@ const (
 	PlatformSenseAudio   = "senseaudio"
 	PlatformTierflow     = "tierflow"
 	PlatformOpenCodeGo   = "opencode_go"
+	PlatformCommandCode  = "command_code"
+	PlatformCline        = "cline"
 	PlatformComposite    = "composite"
 )
 
@@ -66,6 +68,7 @@ const (
 	SenseNovaDefaultBaseURL  = "https://token.sensenova.cn/v1"
 	SenseAudioDefaultBaseURL = "https://api.senseaudio.cn/v1"
 	TierflowDefaultBaseURL   = "https://tierflow.cn/v1"
+	DefaultClineBaseURL      = "https://api.cline.bot/api/v1"
 )
 
 // Account mode constants 区分国产供应商的「按量付费（余额）」与「Coding Plan」两种接入方式。

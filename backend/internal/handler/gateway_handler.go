@@ -1172,9 +1172,9 @@ func (h *GatewayHandler) Models(c *gin.Context) {
 	}
 
 	if platform == service.PlatformComposite {
-		availableModels := h.compositeAvailableModels(c.Request.Context(), groupID, true)
+		availableModels, literalAliases := h.compositeAvailableModelsAndAliases(c.Request.Context(), groupID, "", true)
 		if apiKey != nil && apiKey.Group != nil && apiKey.Group.CustomModelsListEnabled() {
-			availableModels = filterModelsByCustomList(availableModels, defaultModelIDsForPlatform(service.PlatformComposite), apiKey.Group.ModelsListConfig.Models)
+			availableModels = filterModelsByCustomListWithLiteralAliases(availableModels, defaultModelIDsForPlatform(service.PlatformComposite), apiKey.Group.ModelsListConfig.Models, literalAliases)
 			availableModels = filterAPIKeyModels(apiKey, availableModels)
 			writeCustomModelsList(c, service.PlatformComposite, availableModels)
 			return
@@ -1331,15 +1331,21 @@ func (h *GatewayHandler) forkCodexModelIDsForGroup(ctx context.Context, group *s
 		platform = group.Platform
 	}
 	if platform == service.PlatformComposite {
-		availableModels := h.compositeAvailableModels(ctx, groupID, false)
+		availableModels, literalAliases := h.compositeAvailableModelsAndAliases(ctx, groupID, service.CompositeRouteEndpointResponses, false)
 		fallbackModels := defaultCodexModelIDsForPlatform(service.PlatformComposite)
+		models := availableModels
 		if group.CustomModelsListEnabled() {
-			return filterModelsByCustomList(availableModels, fallbackModels, group.ModelsListConfig.Models)
+			models = filterModelsByCustomListWithLiteralAliases(availableModels, fallbackModels, group.ModelsListConfig.Models, literalAliases)
+		} else if len(models) == 0 {
+			models = fallbackModels
 		}
-		if len(availableModels) > 0 {
-			return availableModels
+		if !group.CustomModelsListEnabled() && group.ModelAllowlistEnabled() {
+			models = group.ModelAllowlist.FilterForListing(models)
 		}
-		return fallbackModels
+		if filtered, err := h.gatewayService.FilterCompositeCodexModels(ctx, group.ID, models); err == nil {
+			return filtered
+		}
+		return models
 	}
 
 	availableModels := h.gatewayService.GetAvailableModels(ctx, groupID, platform)
@@ -1360,18 +1366,15 @@ func (h *GatewayHandler) forkCodexModelIDsForGroup(ctx context.Context, group *s
 // compositeAvailableModels lists the models the composite group can serve.
 // includeSystemOne adds TypeSafe models, which only work through /v1/systemone;
 // LLM client catalogs (Codex) must exclude them.
-func (h *GatewayHandler) compositeAvailableModels(ctx context.Context, groupID *int64, includeSystemOne bool) []string {
+func (h *GatewayHandler) compositeAvailableModelsAndAliases(ctx context.Context, groupID *int64, endpoint string, includeSystemOne bool) ([]string, map[string]bool) {
 	if h == nil || h.gatewayService == nil {
-		return nil
+		return nil, nil
 	}
+	literalAliases := make(map[string]bool)
 	seen := make(map[string]struct{})
 	models := make([]string, 0)
 	schedulablePlatforms := h.gatewayService.GetSchedulablePlatforms(ctx, groupID)
-	for _, platform := range []string{service.PlatformAnthropic, service.PlatformGemini, service.PlatformOpenAI,
-		service.PlatformAntigravity, service.PlatformGrok, service.PlatformAgnes, service.PlatformDeepSeek,
-		service.PlatformNvidia, service.PlatformTokenRhythm, service.PlatformKimi, service.PlatformZhipu,
-		service.PlatformChatAnywhere, service.PlatformGLM, service.PlatformModelScope, service.PlatformDashScope,
-		service.PlatformMiniMax, service.PlatformVolcengine, service.PlatformSenseNova, service.PlatformSenseAudio, service.PlatformTierflow, service.PlatformOpenCodeGo, service.PlatformTypeSafe} {
+	for _, platform := range domain.CompositePrecedencePlatformIDs() {
 		if platform == service.PlatformTypeSafe && !includeSystemOne {
 			continue
 		}
@@ -1395,7 +1398,18 @@ func (h *GatewayHandler) compositeAvailableModels(ctx context.Context, groupID *
 			models = append(models, model)
 		}
 	}
-	return models
+	// A route can expose a public ID that no account model mapping contains.
+	// On lookup failure, retain the existing account-derived catalog only.
+	if routeModels, err := h.gatewayService.GetCompositeRouteModels(ctx, groupID, endpoint, includeSystemOne); err == nil {
+		for _, model := range routeModels {
+			if _, ok := seen[model]; !ok {
+				seen[model] = struct{}{}
+				literalAliases[model] = true
+				models = append(models, model)
+			}
+		}
+	}
+	return models, literalAliases
 }
 
 func writeModelsList(c *gin.Context, platform string, modelIDs []string) {
@@ -1590,14 +1604,18 @@ func defaultModelIDsForPlatform(platform string) []string {
 		return service.DefaultOpenCodeGoModelIDs()
 	case service.PlatformTypeSafe:
 		return []string{"jev-latest"}
+	case service.PlatformCline:
+		return nil // Cline account mappings/catalogs are authoritative.
 	case service.PlatformComposite:
 		ids := make([]string, 0)
 		seen := make(map[string]struct{})
-		for _, concretePlatform := range []string{service.PlatformAnthropic, service.PlatformGemini, service.PlatformOpenAI,
-			service.PlatformAntigravity, service.PlatformGrok, service.PlatformAgnes, service.PlatformDeepSeek,
-			service.PlatformNvidia, service.PlatformTokenRhythm, service.PlatformKimi, service.PlatformZhipu,
-			service.PlatformChatAnywhere, service.PlatformGLM, service.PlatformModelScope, service.PlatformDashScope,
-			service.PlatformMiniMax, service.PlatformVolcengine, service.PlatformSenseNova, service.PlatformSenseAudio, service.PlatformTierflow, service.PlatformOpenCodeGo} {
+		for _, concretePlatform := range domain.CompositePrecedencePlatformIDs() {
+			// TypeSafe is deliberately skipped: jev-latest only works through
+			// /v1/systemone, so the static fallback never advertises it to LLM
+			// clients. compositeAvailableModels lists it when the group can serve it.
+			if concretePlatform == service.PlatformTypeSafe {
+				continue
+			}
 			for _, id := range defaultModelIDsForPlatform(concretePlatform) {
 				if _, ok := seen[id]; ok {
 					continue
@@ -2742,6 +2760,10 @@ func customModelsListSource(platform string, availableModels, fallbackModels []s
 }
 
 func filterModelsByCustomList(availableModels, fallbackModels, selectedModels []string) []string {
+	return filterModelsByCustomListWithLiteralAliases(availableModels, fallbackModels, selectedModels, nil)
+}
+
+func filterModelsByCustomListWithLiteralAliases(availableModels, fallbackModels, selectedModels []string, literalAliases map[string]bool) []string {
 	if len(selectedModels) == 0 {
 		return availableModels
 	}
@@ -2768,7 +2790,7 @@ func filterModelsByCustomList(availableModels, fallbackModels, selectedModels []
 		if model == "" {
 			continue
 		}
-		if !customModelsListAllowsModel(allowed, model) {
+		if !customModelsListAllowsModelWithLiteralAliases(allowed, model, literalAliases) {
 			continue
 		}
 		if _, ok := seen[model]; ok {
@@ -2780,7 +2802,7 @@ func filterModelsByCustomList(availableModels, fallbackModels, selectedModels []
 	return filtered
 }
 
-func customModelsListAllowsModel(availablePatterns []string, model string) bool {
+func customModelsListAllowsModelWithLiteralAliases(availablePatterns []string, model string, literalAliases map[string]bool) bool {
 	for _, pattern := range availablePatterns {
 		if pattern == model {
 			return true
@@ -2792,7 +2814,7 @@ func customModelsListAllowsModel(availablePatterns []string, model string) bool 
 	normalizedClaudeModel := claude.NormalizeModelID(strings.TrimSuffix(model, "-thinking"))
 	if normalizedClaudeModel != model {
 		for _, pattern := range availablePatterns {
-			if pattern == normalizedClaudeModel {
+			if pattern == normalizedClaudeModel && !literalAliases[pattern] {
 				return true
 			}
 		}

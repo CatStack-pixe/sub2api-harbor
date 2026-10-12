@@ -23,6 +23,7 @@ import {
   parseHeaderOverridesJson,
   parseOpenCodeGoProtocolRules,
   planTypeDisplayLabel,
+  protocolRuleSet,
   readPlanType,
   serializeHeaderOverrideRows,
   splitHeaderOverridesObject,
@@ -122,9 +123,10 @@ describe('openCodeGo protocol rules', () => {
     expect(defaultCNBaseUrl('opencode_go', 'go', 'anthropic')).toBe('https://opencode.ai/zen/go')
     expect(defaultOpenCodeProtocolRules('zen').some(rule => rule.pattern === 'claude-*')).toBe(true)
     expect(defaultOpenCodeProtocolRules('go').some(rule => rule.pattern === 'minimax-*')).toBe(true)
-    expect(cnQuotaCellVisible('opencode_go', 'zen')).toBe(false)
-    expect(cnQuotaCellVisible('opencode_go', 'go')).toBe(true)
-    expect(cnQuotaCellVisible('opencode_go', '')).toBe(true)
+    const openCodeAccount = (account_mode?: string) => ({ platform: 'opencode_go', type: 'apikey', credentials: { account_mode } })
+    expect(cnQuotaCellVisible(openCodeAccount('zen'))).toBe(false)
+    expect(cnQuotaCellVisible(openCodeAccount('go'))).toBe(true)
+    expect(cnQuotaCellVisible(openCodeAccount())).toBe(true)
   })
 
   it('parses stored rules and skips invalid entries', () => {
@@ -143,6 +145,31 @@ describe('openCodeGo protocol rules', () => {
     ])
   })
 
+  it('round-trips protocol sets with the preferred protocol first', () => {
+    const parsed = parseOpenCodeGoProtocolRules([
+      { pattern: 'gpt-*', protocol: 'responses', protocols: ['responses', 'chat_completions', 'adaptive', 'chat_completions'] },
+      { pattern: 'glm-*', protocols: ['anthropic', 'chat_completions'] },
+      { pattern: 'kimi-*', protocol: 'chat_completions', protocols: ['chat_completions'] }
+    ])
+    expect(parsed).toEqual([
+      { pattern: 'gpt-*', protocol: 'responses', extraProtocols: ['chat_completions'] },
+      { pattern: 'glm-*', protocol: 'anthropic', extraProtocols: ['chat_completions'] },
+      { pattern: 'kimi-*', protocol: 'chat_completions' }
+    ])
+    expect(protocolRuleSet(parsed![0])).toEqual(['responses', 'chat_completions'])
+
+    const cloned = cloneOpenCodeGoProtocolRules(parsed!)
+    expect(cloned).toEqual(parsed)
+    expect(cloned[0].extraProtocols).not.toBe(parsed![0].extraProtocols)
+
+    const credentials: Record<string, unknown> = {}
+    applyOpenCodeGoProtocolRules(credentials, [{ pattern: ' GPT-* ', protocol: 'responses', extraProtocols: ['chat_completions', 'responses'] }, ...parsed!.slice(2)], 'create')
+    expect(credentials[OPENCODE_GO_PROTOCOL_RULES_KEY]).toEqual([
+      { pattern: 'gpt-*', protocol: 'responses', protocols: ['responses', 'chat_completions'] },
+      { pattern: 'kimi-*', protocol: 'chat_completions' }
+    ])
+  })
+
   it('writes lowercase patterns on create and keeps an empty list on edit', () => {
     const created: Record<string, unknown> = {}
     applyOpenCodeGoProtocolRules(created, cloneOpenCodeGoProtocolRules(), 'create')
@@ -151,6 +178,14 @@ describe('openCodeGo protocol rules', () => {
     const edited: Record<string, unknown> = { api_key: 'sk' }
     applyOpenCodeGoProtocolRules(edited, [], 'edit')
     expect(edited[OPENCODE_GO_PROTOCOL_RULES_KEY]).toEqual([])
+  })
+
+  it('persists deliberately empty create rules and uses provider-specific malformed-rule defaults', () => {
+    const created: Record<string, unknown> = {}
+    applyOpenCodeGoProtocolRules(created, [], 'create')
+    expect(created[OPENCODE_GO_PROTOCOL_RULES_KEY]).toEqual([])
+    expect(parseOpenCodeGoProtocolRules({}, [{ pattern: 'claude-*', protocol: 'anthropic' }]))
+      .toEqual([{ pattern: 'claude-*', protocol: 'anthropic' }])
   })
 })
 

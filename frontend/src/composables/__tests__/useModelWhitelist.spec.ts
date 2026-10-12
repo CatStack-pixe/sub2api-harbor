@@ -5,8 +5,40 @@ vi.mock('@/api/admin/accounts', () => ({
 }))
 
 import { buildModelMappingObject, getModelsByPlatform, getPresetMappingsByPlatform, splitModelMappingObject } from '../useModelWhitelist'
+import { BUILTIN_PLATFORM_CATALOG, resetPlatformCatalog, setPlatformCatalog } from '@/constants/platformCatalog'
 
 describe('useModelWhitelist', () => {
+  it('keeps catalog-only multi-protocol providers unrestricted without changing Bedrock presets', () => {
+    setPlatformCatalog({
+      ...BUILTIN_PLATFORM_CATALOG,
+      platforms: [
+        ...BUILTIN_PLATFORM_CATALOG.platforms,
+        {
+          id: 'acme_router',
+          display_name: 'Acme Router',
+          gateway: 'openai',
+          cn_provider: false,
+          multi_protocol: {
+            default_mode: 'standard',
+            routing: 'by_model',
+            modes: [{ mode: 'standard', base_urls: { chat_completions: 'https://router.example/v1' } }]
+          }
+        }
+      ]
+    })
+    try {
+      expect(getModelsByPlatform('acme_router')).toEqual([])
+      expect(getPresetMappingsByPlatform('acme_router')).toEqual([])
+      expect(getModelsByPlatform('kimi').length).toBeGreaterThan(0)
+      expect(getModelsByPlatform('bedrock')).toEqual(getModelsByPlatform('anthropic'))
+    } finally {
+      resetPlatformCatalog()
+    }
+  })
+  it.each(['command_code', 'cline'])('keeps %s unrestricted before syncing its model catalog', (platform) => {
+    expect(getModelsByPlatform(platform)).toEqual([])
+    expect(getPresetMappingsByPlatform(platform)).toEqual([])
+  })
   it('exposes only the documented Agnes model', () => {
     expect(getModelsByPlatform('agnes')).toEqual(['agnes-2.0-flash'])
   })

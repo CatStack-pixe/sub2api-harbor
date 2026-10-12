@@ -379,7 +379,16 @@ const uiLoading = ref(false);
 const uiError = ref("");
 const iframeHeight = ref(640);
 const pluginFrameLoaded = ref(false);
-const pendingBridgeRequests = new Map<string, number>();
+interface PendingBridgeRequest {
+  requestID: string;
+  pluginID: number;
+  sessionVersion: number;
+  bridgeToken: string;
+  frame: Window;
+  timeout: number;
+}
+const pendingBridgeRequests = new Map<string, PendingBridgeRequest>();
+let uiSessionVersion = 0;
 
 function errorMessage(error: unknown): string {
   if (typeof error === "object" && error !== null && "message" in error) {
@@ -523,6 +532,7 @@ async function testPlugin(plugin: PluginInstallation): Promise<void> {
 }
 
 async function openConfiguration(plugin: PluginInstallation): Promise<void> {
+  const version = ++uiSessionVersion;
   configPlugin.value = plugin;
   uiSession.value = null;
   pluginFrameLoaded.value = false;
@@ -531,14 +541,18 @@ async function openConfiguration(plugin: PluginInstallation): Promise<void> {
   uiError.value = "";
   iframeHeight.value = 640;
   try {
-    uiSession.value = await adminAPI.plugins.createUISession(plugin.id);
+    const session = await adminAPI.plugins.createUISession(plugin.id);
+    if (version !== uiSessionVersion) return;
+    uiSession.value = session;
   } catch (error: unknown) {
+    if (version !== uiSessionVersion) return;
     uiLoading.value = false;
     uiError.value = errorMessage(error);
   }
 }
 
 function closeConfiguration(): void {
+  uiSessionVersion++;
   clearPendingBridgeRequests();
   pluginFrameLoaded.value = false;
   configPlugin.value = null;
@@ -548,7 +562,7 @@ function closeConfiguration(): void {
 }
 
 function clearPendingBridgeRequests(): void {
-  for (const timeout of pendingBridgeRequests.values()) window.clearTimeout(timeout);
+  for (const request of pendingBridgeRequests.values()) window.clearTimeout(request.timeout);
   pendingBridgeRequests.clear();
 }
 
@@ -560,35 +574,54 @@ function handlePluginFrameLoad(): void {
   uiLoading.value = false;
 }
 
-function registerBridgeRequest(requestID: string): void {
-  const timeout = window.setTimeout(() => {
-    pendingBridgeRequests.delete(requestID);
+function registerBridgeRequest(requestID: string): PendingBridgeRequest {
+  const request: PendingBridgeRequest = {
+    requestID,
+    pluginID: configPlugin.value!.id,
+    sessionVersion: uiSessionVersion,
+    bridgeToken: uiSession.value!.bridge_token,
+    frame: pluginFrame.value!.contentWindow!,
+    timeout: 0,
+  };
+  request.timeout = window.setTimeout(() => {
+    if (pendingBridgeRequests.get(requestID) === request) {
+      pendingBridgeRequests.delete(requestID);
+    }
   }, 30_000);
-  pendingBridgeRequests.set(requestID, timeout);
+  pendingBridgeRequests.set(requestID, request);
+  return request;
+}
+
+function ownsBridgeRequest(request: PendingBridgeRequest | undefined): request is PendingBridgeRequest {
+  return !!request &&
+    pendingBridgeRequests.get(request.requestID) === request &&
+    request.sessionVersion === uiSessionVersion &&
+    request.pluginID === configPlugin.value?.id &&
+    request.bridgeToken === uiSession.value?.bridge_token &&
+    request.frame === pluginFrame.value?.contentWindow;
 }
 
 function postBridgeResult(
-  request: PluginBridgeMessage,
+  message: PluginBridgeMessage,
+  request: PendingBridgeRequest | undefined,
   payload: Record<string, unknown>,
-): void {
-  if (!pluginFrame.value?.contentWindow || !uiSession.value) return;
-  const requestID = typeof request.request_id === "string" ? request.request_id.trim() : "";
-  const timeout = pendingBridgeRequests.get(requestID);
-  if (!requestID || timeout === undefined) return;
-  window.clearTimeout(timeout);
-  pendingBridgeRequests.delete(requestID);
-  pluginFrame.value.contentWindow.postMessage(
+): boolean {
+  if (!ownsBridgeRequest(request)) return false;
+  window.clearTimeout(request.timeout);
+  pendingBridgeRequests.delete(request.requestID);
+  request.frame.postMessage(
     {
       source: "sub2api-plugin-host",
-      bridge_token: uiSession.value.bridge_token,
-      type: `${request.type}.result`,
-      request_id: requestID,
+      bridge_token: request.bridgeToken,
+      type: `${message.type}.result`,
+      request_id: request.requestID,
       ...payload,
     },
     // The sandboxed iframe has an opaque origin, so no fixed target origin exists.
     // Pending request tracking plus load invalidation prevents cross-navigation leaks.
     "*",
   );
+  return true;
 }
 
 async function handleBridgeMessage(event: MessageEvent): Promise<void> {
@@ -613,9 +646,10 @@ async function handleBridgeMessage(event: MessageEvent): Promise<void> {
     message.type === "config.save" ||
     message.type === "config.test" ||
     message.type === "plugin.status";
+  let request: PendingBridgeRequest | undefined;
   if (expectsResponse) {
     if (!requestID || pendingBridgeRequests.has(requestID)) return;
-    registerBridgeRequest(requestID);
+    request = registerBridgeRequest(requestID);
   }
 
   try {
@@ -624,8 +658,8 @@ async function handleBridgeMessage(event: MessageEvent): Promise<void> {
         uiLoading.value = false;
         break;
       case "config.load": {
-        const config = await adminAPI.plugins.getConfig(configPlugin.value.id);
-        postBridgeResult(message, { ok: true, config });
+        const config = await adminAPI.plugins.getConfig(request!.pluginID);
+        postBridgeResult(message, request, { ok: true, config });
         break;
       }
       case "config.save": {
@@ -636,27 +670,28 @@ async function handleBridgeMessage(event: MessageEvent): Promise<void> {
         ) {
           throw new Error(t("admin.plugins.bridgeRejected"));
         }
-        const config = await pluginStepUp.run(() =>
-          adminAPI.plugins.saveConfig(
-            configPlugin.value!.id,
-            message.config as Record<string, unknown>,
-          ),
-        );
-        postBridgeResult(message, { ok: true, config });
-        appStore.showSuccess(t("common.saved"));
+        const configPayload = structuredClone(message.config as Record<string, unknown>);
+        const config = await pluginStepUp.run(() => {
+          if (!ownsBridgeRequest(request)) throw new Error("Plugin UI request expired");
+          return adminAPI.plugins.saveConfig(request.pluginID, configPayload);
+        });
+        if (postBridgeResult(message, request, { ok: true, config })) {
+          appStore.showSuccess(t("common.saved"));
+        }
         break;
       }
       case "config.test": {
-        const result = await pluginStepUp.run(() =>
-          adminAPI.plugins.test(configPlugin.value!.id),
-        );
-        postBridgeResult(message, { ok: result.success, result });
+        const result = await pluginStepUp.run(() => {
+          if (!ownsBridgeRequest(request)) throw new Error("Plugin UI request expired");
+          return adminAPI.plugins.test(request.pluginID);
+        });
+        const delivered = postBridgeResult(message, request, { ok: result.success, result });
         // A successful result is delivered back to the plugin UI, which owns how it
         // presents it (inline status, or an explicit ui.notify). Only force a host
         // toast on failure so genuine errors are never silently dropped — plugins
         // may call config.test for lightweight status polling, not just as an
         // explicit "test" action, and those must not spam a success toast.
-        if (!result.success)
+        if (delivered && !result.success)
           appStore.showError(result.message || t("common.error"));
         break;
       }
@@ -665,8 +700,8 @@ async function handleBridgeMessage(event: MessageEvent): Promise<void> {
         // effects, so it is intentionally NOT step-up gated and never raises a host
         // toast — the plugin UI renders it however it likes. This is the generic
         // channel for any plugin to surface live state without abusing config.test.
-        const result = await adminAPI.plugins.status(configPlugin.value!.id);
-        postBridgeResult(message, { ok: true, result });
+        const result = await adminAPI.plugins.status(request!.pluginID);
+        postBridgeResult(message, request, { ok: true, result });
         break;
       }
       case "ui.resize": {
@@ -688,8 +723,9 @@ async function handleBridgeMessage(event: MessageEvent): Promise<void> {
       }
     }
   } catch (error: unknown) {
+    if (!ownsBridgeRequest(request)) return;
     if (isStepUpBlocked(error)) reportSensitiveActionError(error);
-    postBridgeResult(message, {
+    postBridgeResult(message, request, {
       ok: false,
       error: isStepUpCancelled(error) ? t("common.cancel") : errorMessage(error),
     });
@@ -723,6 +759,6 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   window.removeEventListener("message", handleBridgeMessage);
-  clearPendingBridgeRequests();
+  closeConfiguration();
 });
 </script>

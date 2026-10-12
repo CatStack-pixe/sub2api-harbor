@@ -58,34 +58,12 @@ const (
 	PlatformSenseAudio   = domain.PlatformSenseAudio
 	PlatformTierflow     = domain.PlatformTierflow
 	PlatformOpenCodeGo   = domain.PlatformOpenCodeGo
+	PlatformCline        = domain.PlatformCline
 )
 
-// AllPlatforms 返回所有支持的平台列表
+// AllPlatforms 返回所有支持的平台列表（平台清单，按展示顺序）。
 func AllPlatforms() []string {
-	return []string{
-		PlatformAnthropic,
-		PlatformOpenAI,
-		PlatformGemini,
-		PlatformAntigravity,
-		PlatformGrok,
-		PlatformAgnes,
-		PlatformDeepSeek,
-		PlatformNvidia,
-		PlatformTokenRhythm,
-		PlatformKimi,
-		PlatformZhipu,
-		PlatformChatAnywhere,
-		PlatformGLM,
-		PlatformModelScope,
-		PlatformDashScope,
-		PlatformMiniMax,
-		PlatformVolcengine,
-		PlatformSenseNova,
-		PlatformSenseAudio,
-		PlatformTierflow,
-		PlatformOpenCodeGo,
-		PlatformTypeSafe,
-	}
+	return domain.ConcretePlatformIDs()
 }
 
 // Validate 验证规则配置的有效性
