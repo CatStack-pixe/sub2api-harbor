@@ -233,7 +233,7 @@ func TestClineUsageProbeKeepsIndependentUnprobeableWallets(t *testing.T) {
 	pass := account.Extra[modelRateLimitsKey].(map[string]any)[clinePassRateLimitKey]
 
 	for _, probe := range []struct {
-		usage                             commandCodeAlphaResponse
+		usage   commandCodeAlphaResponse
 		balance string
 	}{
 		{commandCodeAlphaResponse{status: http.StatusNotFound, body: `{"success":false,"error":"no plan history found for user"}`}, `{"success":true,"data":{"balance":0}}`},

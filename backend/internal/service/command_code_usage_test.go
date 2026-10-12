@@ -548,7 +548,7 @@ func TestHandleUpstreamError_CommandCodeSpendLimitMapsAliasOnce(t *testing.T) {
 			account := commandCodeUsageAccount()
 			account.Credentials["model_mapping"] = map[string]any{
 				"public-alias": "glm-5",
-				"glm-5":       "gpt-5.5",
+				"glm-5":        "gpt-5.5",
 			}
 			ctx := context.Background()
 			var requestedModel []string
