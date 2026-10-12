@@ -219,7 +219,6 @@ var AllowedSchedulingThresholdPlatforms = []string{
 	PlatformZhipu,
 	PlatformMiniMax,
 	PlatformOpenCodeGo,
-	PlatformCline,
 	PlatformCommandCode,
 }
 

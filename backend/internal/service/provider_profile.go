@@ -277,6 +277,15 @@ func (a *Account) defaultProviderBaseURL(protocol string) string {
 // providerSupportsProtocol 报告账号所在供应商在其 account_mode 下是否提供该协议的原生端点。
 func (a *Account) providerSupportsProtocol(protocol string) bool {
 	profile := a.providerProfile()
+	// SenseNova's official default is chat-only; existing adaptive relay
+	// accounts may explicitly supply their own native Anthropic endpoint.
+	if a.IsSenseNova() && protocol == APIProtocolAnthropic {
+		baseURLs, _ := a.Credentials["api_base_urls"].(map[string]any)
+		baseURL, _ := baseURLs[protocol].(string)
+		if strings.TrimSpace(baseURL) != "" {
+			return true
+		}
+	}
 	return profile != nil && profile.SupportsProtocol(a.GetCredential("account_mode"), protocol)
 }
 

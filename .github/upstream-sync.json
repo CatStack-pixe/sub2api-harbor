@@ -9,6 +9,5 @@
   "conflict_policy": "Preserve fork behavior and integrate compatible upstream changes.",
   "history_note": "Squash merges do not retain upstream ancestry. Use the recorded upstream commit as the content merge baseline for the next synchronization, and audit fork differences before merging.",
   "release_tag_commit": "f2669c8cf62555cd92389b3f55920e9e6e7c6ff2",
-  "synced_at": "2026-10-12",
-  "validation_note": "Integration pending final CI, independent audit and release/deployment verification."
+  "synced_at": "2026-10-12"
 }
