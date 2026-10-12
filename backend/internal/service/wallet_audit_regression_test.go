@@ -40,7 +40,7 @@ func TestWalletErrorsForwardingMapsModelOnce(t *testing.T) {
 			account: commandCodeUsageAccount,
 		},
 	} {
-		for _, ingress := range routingMatrixIngresses() {
+		for ingressIndex, ingress := range routingMatrixIngresses() {
 			t.Run(tc.name+"/"+ingress.name, func(t *testing.T) {
 				account := tc.account()
 				account.Schedulable = true
@@ -57,7 +57,7 @@ func TestWalletErrorsForwardingMapsModelOnce(t *testing.T) {
 				if account.IsCommandCode() {
 					// Each ingress starts with an isolated, cold model catalog.
 					// Its discovery request precedes the wallet-limited inference.
-					account.Credentials["api_key"] = "wallet-audit-" + ingress.name
+					account.ID = 880000 + int64(ingressIndex)
 					upstream.responses = []*http.Response{
 						newJSONResponse(http.StatusOK, `{"data":[{"id":"glm-5","supported_endpoints":["/chat/completions"]}]}`),
 						upstream.resp,
