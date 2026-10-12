@@ -202,8 +202,32 @@ func clineFreeModelResetAfter(body []byte) time.Duration {
 	return after
 }
 
+type canonicalTempUnschedulableModelContextKey struct{}
+
+// withCanonicalTempUnschedulableModel marks the model already resolved by forwarding.
+// Direct HandleUpstreamError callers may instead supply an unmapped public alias.
+func withCanonicalTempUnschedulableModel(ctx context.Context, upstreamModel []string) context.Context {
+	ctx = withTempUnschedulableModel(ctx, upstreamModel)
+	model := firstRequestedModel(upstreamModel)
+	if model == "" {
+		return ctx
+	}
+	return context.WithValue(ctx, canonicalTempUnschedulableModelContextKey{}, model)
+}
+
+func walletRateLimitModelKey(ctx context.Context, account *Account) string {
+	model := tempUnschedulableModel(ctx, nil)
+	if ctx != nil {
+		// An explicit replacement alias must not inherit another model's marker.
+		if canonical, _ := ctx.Value(canonicalTempUnschedulableModelContextKey{}).(string); canonical != "" && canonical == model {
+			return model
+		}
+	}
+	return modelRateLimitKeyForUpstreamModelNotFound(ctx, account, model)
+}
+
 // handleClineError 处理已识别的 Cline 上游错误：冷却对应钱包（或免费模型本身），不停
-// 整个账号。handled=false 时由调用方继续走默认逻辑。
+// 整个账号。返回是否识别并处理错误，持久化失败仍保留钱包快照，不进入账号级兜底。
 func (s *RateLimitService) handleClineError(
 	ctx context.Context,
 	account *Account,
@@ -220,7 +244,7 @@ func (s *RateLimitService) handleClineError(
 		return false
 	}
 	now := time.Now()
-	modelKey := modelRateLimitKeyForUpstreamModelNotFound(ctx, account, tempUnschedulableModel(ctx, nil))
+	modelKey := walletRateLimitModelKey(ctx, account)
 
 	scope := modelKey
 	if kind != clineFreeModelLimit {
@@ -262,7 +286,7 @@ func (s *RateLimitService) handleClineError(
 	setAccountModelRateLimitSnapshot(account, scope, until, reason, now)
 	if err := s.accountRepo.SetModelRateLimit(ctx, account.ID, scope, until, reason); err != nil {
 		slog.Warn("cline_limit_set_failed", "account_id", account.ID, "scope", scope, "error", err)
-		return false
+		return true
 	}
 	slog.Info("cline_limit", "account_id", account.ID, "scope", scope, "model", modelKey,
 		"status_code", statusCode, "until", until.UTC())

@@ -144,7 +144,7 @@ func (s *RateLimitService) handleCommandCodeUsageError(
 // 因累积 403 被永久禁用。
 func (s *RateLimitService) handleCommandCodeSpendLimit(ctx context.Context, account *Account, statusCode int, responseBody []byte, now time.Time) (shouldDisable bool) {
 	reset := commandCodeResetAt(responseBody, now, commandCodeMaxSpendLimitCooldown)
-	modelKey := modelRateLimitKeyForUpstreamModelNotFound(ctx, account, tempUnschedulableModel(ctx, nil))
+	modelKey := walletRateLimitModelKey(ctx, account)
 	if modelKey != "" && commandCodeSpendLimitIsModelScoped(responseBody) {
 		until := reset
 		if until == nil {

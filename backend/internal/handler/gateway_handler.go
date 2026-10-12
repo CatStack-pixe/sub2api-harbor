@@ -1366,11 +1366,6 @@ func (h *GatewayHandler) forkCodexModelIDsForGroup(ctx context.Context, group *s
 // compositeAvailableModels lists the models the composite group can serve.
 // includeSystemOne adds TypeSafe models, which only work through /v1/systemone;
 // LLM client catalogs (Codex) must exclude them.
-func (h *GatewayHandler) compositeAvailableModels(ctx context.Context, groupID *int64, endpoint string, includeSystemOne bool) []string {
-	models, _ := h.compositeAvailableModelsAndAliases(ctx, groupID, endpoint, includeSystemOne)
-	return models
-}
-
 func (h *GatewayHandler) compositeAvailableModelsAndAliases(ctx context.Context, groupID *int64, endpoint string, includeSystemOne bool) ([]string, map[string]bool) {
 	if h == nil || h.gatewayService == nil {
 		return nil, nil

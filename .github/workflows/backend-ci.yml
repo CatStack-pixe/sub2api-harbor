@@ -107,7 +107,7 @@ jobs:
         working-directory: backend
         env:
           ROUTING_MATRIX_DIFFERENCES_OUTPUT: ${{ runner.temp }}/routing-differences.json
-        run: go test -tags unit ./internal/service/ -run '^TestUpstreamProtocolRoutingMatrixMatchesMainGolden$' -count=1
+        run: go test -tags unit ./internal/service/ -run '^(TestUpstreamProtocolRoutingMatrixMatchesMainGolden|TestWalletErrorsForwardingMapsModelOnce|TestClineWalletWriteFailuresStayIsolatedThroughForwarding|TestClineUsageProbe.*|TestHandleUpstreamError_Cline.*)$' -count=1
       - name: Upload detailed comparison
         if: always()
         uses: actions/upload-artifact@v7

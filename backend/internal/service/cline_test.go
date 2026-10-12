@@ -264,9 +264,19 @@ func TestHandleUpstreamError_ClineCoolsDownWallet(t *testing.T) {
 // clineModelLimitFailRepo 让钱包冷却写入失败。
 type clineModelLimitFailRepo struct {
 	commandCodeRateLimitRepo
+	modelAttempts int
+	failedScope   string
+	failedResetAt time.Time
+	failedReason  string
 }
 
-func (r *clineModelLimitFailRepo) SetModelRateLimit(context.Context, int64, string, time.Time, ...string) error {
+func (r *clineModelLimitFailRepo) SetModelRateLimit(_ context.Context, _ int64, scope string, resetAt time.Time, reason ...string) error {
+	r.modelAttempts++
+	r.failedScope = scope
+	r.failedResetAt = resetAt
+	if len(reason) > 0 {
+		r.failedReason = reason[0]
+	}
 	return errors.New("db unavailable")
 }
 
@@ -276,13 +286,19 @@ func TestHandleUpstreamError_Cline402KeepsAccountWhenCooldownWriteFails(t *testi
 	ctx := withTempUnschedulableModel(context.Background(), []string{"deepseek/deepseek-v4-flash"})
 	for _, body := range []string{clineInsufficientCreditsBody, `{"error":{"message":"Payment required"}}`} {
 		repo := &clineModelLimitFailRepo{}
+		account := clineTestAccount(19)
 
-		shouldDisable := NewRateLimitService(repo, nil, &config.Config{}, nil, nil).HandleUpstreamError(ctx, clineTestAccount(19),
+		shouldDisable := NewRateLimitService(repo, nil, &config.Config{}, nil, nil).HandleUpstreamError(ctx, account,
 			http.StatusPaymentRequired, http.Header{}, []byte(body))
 
 		require.False(t, shouldDisable, body)
 		require.Equal(t, 0, repo.setErrorCalls, body)
 		require.Equal(t, 0, repo.tempCalls, body)
+		require.Zero(t, repo.rateLimitedCalls, body)
+		require.Equal(t, 1, repo.modelAttempts, body)
+		require.Equal(t, clineCreditsRateLimitKey, repo.failedScope, body)
+		require.True(t, account.isRateLimitActiveForKey(clineCreditsRateLimitKey), body)
+		require.False(t, account.isRateLimitActiveForKey(clinePassRateLimitKey), body)
 	}
 }
 

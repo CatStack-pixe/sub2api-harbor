@@ -307,7 +307,7 @@ func (s *CNProviderQuotaService) applyClineWallets(ctx context.Context, account 
 		s.setClineWalletLimit(ctx, account, clinePassRateLimitKey, *until, reason, now)
 	case account.isRateLimitActiveForKey(clinePassRateLimitKey):
 		reason := account.modelRateLimitReason(clinePassRateLimitKey)
-		if strings.HasPrefix(reason, clinePassLimitReason) || strings.HasPrefix(reason, clinePassNoSubscriptionReason) {
+		if clineWalletLimitRecoverableByProbe(clinePassRateLimitKey, reason) {
 			s.setClineWalletLimit(ctx, account, clinePassRateLimitKey, now, "", now)
 		}
 	}
@@ -325,7 +325,7 @@ func (s *CNProviderQuotaService) applyClineWallets(ctx context.Context, account 
 			fmt.Sprintf("%s: balance %.4g USD below threshold %.2f", clineCreditsLowReason, balance.Balance, threshold), now)
 	case account.isRateLimitActiveForKey(clineCreditsRateLimitKey):
 		reason := account.modelRateLimitReason(clineCreditsRateLimitKey)
-		if strings.HasPrefix(reason, clineCreditsReason) || strings.HasPrefix(reason, clineCreditsLowReason) {
+		if clineWalletLimitRecoverableByProbe(clineCreditsRateLimitKey, reason) {
 			s.setClineWalletLimit(ctx, account, clineCreditsRateLimitKey, now, "", now)
 		}
 	}
@@ -357,8 +357,25 @@ func clinePassWalletState(subscribed bool, tiers []CNQuotaTier, now, fallback ti
 	return until, clinePassLimitReason + ": " + strings.Join(exhausted, ", ") + " window used up"
 }
 
-// setClineWalletLimit 写钱包冷却；until 不晚于 now 时即解除。
+func clineWalletLimitRecoverableByProbe(scope, reason string) bool {
+	switch scope {
+	case clinePassRateLimitKey:
+		return strings.HasPrefix(reason, clinePassLimitReason) || strings.HasPrefix(reason, clinePassNoSubscriptionReason)
+	case clineCreditsRateLimitKey:
+		return strings.HasPrefix(reason, clineCreditsReason) || strings.HasPrefix(reason, clineCreditsLowReason)
+	default:
+		return false
+	}
+}
+
+// setClineWalletLimit 写探测能确认的钱包冷却；until 不晚于 now 时即解除。
+// 活跃的花费上限、订阅档位等限制无法由探测验证，保留原原因与截止时间，
+// 防止低余额 / 用满窗口覆盖它们后，被下一次健康探测提前解除。
 func (s *CNProviderQuotaService) setClineWalletLimit(ctx context.Context, account *Account, scope string, until time.Time, reason string, now time.Time) {
+	if resetAt := account.modelRateLimitResetAt(scope); resetAt != nil && resetAt.After(now) &&
+		!clineWalletLimitRecoverableByProbe(scope, account.modelRateLimitReason(scope)) {
+		return
+	}
 	setAccountModelRateLimitSnapshot(account, scope, until, reason, now)
 	if err := s.accountRepo.SetModelRateLimit(ctx, account.ID, scope, until, reason); err != nil {
 		slog.Warn("cline_wallet_limit_set_failed", "account_id", account.ID, "scope", scope, "error", err)

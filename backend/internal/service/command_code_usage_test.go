@@ -542,6 +542,46 @@ func TestHandleUpstreamError_CommandCodeSpendLimitIsModelScoped(t *testing.T) {
 	require.Equal(t, commandCodeSpendLimitReason, repo.reasons["glm-5"])
 }
 
+func TestHandleUpstreamError_CommandCodeSpendLimitMapsAliasOnce(t *testing.T) {
+	for _, source := range []string{"argument alias", "context alias", "canonical context", "explicit alias overrides canonical context"} {
+		t.Run(source, func(t *testing.T) {
+			account := commandCodeUsageAccount()
+			account.Credentials["model_mapping"] = map[string]any{
+				"public-alias": "glm-5",
+				"glm-5":       "gpt-5.5",
+			}
+			ctx := context.Background()
+			var requestedModel []string
+			switch source {
+			case "argument alias":
+				requestedModel = []string{"public-alias"}
+			case "context alias":
+				ctx = withTempUnschedulableModel(ctx, []string{"public-alias"})
+			case "canonical context":
+				ctx = withCanonicalTempUnschedulableModel(ctx, []string{"glm-5"})
+			case "explicit alias overrides canonical context":
+				ctx = withCanonicalTempUnschedulableModel(ctx, []string{"gpt-5.5"})
+				requestedModel = []string{"public-alias"}
+			}
+			repo := &commandCodeRateLimitRepo{}
+
+			shouldDisable := NewRateLimitService(repo, nil, &config.Config{}, nil, nil).HandleUpstreamError(
+				ctx, account, http.StatusForbidden, http.Header{}, []byte(commandCodeSpendLimitBody), requestedModel...)
+
+			require.False(t, shouldDisable)
+			require.Len(t, repo.modelLimits, 1)
+			require.Contains(t, repo.modelLimits, "glm-5")
+			require.NotContains(t, repo.modelLimits, "gpt-5.5")
+			require.Equal(t, commandCodeSpendLimitReason, repo.reasons["glm-5"])
+			require.WithinDuration(t, time.Now().Add(72*time.Hour), repo.modelLimits["glm-5"], time.Minute)
+			require.Contains(t, account.modelRateLimitKeysForRequest(context.Background(), "public-alias"), "glm-5")
+			require.Zero(t, repo.setErrorCalls)
+			require.Zero(t, repo.tempCalls)
+			require.Zero(t, repo.rateLimitedCalls)
+		})
+	}
+}
+
 // 成员总额度耗尽：即使请求模型已知也按账号冷却，但最长一小时（管理员可能调高上限）。
 func TestHandleUpstreamError_CommandCodeMemberSpendLimitIsAccountScoped(t *testing.T) {
 	repo := &commandCodeRateLimitRepo{}
