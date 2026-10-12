@@ -93,6 +93,7 @@ func TestAccountTestService_AdaptiveChatOnlyProvidersTestChatAndAnthropicEndpoin
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
 			account := adaptiveCNAccountTestAccount(int64(301+index), testCase.platform)
+			delete(account.Credentials["api_base_urls"].(map[string]any), APIProtocolResponses)
 			svc, upstream := adaptiveCNAccountTestService(
 				account,
 				adaptiveCNChatTestResponse(),
@@ -113,6 +114,25 @@ func TestAccountTestService_AdaptiveChatOnlyProvidersTestChatAndAnthropicEndpoin
 			require.Contains(t, recorder.Body.String(), "已通过原生 /v1/messages 验证")
 		})
 	}
+}
+
+func TestAccountTestService_AdaptiveKimiTestsExplicitNativeResponsesEndpoint(t *testing.T) {
+	account := adaptiveCNAccountTestAccount(306, PlatformKimi)
+	svc, upstream := adaptiveCNAccountTestService(
+		account,
+		adaptiveCNChatTestResponse(),
+		adaptiveCNAnthropicTestResponse(),
+		adaptiveCNResponsesTestResponse(),
+	)
+	c, recorder := newTestContext()
+
+	err := svc.TestAccountConnection(c, account.ID, "kimi-k2.5", "", AccountTestModeDefault)
+
+	require.NoError(t, err)
+	require.Len(t, upstream.requests, 3)
+	require.Equal(t, "http://responses.example/v1/responses", upstream.requests[2].URL.String())
+	require.Equal(t, "Bearer sk-adaptive-test", upstream.requests[2].Header.Get("Authorization"))
+	require.Equal(t, 1, strings.Count(recorder.Body.String(), `"type":"test_complete"`))
 }
 
 func TestAccountTestService_AdaptiveDeepSeekAlsoTestsResponsesEndpoint(t *testing.T) {
