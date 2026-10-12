@@ -8,31 +8,18 @@ import {
   type UpdateSettingsRequest,
   type DefaultPlatformQuotasMap,
 } from "@/api/admin/settings";
+import { listPlatformIds } from "@/constants/platformCatalog";
 
 /** 全 null 的平台 map，用于断言归一化默认值 */
-const allNullQuotas: DefaultPlatformQuotasMap = {
-  anthropic: { daily: null, weekly: null, monthly: null },
-  openai:    { daily: null, weekly: null, monthly: null },
-  gemini:    { daily: null, weekly: null, monthly: null },
-  antigravity: { daily: null, weekly: null, monthly: null },
-  grok: { daily: null, weekly: null, monthly: null },
-  agnes: { daily: null, weekly: null, monthly: null },
-  deepseek: { daily: null, weekly: null, monthly: null },
-  kimi: { daily: null, weekly: null, monthly: null },
-  zhipu: { daily: null, weekly: null, monthly: null },
-  nvidia: { daily: null, weekly: null, monthly: null },
-  tokenrhythm: { daily: null, weekly: null, monthly: null },
-  tierflow: { daily: null, weekly: null, monthly: null },
-  senseaudio: { daily: null, weekly: null, monthly: null },
-  chatanywhere: { daily: null, weekly: null, monthly: null },
-  glm: { daily: null, weekly: null, monthly: null },
-  modelscope: { daily: null, weekly: null, monthly: null },
-  dashscope: { daily: null, weekly: null, monthly: null },
-  minimax: { daily: null, weekly: null, monthly: null },
-  volcengine: { daily: null, weekly: null, monthly: null },
-  sensenova: { daily: null, weekly: null, monthly: null },
-  typesafe: { daily: null, weekly: null, monthly: null },
-}
+const quotaPlatforms = [
+  "anthropic", "openai", "gemini", "antigravity", "grok", "agnes",
+  "deepseek", "nvidia", "tokenrhythm", "tierflow", "senseaudio",
+  "kimi", "zhipu", "chatanywhere", "glm", "modelscope", "dashscope",
+  "minimax", "volcengine", "sensenova", "opencode_go", "typesafe", "command_code", "cline",
+];
+const allNullQuotas: DefaultPlatformQuotasMap = Object.fromEntries(
+  quotaPlatforms.map(platform => [platform, { daily: null, weekly: null, monthly: null }]),
+);
 
 describe("admin settings auth source defaults helpers", () => {
   it("builds auth source defaults state from flat settings fields", () => {
@@ -267,6 +254,7 @@ describe("normalizePlatformQuotasMap", () => {
 
   it("无参数时返回全平台全 null", () => {
     const result = normalizePlatformQuotasMap();
+    expect(listPlatformIds()).toEqual(quotaPlatforms);
     expect(Object.keys(result)).toEqual(Object.keys(allNullQuotas));
     expect(result.senseaudio).toEqual({ daily: null, weekly: null, monthly: null });
     for (const v of Object.values(result)) {

@@ -1,5 +1,10 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
+import {
+  BUILTIN_PLATFORM_CATALOG,
+  resetPlatformCatalog,
+  setPlatformCatalog
+} from '@/constants/platformCatalog'
 
 const {
   copyToClipboard,
@@ -80,6 +85,20 @@ function findModelRow(wrapper: ReturnType<typeof mountSelector>, modelId: string
   return row
 }
 
+function deferredModels() {
+  let resolve!: (value: { models: string[] }) => void
+  let reject!: (error: Error) => void
+  const promise = new Promise<{ models: string[] }>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise
+    reject = rejectPromise
+  })
+  return { promise, resolve, reject }
+}
+
+function syncButton(wrapper: ReturnType<typeof mountSelector>) {
+  return wrapper.get('[data-testid="sync-upstream-models"]')
+}
+
 describe('ModelWhitelistSelector', () => {
   beforeEach(() => {
     copyToClipboard.mockClear()
@@ -89,6 +108,166 @@ describe('ModelWhitelistSelector', () => {
     showWarning.mockReset()
     syncUpstreamModels.mockReset()
     syncUpstreamModelsPreview.mockReset()
+  })
+
+  afterEach(() => {
+    resetPlatformCatalog()
+  })
+
+  it.each([
+    ['provider', { platform: 'cline', type: 'apikey', api_key: 'original', base_url: 'https://original.example/v1' }],
+    ['key', { platform: 'openai', type: 'apikey', api_key: 'replacement', base_url: 'https://original.example/v1' }],
+    ['endpoint', { platform: 'openai', type: 'apikey', api_key: 'original', base_url: 'https://replacement.example/v1' }],
+    ['account type', { platform: 'openai', type: 'oauth', api_key: 'original', base_url: 'https://original.example/v1' }]
+  ])('ignores preview results after the draft %s changes', async (_name, credentials) => {
+    const pending = deferredModels()
+    syncUpstreamModelsPreview.mockReturnValue(pending.promise)
+    const wrapper = mountSelector({
+      syncCredentials: { platform: 'openai', type: 'apikey', api_key: 'original', base_url: 'https://original.example/v1' }
+    })
+    await syncButton(wrapper).trigger('click')
+    await wrapper.setProps({ syncCredentials: credentials })
+    pending.resolve({ models: ['old-provider-model'] })
+    await flushPromises()
+
+    expect(wrapper.emitted('update:modelValue')).toBeUndefined()
+    expect(wrapper.emitted('upstream-synced')).toBeUndefined()
+    expect(showSuccess).not.toHaveBeenCalled()
+    expect(showInfo).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
+
+  it('invalidates a preview that switches away and back to identical credentials', async () => {
+    const pending = deferredModels()
+    syncUpstreamModelsPreview.mockReturnValue(pending.promise)
+    const original = { platform: 'openai', type: 'apikey', api_key: 'original' }
+    const wrapper = mountSelector({ syncCredentials: original })
+    await syncButton(wrapper).trigger('click')
+    await wrapper.setProps({ syncCredentials: { ...original, api_key: 'temporary' } })
+    await wrapper.setProps({ syncCredentials: original })
+    pending.resolve({ models: ['stale-model'] })
+    await flushPromises()
+
+    expect(wrapper.emitted('update:modelValue')).toBeUndefined()
+    expect(wrapper.emitted('upstream-synced')).toBeUndefined()
+    wrapper.unmount()
+  })
+
+  it('keeps a replacement saved-account request busy when the previous account settles', async () => {
+    const oldRequest = deferredModels()
+    const currentRequest = deferredModels()
+    syncUpstreamModels.mockReturnValueOnce(oldRequest.promise).mockReturnValueOnce(currentRequest.promise)
+    const wrapper = mountSelector({ accountId: 46 })
+    await syncButton(wrapper).trigger('click')
+    await wrapper.setProps({ accountId: 47 })
+    await syncButton(wrapper).trigger('click')
+    oldRequest.resolve({ models: ['old-account-model'] })
+    await flushPromises()
+
+    expect(wrapper.emitted('update:modelValue')).toBeUndefined()
+    expect(syncButton(wrapper).attributes('disabled')).toBeDefined()
+    currentRequest.resolve({ models: ['current-account-model'] })
+    await flushPromises()
+
+    expect(syncUpstreamModels.mock.calls).toEqual([[46], [47]])
+    expect(wrapper.emitted('update:modelValue')).toEqual([[['current-account-model']]])
+    wrapper.unmount()
+  })
+
+  it('discards stale TokenRhythm failures without adding fallback models or notices', async () => {
+    const pending = deferredModels()
+    syncUpstreamModelsPreview.mockReturnValue(pending.promise)
+    const wrapper = mountSelector({
+      platform: 'tokenrhythm',
+      syncCredentials: { platform: 'tokenrhythm', type: 'apikey', api_key: 'old-key' }
+    })
+    await syncButton(wrapper).trigger('click')
+    await wrapper.setProps({ syncCredentials: { platform: 'tokenrhythm', type: 'apikey', api_key: 'new-key' } })
+    pending.reject(new Error('old credentials rejected'))
+    await flushPromises()
+
+    expect(wrapper.emitted('update:modelValue')).toBeUndefined()
+    expect(showInfo).not.toHaveBeenCalled()
+    expect(showError).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
+
+  it('ignores responses after unmount while preserving edits made during a current request', async () => {
+    const discarded = deferredModels()
+    syncUpstreamModels.mockReturnValueOnce(discarded.promise)
+    const closed = mountSelector({ accountId: 46 })
+    await syncButton(closed).trigger('click')
+    closed.unmount()
+    discarded.resolve({ models: ['closed-dialog-model'] })
+    await flushPromises()
+    expect(closed.emitted('update:modelValue')).toBeUndefined()
+    expect(showSuccess).not.toHaveBeenCalled()
+
+    const current = deferredModels()
+    syncUpstreamModels.mockReturnValueOnce(current.promise)
+    const wrapper = mountSelector({ accountId: 47 })
+    await syncButton(wrapper).trigger('click')
+    await wrapper.setProps({ modelValue: ['manually-added'] })
+    current.resolve({ models: ['synced-model'] })
+    await flushPromises()
+    expect(wrapper.emitted('update:modelValue')).toEqual([[['manually-added', 'synced-model']]])
+    wrapper.unmount()
+  })
+
+  it.each([
+    'anthropic', 'openai', 'gemini', 'antigravity', 'grok', 'kimi', 'zhipu', 'deepseek',
+    'minimax', 'opencode_go', 'command_code', 'cline', 'agnes', 'nvidia',
+    'tokenrhythm', 'tierflow', 'senseaudio', 'chatanywhere', 'glm', 'modelscope',
+    'dashscope', 'volcengine', 'sensenova'
+  ])(
+    'supports upstream sync for %s saved accounts and creation previews',
+    (platform) => {
+      const wrappers = [
+        mountSelector({ platform, accountId: 46 }),
+        mountSelector({ platform, syncCredentials: { platform, type: 'apikey', api_key: 'test-key' } })
+      ]
+      for (const wrapper of wrappers) {
+        expect(wrapper.findAll('button').some(button => button.text() === 'admin.accounts.syncUpstreamModels')).toBe(true)
+        wrapper.unmount()
+      }
+    }
+  )
+
+  it.each(['typesafe', 'unregistered'])(
+    'hides upstream sync for unsupported %s saved accounts and creation previews',
+    (platform) => {
+      const wrappers = [
+        mountSelector({ platform, accountId: 46 }),
+        mountSelector({ platform, syncCredentials: { platform, type: 'apikey', api_key: 'test-key' } })
+      ]
+      for (const wrapper of wrappers) {
+        expect(wrapper.findAll('button').some(button => button.text() === 'admin.accounts.syncUpstreamModels')).toBe(false)
+        wrapper.unmount()
+      }
+      expect(syncUpstreamModels).not.toHaveBeenCalled()
+      expect(syncUpstreamModelsPreview).not.toHaveBeenCalled()
+    }
+  )
+
+  it('requires a supported request builder for newly registered platforms', async () => {
+    const wrapper = mountSelector({ platform: 'acme_router', accountId: 46 })
+    const platforms = [
+      ...BUILTIN_PLATFORM_CATALOG.platforms,
+      { id: 'acme_router', display_name: 'Acme Router', gateway: 'openai' as const, cn_provider: false }
+    ]
+    setPlatformCatalog({ ...BUILTIN_PLATFORM_CATALOG, platforms })
+    await flushPromises()
+    expect(wrapper.findAll('button').some(button => button.text() === 'admin.accounts.syncUpstreamModels')).toBe(false)
+
+    setPlatformCatalog({
+      ...BUILTIN_PLATFORM_CATALOG,
+      platforms: platforms.map(spec => spec.id === 'acme_router'
+        ? { ...spec, multi_protocol: { default_mode: 'default', routing: 'by_inbound', modes: [] } }
+        : spec)
+    })
+    await flushPromises()
+    expect(wrapper.findAll('button').some(button => button.text() === 'admin.accounts.syncUpstreamModels')).toBe(true)
+    wrapper.unmount()
   })
 
   it('rejects a custom whitelist model that is already mapped to a different target', async () => {

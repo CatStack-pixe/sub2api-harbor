@@ -73,4 +73,63 @@ describe('CNProviderBalanceCell', () => {
     expect(wrapper.text()).toContain('CNY 12.50')
     expect(wrapper.text()).toContain('HTTP 401')
   })
+
+  it.each(['cline', 'command_code'])('renders persisted %s credits and supports manual refresh', async (platform) => {
+    queryBalance.mockResolvedValue({ success: true, balance: 9.25, currency: 'USD' })
+    const wrapper = mount(CNProviderBalanceCell, {
+      props: {
+        account: {
+          ...account,
+          platform,
+          credentials: { account_mode: 'payg' },
+          extra: { [`${platform}_balance`]: 12.5, [`${platform}_balance_currency`]: 'USD' }
+        }
+      }
+    })
+    expect(wrapper.get('[data-test="cn-provider-balance-value"]').text()).toContain('USD 12.50')
+    expect(queryBalance).not.toHaveBeenCalled()
+
+    await wrapper.get('[data-test="cn-provider-balance-probe"]').trigger('click')
+    await flushPromises()
+    expect(queryBalance).toHaveBeenCalledWith(account.id)
+    expect(wrapper.get('[data-test="cn-provider-balance-value"]').text()).toContain('USD 9.25')
+    wrapper.unmount()
+  })
+
+  it.each(['cline', 'command_code'])('hides %s relay balance snapshots and refresh controls', async (platform) => {
+    const wrapper = mount(CNProviderBalanceCell, {
+      props: {
+        account: {
+          ...account,
+          platform,
+          credentials: { base_url: 'https://relay.example.com/v1' },
+          extra: { [`${platform}_balance`]: 12.5, [`${platform}_balance_currency`]: 'USD' }
+        }
+      }
+    })
+    await flushPromises()
+
+    expect(wrapper.find('[data-test="cn-provider-balance-value"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="cn-provider-balance-probe"]').exists()).toBe(false)
+    expect(queryBalance).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
+
+  it('updates credits from a sibling quota probe without a second request', async () => {
+    const wrapper = mount(CNProviderBalanceCell, {
+      props: {
+        account: { ...account, platform: 'cline', credentials: {}, extra: {} }
+      }
+    })
+    await wrapper.setProps({
+      balanceResult: {
+        provider: 'cline', success: true, balance: 7.5, currency: 'USD',
+        fetched_at: 1, persisted: true
+      }
+    })
+
+    expect(wrapper.get('[data-test="cn-provider-balance-value"]').text()).toContain('USD 7.50')
+    expect(queryBalance).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
 })

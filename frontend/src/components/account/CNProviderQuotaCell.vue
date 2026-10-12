@@ -79,26 +79,30 @@
   </div>
 </template>
 
+<script lang="ts">
+// Shared by rows and remounts; expired entries are pruned before recording a probe.
+const AUTO_PROBE_DEBOUNCE_MS = 5 * 60 * 1000
+const lastAutoProbeAt = new Map<number, number>()
+</script>
+
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { adminAPI } from '@/api/admin'
-import type { CNProviderQuotaProbeResult } from '@/api/admin/cnProviders'
+import type { CNProviderBalanceResult, CNProviderQuotaProbeResult } from '@/api/admin/cnProviders'
 import type { Account } from '@/types'
 import { cnQuotaCellVisible } from './credentialsBuilder'
 
 const props = defineProps<{
   account: Account
 }>()
+const emit = defineEmits<{
+  (event: 'balance-updated', balance: CNProviderBalanceResult): void
+}>()
 
 const { t } = useI18n()
 
-const readMode = (): string => {
-  const mode = props.account.credentials?.account_mode
-  return typeof mode === 'string' ? mode : ''
-}
-
-const visible = computed(() => cnQuotaCellVisible(props.account.platform, readMode()))
+const visible = computed(() => cnQuotaCellVisible(props.account))
 
 const loading = ref(false)
 const error = ref<string | null>(null)
@@ -107,10 +111,6 @@ const data = ref<CNProviderQuotaProbeResult | null>(null)
 // 后端周期任务/手动探测写入的 extra 快照键（<provider>_ 前缀，与后端
 // cnQuotaExtraUpdates 对齐）。页面加载即有数据，无需等待探测。
 const SNAPSHOT_STALE_MS = 15 * 60 * 1000
-
-// 自动探测去抖窗口与最近一次自动探测时间（模块级，跨实例共享）。
-const AUTO_PROBE_DEBOUNCE_MS = 5 * 60 * 1000
-const lastAutoProbeAt = new Map<number, number>()
 
 const readExtraNumber = (key: string): number | null => {
   const v = (props.account.extra as Record<string, unknown> | undefined)?.[key]
@@ -158,9 +158,13 @@ onMounted(() => {
   if (!snapshotIsStale.value) return
   // 模块级去抖：列表页每行一个实例，翻页/筛选/刷新会重复挂载；同一账号
   // 短时间内已自动探测过则跳过，避免对上游形成探测风暴。
-  const last = lastAutoProbeAt.get(props.account.id) ?? 0
-  if (Date.now() - last < AUTO_PROBE_DEBOUNCE_MS) return
-  lastAutoProbeAt.set(props.account.id, Date.now())
+  const now = Date.now()
+  for (const [id, timestamp] of lastAutoProbeAt) {
+    if (now - timestamp >= AUTO_PROBE_DEBOUNCE_MS) lastAutoProbeAt.delete(id)
+  }
+  const last = lastAutoProbeAt.get(props.account.id)
+  if (last !== undefined && now - last < AUTO_PROBE_DEBOUNCE_MS) return
+  lastAutoProbeAt.set(props.account.id, now)
   handleProbe()
 })
 
@@ -226,6 +230,7 @@ const handleProbe = async () => {
     // 失败时保留已渲染的快照条形图（仅显示错误行），成功才覆盖。
     if (result.success) {
       data.value = result
+      if (result.balance?.success) emit('balance-updated', result.balance)
     } else {
       error.value = result.error || t('common.error')
     }

@@ -67,21 +67,22 @@ import { cnBalanceCellVisible } from './credentialsBuilder'
 
 const props = defineProps<{
   account: Account
+  balanceResult?: CNProviderBalanceResult | null
 }>()
 
 const { t } = useI18n()
 
-const readMode = (): string => {
-  const mode = props.account.credentials?.account_mode
-  return typeof mode === 'string' ? mode : ''
-}
-
-// 仅 kimi / deepseek payg 账号有公开余额端点（智谱 payg 无）。
-const visible = computed(() => cnBalanceCellVisible(props.account.platform, readMode()))
+// Kimi / DeepSeek 按量余额，以及官方主机的 Command Code / Cline 积分。
+const visible = computed(() => cnBalanceCellVisible(props.account))
 
 const loading = ref(false)
 const error = ref<string | null>(null)
 const data = ref<CNProviderBalanceResult | null>(null)
+watch(
+  () => props.balanceResult,
+  result => { data.value = result?.success ? result : null },
+  { immediate: true }
+)
 
 const extraKey = (suffix: string) => `${props.account.platform}_${suffix}`
 

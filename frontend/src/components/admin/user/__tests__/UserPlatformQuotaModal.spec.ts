@@ -108,7 +108,7 @@ describe('UserPlatformQuotaModal', () => {
       'anthropic', 'openai', 'gemini', 'antigravity', 'grok', 'agnes',
       'deepseek', 'nvidia', 'tokenrhythm', 'tierflow', 'senseaudio',
       'kimi', 'zhipu', 'chatanywhere', 'glm', 'modelscope', 'dashscope',
-      'minimax', 'volcengine', 'sensenova', 'opencode_go', 'typesafe',
+      'minimax', 'volcengine', 'sensenova', 'opencode_go', 'typesafe', 'command_code', 'cline',
     ]
     expect(PLATFORM_QUOTA_PLATFORMS).toEqual(expectedPlatforms)
     expect(w.findAll('tbody tr').map(row => row.find('td').text())).toEqual(expectedPlatforms)
