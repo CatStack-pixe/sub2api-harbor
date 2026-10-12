@@ -116,6 +116,12 @@ func (s *OpenAIGatewayService) forwardAsChatCompletions(
 	inbound := APIProtocolChatCompletions
 	if isResponsesShape {
 		inbound = APIProtocolResponses
+		// Harbor historically bridges Cursor's Responses-shaped Chat requests
+		// through Chat for adaptive single-provider accounts except DeepSeek.
+		// Explicit native Responses on /v1/responses remains available.
+		if account.IsAdaptiveAPIProtocol() && !account.routesByModel() && !account.IsDeepSeek() {
+			inbound = APIProtocolChatCompletions
+		}
 	}
 	// 按模型分流与 adaptive 账号按请求体形状处理 Responses 形状入站；其余账号
 	// 维持原样把请求体交给所选路径。

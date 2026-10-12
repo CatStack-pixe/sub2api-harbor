@@ -35,6 +35,10 @@ func resolveUpstreamProtocol(account *Account, inbound, model string, catalog []
 	}
 	if account.IsAdaptiveAPIProtocol() {
 		if inbound == APIProtocolResponses && account.IsKimi() && !account.UsesNativeCNResponses() {
+			if account.Type != AccountTypeAPIKey {
+				// Retain the historical credential error before any transport.
+				return APIProtocolResponses
+			}
 			return APIProtocolChatCompletions
 		}
 		if account.providerSupportsProtocol(inbound) {

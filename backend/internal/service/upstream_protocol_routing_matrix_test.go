@@ -310,6 +310,55 @@ func matchesKnownZhipuNonAPIKeyDifference(tc routingMatrixCase, want, got routin
 		reflect.DeepEqual(got, routingObservation{Error: "account 801 missing api_key", Status: http.StatusOK})
 }
 
+// These expectations specify the two intentional upstream fixes from 0dccd7b6f,
+// independently of production routing helpers. The captured historical fixture
+// remains immutable; every other observation must still match it exactly.
+func routingMatrixUpstreamFixExpectation(tc routingMatrixCase) (string, routingObservation) {
+	if tc.platform != PlatformOpenCodeGo {
+		return "", routingObservation{}
+	}
+	model := strings.TrimSpace(tc.model)
+	if model == "mapped-unsupported" {
+		model = "gemini-3.8-flash"
+	}
+	if model == "gemini-3.8-flash" || model == "jev-1.13" {
+		expected := routingObservation{
+			Error: "opencode unsupported model: " + model, Status: http.StatusBadRequest,
+			ClientErrorType: "invalid_request_error",
+			ClientErrorMessage: fmt.Sprintf("Model '%s' is not supported on OpenCode standard gateway (gemini models require Google SDK endpoint, jev models require System One endpoint)", model),
+		}
+		if tc.ingress.name != "messages" {
+			expected.ClientErrorCode = "model_not_supported"
+		}
+		return "unsupported_model", expected
+	}
+	if model != "qwen3.8-max" || tc.mode != AccountModeZen || tc.rules ||
+		(tc.apiProtocol != "" && tc.apiProtocol != APIProtocolAdaptive && tc.apiProtocol != "invalid") {
+		return "", routingObservation{}
+	}
+	if tc.accountType != AccountTypeAPIKey {
+		message := "account 801 missing api_key"
+		if tc.ingress.name == "chat" || tc.ingress.name == "chat_responses_shape" {
+			message = "unsupported account type: upstream"
+		}
+		return "qwen_chat_endpoint", routingObservation{Error: message, Status: http.StatusOK}
+	}
+	base := "https://opencode.ai/zen/v1"
+	switch tc.addresses {
+	case "base":
+		base = "http://base.example/v1"
+	case "split", "both":
+		base = "http://cc.example/v1"
+	}
+	return "qwen_chat_endpoint", routingObservation{
+		Requests: []routingUpstreamRequest{{
+			URL: base + "/chat/completions", Authorization: "Bearer sk-test",
+			BodyKind: "messages", Model: "qwen3.8-max",
+		}},
+		Error: "upstream error: 502 (failover)", Status: http.StatusOK,
+	}
+}
+
 func TestUpstreamProtocolRoutingMatrixMatchesMainGolden(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	data, err := os.ReadFile(routingMatrixGoldenPath)
@@ -330,11 +379,16 @@ func TestUpstreamProtocolRoutingMatrixMatchesMainGolden(t *testing.T) {
 	}
 	mismatched := 0
 	knownDifferences := 0
+	upstreamFixCases := map[string]int{}
 	for i, tc := range cases {
 		index := golden.Results[i]
 		require.GreaterOrEqual(t, index, 0)
 		require.Less(t, index, len(golden.Observations))
 		want := golden.Observations[index]
+		if fix, expected := routingMatrixUpstreamFixExpectation(tc); fix != "" {
+			upstreamFixCases[fix]++
+			want = expected
+		}
 		got := observeRouting(tc)
 		if reflect.DeepEqual(want, got) {
 			continue
@@ -362,4 +416,6 @@ func TestUpstreamProtocolRoutingMatrixMatchesMainGolden(t *testing.T) {
 	// 2 account types × 4 modes × 3 probe states × 4 address configurations ×
 	// 2 model spellings. A disappeared or expanded exception requires review.
 	require.Equal(t, 192, knownDifferences, "unexpected change to the declared Zhipu non-API-Key difference")
+	require.Equal(t, map[string]int{"unsupported_model": 9216, "qwen_chat_endpoint": 192}, upstreamFixCases,
+		"intentional upstream fixes must retain their full input matrix")
 }
