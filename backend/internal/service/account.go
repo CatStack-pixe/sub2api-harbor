@@ -355,7 +355,8 @@ func (a *Account) IsOpenAICompatible() bool {
 		a.Platform == PlatformTokenRhythm || a.Platform == PlatformKimi || a.Platform == PlatformZhipu ||
 		a.Platform == PlatformChatAnywhere || a.Platform == PlatformGLM || a.Platform == PlatformModelScope ||
 		a.Platform == PlatformDashScope || a.Platform == PlatformMiniMax || a.Platform == PlatformVolcengine ||
-		a.Platform == PlatformSenseNova || a.Platform == PlatformSenseAudio || a.Platform == PlatformTierflow || a.IsOpenCodeGo())
+		a.Platform == PlatformSenseNova || a.Platform == PlatformSenseAudio || a.Platform == PlatformTierflow ||
+		a.Platform == PlatformCline || a.IsOpenCodeGo())
 }
 
 // ShouldUseOpenAIResponsesAPI reports whether this OpenAI-compatible account
@@ -370,7 +371,7 @@ func (a *Account) ShouldUseOpenAIResponsesAPI() bool {
 	}
 	return !a.IsAgnes() && !a.IsDeepSeek() && !a.IsNvidia() && !a.IsTokenRhythm() &&
 		!a.IsKimi() && !a.IsChatAnywhere() && !a.IsGLM() && !a.IsModelScope() &&
-		!a.IsDashScope() && !a.IsMiniMax() && !a.IsVolcengine() && !a.IsSenseNova() && !a.IsSenseAudio() && !a.IsTierflow() &&
+		!a.IsDashScope() && !a.IsMiniMax() && !a.IsVolcengine() && !a.IsSenseNova() && !a.IsSenseAudio() && !a.IsTierflow() && !a.IsCline() &&
 		openai_compat.ShouldUseResponsesAPI(a.Extra)
 }
 
@@ -1468,7 +1469,7 @@ func (a *Account) IsOpenAIApiKey() bool {
 func (a *Account) GetOpenAIBaseURL() string {
 	if a == nil || (!a.IsOpenAI() && !a.IsAgnes() && !a.IsDeepSeek() && !a.IsNvidia() &&
 		!a.IsTokenRhythm() && !a.IsKimi() && !a.IsZhipu() && !a.IsChatAnywhere() &&
-		!a.IsGLM() && !a.IsModelScope() && !a.IsDashScope() && !a.IsMiniMax() && !a.IsVolcengine() && !a.IsSenseNova() && !a.IsSenseAudio() && !a.IsTierflow() && !a.IsOpenCodeGo()) {
+		!a.IsGLM() && !a.IsModelScope() && !a.IsDashScope() && !a.IsMiniMax() && !a.IsVolcengine() && !a.IsSenseNova() && !a.IsSenseAudio() && !a.IsTierflow() && !a.IsCline() && !a.IsOpenCodeGo()) {
 		return ""
 	}
 	if a.IsChatAnywhere() {
@@ -1559,6 +1560,8 @@ func (a *Account) GetOpenAIBaseURL() string {
 		return TierflowDefaultBaseURL
 	case PlatformOpenCodeGo:
 		return a.openCodeDefaultChatBaseURL()
+	case PlatformCline:
+		return DefaultClineBaseURL
 	default:
 		return "https://api.openai.com"
 	}
@@ -1802,7 +1805,7 @@ func (a *Account) GetOpenAIFormatBaseURL() string {
 // GetCNAPIKey 返回国产 OpenAI 兼容供应商账号的 api_key 凭据（kimi/zhipu/deepseek/sensenova）。
 // 与 openai 的 GetOpenAIApiKey 区分：后者仅对 openai 平台返回。
 func (a *Account) GetCNAPIKey() string {
-	if a == nil || !a.IsMultiProtocolAPIKey() {
+	if a == nil || (!a.IsMultiProtocolAPIKey() && !a.IsCline()) {
 		return ""
 	}
 	return a.GetCredential("api_key")
@@ -1817,6 +1820,9 @@ func (a *Account) GetCodingPlanProvider() string {
 	}
 	if a.IsOpenCodeGoPlan() {
 		return PlatformOpenCodeGo
+	}
+	if a.IsCline() && a.clineAccountAPISupported() {
+		return PlatformCline
 	}
 	if a.GetAccountMode() != AccountModeCoding {
 		return ""
@@ -1964,7 +1970,7 @@ func (a *Account) GetOpenAIProtocolAPIKey() string {
 	if a == nil {
 		return ""
 	}
-	if a.IsMultiProtocolAPIKey() || a.IsModelScope() || a.IsDashScope() || a.IsMiniMax() || a.IsVolcengine() || a.IsSenseNova() {
+	if a.IsMultiProtocolAPIKey() || a.IsCline() || a.IsModelScope() || a.IsDashScope() || a.IsMiniMax() || a.IsVolcengine() || a.IsSenseNova() {
 		if a.Type != AccountTypeAPIKey {
 			return ""
 		}

@@ -58,6 +58,7 @@ const (
 	PlatformSenseAudio   = domain.PlatformSenseAudio
 	PlatformTierflow     = domain.PlatformTierflow
 	PlatformOpenCodeGo   = domain.PlatformOpenCodeGo
+	PlatformCline        = domain.PlatformCline
 )
 
 // AllPlatforms 返回所有支持的平台列表
@@ -84,6 +85,7 @@ func AllPlatforms() []string {
 		PlatformSenseAudio,
 		PlatformTierflow,
 		PlatformOpenCodeGo,
+		PlatformCline,
 		PlatformTypeSafe,
 	}
 }

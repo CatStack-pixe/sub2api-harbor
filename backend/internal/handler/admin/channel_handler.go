@@ -721,6 +721,7 @@ var platformToLiteLLMProvider = map[string]string{
 	service.PlatformTierflow:     "tierflow",
 	service.PlatformTypeSafe:     "typesafe",
 	service.PlatformOpenCodeGo:   "opencode-go",
+	service.PlatformCline:        "cline",
 }
 
 // SyncPricingModels 返回 LiteLLM 定价目录中指定平台的最新模型列表

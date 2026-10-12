@@ -113,6 +113,15 @@ func (s *CNProviderBalanceCheckService) runOnce() {
 			if !account.IsActive() {
 				continue
 			}
+			// Cline exposes both credit balance and ClinePass subscription
+			// windows through its quota probe; its model-scoped wallet limits
+			// must not be replaced with the generic account pause.
+			if account.IsCline() {
+				if account.clineAccountAPISupported() && s.quotaService != nil {
+					quotaTargets = append(quotaTargets, quotaTarget{id: account.ID, platform: account.Platform})
+				}
+				continue
+			}
 			// coding 账号：探测滚动窗口并落快照（不要求 Schedulable——已被
 			// 阈值停调的账号也需要新鲜快照决定是否续停）。
 			if account.IsCodingPlan() {
@@ -248,7 +257,7 @@ func (s *CNProviderBalanceCheckService) checkOne(ctx context.Context, account *A
 }
 
 func (s *CNProviderBalanceCheckService) platforms() []string {
-	return []string{PlatformKimi, PlatformDeepseek}
+	return []string{PlatformKimi, PlatformDeepseek, PlatformCline}
 }
 
 // allCNBalancesBelowThreshold 判断全部币种余额是否均低于阈值。

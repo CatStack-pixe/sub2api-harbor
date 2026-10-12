@@ -60,6 +60,7 @@ const (
 	PlatformSenseNova         = domain.PlatformSenseNova
 	PlatformSenseAudio        = domain.PlatformSenseAudio
 	PlatformTierflow          = domain.PlatformTierflow
+	PlatformCline             = domain.PlatformCline
 	PlatformComposite         = domain.PlatformComposite
 	PlatformKiro              = "kiro"
 	AgnesDefaultBaseURL       = domain.AgnesDefaultBaseURL
@@ -80,6 +81,7 @@ const (
 	SenseNovaDefaultBaseURL   = domain.SenseNovaDefaultBaseURL
 	SenseAudioDefaultBaseURL  = domain.SenseAudioDefaultBaseURL
 	TierflowDefaultBaseURL    = domain.TierflowDefaultBaseURL
+	DefaultClineBaseURL       = domain.DefaultClineBaseURL
 	PlatformOpenCodeGo        = domain.PlatformOpenCodeGo
 )
 
@@ -174,6 +176,7 @@ var AllowedQuotaPlatforms = []string{
 	PlatformSenseAudio,
 	PlatformTierflow,
 	PlatformOpenCodeGo,
+	PlatformCline,
 	PlatformTypeSafe,
 }
 
@@ -240,6 +243,7 @@ var AllowedSchedulingThresholdPlatforms = []string{
 	PlatformZhipu,
 	PlatformMiniMax,
 	PlatformOpenCodeGo,
+	PlatformCline,
 }
 
 func NvidiaDefaultModelIDs() []string {

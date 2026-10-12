@@ -72,7 +72,6 @@ func (a *Account) modelRateLimitKeysForRequest(ctx context.Context, requestedMod
 	if a == nil {
 		return nil
 	}
-
 	modelKey := a.GetMappedModel(requestedModel)
 	if a.Platform == PlatformAntigravity {
 		modelKey = resolveFinalAntigravityModelKey(ctx, a, requestedModel)
@@ -101,6 +100,10 @@ func (a *Account) modelRateLimitKeysForRequest(ctx context.Context, requestedMod
 		}
 	case PlatformChatAnywhere:
 		keys = append(keys, chatAnywhereContextRateLimitKey)
+	case PlatformCline:
+		if walletKey := clineWalletRateLimitKey(modelKey); walletKey != "" && walletKey != modelKey {
+			keys = append(keys, walletKey)
+		}
 	}
 	return keys
 }

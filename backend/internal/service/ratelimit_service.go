@@ -473,6 +473,19 @@ func (s *RateLimitService) HandleUpstreamError(ctx context.Context, account *Acc
 		upstreamMsg = truncateForLog([]byte(upstreamMsg), 512)
 	}
 
+	// Cline wallet limits are provider-specific and stored separately from
+	// generic model_rate_limits. Keep this after error-code policy and pool-mode
+	// handling so fork overrides retain their existing precedence.
+	if account.IsCline() && (statusCode == http.StatusPaymentRequired ||
+		statusCode == http.StatusForbidden || statusCode == http.StatusTooManyRequests) {
+		if s.handleClineError(ctx, account, statusCode, responseBody, upstreamMsg) {
+			return false
+		}
+		if statusCode == http.StatusPaymentRequired {
+			return false
+		}
+	}
+
 	switch statusCode {
 	case 400:
 		// "organization has been disabled" → 永久禁用
