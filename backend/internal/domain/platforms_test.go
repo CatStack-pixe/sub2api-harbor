@@ -35,6 +35,10 @@ var (
 		PlatformAntigravity: "anthropic", PlatformGrok: "xai", PlatformKimi: "moonshot",
 		PlatformZhipu: "zhipu", PlatformDeepseek: "deepseek", PlatformMiniMax: "minimax",
 		PlatformOpenCodeGo: "opencode-go", PlatformTypeSafe: "typesafe", PlatformCommandCode: "", PlatformCline: "",
+		PlatformAgnes: "agnes", PlatformNvidia: "nvidia_nim", PlatformTokenRhythm: "tokenrhythm",
+		PlatformTierflow: "tierflow", PlatformSenseAudio: "senseaudio", PlatformChatAnywhere: "chatanywhere",
+		PlatformGLM: "zai", PlatformModelScope: "modelscope", PlatformDashScope: "dashscope",
+		PlatformVolcengine: "volcengine", PlatformSenseNova: "sensenova",
 	}
 )
 

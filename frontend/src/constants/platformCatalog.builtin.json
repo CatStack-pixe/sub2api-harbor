@@ -39,7 +39,8 @@
       "id": "agnes",
       "display_name": "Agnes",
       "gateway": "openai",
-      "cn_provider": false
+      "cn_provider": false,
+      "litellm_provider": "agnes"
     },
     {
       "id": "deepseek",
@@ -67,19 +68,22 @@
       "id": "nvidia",
       "display_name": "NVIDIA",
       "gateway": "openai",
-      "cn_provider": false
+      "cn_provider": false,
+      "litellm_provider": "nvidia_nim"
     },
     {
       "id": "tokenrhythm",
       "display_name": "TokenRhythm",
       "gateway": "openai",
-      "cn_provider": false
+      "cn_provider": false,
+      "litellm_provider": "tokenrhythm"
     },
     {
       "id": "tierflow",
       "display_name": "Tierflow / 清枢智汇",
       "gateway": "openai",
-      "cn_provider": false
+      "cn_provider": false,
+      "litellm_provider": "tierflow"
     },
     {
       "id": "senseaudio",
@@ -99,7 +103,8 @@
             }
           }
         ]
-      }
+      },
+      "litellm_provider": "senseaudio"
     },
     {
       "id": "kimi",
@@ -161,25 +166,29 @@
       "id": "chatanywhere",
       "display_name": "ChatAnywhere",
       "gateway": "openai",
-      "cn_provider": false
+      "cn_provider": false,
+      "litellm_provider": "chatanywhere"
     },
     {
       "id": "glm",
       "display_name": "GLM",
       "gateway": "openai",
-      "cn_provider": false
+      "cn_provider": false,
+      "litellm_provider": "zai"
     },
     {
       "id": "modelscope",
       "display_name": "ModelScope",
       "gateway": "openai",
-      "cn_provider": false
+      "cn_provider": false,
+      "litellm_provider": "modelscope"
     },
     {
       "id": "dashscope",
       "display_name": "DashScope",
       "gateway": "openai",
-      "cn_provider": false
+      "cn_provider": false,
+      "litellm_provider": "dashscope"
     },
     {
       "id": "minimax",
@@ -214,7 +223,8 @@
       "id": "volcengine",
       "display_name": "Volcengine Ark",
       "gateway": "openai",
-      "cn_provider": false
+      "cn_provider": false,
+      "litellm_provider": "volcengine"
     },
     {
       "id": "sensenova",
@@ -232,7 +242,8 @@
             }
           }
         ]
-      }
+      },
+      "litellm_provider": "sensenova"
     },
     {
       "id": "opencode_go",

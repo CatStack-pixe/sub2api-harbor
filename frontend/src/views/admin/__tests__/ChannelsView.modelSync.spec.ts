@@ -97,6 +97,17 @@ describe('ChannelsView pricing model sync', () => {
     ['openai', true],
     ['opencode_go', true],
     ['typesafe', true],
+    ['agnes', true],
+    ['nvidia', true],
+    ['tokenrhythm', true],
+    ['tierflow', true],
+    ['senseaudio', true],
+    ['chatanywhere', true],
+    ['glm', true],
+    ['modelscope', true],
+    ['dashscope', true],
+    ['volcengine', true],
+    ['sensenova', true],
     ['command_code', false],
     ['cline', false]
   ] as const)('offers pricing model sync for %s only when its pricing catalog exists', async (platform, expected) => {
