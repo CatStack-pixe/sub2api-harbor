@@ -562,7 +562,9 @@ func TestSyncPricingModels_UnsupportedPlatform(t *testing.T) {
 }
 
 func TestPlatformToLiteLLMProvider_GLMMatchesZAI(t *testing.T) {
-	require.Equal(t, "zai", platformToLiteLLMProvider[service.PlatformGLM])
+	provider, ok := platformLiteLLMProvider(service.PlatformGLM)
+	require.True(t, ok)
+	require.Equal(t, "zai", provider)
 }
 
 func TestSyncPricingModels_ValidPlatform_EmptyService(t *testing.T) {

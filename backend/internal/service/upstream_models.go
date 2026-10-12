@@ -794,9 +794,7 @@ func (s *AccountTestService) buildUpstreamModelsRequest(ctx context.Context, acc
 		return s.buildGrokUpstreamModelsRequest(ctx, account)
 	case account.IsDeepSeek():
 		return s.buildDeepSeekUpstreamModelsRequest(ctx, account)
-	case account.IsOpenAI() || account.IsCNProvider() || account.IsAgnes() || account.IsNvidia() ||
-		account.IsTokenRhythm() || account.IsChatAnywhere() || account.IsGLM() || account.IsModelScope() ||
-		account.IsDashScope() || account.IsMiniMax() || account.IsVolcengine() || account.IsSenseNova() || account.IsSenseAudio() || account.IsTierflow() || account.IsOpenCodeGo() || account.IsCommandCode() || account.IsCline():
+	case account.IsOpenAICompatible() || account.IsMultiProtocolAPIKey():
 		// OpenAI-compatible fork and CN providers reuse the OpenAI /v1/models probe.
 		return s.buildOpenAIUpstreamModelsRequest(ctx, account)
 	case account.IsGemini():

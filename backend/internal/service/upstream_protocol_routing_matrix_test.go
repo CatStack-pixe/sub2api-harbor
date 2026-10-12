@@ -323,6 +323,11 @@ func TestUpstreamProtocolRoutingMatrixMatchesMainGolden(t *testing.T) {
 	require.Len(t, golden.Results, len(cases))
 
 	var differences []string
+	var differenceRecords []struct {
+		Case string             `json:"case"`
+		Want routingObservation `json:"want"`
+		Got  routingObservation `json:"got"`
+	}
 	mismatched := 0
 	knownDifferences := 0
 	for i, tc := range cases {
@@ -339,9 +344,19 @@ func TestUpstreamProtocolRoutingMatrixMatchesMainGolden(t *testing.T) {
 			continue
 		}
 		mismatched++
+		differenceRecords = append(differenceRecords, struct {
+			Case string             `json:"case"`
+			Want routingObservation `json:"want"`
+			Got  routingObservation `json:"got"`
+		}{Case: tc.key(), Want: want, Got: got})
 		if len(differences) < 12 {
 			differences = append(differences, fmt.Sprintf("%s\nmain: %s\ncurrent: %s", tc.key(), want, got))
 		}
+	}
+	if path := os.Getenv("ROUTING_MATRIX_DIFFERENCES_OUTPUT"); path != "" {
+		report, err := json.MarshalIndent(differenceRecords, "", "  ")
+		require.NoError(t, err)
+		require.NoError(t, os.WriteFile(path, report, 0o600))
 	}
 	require.Zero(t, mismatched, "routing differs from main %s in %d cases:\n%s", golden.SourceRevision, mismatched, strings.Join(differences, "\n"))
 	// 2 account types × 4 modes × 3 probe states × 4 address configurations ×

@@ -77,16 +77,10 @@ func (a *Account) IsHeaderOverrideEligible() bool {
 	if a == nil {
 		return false
 	}
-	switch a.Platform {
-	case PlatformAnthropic, PlatformOpenAI, PlatformAgnes, PlatformDeepSeek, PlatformNvidia,
-		PlatformTokenRhythm, PlatformKimi, PlatformZhipu, PlatformChatAnywhere, PlatformGLM,
-		PlatformModelScope, PlatformDashScope, PlatformMiniMax, PlatformVolcengine, PlatformSenseNova, PlatformSenseAudio, PlatformTierflow, PlatformOpenCodeGo, PlatformCommandCode, PlatformCline:
-		return a.Type == AccountTypeAPIKey
-	case PlatformGrok:
+	if a.IsGrok() {
 		return a.Type == AccountTypeAPIKey || a.Type == AccountTypeOAuth
-	default:
-		return false
 	}
+	return (a.IsAnthropic() || a.IsOpenAICompatible() || a.IsMultiProtocolAPIKey()) && a.Type == AccountTypeAPIKey
 }
 
 // IsHeaderOverrideEnabled 报告账号是否启用了请求头覆写。

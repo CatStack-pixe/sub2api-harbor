@@ -9,6 +9,10 @@ on:
         description: Record the routing baseline from pinned pre-integration main
         type: boolean
         default: false
+      diagnose_routing:
+        description: Export detailed routing differences while all normal gates run
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -86,6 +90,33 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+  diagnose-routing:
+    if: github.event_name == 'workflow_dispatch' && inputs.diagnose_routing
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: backend/go.mod
+          check-latest: false
+          cache-dependency-path: backend/go.sum
+      - name: Generate Ent
+        working-directory: backend
+        run: go generate ./ent
+      - name: Compare historical routing
+        working-directory: backend
+        env:
+          ROUTING_MATRIX_DIFFERENCES_OUTPUT: ${{ runner.temp }}/routing-differences.json
+        run: go test -tags unit ./internal/service/ -run '^TestUpstreamProtocolRoutingMatrixMatchesMainGolden$' -count=1
+      - name: Upload detailed comparison
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: routing-diagnostic
+          path: ${{ runner.temp }}/routing-differences.json
+          if-no-files-found: error
+          retention-days: 7
+
   shell:
     runs-on: macos-15
     steps:
@@ -119,7 +150,17 @@ jobs:
         run: go generate ./ent ./cmd/server
       - name: Unit tests
         working-directory: backend
+        env:
+          ROUTING_MATRIX_DIFFERENCES_OUTPUT: ${{ runner.temp }}/routing-differences.json
         run: make test-unit
+      - name: Upload routing comparison evidence
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: routing-differences-${{ github.sha }}
+          path: ${{ runner.temp }}/routing-differences.json
+          if-no-files-found: ignore
+          retention-days: 7
       - name: Integration tests
         working-directory: backend
         run: make test-integration
