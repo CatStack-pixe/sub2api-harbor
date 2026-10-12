@@ -62,7 +62,7 @@ func TestResolveUpstreamProtocol(t *testing.T) {
 		{"kimi adaptive cc inbound", adaptive(PlatformKimi), cc, "", cc},
 		{"kimi adaptive responses inbound bridges by default", adaptive(PlatformKimi), responses, "", cc},
 		{"kimi adaptive responses inbound explicit native endpoint", routingTestAccount(PlatformKimi, AccountTypeAPIKey, map[string]any{
-			"api_protocol": APIProtocolAdaptive,
+			"api_protocol":  APIProtocolAdaptive,
 			"api_base_urls": map[string]any{APIProtocolResponses: "https://native.example/v1"},
 		}, nil), responses, "", responses},
 		{"zhipu adaptive responses inbound falls back to cc", adaptive(PlatformZhipu), responses, "", cc},

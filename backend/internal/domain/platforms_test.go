@@ -29,7 +29,7 @@ var (
 		PlatformModelScope, PlatformDashScope, PlatformMiniMax, PlatformVolcengine, PlatformSenseNova,
 		PlatformOpenCodeGo, PlatformCommandCode, PlatformCline,
 	}
-	legacyCNProviders = []string{PlatformDeepSeek, PlatformSenseAudio, PlatformKimi, PlatformZhipu, PlatformMiniMax, PlatformSenseNova}
+	legacyCNProviders    = []string{PlatformDeepSeek, PlatformSenseAudio, PlatformKimi, PlatformZhipu, PlatformMiniMax, PlatformSenseNova}
 	legacyLiteLLMByPlatf = map[string]string{
 		PlatformAnthropic: "anthropic", PlatformOpenAI: "openai", PlatformGemini: "gemini",
 		PlatformAntigravity: "anthropic", PlatformGrok: "xai", PlatformKimi: "moonshot",

@@ -1554,8 +1554,6 @@ func (a *Account) GetOpenAIBaseURL() string {
 		return SenseAudioDefaultBaseURL
 	case PlatformTierflow:
 		return TierflowDefaultBaseURL
-	case PlatformOpenCodeGo:
-		return a.openCodeDefaultChatBaseURL()
 	case PlatformCline:
 		return DefaultClineBaseURL
 	}
