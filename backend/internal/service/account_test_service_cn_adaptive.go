@@ -49,7 +49,7 @@ func (s *AccountTestService) testCNProviderAdaptiveConnection(c *gin.Context, ac
 		}
 	}
 
-	if account.Platform == PlatformDeepseek {
+	if account.UsesNativeCNResponses() {
 		if err := s.testCNProviderAdaptiveResponsesConnection(c, account, testModelID, authToken); err != nil {
 			return err
 		}
@@ -66,7 +66,7 @@ func (s *AccountTestService) testCNProviderAdaptiveAnthropicConnection(c *gin.Co
 	if err != nil {
 		return s.sendErrorAndEnd(c, fmt.Sprintf("Invalid adaptive Anthropic base URL: %s", err.Error()))
 	}
-	apiURL := strings.TrimRight(baseURL, "/") + "/v1/messages"
+	apiURL := nativeAnthropicMessagesURL(account, baseURL)
 
 	payload, err := createTestPayload(testModelID)
 	if err != nil {

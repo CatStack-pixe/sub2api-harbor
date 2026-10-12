@@ -1461,7 +1461,7 @@ func (a *Account) IsOpenAIApiKey() bool {
 // 适用 openai 与国产 OpenAI 兼容供应商（kimi/zhipu/deepseek/sensenova）；grok 走 GetGrokBaseURL，
 // 此处对 grok 返回 "" 以保持原有行为。
 func (a *Account) GetOpenAIBaseURL() string {
-	if a == nil || (!a.IsOpenAICompatible() || a.IsGrok()) {
+	if a == nil || a.IsGrok() || (!a.IsOpenAICompatible() && !a.IsMultiProtocolAPIKey()) {
 		return ""
 	}
 	if a.IsChatAnywhere() {
