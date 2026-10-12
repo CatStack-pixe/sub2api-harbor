@@ -1087,7 +1087,7 @@ func defaultOpenAIAccountTestModel(account *Account) string {
 		return GLMDefaultModelIDs()[0]
 	}
 	if account != nil && account.IsCline() {
-		if account.clinePassSubscribed() && !account.isClineWalletRateLimitActiveForKey(clinePassRateLimitKey) {
+		if account.clinePassSubscribed() && !account.isRateLimitActiveForKey(clinePassRateLimitKey) {
 			return DefaultClinePassTestModel
 		}
 		return DefaultClineTestModel

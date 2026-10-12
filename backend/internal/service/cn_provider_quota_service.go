@@ -62,6 +62,7 @@ type CNProviderQuotaProbeResult struct {
 	FetchedAt       int64         `json:"fetched_at"`
 	Persisted       bool          `json:"persisted"`
 	Error           string        `json:"error,omitempty"`
+	Balance         *CNProviderBalanceResult `json:"balance,omitempty"`
 }
 
 // CNProviderQuotaService 探测 Kimi / Zhipu Coding Plan 的滚动窗口用量。

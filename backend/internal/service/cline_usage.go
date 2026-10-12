@@ -168,9 +168,6 @@ func clineFetchFailure(err error) (status int, message string, ok bool) {
 }
 
 func clineApplicationError(err error, errPrefix string) error {
-	if isApplicationError(err) {
-		return err
-	}
 	return infraerrors.Newf(http.StatusBadGateway, errPrefix+"_REQUEST_FAILED", "%v", err)
 }
 

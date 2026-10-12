@@ -313,6 +313,10 @@ func (a *Account) IsTypeSafe() bool {
 	return a != nil && a.Platform == PlatformTypeSafe
 }
 
+func (a *Account) IsCline() bool {
+	return a != nil && a.Platform == PlatformCline
+}
+
 func (a *Account) IsVolcengine() bool {
 	return a != nil && a.Platform == PlatformVolcengine
 }
