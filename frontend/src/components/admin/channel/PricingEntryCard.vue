@@ -324,7 +324,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onBeforeUnmount, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Select from '@/components/common/Select.vue'
 import Icon from '@/components/icons/Icon.vue'
@@ -360,6 +360,34 @@ const emit = defineEmits<{
 
 // Collapse state: entries with existing models default to collapsed
 const collapsed = ref(props.entry.models.length > 0)
+const defaultPriceFields = [
+  'input_price', 'output_price', 'cache_write_price', 'cache_write_1h_price',
+  'cache_read_price', 'image_input_price', 'image_output_price'
+] as const
+const defaultPriceContext = computed(() => JSON.stringify([
+  props.platform,
+  props.entry.billing_mode,
+  defaultPriceFields.map(field => props.entry[field] ?? null)
+]))
+let defaultPriceVersion = 0
+let pendingDefaultPriceModels: string | null = null
+
+function invalidateDefaultPriceLookup() {
+  defaultPriceVersion += 1
+  pendingDefaultPriceModels = null
+}
+
+watch(defaultPriceContext, invalidateDefaultPriceLookup, { flush: 'sync' })
+watch(
+  () => JSON.stringify(props.entry.models),
+  models => {
+    if (pendingDefaultPriceModels !== null && models !== pendingDefaultPriceModels) {
+      invalidateDefaultPriceLookup()
+    }
+  },
+  { flush: 'sync' }
+)
+onBeforeUnmount(invalidateDefaultPriceLookup)
 
 const billingModeOptions = computed(() => [
   { value: 'token', label: t('admin.channels.billingMode.token') },
@@ -453,28 +481,37 @@ function removeTimeWindow(idx: number) {
 }
 
 async function onModelsUpdate(newModels: string[]) {
-  const oldModels = props.entry.models
-  emit('update', { ...props.entry, models: newModels })
+  invalidateDefaultPriceLookup()
+  const version = defaultPriceVersion
+  const context = defaultPriceContext.value
+  const entry = props.entry
+  const oldModels = [...entry.models]
+  const models = [...newModels]
+  emit('update', { ...entry, models })
 
   // 仅在「空条目首次加入单个模型」时自动填充默认价：
   // 条目已有模型时（即使价格留空、按各模型的官方默认价回退）追加模型不应改写整条价格，
   // 一次加入多个模型也不应把第一个模型的价格套用到整条，否则条目内所有模型都会被静默改价。
-  const addedModels = newModels.filter(m => !oldModels.includes(m))
+  const addedModels = models.filter(m => !oldModels.includes(m))
   if (oldModels.length !== 0 || addedModels.length !== 1) return
 
   // 检查是否所有价格字段都为空
-  const e = props.entry
-  const hasPrice = e.input_price != null || e.output_price != null ||
-                   e.cache_write_price != null || e.cache_write_1h_price != null || e.cache_read_price != null
+  const hasPrice = defaultPriceFields.some(field => entry[field] != null)
   if (hasPrice) return
+  const expectedModels = JSON.stringify(models)
+  pendingDefaultPriceModels = expectedModels
 
   // 查询第一个新增模型的默认价格
   try {
     const result = await channelsAPI.getModelDefaultPricing(addedModels[0])
+    if (
+      version !== defaultPriceVersion ||
+      context !== defaultPriceContext.value ||
+      JSON.stringify(props.entry.models) !== expectedModels
+    ) return
     if (result.found) {
       emit('update', {
         ...props.entry,
-        models: newModels,
         input_price: perTokenToMTok(result.input_price ?? null),
         output_price: perTokenToMTok(result.output_price ?? null),
         cache_write_price: perTokenToMTok(result.cache_write_price ?? null),
@@ -487,6 +524,8 @@ async function onModelsUpdate(newModels: string[]) {
     }
   } catch {
     // 查询失败不影响用户操作
+  } finally {
+    if (version === defaultPriceVersion) pendingDefaultPriceModels = null
   }
 }
 </script>

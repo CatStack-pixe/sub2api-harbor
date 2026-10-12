@@ -324,7 +324,7 @@ func routingMatrixUpstreamFixExpectation(tc routingMatrixCase) (string, routingO
 	if model == "gemini-3.8-flash" || model == "jev-1.13" {
 		expected := routingObservation{
 			Error: "opencode unsupported model: " + model, Status: http.StatusBadRequest,
-			ClientErrorType: "invalid_request_error",
+			ClientErrorType:    "invalid_request_error",
 			ClientErrorMessage: fmt.Sprintf("Model '%s' is not supported on OpenCode standard gateway (gemini models require Google SDK endpoint, jev models require System One endpoint)", model),
 		}
 		if tc.ingress.name != "messages" {
