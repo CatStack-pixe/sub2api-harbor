@@ -107,13 +107,17 @@ jobs:
         working-directory: backend
         env:
           ROUTING_MATRIX_DIFFERENCES_OUTPUT: ${{ runner.temp }}/routing-differences.json
-        run: go test -tags unit ./internal/service/ -run '^(TestUpstreamProtocolRoutingMatrixMatchesMainGolden|TestWalletErrorsForwardingMapsModelOnce|TestClineWalletWriteFailuresStayIsolatedThroughForwarding|TestClineUsageProbe.*|TestHandleUpstreamError_Cline.*)$' -count=1
+        run: |
+          set -o pipefail
+          go test -tags unit ./internal/service/ -run '^(TestUpstreamProtocolRoutingMatrixMatchesMainGolden|TestWalletErrorsForwardingMapsModelOnce|TestClineWalletWriteFailuresStayIsolatedThroughForwarding|TestClineUsageProbe.*|TestHandleUpstreamError_Cline.*)$' -count=1 2>&1 | tee "${{ runner.temp }}/provider-diagnostic.log"
       - name: Upload detailed comparison
         if: always()
         uses: actions/upload-artifact@v7
         with:
           name: routing-diagnostic
-          path: ${{ runner.temp }}/routing-differences.json
+          path: |
+            ${{ runner.temp }}/routing-differences.json
+            ${{ runner.temp }}/provider-diagnostic.log
           if-no-files-found: error
           retention-days: 7
 

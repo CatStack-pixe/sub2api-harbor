@@ -53,6 +53,18 @@ func TestWalletErrorsForwardingMapsModelOnce(t *testing.T) {
 					Header:     make(http.Header),
 					Body:       io.NopCloser(strings.NewReader(tc.body)),
 				}}
+				expectedRequests := 1
+				if account.IsCommandCode() {
+					// Each ingress starts with an isolated, cold model catalog.
+					// Its discovery request precedes the wallet-limited inference.
+					account.Credentials["api_key"] = "wallet-audit-" + ingress.name
+					upstream.responses = []*http.Response{
+						newJSONResponse(http.StatusOK, `{"data":[{"id":"glm-5","supported_endpoints":["/chat/completions"]}]}`),
+						upstream.resp,
+					}
+					upstream.resp = nil
+					expectedRequests = 2
+				}
 				repo := &commandCodeRateLimitRepo{}
 				cfg := rawChatCompletionsTestConfig()
 				svc := &OpenAIGatewayService{
@@ -66,7 +78,12 @@ func TestWalletErrorsForwardingMapsModelOnce(t *testing.T) {
 				var failover *UpstreamFailoverError
 				require.ErrorAs(t, err, &failover)
 				require.Equal(t, http.StatusTooManyRequests, failover.StatusCode)
-				require.Len(t, upstream.requests, 1)
+				require.Len(t, upstream.requests, expectedRequests)
+				if account.IsCommandCode() {
+					require.Equal(t, http.MethodGet, upstream.requests[0].Method)
+					require.True(t, strings.HasSuffix(upstream.requests[0].URL.Path, "/models"))
+				}
+				require.Equal(t, http.MethodPost, upstream.lastReq.Method)
 				require.True(t, strings.HasSuffix(upstream.lastReq.URL.Path, "/chat/completions"), upstream.lastReq.URL.String())
 				require.Equal(t, tc.model, gjson.GetBytes(upstream.lastBody, "model").String())
 				require.Len(t, repo.modelLimits, 1)
