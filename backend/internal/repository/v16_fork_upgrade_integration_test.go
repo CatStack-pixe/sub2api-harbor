@@ -162,9 +162,9 @@ VALUES ($1, $2, $3, $4, 'v16-harbor-trace', 'v16-harbor-session', 'v16-upstream-
 	_, err = tx.ExecContext(ctx, `
 INSERT INTO ops_error_logs (
  user_id, api_key_id, account_id, group_id, request_id, client_request_id,
- session_id, upstream_request_id, platform, model, error_phase, error_type, error_message)
+ session_id, upstream_errors, platform, model, error_phase, error_type, error_message)
 VALUES ($1, $2, $3, $4, 'v16-harbor-trace', 'v16-client-trace',
- 'v16-harbor-session', 'v16-upstream-trace', 'openai', 'harbor-public',
+ 'v16-harbor-session', '[{"request_id":"v16-upstream-trace","status_code":502}]', 'openai', 'harbor-public',
  'upstream', 'upstream_error', 'saved diagnostic detail')`, userID, keyID, firstAccountID, firstGroupID)
 	require.NoError(t, err)
 
