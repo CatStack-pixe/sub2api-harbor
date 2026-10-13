@@ -109,7 +109,12 @@ jobs:
           ROUTING_MATRIX_DIFFERENCES_OUTPUT: ${{ runner.temp }}/routing-differences.json
         run: |
           set -o pipefail
-          go test -tags unit ./internal/service/ -run '^(TestUpstreamProtocolRoutingMatrixMatchesMainGolden|TestWalletErrorsForwardingMapsModelOnce|TestClineWalletWriteFailuresStayIsolatedThroughForwarding|TestClineUsageProbe.*|TestHandleUpstreamError_Cline.*)$' -count=1 2>&1 | tee "${{ runner.temp }}/provider-diagnostic.log"
+          go test -tags unit ./internal/service/ -run '^(TestUpstreamProtocolRoutingMatrixMatchesMainGolden|TestWalletErrorsForwardingMapsModelOnce|TestClineWalletWriteFailuresStayIsolatedThroughForwarding|TestClineUsageProbe.*|TestHandleUpstreamError_Cline.*|TestReserveFixedCharge.*|TestGeminiCachedContent.*|TestOpenAIGatewayServiceRecordUsage_GPT61Sol.*)$' -count=1 2>&1 | tee "${{ runner.temp }}/provider-diagnostic.log"
+      - name: Check cache mutation and billing regressions
+        working-directory: backend
+        run: |
+          set -o pipefail
+          go test -tags unit ./internal/handler/ -run '^TestGeminiCachedContents' -count=1 2>&1 | tee "${{ runner.temp }}/cache-handler-diagnostic.log"
       - name: Upload detailed comparison
         if: always()
         uses: actions/upload-artifact@v7
@@ -118,6 +123,7 @@ jobs:
           path: |
             ${{ runner.temp }}/routing-differences.json
             ${{ runner.temp }}/provider-diagnostic.log
+            ${{ runner.temp }}/cache-handler-diagnostic.log
           if-no-files-found: error
           retention-days: 7
 

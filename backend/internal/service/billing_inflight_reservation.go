@@ -26,6 +26,13 @@ type InflightBalanceReservationCache interface {
 	ReleaseInflightBalance(ctx context.Context, userID int64, requestID string) error
 }
 
+// InflightStrictBalanceReservationCache optionally enforces full coverage for fixed charges,
+// including the first reservation. Estimated inference retains its first-request allowance.
+type InflightStrictBalanceReservationCache interface {
+	InflightBalanceReservationCache
+	ReserveInflightBalanceStrict(ctx context.Context, userID int64, requestID string, amount, balance float64, ttl time.Duration) (bool, float64, error)
+}
+
 // InflightScopeReservationCache 订阅 / API Key 维度在途预留的缓存能力（可选），用于扣费前即可确定金额的费用；
 // 未实现时这两个维度不登记预留（fail-open），准入仍按库中用量校验。
 type InflightScopeReservationCache interface {
@@ -235,7 +242,7 @@ func (s *BillingCacheService) InflightReservationFailClosedOnUnpriced() bool {
 
 // ReserveInflightBalance 简化封装：返回释放函数，不续期、不做计费交接（预留最长存活 TTL）。
 func (s *BillingCacheService) ReserveInflightBalance(ctx context.Context, user *User, group *Group, subscription *UserSubscription, estimate float64) (func(), error) {
-	r, err := s.reserveInflight(ctx, user, group, subscription, estimate, false, true)
+	r, err := s.reserveInflight(ctx, user, group, subscription, estimate, false, true, false)
 	if err != nil {
 		return noopRelease, err
 	}
@@ -254,7 +261,7 @@ func (s *BillingCacheService) ReserveInflightBalance(ctx context.Context, user *
 // 开关关闭 / 简易模式 / 订阅模式 / estimate <= 0 / 缓存不支持 / 余额读取失败 / Redis 执行失败。
 // 仅当 Redis 明确判定 缓存余额 - 在途合计 < estimate（且已有在途请求）时返回 ErrInsufficientBalance。
 func (s *BillingCacheService) ReserveInflight(ctx context.Context, user *User, group *Group, subscription *UserSubscription, estimate float64) (*InflightReservation, error) {
-	return s.reserveInflight(ctx, user, group, subscription, estimate, true, true)
+	return s.reserveInflight(ctx, user, group, subscription, estimate, true, true, false)
 }
 
 // inflightSubscriptionScope / inflightAPIKeyScope 是订阅 / API Key 维度在途预留的 scope 名。
@@ -297,7 +304,7 @@ func (s *BillingCacheService) reserveInflightScope(ctx context.Context, res *Inf
 	return res, pending
 }
 
-func (s *BillingCacheService) reserveInflight(ctx context.Context, user *User, group *Group, subscription *UserSubscription, estimate float64, renew, capped bool) (*InflightReservation, error) {
+func (s *BillingCacheService) reserveInflight(ctx context.Context, user *User, group *Group, subscription *UserSubscription, estimate float64, renew, capped, strict bool) (*InflightReservation, error) {
 	cfg, ok := s.inflightReservationConfig()
 	if !ok || user == nil {
 		return nil, nil
@@ -322,13 +329,24 @@ func (s *BillingCacheService) reserveInflight(ctx context.Context, user *User, g
 		return nil, nil
 	}
 
+	// Fixed charges must also cover the fresh balance read after their initial admission check.
+	if strict && balance < estimate {
+		return nil, ErrInsufficientBalance
+	}
+
+	reserve := rc.ReserveInflightBalance
+	if strict {
+		if strictCache, ok := s.cache.(InflightStrictBalanceReservationCache); ok {
+			reserve = strictCache.ReserveInflightBalanceStrict
+		}
+	}
 	ttl := defaultInflightReservationTTL
 	if cfg.TTLSeconds > 0 {
 		ttl = time.Duration(cfg.TTLSeconds) * time.Second
 	}
 	requestID := uuid.NewString()
 	reserveCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), inflightReservationReserveTimeout)
-	allowed, inflight, err := rc.ReserveInflightBalance(reserveCtx, user.ID, requestID, estimate, balance, ttl)
+	allowed, inflight, err := reserve(reserveCtx, user.ID, requestID, estimate, balance, ttl)
 	cancel()
 	if err != nil {
 		logger.LegacyPrintf("service.billing_cache", "Warning: inflight reservation failed for user %d (fail-open): %v", user.ID, err)
@@ -341,6 +359,19 @@ func (s *BillingCacheService) reserveInflight(ctx context.Context, user *User, g
 
 	r := &InflightReservation{cache: rc, userID: user.ID, requestID: requestID, amount: estimate, ttl: ttl}
 	r.refs.Store(1)
+	if strict {
+		// Hold the reservation while rereading: another charge may settle and release between
+		// the pre-registration balance read and Lua. Also enforce coverage for legacy caches.
+		balance, err = s.GetUserBalance(ctx, user.ID)
+		if err != nil {
+			r.Release()
+			return nil, ErrBillingServiceUnavailable.WithCause(err)
+		}
+		if balance-inflight < estimate {
+			r.Release()
+			return nil, ErrInsufficientBalance
+		}
+	}
 	if renewer, ok := s.cache.(InflightBalanceReservationRenewer); renew && ok && renewer != nil {
 		r.startRenewal(renewer)
 	}

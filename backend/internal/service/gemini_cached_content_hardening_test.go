@@ -478,3 +478,138 @@ func TestReserveFixedCharge(t *testing.T) {
 		require.NoError(t, reserve(svc, nil, nil, nil, 1000))
 	})
 }
+
+// fixedChargeBalanceSequenceCache models settled debits between admission, registration and revalidation.
+// It deliberately provides only the legacy optional reservation interface.
+type fixedChargeBalanceSequenceCache struct {
+	*fixedChargeCacheStub
+	balances     []float64
+	balanceReads int
+	reserveCalls int
+}
+
+func (s *fixedChargeBalanceSequenceCache) GetUserBalance(context.Context, int64) (float64, error) {
+	balance := s.balances[s.balanceReads]
+	s.balanceReads++
+	return balance, nil
+}
+
+func (s *fixedChargeBalanceSequenceCache) ReserveInflightBalance(ctx context.Context, userID int64, requestID string, amount, balance float64, ttl time.Duration) (bool, float64, error) {
+	s.reserveCalls++
+	return s.fixedChargeCacheStub.ReserveInflightBalance(ctx, userID, requestID, amount, balance, ttl)
+}
+
+// fixedChargeStrictCacheStub exposes the strict mode without changing the legacy mode.
+type fixedChargeStrictCacheStub struct {
+	*fixedChargeCacheStub
+	strictCalls int
+}
+
+func (s *fixedChargeStrictCacheStub) ReserveInflightBalanceStrict(_ context.Context, userID int64, requestID string, amount, balance float64, _ time.Duration) (bool, float64, error) {
+	s.strictCalls++
+	key := fmt.Sprintf("user:%d", userID)
+	others := s.reserve(key, requestID, amount)
+	if balance-others < amount {
+		delete(s.reserved[key], requestID)
+		return false, others, nil
+	}
+	return true, others, nil
+}
+
+// A legacy cache may admit before returning its pending sum; fixed charges must undo that admission.
+type fixedChargePermissiveCacheStub struct {
+	*fixedChargeCacheStub
+}
+
+func (s *fixedChargePermissiveCacheStub) ReserveInflightBalance(_ context.Context, userID int64, requestID string, amount, _ float64, _ time.Duration) (bool, float64, error) {
+	return true, s.reserve(fmt.Sprintf("user:%d", userID), requestID, amount), nil
+}
+
+func TestReserveFixedCharge_StrictBalanceReservation(t *testing.T) {
+	ctx := context.Background()
+	user := &User{ID: 1}
+	newSvc := func(cache BillingCache, maxReservation float64) *BillingCacheService {
+		cfg := &config.Config{}
+		cfg.Billing.InflightReservation.Enabled = true
+		cfg.Billing.InflightReservation.MaxReservationUSD = maxReservation
+		svc := NewBillingCacheService(cache, nil, nil, nil, nil, nil, cfg, nil)
+		t.Cleanup(svc.Stop)
+		return svc
+	}
+
+	t.Run("settled debit before reservation rejects an empty set", func(t *testing.T) {
+		cache := &fixedChargeBalanceSequenceCache{
+			fixedChargeCacheStub: &fixedChargeCacheStub{},
+			balances:             []float64{100, 10},
+		}
+		svc := newSvc(cache, 0)
+		apiKey := &APIKey{ID: 5, UserID: user.ID}
+		group := &Group{ID: 2, SubscriptionType: SubscriptionTypeStandard}
+		res, err := svc.ReserveFixedCharge(ctx, user, apiKey, group, nil, 90)
+		t.Cleanup(res.Release)
+		require.ErrorIs(t, err, ErrInsufficientBalance)
+		require.Nil(t, res)
+		require.Equal(t, 2, cache.balanceReads)
+		require.Zero(t, cache.reserveCalls, "an insufficient fresh balance must reject before registering")
+		require.Empty(t, cache.reserved)
+	})
+
+	t.Run("settled debit between balance read and registration releases the hold", func(t *testing.T) {
+		cache := &fixedChargeBalanceSequenceCache{
+			fixedChargeCacheStub: &fixedChargeCacheStub{},
+			balances:             []float64{100, 100, 10},
+		}
+		svc := newSvc(cache, 0)
+		res, err := svc.ReserveFixedCharge(ctx, user, nil, nil, nil, 90)
+		t.Cleanup(res.Release)
+		require.ErrorIs(t, err, ErrInsufficientBalance)
+		require.Nil(t, res)
+		require.Equal(t, 3, cache.balanceReads)
+		require.Equal(t, 1, cache.reserveCalls)
+		require.Empty(t, cache.reserved["user:1"], "failed coverage must release the newly registered hold")
+	})
+
+	t.Run("fixed charge selects strict mode without the estimate cap", func(t *testing.T) {
+		cache := &fixedChargeStrictCacheStub{fixedChargeCacheStub: &fixedChargeCacheStub{balance: 100}}
+		svc := newSvc(cache, 1)
+		res, err := svc.ReserveFixedCharge(ctx, user, nil, nil, nil, 90)
+		t.Cleanup(res.Release)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+		require.Equal(t, 1, cache.strictCalls)
+		require.Equal(t, 90.0, cache.reserved["user:1"][res.requestID])
+		second, err := svc.ReserveFixedCharge(ctx, user, nil, nil, nil, 90)
+		t.Cleanup(second.Release)
+		require.ErrorIs(t, err, ErrInsufficientBalance)
+		require.Nil(t, second)
+		require.Equal(t, 2, cache.strictCalls)
+		require.Len(t, cache.reserved["user:1"], 1)
+		res.Release()
+		require.Empty(t, cache.reserved["user:1"])
+	})
+
+	t.Run("estimated inference retains its first reservation allowance", func(t *testing.T) {
+		cache := &fixedChargeStrictCacheStub{fixedChargeCacheStub: &fixedChargeCacheStub{balance: 10}}
+		svc := newSvc(cache, 0)
+		release, err := svc.ReserveInflightBalance(ctx, user, nil, nil, 90)
+		t.Cleanup(release)
+		require.NoError(t, err)
+		require.Zero(t, cache.strictCalls)
+		require.Len(t, cache.reserved["user:1"], 1)
+		_, err = svc.ReserveInflightBalance(ctx, user, nil, nil, 1)
+		require.ErrorIs(t, err, ErrInsufficientBalance)
+		release()
+		require.Empty(t, cache.reserved["user:1"])
+	})
+
+	t.Run("legacy cache admission is released when pending funds do not fit", func(t *testing.T) {
+		cache := &fixedChargePermissiveCacheStub{fixedChargeCacheStub: &fixedChargeCacheStub{balance: 100}}
+		cache.reserve("user:1", "held", 20)
+		svc := newSvc(cache, 0)
+		res, err := svc.ReserveFixedCharge(ctx, user, nil, nil, nil, 90)
+		t.Cleanup(res.Release)
+		require.ErrorIs(t, err, ErrInsufficientBalance)
+		require.Nil(t, res)
+		require.Equal(t, map[string]float64{"held": 20}, cache.reserved["user:1"])
+	})
+}

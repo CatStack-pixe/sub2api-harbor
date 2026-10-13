@@ -814,7 +814,7 @@ func (s *BillingCacheService) ReserveFixedCharge(ctx context.Context, user *User
 			return nil, ErrInsufficientBalance
 		}
 	}
-	res, err := s.reserveInflight(ctx, user, group, subscription, amount, false, false)
+	res, err := s.reserveInflight(ctx, user, group, subscription, amount, false, false, true)
 	if err != nil {
 		return nil, err
 	}

@@ -41,10 +41,10 @@ func billingInflightScopeKeys(scope string) (string, string) {
 
 var (
 	// KEYS: [1]=zset [2]=hash
-	// ARGV: [1]=now_ms [2]=expire_at_ms [3]=member [4]=amount [5]=balance [6]=key_ttl_ms
+	// ARGV: [1]=now_ms [2]=expire_at_ms [3]=member [4]=amount [5]=balance [6]=key_ttl_ms [7]=strict (optional, defaults to 0)
 	// 返回 {allowed, inflight_sum(string), inflight_count}
-	// 规则：先清理已过期成员；若无在途预留则直接放行（与旧行为一致，外层已校验余额 > 阈值）；
-	// 否则要求 balance - sum(在途) >= amount。放行时登记预留。
+	// After pruning, require balance - sum(inflight) >= amount when strict=1 or another request is pending.
+	// Otherwise preserve the estimated-inference first-reservation allowance. Register only when allowed.
 	reserveInflightBalanceScript = redis.NewScript(`
 		local now = tonumber(ARGV[1])
 		local expired = redis.call('ZRANGEBYSCORE', KEYS[1], '-inf', now)
@@ -60,7 +60,8 @@ var (
 		local count = redis.call('ZCARD', KEYS[1])
 		local amount = tonumber(ARGV[4])
 		local balance = tonumber(ARGV[5])
-		if count > 0 and (balance - sum) < amount then
+		local strict = tonumber(ARGV[7] or '0') == 1
+		if (strict or count > 0) and (balance - sum) < amount then
 			return {0, tostring(sum), count}
 		end
 		redis.call('ZADD', KEYS[1], tonumber(ARGV[2]), ARGV[3])
@@ -125,11 +126,24 @@ var (
 
 // ReserveInflightBalance 实现 service.InflightBalanceReservationCache。
 func (c *billingCache) ReserveInflightBalance(ctx context.Context, userID int64, requestID string, amount, balance float64, ttl time.Duration) (bool, float64, error) {
+	return c.reserveInflightBalance(ctx, userID, requestID, amount, balance, ttl, false)
+}
+
+// ReserveInflightBalanceStrict requires full balance coverage for every fixed-charge reservation.
+func (c *billingCache) ReserveInflightBalanceStrict(ctx context.Context, userID int64, requestID string, amount, balance float64, ttl time.Duration) (bool, float64, error) {
+	return c.reserveInflightBalance(ctx, userID, requestID, amount, balance, ttl, true)
+}
+
+func (c *billingCache) reserveInflightBalance(ctx context.Context, userID int64, requestID string, amount, balance float64, ttl time.Duration, strict bool) (bool, float64, error) {
 	zkey, hkey := billingInflightKeys(userID)
 	now := time.Now().UnixMilli()
 	ttlMs := ttl.Milliseconds()
 	if ttlMs <= 0 {
 		ttlMs = 1
+	}
+	strictArg := 0
+	if strict {
+		strictArg = 1
 	}
 	res, err := reserveInflightBalanceScript.Run(ctx, c.rdb, []string{zkey, hkey},
 		now,
@@ -138,6 +152,7 @@ func (c *billingCache) ReserveInflightBalance(ctx context.Context, userID int64,
 		strconv.FormatFloat(amount, 'f', -1, 64),
 		strconv.FormatFloat(balance, 'f', -1, 64),
 		ttlMs,
+		strictArg,
 	).Slice()
 	if err != nil {
 		return false, 0, err
@@ -202,7 +217,8 @@ func (c *billingCache) ReleaseInflightScope(ctx context.Context, scope, requestI
 }
 
 var (
-	_ service.InflightBalanceReservationCache   = (*billingCache)(nil)
-	_ service.InflightBalanceReservationRenewer = (*billingCache)(nil)
-	_ service.InflightScopeReservationCache     = (*billingCache)(nil)
+	_ service.InflightBalanceReservationCache       = (*billingCache)(nil)
+	_ service.InflightStrictBalanceReservationCache = (*billingCache)(nil)
+	_ service.InflightBalanceReservationRenewer     = (*billingCache)(nil)
+	_ service.InflightScopeReservationCache         = (*billingCache)(nil)
 )

@@ -864,7 +864,7 @@ func (s *GeminiCachedContentService) rollbackUpstream(ctx context.Context, recor
 	if remaining < time.Second {
 		err = s.DeleteUpstream(ctx, account, record)
 	} else {
-		_, err = s.PatchUpstream(ctx, account, record, remaining)
+		_, err = s.PatchUpstreamUntil(ctx, account, record, record.ExpireTime)
 	}
 	var upErr *GeminiCachedContentUpstreamError
 	if errors.As(err, &upErr) && upErr.NotFound() {

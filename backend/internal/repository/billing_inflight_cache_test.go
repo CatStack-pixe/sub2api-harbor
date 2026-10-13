@@ -354,3 +354,46 @@ func TestReserveFixedCharge_ConcurrentChargesAdmitOnlyWhatAPIKeyQuotaCovers(t *t
 	require.Zero(t, remaining)
 	require.Equal(t, int64(0), inflightCount(t, cache, user.ID))
 }
+
+func TestInflightReservation_StrictFixedChargeCoverage(t *testing.T) {
+	_, cache, _ := newInflightTestEnv(t, true, 60)
+	ctx := context.Background()
+	userID := int64(80)
+	zkey, hkey := billingInflightKeys(userID)
+
+	allowed, pending, err := cache.ReserveInflightBalanceStrict(ctx, userID, "insufficient", 90, 10, time.Minute)
+	require.NoError(t, err)
+	require.False(t, allowed, "strict mode requires coverage even when no reservation exists")
+	require.Zero(t, pending)
+	require.Zero(t, inflightCount(t, cache, userID))
+	require.Zero(t, cache.rdb.HLen(ctx, hkey).Val())
+
+	allowed, pending, err = cache.ReserveInflightBalanceStrict(ctx, userID, "exact", 90, 90, time.Minute)
+	require.NoError(t, err)
+	require.True(t, allowed, "exact coverage is sufficient")
+	require.Zero(t, pending)
+	allowed, pending, err = cache.ReserveInflightBalanceStrict(ctx, userID, "over", 1, 90, time.Minute)
+	require.NoError(t, err)
+	require.False(t, allowed)
+	require.Equal(t, 90.0, pending)
+	require.Equal(t, int64(1), inflightCount(t, cache, userID))
+	require.Equal(t, int64(1), cache.rdb.HLen(ctx, hkey).Val())
+	require.NoError(t, cache.ReleaseInflightBalance(ctx, userID, "exact"))
+
+	// Pruning the last expired reservation must not restore the legacy allowance in strict mode.
+	require.NoError(t, cache.rdb.ZAdd(ctx, zkey, redis.Z{Score: float64(time.Now().UnixMilli() - 1000), Member: "expired"}).Err())
+	require.NoError(t, cache.rdb.HSet(ctx, hkey, "expired", "90").Err())
+	allowed, pending, err = cache.ReserveInflightBalanceStrict(ctx, userID, "after-expiry", 90, 10, time.Minute)
+	require.NoError(t, err)
+	require.False(t, allowed)
+	require.Zero(t, pending)
+	require.Zero(t, inflightCount(t, cache, userID))
+	require.Zero(t, cache.rdb.HLen(ctx, hkey).Val())
+
+	allowed, pending, err = cache.ReserveInflightBalance(ctx, userID, "estimated", 90, 10, time.Minute)
+	require.NoError(t, err)
+	require.True(t, allowed, "the legacy estimated-inference first reservation remains admitted")
+	require.Zero(t, pending)
+	require.NoError(t, cache.ReleaseInflightBalance(ctx, userID, "estimated"))
+	require.Zero(t, inflightCount(t, cache, userID))
+}

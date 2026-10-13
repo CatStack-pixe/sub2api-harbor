@@ -198,9 +198,9 @@ type cachedBillingUpstream struct {
 	createBody string
 	calls      []string
 	// patchTTLs 按顺序记录 PATCH 请求体中的 ttl。
-	patchTTLs  []string
+	patchTTLs        []string
 	patchExpirations []time.Time
-	beforePost func(n int)
+	beforePost       func(n int)
 	// failures 按请求方法返回上游错误响应；transportErrors 按请求方法返回传输层错误（上游结果未知）。
 	failures        map[string]cachedBillingUpstreamFailure
 	transportErrors map[string]error
@@ -213,7 +213,7 @@ type cachedBillingUpstreamFailure struct {
 
 func (u *cachedBillingUpstream) Do(req *http.Request, _ string, _ int64, _ int) (*http.Response, error) {
 	var patch struct {
-		TTL string `json:"ttl"`
+		TTL        string    `json:"ttl"`
 		ExpireTime time.Time `json:"expireTime"`
 	}
 	if req.Method == http.MethodPatch {
@@ -250,7 +250,7 @@ func (u *cachedBillingUpstream) Do(req *http.Request, _ string, _ int64, _ int) 
 		seconds, _ := strconv.ParseInt(strings.TrimSuffix(patch.TTL, "s"), 10, 64)
 		expireTime := patch.ExpireTime
 		if expireTime.IsZero() {
-			expireTime = time.Now().Add(time.Duration(seconds)*time.Second)
+			expireTime = time.Now().Add(time.Duration(seconds) * time.Second)
 		}
 		body = fmt.Sprintf(`{"name":"cachedContents/up1","expireTime":%q}`, expireTime.UTC().Format(time.RFC3339Nano))
 	}
@@ -773,16 +773,20 @@ func TestGeminiCachedContentsCreate_UnknownPostOutcomeDoesNotAllocateOnAnotherAc
 func TestGeminiCachedContentsPatch_AbsoluteExpiryKeepsChargeWithinQuotedHeadroom(t *testing.T) {
 	for _, shortening := range []bool{false, true} {
 		t.Run(fmt.Sprintf("shortening=%t", shortening), func(t *testing.T) {
+			balance := 4.505
+			if shortening {
+				balance = 0.001
+			}
+			// Infrastructure owns background cache janitors. Keep those outside
+			// the virtual-time bubble; only the request's transport delay advances.
+			env := newCachedBillingEnv(t, balance, 900)
 			synctest.Test(t, func(t *testing.T) {
-				balance := 4.505
 				baseline := time.Now().Add(time.Hour)
 				ttl := "7200s"
 				if shortening {
-					balance = 0.001
 					baseline = time.Now().Add(time.Hour + 5*time.Second)
 					ttl = "3600s"
 				}
-				env := newCachedBillingEnv(t, balance, 900)
 				env.seed(baseline)
 				env.upstream.beforePost = func(int) { time.Sleep(10 * time.Second) }
 				before := time.Now()
@@ -792,7 +796,8 @@ func TestGeminiCachedContentsPatch_AbsoluteExpiryKeepsChargeWithinQuotedHeadroom
 				if shortening {
 					target = before.Add(time.Hour)
 				}
-				require.Equal(t, []time.Time{target}, env.upstream.patchExpirations)
+				require.Len(t, env.upstream.patchExpirations, 1)
+				require.True(t, env.upstream.patchExpirations[0].Equal(target))
 				require.True(t, env.repo.records["abc"].ExpireTime.Equal(target))
 				require.False(t, env.repo.pendingMutation(100))
 				if shortening {
