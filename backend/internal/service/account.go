@@ -1518,6 +1518,12 @@ func (a *Account) GetOpenAIBaseURL() string {
 				}
 				return KimiDefaultBaseURL
 			}
+			if a.GetAccountMode() == AccountModeCoding {
+				baseURL := strings.TrimRight(strings.TrimSpace(a.GetCredential("base_url")), "/")
+				if isKimiCodingBaseURL(baseURL) {
+					return baseURL
+				}
+			}
 		}
 		if a.IsAdaptiveAPIProtocol() {
 			if baseURLs, ok := a.Credentials["api_base_urls"].(map[string]any); ok {
@@ -1775,13 +1781,16 @@ func (a *Account) GetCodingPlanProvider() string {
 	// inspect an explicit base_url before that fallback so those domains are
 	// rejected by the outbound URL policy instead of probing the official host.
 	if a.Platform == PlatformKimi {
+		quotaBaseURL := a.GetOpenAIBaseURL()
 		if configured := strings.TrimRight(strings.TrimSpace(a.GetCredential("base_url")), "/"); configured != "" {
-			baseURL = strings.ToLower(configured)
+			quotaBaseURL = configured
 		}
+		if isKimiCodingBaseURL(quotaBaseURL) {
+			return PlatformKimi
+		}
+		return ""
 	}
 	switch {
-	case isKimiCodingBaseURL(a.GetOpenAIBaseURL()):
-		return PlatformKimi
 	case strings.Contains(baseURL, "bigmodel.cn"), strings.Contains(baseURL, "api.z.ai"):
 		return PlatformZhipu
 	case strings.Contains(baseURL, "minimax.io"),
