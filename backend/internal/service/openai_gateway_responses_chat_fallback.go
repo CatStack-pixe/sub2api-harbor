@@ -147,7 +147,7 @@ func (s *OpenAIGatewayService) forwardResponsesViaRawChatCompletions(
 	if resp.StatusCode >= 400 {
 		respBody, upstreamMsg := s.readOpenAIUpstreamError(resp)
 		if s.activateAgnesQuotaFallback(account, upstreamModel, resp.StatusCode, respBody, time.Now()) {
-			return s.forwardResponsesViaRawChatCompletions(ctx, c, account, body)
+			return s.forwardResponsesViaRawChatCompletions(ctx, c, account, body, startTime)
 		}
 		if account.IsNvidia() {
 			return nil, s.handleOpenAINvidiaResponsesHTTPError(c, account, resp, respBody, upstreamMsg)

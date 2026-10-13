@@ -1041,7 +1041,7 @@ func (s *GatewayService) QuoteUsageCost(ctx context.Context, input *RecordUsageI
 	}
 	multiplier, imageMultiplier, pricingAt := s.recordUsageMultipliers(ctx, input.APIKey, user, input.PricingAt)
 	billingModel := s.recordUsageBillingModel(ctx, input.APIKey, input.Result, input.ChannelUsageFields)
-	cost := s.calculateRecordUsageCost(ctx, input.Result, input.APIKey, billingModel, multiplier, imageMultiplier, pricingAt)
+	cost := s.calculateRecordUsageCost(ctx, input.Result, input.APIKey, billingModel, multiplier, imageMultiplier, pricingAt, &recordUsageOpts{})
 	if cost == nil {
 		return 0
 	}
