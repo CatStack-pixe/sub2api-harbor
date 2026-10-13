@@ -955,7 +955,7 @@ func GeminiCachedContentUpstreamModelResource(account *Account, mappedModel stri
 func (s *GeminiCachedContentService) CreateUpstream(ctx context.Context, account *Account, req *GeminiCachedContentCreateRequest, mappedModel, publicID string, ttl time.Duration) (*GeminiCachedContentUpstream, error) {
 	upstreamModel, err := GeminiCachedContentUpstreamModelResource(account, mappedModel)
 	if err != nil {
-		return nil, err
+		return nil, geminiCachedContentNotSent(err)
 	}
 	payload := make(map[string]any, len(req.payload)+3)
 	for k, v := range req.payload {
@@ -966,15 +966,15 @@ func (s *GeminiCachedContentService) CreateUpstream(ctx context.Context, account
 	payload["displayName"] = geminiCachedContentUpstreamTagPrefix + publicID
 	body, err := json.Marshal(payload)
 	if err != nil {
-		return nil, err
+		return nil, geminiCachedContentNotSent(err)
 	}
 	base, err := s.apiBase(account)
 	if err != nil {
-		return nil, err
+		return nil, geminiCachedContentNotSent(err)
 	}
 	collectionURL, err := geminiCachedContentCollectionURL(account, base, mappedModel)
 	if err != nil {
-		return nil, err
+		return nil, geminiCachedContentNotSent(err)
 	}
 	respBody, err := s.doUpstream(ctx, account, http.MethodPost, collectionURL, body, geminiCachedContentUpstreamTimeout)
 	if err != nil {
@@ -992,13 +992,18 @@ func (s *GeminiCachedContentService) CreateUpstream(ctx context.Context, account
 
 // PatchUpstream 把上游缓存的有效期改为自现在起 ttl。
 func (s *GeminiCachedContentService) PatchUpstream(ctx context.Context, account *Account, record *GeminiCachedContent, ttl time.Duration) (*GeminiCachedContentUpstream, error) {
+	return s.PatchUpstreamUntil(ctx, account, record, s.Now().Add(ttl))
+}
+
+// PatchUpstreamUntil uses the absolute expiry quoted before mutation admission,
+// so transport latency cannot increase the storage charge.
+func (s *GeminiCachedContentService) PatchUpstreamUntil(ctx context.Context, account *Account, record *GeminiCachedContent, expireTime time.Time) (*GeminiCachedContentUpstream, error) {
 	resourceURL, err := s.upstreamResourceURL(account, record)
 	if err != nil {
 		return nil, err
 	}
-	seconds := int64(math.Ceil(ttl.Seconds()))
-	body, _ := json.Marshal(map[string]any{"ttl": fmt.Sprintf("%ds", seconds)})
-	respBody, err := s.doUpstream(ctx, account, http.MethodPatch, resourceURL+"?updateMask=ttl", body, geminiCachedContentMutationUpstreamTimeout)
+	body, _ := json.Marshal(map[string]any{"expireTime": expireTime.UTC().Format(time.RFC3339Nano)})
+	respBody, err := s.doUpstream(ctx, account, http.MethodPatch, resourceURL+"?updateMask=expireTime", body, geminiCachedContentMutationUpstreamTimeout)
 	if err != nil {
 		return nil, err
 	}

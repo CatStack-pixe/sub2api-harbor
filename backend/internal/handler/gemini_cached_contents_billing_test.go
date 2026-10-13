@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -16,6 +17,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
@@ -197,6 +199,7 @@ type cachedBillingUpstream struct {
 	calls      []string
 	// patchTTLs 按顺序记录 PATCH 请求体中的 ttl。
 	patchTTLs  []string
+	patchExpirations []time.Time
 	beforePost func(n int)
 	// failures 按请求方法返回上游错误响应；transportErrors 按请求方法返回传输层错误（上游结果未知）。
 	failures        map[string]cachedBillingUpstreamFailure
@@ -211,6 +214,7 @@ type cachedBillingUpstreamFailure struct {
 func (u *cachedBillingUpstream) Do(req *http.Request, _ string, _ int64, _ int) (*http.Response, error) {
 	var patch struct {
 		TTL string `json:"ttl"`
+		ExpireTime time.Time `json:"expireTime"`
 	}
 	if req.Method == http.MethodPatch {
 		_ = json.NewDecoder(req.Body).Decode(&patch)
@@ -219,6 +223,10 @@ func (u *cachedBillingUpstream) Do(req *http.Request, _ string, _ int64, _ int) 
 	u.calls = append(u.calls, req.Method+" "+req.URL.Path)
 	n := len(u.calls)
 	if req.Method == http.MethodPatch {
+		if !patch.ExpireTime.IsZero() {
+			u.patchExpirations = append(u.patchExpirations, patch.ExpireTime)
+			patch.TTL = fmt.Sprintf("%ds", int64(math.Ceil(time.Until(patch.ExpireTime).Seconds())))
+		}
 		u.patchTTLs = append(u.patchTTLs, patch.TTL)
 	}
 	failure, failed := u.failures[req.Method]
@@ -240,7 +248,11 @@ func (u *cachedBillingUpstream) Do(req *http.Request, _ string, _ int64, _ int) 
 			u.beforePost(n)
 		}
 		seconds, _ := strconv.ParseInt(strings.TrimSuffix(patch.TTL, "s"), 10, 64)
-		body = fmt.Sprintf(`{"name":"cachedContents/up1","expireTime":%q}`, time.Now().Add(time.Duration(seconds)*time.Second).UTC().Format(time.RFC3339Nano))
+		expireTime := patch.ExpireTime
+		if expireTime.IsZero() {
+			expireTime = time.Now().Add(time.Duration(seconds)*time.Second)
+		}
+		body = fmt.Sprintf(`{"name":"cachedContents/up1","expireTime":%q}`, expireTime.UTC().Format(time.RFC3339Nano))
 	}
 	return &http.Response{StatusCode: http.StatusOK, Header: http.Header{"Content-Type": []string{"application/json"}},
 		Body: io.NopCloser(strings.NewReader(body))}, nil
@@ -745,6 +757,55 @@ func TestGeminiCachedContentsPatch_UnaffordableExtensionRejectedBeforeUpstream(t
 	require.NotEqual(t, http.StatusOK, rec.Code)
 	require.Zero(t, env.upstream.methodCalls(http.MethodPatch), "余额不足以支付延长部分时不调用上游")
 	require.Empty(t, env.usage.totals())
+}
+
+func TestGeminiCachedContentsCreate_UnknownPostOutcomeDoesNotAllocateOnAnotherAccount(t *testing.T) {
+	env := newCachedBillingEnv(t, 500, 900, 901)
+	env.upstream.transportErrors = map[string]error{http.MethodPost: errors.New("response lost after cache allocation")}
+	rec := env.create()
+	require.Equal(t, http.StatusBadGateway, rec.Code, rec.Body.String())
+	require.Contains(t, rec.Body.String(), "outcome is unknown")
+	require.Equal(t, 1, env.upstream.methodCalls(http.MethodPost))
+	require.Empty(t, env.repo.records)
+	require.Empty(t, env.usage.totals())
+}
+
+func TestGeminiCachedContentsPatch_AbsoluteExpiryKeepsChargeWithinQuotedHeadroom(t *testing.T) {
+	for _, shortening := range []bool{false, true} {
+		t.Run(fmt.Sprintf("shortening=%t", shortening), func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				balance := 4.505
+				baseline := time.Now().Add(time.Hour)
+				ttl := "7200s"
+				if shortening {
+					balance = 0.001
+					baseline = time.Now().Add(time.Hour + 5*time.Second)
+					ttl = "3600s"
+				}
+				env := newCachedBillingEnv(t, balance, 900)
+				env.seed(baseline)
+				env.upstream.beforePost = func(int) { time.Sleep(10 * time.Second) }
+				before := time.Now()
+				rec := env.patchTTL("abc", ttl)
+				require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+				target := before.Add(2 * time.Hour)
+				if shortening {
+					target = before.Add(time.Hour)
+				}
+				require.Equal(t, []time.Time{target}, env.upstream.patchExpirations)
+				require.True(t, env.repo.records["abc"].ExpireTime.Equal(target))
+				require.False(t, env.repo.pendingMutation(100))
+				if shortening {
+					require.Empty(t, env.usage.totals(), "latency must not turn a shortening into a billable extension")
+				} else {
+					totals := env.waitForUsage(t, 1)
+					require.Len(t, totals, 1)
+					require.InDelta(t, 4.5, totals[0], 1e-12)
+					require.LessOrEqual(t, totals[0], balance)
+				}
+			})
+		})
+	}
 }
 
 // 上游对缓存不存在的响应：AI Studio 403；Vertex 缓存资源接口 404，文案含上游缓存数字 ID。

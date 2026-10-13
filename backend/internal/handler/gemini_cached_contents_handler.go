@@ -262,8 +262,14 @@ func (h *GatewayHandler) GeminiCachedContentsCreate(c *gin.Context) {
 				return
 			}
 			reqLog.Warn("gemini.cached_content.upstream_create_error", zap.Int64("account_id", account.ID), zap.Error(err))
-			excluded[account.ID] = struct{}{}
-			continue
+			if errors.Is(err, service.ErrGeminiCachedContentRequestNotSent) {
+				excluded[account.ID] = struct{}{}
+				continue
+			}
+			// A transport error can follow a successful non-idempotent POST.
+			// Its unknown outcome must not allocate another cache on a new account.
+			googleError(c, http.StatusBadGateway, "Cached content creation outcome is unknown")
+			return
 		}
 
 		// 缓存 token 数在上游创建后才确定：按确定金额校验余额 / 额度并预留，不足时删除上游缓存，
@@ -421,17 +427,19 @@ func (h *GatewayHandler) GeminiCachedContentsPatch(c *gin.Context) {
 		googleError(c, http.StatusServiceUnavailable, geminiCachedContentUnavailableMessage)
 		return
 	}
-	ttl, err := service.ParseGeminiCachedContentPatchRequest(body, c.Query("updateMask"), svc.Now(), svc.MaxTTLForAccount(account))
+	mutationAt := svc.Now()
+	ttl, err := service.ParseGeminiCachedContentPatchRequest(body, c.Query("updateMask"), mutationAt, svc.MaxTTLForAccount(account))
 	if err != nil {
 		googleError(c, http.StatusBadRequest, err.Error())
 		return
 	}
+	targetExpire := mutationAt.Add(ttl)
 	setOpsRequestContext(c, record.Model, false)
 	pricingCtx, pricingAt := service.WithGatewayTokenRequestPricing(c.Request.Context())
 	c.Request = c.Request.WithContext(pricingCtx)
 
 	subscription, _ := middleware.GetSubscriptionFromContext(c)
-	if extension := svc.Now().Add(ttl).Sub(record.ExpireTime); extension > 0 {
+	if extension := targetExpire.Sub(record.ExpireTime); extension > 0 {
 		usage := &service.RecordUsageInput{
 			Result: &service.ForwardResult{
 				Model: record.Model, UpstreamModel: record.UpstreamModelID(),
@@ -471,7 +479,7 @@ func (h *GatewayHandler) GeminiCachedContentsPatch(c *gin.Context) {
 		}
 		return
 	}
-	upstream, err := svc.PatchUpstream(c.Request.Context(), account, record, ttl)
+	upstream, err := svc.PatchUpstreamUntil(c.Request.Context(), account, record, targetExpire)
 	if err != nil {
 		var upErr *service.GeminiCachedContentUpstreamError
 		upstreamRejected := errors.As(err, &upErr)
@@ -496,7 +504,7 @@ func (h *GatewayHandler) GeminiCachedContentsPatch(c *gin.Context) {
 		googleError(c, http.StatusBadGateway, "Upstream request failed")
 		return
 	}
-	expireTime := service.ClampGeminiCachedContentExpire(upstream.ExpireTime, svc.Now().Add(ttl))
+	expireTime := service.ClampGeminiCachedContentExpire(upstream.ExpireTime, targetExpire)
 	persistCtx, cancelPersist := geminiCachedContentPersistContext(c)
 	err = svc.CommitMutation(persistCtx, mutation, expireTime)
 	cancelPersist()
