@@ -196,7 +196,7 @@ VALUES ($1, $2, $3, $4, 'v16-harbor-trace', 'v16-client-trace',
 	for _, table := range tables {
 		require.Equal(t, snapshots[table], v16RowsSnapshot(t, ctx, tx, table), "every saved field and row in %s must survive", table)
 	}
-	require.Equal(t, constraintsBefore, v16LegacyConstraints(t, ctx, tx), "only the previously deployed platform CHECK removal is permitted")
+	require.Equal(t, constraintsBefore, v16LegacyConstraints(t, ctx, tx), "every legacy constraint must survive; the new i18n NOT NULL constraint is checked separately")
 	require.Equal(t, indexesBefore, v16LegacyIndexes(t, ctx, tx), "legacy uniqueness, trace and monitor indexes must survive")
 	require.Equal(t, historyBefore, v16MigrationHistory(t, ctx, tx))
 	for _, table := range []string{"channel_monitors", "channel_monitor_request_templates"} {
@@ -362,7 +362,8 @@ SELECT jsonb_agg(jsonb_build_object('table', r.relname, 'name', c.conname,
  ORDER BY r.relname, c.conname)::text
 FROM pg_constraint c JOIN pg_class r ON r.oid = c.conrelid
 JOIN pg_namespace n ON n.oid = r.relnamespace
-WHERE n.nspname = 'public' AND r.relname <> 'gemini_cached_contents'`).Scan(&snapshot))
+WHERE n.nspname = 'public' AND r.relname <> 'gemini_cached_contents'
+ AND NOT (r.relname = 'groups' AND c.contype = 'n' AND pg_get_constraintdef(c.oid) = 'NOT NULL i18n')`).Scan(&snapshot))
 	require.Contains(t, snapshot, "channel_monitors_provider_check")
 	require.Contains(t, snapshot, "channel_monitor_request_templates_provider_check")
 	require.NotContains(t, snapshot, "user_platform_quotas_platform_check")
