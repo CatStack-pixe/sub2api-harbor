@@ -285,3 +285,139 @@ func TestInflightReservation_RenewDoesNotResurrectExpiredMember(t *testing.T) {
 	require.NoError(t, err)
 	require.False(t, exists)
 }
+
+func TestInflightScopeReservation_ReturnsOthersAndReleases(t *testing.T) {
+	mr, cache, _ := newInflightTestEnv(t, true, 60)
+	ctx := context.Background()
+
+	others, err := cache.ReserveInflightScope(ctx, "apikey:7", "r1", 3, time.Minute)
+	require.NoError(t, err)
+	require.Zero(t, others)
+	others, err = cache.ReserveInflightScope(ctx, "apikey:7", "r2", 2, time.Minute)
+	require.NoError(t, err)
+	require.InDelta(t, 3, others, 1e-9, "返回登记前其他在途预留的合计")
+	others, err = cache.ReserveInflightScope(ctx, "sub:7", "r3", 5, time.Minute)
+	require.NoError(t, err)
+	require.Zero(t, others, "不同维度互不影响")
+
+	require.NoError(t, cache.ReleaseInflightScope(ctx, "apikey:7", "r1"))
+	require.NoError(t, cache.ReleaseInflightScope(ctx, "apikey:7", "r1"))
+	others, err = cache.ReserveInflightScope(ctx, "apikey:7", "r4", 1, time.Minute)
+	require.NoError(t, err)
+	require.InDelta(t, 2, others, 1e-9)
+
+	mr.FastForward(2 * time.Minute)
+	others, err = cache.ReserveInflightScope(ctx, "apikey:7", "r5", 1, time.Minute)
+	require.NoError(t, err)
+	require.Zero(t, others, "过期预留不再计入")
+}
+
+func TestReserveFixedCharge_ConcurrentChargesAdmitOnlyWhatAPIKeyQuotaCovers(t *testing.T) {
+	_, cache, svc := newInflightTestEnv(t, true, 60)
+	ctx := context.Background()
+	user := &service.User{ID: 42}
+	apiKey := &service.APIKey{ID: 9, UserID: user.ID, Quota: 1.0}
+	require.NoError(t, cache.SetUserBalance(ctx, user.ID, 100))
+
+	const n = 20
+	var admitted atomic.Int32
+	reservations := make(chan *service.InflightReservation, n)
+	var wg sync.WaitGroup
+	start := make(chan struct{})
+	for i := 0; i < n; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-start
+			res, err := svc.ReserveFixedCharge(ctx, user, apiKey, nil, nil, 0.3)
+			if err != nil {
+				if !errors.Is(err, service.ErrAPIKeyQuotaExhausted) {
+					t.Errorf("unexpected error: %v", err)
+				}
+				return
+			}
+			admitted.Add(1)
+			reservations <- res
+		}()
+	}
+	close(start)
+	wg.Wait()
+	close(reservations)
+
+	require.Equal(t, int32(3), admitted.Load(), "Key 额度 1.0、每笔 0.3：同时在途的不超过 3 笔")
+	for res := range reservations {
+		res.Release()
+	}
+	zkey, _ := billingInflightScopeKeys("apikey:9")
+	remaining, err := cache.rdb.ZCard(ctx, zkey).Result()
+	require.NoError(t, err)
+	require.Zero(t, remaining)
+	require.Equal(t, int64(0), inflightCount(t, cache, user.ID))
+}
+
+func TestInflightReservation_StrictFixedChargeCoverage(t *testing.T) {
+	_, cache, _ := newInflightTestEnv(t, true, 60)
+	ctx := context.Background()
+	userID := int64(80)
+	zkey, hkey := billingInflightKeys(userID)
+
+	allowed, pending, err := cache.ReserveInflightBalanceStrict(ctx, userID, "insufficient", 90, 10, time.Minute)
+	require.NoError(t, err)
+	require.False(t, allowed, "strict mode requires coverage even when no reservation exists")
+	require.Zero(t, pending)
+	require.Zero(t, inflightCount(t, cache, userID))
+	require.Zero(t, cache.rdb.HLen(ctx, hkey).Val())
+
+	allowed, pending, err = cache.ReserveInflightBalanceStrict(ctx, userID, "exact", 90, 90, time.Minute)
+	require.NoError(t, err)
+	require.True(t, allowed, "exact coverage is sufficient")
+	require.Zero(t, pending)
+	allowed, pending, err = cache.ReserveInflightBalanceStrict(ctx, userID, "over", 1, 90, time.Minute)
+	require.NoError(t, err)
+	require.False(t, allowed)
+	require.Equal(t, 90.0, pending)
+	require.Equal(t, int64(1), inflightCount(t, cache, userID))
+	require.Equal(t, int64(1), cache.rdb.HLen(ctx, hkey).Val())
+	allowed, pending, err = cache.RevalidateInflightBalanceStrict(ctx, userID, "exact", 90, 90, time.Minute)
+	require.NoError(t, err)
+	require.True(t, allowed, "revalidation must not count its own hold twice")
+	require.Zero(t, pending)
+	require.NoError(t, cache.ReleaseInflightBalance(ctx, userID, "exact"))
+
+	// Pruning the last expired reservation must not restore the legacy allowance in strict mode.
+	require.NoError(t, cache.rdb.ZAdd(ctx, zkey, redis.Z{Score: float64(time.Now().UnixMilli() - 1000), Member: "expired"}).Err())
+	require.NoError(t, cache.rdb.HSet(ctx, hkey, "expired", "90").Err())
+	allowed, pending, err = cache.ReserveInflightBalanceStrict(ctx, userID, "after-expiry", 90, 10, time.Minute)
+	require.NoError(t, err)
+	require.False(t, allowed)
+	require.Zero(t, pending)
+	require.Zero(t, inflightCount(t, cache, userID))
+	require.Zero(t, cache.rdb.HLen(ctx, hkey).Val())
+
+	allowed, pending, err = cache.ReserveInflightBalance(ctx, userID, "estimated", 90, 10, time.Minute)
+	require.NoError(t, err)
+	require.True(t, allowed, "the legacy estimated-inference first reservation remains admitted")
+	require.Zero(t, pending)
+	require.NoError(t, cache.ReleaseInflightBalance(ctx, userID, "estimated"))
+	require.Zero(t, inflightCount(t, cache, userID))
+}
+
+func TestInflightReservation_RevalidationIgnoresSettledReleasedHold(t *testing.T) {
+	_, cache, _ := newInflightTestEnv(t, true, 60)
+	ctx := context.Background()
+	const userID int64 = 81
+	allowed, _, err := cache.ReserveInflightBalanceStrict(ctx, userID, "settling", 20, 100, time.Minute)
+	require.NoError(t, err)
+	require.True(t, allowed)
+	allowed, pending, err := cache.ReserveInflightBalanceStrict(ctx, userID, "current", 70, 100, time.Minute)
+	require.NoError(t, err)
+	require.True(t, allowed)
+	require.Equal(t, 20.0, pending)
+	require.NoError(t, cache.ReleaseInflightBalance(ctx, userID, "settling"))
+	allowed, pending, err = cache.RevalidateInflightBalanceStrict(ctx, userID, "current", 70, 80, time.Minute)
+	require.NoError(t, err)
+	require.True(t, allowed, "fresh balance already includes the completed debit")
+	require.Zero(t, pending)
+	require.Equal(t, int64(1), inflightCount(t, cache, userID))
+	require.NoError(t, cache.ReleaseInflightBalance(ctx, userID, "current"))
+}

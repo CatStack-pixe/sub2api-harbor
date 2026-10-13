@@ -1906,6 +1906,146 @@ describe('AccountUsageCell', () => {
 		expect(wrapper.text()).toContain('0')
 		expect(wrapper.text()).toContain('A $0.00')
 		expect(wrapper.text()).toContain('U $0.00')
+		expect(wrapper.text()).toContain('vertex')
+		expect(wrapper.text()).not.toContain('admin.accounts.gemini.quotaPolicy.title')
+		expect(wrapper.text()).not.toContain('admin.accounts.gemini.rateLimit.unlimited')
+		expect(getUsage).not.toHaveBeenCalled()
+  })
+
+  it('Gemini 第三方上游 API Key 按普通 Key 账号展示今日统计与额度，不显示 Gemini 徽章', async () => {
+    const wrapper = mount(AccountUsageCell, {
+      props: {
+        account: makeAccount({
+          id: 4002,
+          platform: 'gemini',
+          type: 'apikey',
+          credentials: {
+            base_url: 'https://relay.example.com/gemini',
+            api_key: 'sk-relay',
+            tier_id: 'aistudio_free'
+          },
+          extra: {},
+          quota_daily_limit: 10,
+          quota_daily_used: 2.5
+        }),
+        todayStats: {
+          requests: 123,
+          tokens: 2300000,
+          cost: 1.79,
+          standard_cost: 1.79,
+          user_cost: 0
+        }
+      },
+      global: {
+        stubs: {
+          UsageProgressBar: true,
+          AccountQuotaInfo: true
+        }
+      }
+    })
+
+    await flushPromises()
+
+    const text = wrapper.text()
+    expect(text).not.toContain('api key')
+    expect(text).not.toContain('ai studio')
+    expect(text).not.toContain('free')
+    expect(text).not.toContain('relay.example.com')
+    expect(wrapper.find('account-quota-info-stub').exists()).toBe(false)
+    expect(text).toContain('123 req')
+    expect(text).toContain('A $1.79')
+    expect(text).toContain('U $0.00')
+    const bars = wrapper.findAll('usage-progress-bar-stub')
+    expect(bars.map((bar) => bar.attributes('label'))).toEqual(['1d'])
+    expect(text).not.toContain('admin.accounts.gemini.quotaPolicy.title')
+    expect(text).not.toContain('admin.accounts.gemini.quotaPolicy.simulatedNote')
+    expect(text).not.toContain('admin.accounts.gemini.rateLimit.unlimited')
+    expect(getUsage).not.toHaveBeenCalled()
+  })
+
+  it.each([false, true])('reloads Gemini quotas after switching between relay and official URLs (batched: %s)', async (batched) => {
+    const account = makeAccount({
+      id: batched ? 9402 : 9401,
+      platform: 'gemini',
+      type: 'apikey',
+      credentials: { base_url: 'https://relay.example.com' },
+      extra: {}
+    })
+    getUsage.mockResolvedValue({
+      gemini_pro_daily: { utilization: 20, resets_at: '2026-10-15T00:00:00Z', remaining_seconds: 3600 }
+    })
+    const requestBatchedUsage = vi.fn()
+    const wrapper = mount(AccountUsageCell, {
+      props: { account, ...(batched ? { requestBatchedUsage } : {}) },
+      global: { stubs: { UsageProgressBar: true, AccountQuotaInfo: true } }
+    })
+    await flushPromises()
+    expect(getUsage).not.toHaveBeenCalled()
+    expect(requestBatchedUsage).not.toHaveBeenCalled()
+
+    const official = { ...account, credentials: { base_url: 'https://generativelanguage.googleapis.com' } }
+    await wrapper.setProps({ account: official })
+    await flushPromises()
+    const requests = batched ? requestBatchedUsage : getUsage
+    expect(requests).toHaveBeenCalledTimes(1)
+    if (batched) {
+      expect(requestBatchedUsage).toHaveBeenLastCalledWith(official, { force: true })
+      expect(getUsage).not.toHaveBeenCalled()
+    } else {
+      expect(getUsage).toHaveBeenLastCalledWith(account.id)
+      expect(wrapper.text()).not.toContain('admin.accounts.gemini.rateLimit.unlimited')
+    }
+
+    await wrapper.setProps({ account: { ...official, updated_at: '2026-10-14T02:00:00Z' } })
+    await flushPromises()
+    expect(requests).toHaveBeenCalledTimes(1)
+    await wrapper.setProps({ account })
+    await flushPromises()
+    expect(requests).toHaveBeenCalledTimes(1)
+    await wrapper.setProps({ account: official })
+    await flushPromises()
+    expect(requests).toHaveBeenCalledTimes(2)
+    wrapper.unmount()
+  })
+
+  it('Gemini 官方 API Key 保留 AI Studio 等级与模拟配额', async () => {
+    getUsage.mockResolvedValue({
+      gemini_pro_daily: {
+        utilization: 20,
+        resets_at: '2026-10-11T07:00:00Z',
+        remaining_seconds: 3600
+      }
+    })
+
+    const wrapper = mount(AccountUsageCell, {
+      props: {
+        account: makeAccount({
+          id: 4003,
+          platform: 'gemini',
+          type: 'apikey',
+          credentials: {
+            base_url: 'https://generativelanguage.googleapis.com',
+            api_key: 'AIza-official',
+            tier_id: 'aistudio_paid'
+          },
+          extra: {}
+        })
+      },
+      global: {
+        stubs: {
+          UsageProgressBar: true,
+          AccountQuotaInfo: true
+        }
+      }
+    })
+
+    await flushPromises()
+
+    const text = wrapper.text()
+    expect(text).toContain('ai studio paid')
+    expect(text).toContain('admin.accounts.gemini.quotaPolicy.title')
+    expect(text).toContain('admin.accounts.gemini.quotaPolicy.simulatedNote')
+    expect(getUsage).toHaveBeenCalledWith(4003)
   })
 
   it('Anthropic OAuth 会渲染 7d F (Fable) 进度条，且 7d S 逻辑保留', async () => {
