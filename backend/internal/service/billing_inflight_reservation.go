@@ -33,6 +33,12 @@ type InflightStrictBalanceReservationCache interface {
 	ReserveInflightBalanceStrict(ctx context.Context, userID int64, requestID string, amount, balance float64, ttl time.Duration) (bool, float64, error)
 }
 
+// InflightBalanceReservationRevalidator checks current outstanding holds while
+// retaining this request's hold; settled and released requests are not counted again.
+type InflightBalanceReservationRevalidator interface {
+	RevalidateInflightBalanceStrict(ctx context.Context, userID int64, requestID string, amount, balance float64, ttl time.Duration) (bool, float64, error)
+}
+
 // InflightScopeReservationCache 订阅 / API Key 维度在途预留的缓存能力（可选），用于扣费前即可确定金额的费用；
 // 未实现时这两个维度不登记预留（fail-open），准入仍按库中用量校验。
 type InflightScopeReservationCache interface {
@@ -367,7 +373,18 @@ func (s *BillingCacheService) reserveInflight(ctx context.Context, user *User, g
 			r.Release()
 			return nil, ErrBillingServiceUnavailable.WithCause(err)
 		}
-		if balance-inflight < estimate {
+		if current, ok := s.cache.(InflightBalanceReservationRevalidator); ok {
+			checkCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), inflightReservationReserveTimeout)
+			allowed, _, err = current.RevalidateInflightBalanceStrict(checkCtx, user.ID, requestID, estimate, balance, ttl)
+			cancel()
+			if err != nil {
+				r.Release()
+				return nil, ErrBillingServiceUnavailable.WithCause(err)
+			}
+		} else {
+			allowed = balance-inflight >= estimate
+		}
+		if !allowed {
 			r.Release()
 			return nil, ErrInsufficientBalance
 		}

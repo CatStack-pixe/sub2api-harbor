@@ -505,6 +505,27 @@ type fixedChargeStrictCacheStub struct {
 	strictCalls int
 }
 
+type fixedChargeSettledHoldCache struct {
+	*fixedChargeBalanceSequenceCache
+}
+
+func (s *fixedChargeSettledHoldCache) GetUserBalance(ctx context.Context, userID int64) (float64, error) {
+	if s.balanceReads == 2 {
+		delete(s.reserved[fmt.Sprintf("user:%d", userID)], "settling")
+	}
+	return s.fixedChargeBalanceSequenceCache.GetUserBalance(ctx, userID)
+}
+
+func (s *fixedChargeSettledHoldCache) RevalidateInflightBalanceStrict(_ context.Context, userID int64, requestID string, amount, balance float64, _ time.Duration) (bool, float64, error) {
+	sum := 0.0
+	for id, held := range s.reserved[fmt.Sprintf("user:%d", userID)] {
+		if id != requestID {
+			sum += held
+		}
+	}
+	return balance-sum >= amount, sum, nil
+}
+
 func (s *fixedChargeStrictCacheStub) ReserveInflightBalanceStrict(_ context.Context, userID int64, requestID string, amount, balance float64, _ time.Duration) (bool, float64, error) {
 	s.strictCalls++
 	key := fmt.Sprintf("user:%d", userID)
@@ -567,6 +588,24 @@ func TestReserveFixedCharge_StrictBalanceReservation(t *testing.T) {
 		require.Equal(t, 3, cache.balanceReads)
 		require.Equal(t, 1, cache.reserveCalls)
 		require.Empty(t, cache.reserved["user:1"], "failed coverage must release the newly registered hold")
+	})
+
+	t.Run("settled and released pending debit is not subtracted twice", func(t *testing.T) {
+		base := &fixedChargeCacheStub{}
+		base.reserve("user:1", "settling", 20)
+		cache := &fixedChargeSettledHoldCache{&fixedChargeBalanceSequenceCache{
+			fixedChargeCacheStub: base, balances: []float64{100, 100, 80},
+		}}
+		svc := newSvc(cache, 0)
+		res, err := svc.ReserveFixedCharge(ctx, user, nil, nil, nil, 70)
+		t.Cleanup(res.Release)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+		require.Equal(t, 3, cache.balanceReads)
+		require.Len(t, cache.reserved["user:1"], 1)
+		require.Equal(t, 70.0, cache.reserved["user:1"][res.requestID])
+		res.Release()
+		require.Empty(t, cache.reserved["user:1"])
 	})
 
 	t.Run("fixed charge selects strict mode without the estimate cap", func(t *testing.T) {

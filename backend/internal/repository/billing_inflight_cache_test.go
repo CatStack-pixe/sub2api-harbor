@@ -378,6 +378,10 @@ func TestInflightReservation_StrictFixedChargeCoverage(t *testing.T) {
 	require.Equal(t, 90.0, pending)
 	require.Equal(t, int64(1), inflightCount(t, cache, userID))
 	require.Equal(t, int64(1), cache.rdb.HLen(ctx, hkey).Val())
+	allowed, pending, err = cache.RevalidateInflightBalanceStrict(ctx, userID, "exact", 90, 90, time.Minute)
+	require.NoError(t, err)
+	require.True(t, allowed, "revalidation must not count its own hold twice")
+	require.Zero(t, pending)
 	require.NoError(t, cache.ReleaseInflightBalance(ctx, userID, "exact"))
 
 	// Pruning the last expired reservation must not restore the legacy allowance in strict mode.
@@ -396,4 +400,24 @@ func TestInflightReservation_StrictFixedChargeCoverage(t *testing.T) {
 	require.Zero(t, pending)
 	require.NoError(t, cache.ReleaseInflightBalance(ctx, userID, "estimated"))
 	require.Zero(t, inflightCount(t, cache, userID))
+}
+
+func TestInflightReservation_RevalidationIgnoresSettledReleasedHold(t *testing.T) {
+	_, cache, _ := newInflightTestEnv(t, true, 60)
+	ctx := context.Background()
+	const userID int64 = 81
+	allowed, _, err := cache.ReserveInflightBalanceStrict(ctx, userID, "settling", 20, 100, time.Minute)
+	require.NoError(t, err)
+	require.True(t, allowed)
+	allowed, pending, err := cache.ReserveInflightBalanceStrict(ctx, userID, "current", 70, 100, time.Minute)
+	require.NoError(t, err)
+	require.True(t, allowed)
+	require.Equal(t, 20.0, pending)
+	require.NoError(t, cache.ReleaseInflightBalance(ctx, userID, "settling"))
+	allowed, pending, err = cache.RevalidateInflightBalanceStrict(ctx, userID, "current", 70, 80, time.Minute)
+	require.NoError(t, err)
+	require.True(t, allowed, "fresh balance already includes the completed debit")
+	require.Zero(t, pending)
+	require.Equal(t, int64(1), inflightCount(t, cache, userID))
+	require.NoError(t, cache.ReleaseInflightBalance(ctx, userID, "current"))
 }

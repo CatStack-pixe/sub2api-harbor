@@ -58,6 +58,11 @@ var (
 			sum = sum + (tonumber(vals[i]) or 0)
 		end
 		local count = redis.call('ZCARD', KEYS[1])
+		local own = redis.call('HGET', KEYS[2], ARGV[3])
+		if own then
+			sum = sum - (tonumber(own) or 0)
+			count = math.max(0, count - 1)
+		end
 		local amount = tonumber(ARGV[4])
 		local balance = tonumber(ARGV[5])
 		local strict = tonumber(ARGV[7] or '0') == 1
@@ -131,6 +136,10 @@ func (c *billingCache) ReserveInflightBalance(ctx context.Context, userID int64,
 
 // ReserveInflightBalanceStrict requires full balance coverage for every fixed-charge reservation.
 func (c *billingCache) ReserveInflightBalanceStrict(ctx context.Context, userID int64, requestID string, amount, balance float64, ttl time.Duration) (bool, float64, error) {
+	return c.reserveInflightBalance(ctx, userID, requestID, amount, balance, ttl, true)
+}
+
+func (c *billingCache) RevalidateInflightBalanceStrict(ctx context.Context, userID int64, requestID string, amount, balance float64, ttl time.Duration) (bool, float64, error) {
 	return c.reserveInflightBalance(ctx, userID, requestID, amount, balance, ttl, true)
 }
 
