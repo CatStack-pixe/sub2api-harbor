@@ -334,7 +334,7 @@ func TestGeminiCachedContentRepository_ConcurrentMutationHasSingleHolder(t *test
 func geminiCacheRegressionRecord(label string, apiKeyID, groupID int64, expires time.Time) *service.GeminiCachedContent {
 	return &service.GeminiCachedContent{
 		PublicID: fmt.Sprintf("%s-%d", label, time.Now().UnixNano()),
-		UserID: 41, APIKeyID: apiKeyID, GroupID: groupID, AccountID: 99,
+		UserID:   41, APIKeyID: apiKeyID, GroupID: groupID, AccountID: 99,
 		UpstreamName: "cachedContents/" + label, Model: "gemini-public", UpstreamModel: "models/gemini-upstream",
 		DisplayName: label, TotalTokenCount: 8192, ExpireTime: expires,
 		ChannelUsage: service.ChannelUsageFields{ChannelID: 73, OriginalModel: "gemini-public", ChannelMappedModel: "gemini-upstream", BillingModelSource: "requested"},
