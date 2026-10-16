@@ -315,20 +315,23 @@ func (s *PaymentService) outstandingRefundDeduction(ctx context.Context, oid int
 			return nil, err
 		}
 		if detail.RefundAmount == 0 {
+			// An old immediate gateway failure has no matching pending audit.
+			// Neither a previous pending amount nor the order's old refund_amount
+			// proves the amount whose compensation failed.
+			if pending.auditID <= entry.ID || pending.RefundAmount <= 0 {
+				return nil, fmt.Errorf("legacy held refund amount requires reconciliation before retry")
+			}
 			detail.RefundAmount = pending.RefundAmount
 		}
 		if detail.SubscriptionID == 0 {
 			detail.SubscriptionID = pending.SubscriptionID
-			detail.SubscriptionRevoked = pending.SubscriptionRevoked
+			detail.SubscriptionRevoked = detail.SubscriptionRevoked || pending.SubscriptionRevoked
 		}
 	}
 	if detail.RefundAmount == 0 || (detail.DeductionType == payment.DeductionTypeSubscription && detail.SubscriptionID == 0) {
 		order, err := s.entClient.PaymentOrder.Get(ctx, oid)
 		if err != nil {
 			return nil, fmt.Errorf("load original refund order: %w", err)
-		}
-		if detail.RefundAmount == 0 {
-			detail.RefundAmount = order.RefundAmount
 		}
 		if detail.DeductionType == payment.DeductionTypeSubscription && detail.SubscriptionID == 0 {
 			if order.OrderType != payment.OrderTypeSubscription || order.SubscriptionGroupID == nil || *order.SubscriptionGroupID <= 0 {
@@ -344,7 +347,9 @@ func (s *PaymentService) outstandingRefundDeduction(ctx context.Context, oid int
 				return nil, fmt.Errorf("resolve unique legacy refund subscription binding: %w", err)
 			}
 			detail.SubscriptionID = sub.ID
-			detail.SubscriptionRevoked = sub.DeletedAt != nil
+			if sub.DeletedAt != nil && !detail.SubscriptionRevoked {
+				return nil, fmt.Errorf("legacy revoked subscription deduction requires reconciliation before retry")
+			}
 		}
 	}
 	if math.IsNaN(detail.RefundAmount) || math.IsInf(detail.RefundAmount, 0) || detail.RefundAmount <= 0 ||

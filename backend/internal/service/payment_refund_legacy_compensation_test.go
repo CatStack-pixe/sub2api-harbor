@@ -4,7 +4,9 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"strconv"
 	"testing"
 	"time"
 
@@ -85,6 +87,20 @@ func TestRefundRetryRepaysRevokedSubscriptionAtomically(t *testing.T) {
 				SetDeletedAt(now.Add(-time.Hour)).
 				Save(ctx)
 			require.NoError(t, err)
+			// Current-format audits prove that the deduction itself revoked this
+			// row. A legacy row's deleted state alone does not prove that.
+			detail, err := json.Marshal(refundPendingAuditDetail{
+				RefundAmount: 60, DeductionType: payment.DeductionTypeSubscription,
+				SubDaysDeducted: 7, SubscriptionID: original.ID, SubscriptionRevoked: true,
+			})
+			require.NoError(t, err)
+			_, err = client.PaymentAuditLog.Create().
+				SetOrderID(strconv.FormatInt(order.ID, 10)).
+				SetAction("REFUND_ROLLBACK_FAILED").
+				SetOperator("admin").
+				SetDetail(string(detail)).
+				Save(ctx)
+			require.NoError(t, err)
 			repo := &refundRevokedSubscriptionRepo{
 				client: client, failAfterRestore: mode == "restoration fails after write",
 			}
@@ -156,4 +172,70 @@ func TestRefundRetryRepaysRevokedSubscriptionAtomically(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestRefundRetryRejectsUnprovenLegacyImmediateFailureAmount(t *testing.T) {
+	ctx := context.Background()
+	client := newPaymentConfigServiceTestClient(t)
+	order := createPendingRefundOrderWithDetailForTest(t, ctx, client, "unproven-immediate-amount",
+		`{"refundID":"rf_previous","refundAmount":100,"deductionRollbackOK":true}`)
+	order, err := client.PaymentOrder.UpdateOneID(order.ID).SetStatus(OrderStatusRefundFailed).Save(ctx)
+	require.NoError(t, err)
+	_, err = client.User.UpdateOneID(order.UserID).SetBalance(40).Save(ctx)
+	require.NoError(t, err)
+	_, err = client.PaymentAuditLog.Create().
+		SetOrderID(strconv.FormatInt(order.ID, 10)).
+		SetAction("REFUND_ROLLBACK_FAILED").
+		SetOperator("admin").
+		SetDetail(`{"balanceDeducted":60}`).
+		Save(ctx)
+	require.NoError(t, err)
+	svc := &PaymentService{entClient: client}
+	for _, amount := range []float64{0, 60, 100} {
+		for _, force := range []bool{false, true} {
+			plan, early, err := svc.PrepareRefund(ctx, order.ID, amount, "unproven original amount", force, true)
+			require.ErrorContains(t, err, "legacy held refund amount requires reconciliation")
+			require.Nil(t, plan)
+			require.Nil(t, early)
+		}
+	}
+	current, err := client.PaymentOrder.Get(ctx, order.ID)
+	require.NoError(t, err)
+	require.Equal(t, order.Status, current.Status)
+	require.Equal(t, order.RefundAmount, current.RefundAmount)
+	require.True(t, order.UpdatedAt.Equal(current.UpdatedAt))
+	user, err := client.User.Get(ctx, order.UserID)
+	require.NoError(t, err)
+	require.Equal(t, 40.0, user.Balance)
+	require.Zero(t, countRefundAuditsForTest(t, ctx, client, order.ID, "REFUND_DEDUCTION_RETURNED"))
+}
+
+func TestRefundRetryRejectsUnprovenLegacySubscriptionRevocation(t *testing.T) {
+	ctx := context.Background()
+	client := newPaymentConfigServiceTestClient(t)
+	order := createLegacySubscriptionRefundForAttemptTest(t, ctx, client, "unproven-legacy-revocation")
+	now := time.Now()
+	// This row could have been shortened by seven days before an unrelated
+	// administrator revocation. Restoring it alone would lose those seven days.
+	original, err := client.UserSubscription.Create().
+		SetUserID(order.UserID).
+		SetGroupID(*order.SubscriptionGroupID).
+		SetStartsAt(now.AddDate(0, 0, -30)).
+		SetExpiresAt(now.AddDate(0, 0, 2)).
+		SetDeletedAt(now.Add(-time.Hour)).
+		Save(ctx)
+	require.NoError(t, err)
+	svc := &PaymentService{entClient: client}
+	for _, force := range []bool{false, true} {
+		plan, early, err := svc.PrepareRefund(ctx, order.ID, 60, "unproven legacy revocation", force, true)
+		require.ErrorContains(t, err, "legacy revoked subscription deduction requires reconciliation")
+		require.Nil(t, plan)
+		require.Nil(t, early)
+	}
+	reloaded, err := client.UserSubscription.Get(mixins.SkipSoftDelete(ctx), original.ID)
+	require.NoError(t, err)
+	require.NotNil(t, reloaded.DeletedAt)
+	require.True(t, original.ExpiresAt.Equal(reloaded.ExpiresAt))
+	require.True(t, original.DeletedAt.Equal(*reloaded.DeletedAt))
+	require.Zero(t, countRefundAuditsForTest(t, ctx, client, order.ID, "REFUND_DEDUCTION_RETURNED"))
 }
