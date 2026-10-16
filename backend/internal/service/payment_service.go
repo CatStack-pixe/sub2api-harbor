@@ -134,6 +134,10 @@ type RefundPlan struct {
 	BalanceToDeduct float64
 	SubDaysToDeduct int
 	SubscriptionID  int64
+	// deductionHeld 表示扣减已在进入 REFUND_PENDING 前执行并保留，终态收敛时不再重复扣减。
+	deductionHeld bool
+	// pendingAuditID 标识本次查单对应的持久退款尝试，防止旧结果认领重试产生的新 pending。
+	pendingAuditID int64
 }
 
 type RefundResult struct {
