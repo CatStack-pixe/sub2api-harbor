@@ -373,6 +373,7 @@ func TestRefundRetryRestoresOriginalHeldRefundAmount(t *testing.T) {
 		failedDetail  string
 		force         bool
 		deduct        bool
+		pendingAfter  bool
 	}{
 		{
 			name: "original pending amount", refundAmount: 60, storedAmount: 100, deduct: true,
@@ -399,6 +400,11 @@ func TestRefundRetryRestoresOriginalHeldRefundAmount(t *testing.T) {
 			pendingDetail: `{"refundID":"rf_test"}`,
 			failedDetail:  `{"balanceDeducted":60}`,
 		},
+		{
+			name: "legacy failure precedes current pending", refundAmount: 60, storedAmount: 60, deduct: true,
+			pendingDetail: `{"refundID":"rf_previous","refundAmount":100}`,
+			failedDetail: `{"balanceDeducted":60}`, pendingAfter: true,
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()
@@ -416,6 +422,19 @@ func TestRefundRetryRestoresOriginalHeldRefundAmount(t *testing.T) {
 				SetDetail(tc.failedDetail).
 				Save(ctx)
 			require.NoError(t, err)
+			if tc.pendingAfter {
+				_, err = client.PaymentAuditLog.Create().
+					SetOrderID(strconv.FormatInt(order.ID, 10)).
+					SetAction("REFUND_PENDING").
+					SetOperator("admin").
+					SetDetail(`{"refundID":"rf_current","refundAmount":60,"deductionRollbackOK":false}`).
+					Save(ctx)
+				require.NoError(t, err)
+				changed, early, err := (&PaymentService{entClient: client}).PrepareRefund(ctx, order.ID, 100, "stale previous amount", true, true)
+				require.Equal(t, "REFUND_AMOUNT_CHANGED", infraerrors.Reason(err))
+				require.Nil(t, changed)
+				require.Nil(t, early)
+			}
 			refundCalls := 0
 			prov := &refundAttemptProviderTestDouble{
 				refund: func(_ context.Context, req payment.RefundRequest) (*payment.RefundResponse, error) {

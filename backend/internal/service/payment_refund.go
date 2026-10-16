@@ -307,7 +307,10 @@ func (s *PaymentService) outstandingRefundDeduction(ctx context.Context, oid int
 		}
 	}
 	if detail.RefundAmount == 0 || (detail.DeductionType == payment.DeductionTypeSubscription && detail.SubscriptionID == 0) {
-		pending, err := refundPendingDetailBefore(ctx, s.entClient, oid, entry.ID)
+		// Legacy markRefundPending wrote rollback failures before its pending
+		// audit. The current pending record can therefore follow this failure;
+		// restricting recovery to earlier audits can pick a previous attempt.
+		pending, err := latestRefundPendingDetailWithClient(ctx, s.entClient, oid)
 		if err != nil {
 			return nil, err
 		}
@@ -340,6 +343,7 @@ func (s *PaymentService) outstandingRefundDeduction(ctx context.Context, oid int
 				return nil, fmt.Errorf("resolve unique legacy refund subscription binding: %w", err)
 			}
 			detail.SubscriptionID = sub.ID
+			detail.SubscriptionRevoked = sub.DeletedAt != nil
 		}
 	}
 	if math.IsNaN(detail.RefundAmount) || math.IsInf(detail.RefundAmount, 0) || detail.RefundAmount <= 0 ||
@@ -439,6 +443,7 @@ func (s *PaymentService) ExecuteRefund(ctx context.Context, p *RefundPlan) (*Ref
 						s.restoreStatus(ctx, p)
 						return nil, fmt.Errorf("revoke subscription: %w", revokeErr)
 					}
+					p.subscriptionRevoked = true
 				} else {
 					// Other errors (DB failure, not found) — abort refund
 					s.restoreStatus(ctx, p)
@@ -688,6 +693,7 @@ func (s *PaymentService) applyRefundFinalDeduction(ctx context.Context, p *Refun
 				if revokeErr := s.subscriptionSvc.RevokeSubscription(ctx, p.SubscriptionID); revokeErr != nil {
 					return fmt.Errorf("revoke subscription: %w", revokeErr)
 				}
+				p.subscriptionRevoked = true
 			} else {
 				return fmt.Errorf("deduct subscription days: %w", err)
 			}
@@ -781,6 +787,14 @@ func (s *PaymentService) returnHeldRefundDeduction(ctx context.Context, p *Refun
 		}
 	}
 	if p.DeductionType == payment.DeductionTypeSubscription && p.SubDaysToDeduct > 0 && p.SubscriptionID > 0 {
+		if p.subscriptionRevoked {
+			// Revocation did not shorten expiry; extending after restoration would
+			// repay days that were never removed.
+			if _, err := s.subscriptionSvc.RestoreSubscription(ctx, p.SubscriptionID); err != nil {
+				return fmt.Errorf("restore held subscription deduction: %w", err)
+			}
+			return nil
+		}
 		if _, err := s.subscriptionSvc.ExtendSubscription(ctx, p.SubscriptionID, p.SubDaysToDeduct); err != nil {
 			return fmt.Errorf("return held subscription deduction: %w", err)
 		}
@@ -790,11 +804,12 @@ func (s *PaymentService) returnHeldRefundDeduction(ctx context.Context, p *Refun
 
 func refundDeductionAuditDetail(p *RefundPlan) map[string]any {
 	return map[string]any{
-		"refundAmount":    p.RefundAmount,
-		"deductionType":   p.DeductionType,
-		"balanceDeducted": p.BalanceToDeduct,
-		"subDaysDeducted": p.SubDaysToDeduct,
-		"subscriptionID":  p.SubscriptionID,
+		"refundAmount":        p.RefundAmount,
+		"deductionType":       p.DeductionType,
+		"balanceDeducted":     p.BalanceToDeduct,
+		"subDaysDeducted":     p.SubDaysToDeduct,
+		"subscriptionID":      p.SubscriptionID,
+		"subscriptionRevoked": p.subscriptionRevoked,
 	}
 }
 
@@ -827,6 +842,7 @@ type refundPendingAuditDetail struct {
 	BalanceDeducted     float64 `json:"balanceDeducted"`
 	SubDaysDeducted     int     `json:"subDaysDeducted"`
 	SubscriptionID      int64   `json:"subscriptionID,omitempty"`
+	SubscriptionRevoked bool   `json:"subscriptionRevoked,omitempty"`
 	// requestedAt 取自审计记录的创建时间，不参与序列化。
 	requestedAt time.Time
 	auditID     int64
@@ -842,6 +858,7 @@ func (d refundPendingAuditDetail) applyTo(p *RefundPlan) {
 	p.BalanceToDeduct = d.BalanceDeducted
 	p.SubDaysToDeduct = d.SubDaysDeducted
 	p.SubscriptionID = d.SubscriptionID
+	p.subscriptionRevoked = d.SubscriptionRevoked
 }
 
 // latestRefundPendingDetail 读取最近一次 REFUND_PENDING 审计。没有记录视为旧订单（扣减已在
@@ -851,18 +868,10 @@ func (s *PaymentService) latestRefundPendingDetail(ctx context.Context, oid int6
 }
 
 func latestRefundPendingDetailWithClient(ctx context.Context, client *dbent.Client, oid int64) (refundPendingAuditDetail, error) {
-	return refundPendingDetailBefore(ctx, client, oid, 0)
-}
-
-// beforeAuditID pins legacy recovery to a pending record preceding the failure.
-func refundPendingDetailBefore(ctx context.Context, client *dbent.Client, oid, beforeAuditID int64) (refundPendingAuditDetail, error) {
 	detail := refundPendingAuditDetail{DeductionRollbackOK: true}
 	query := client.PaymentAuditLog.Query().
 		Where(paymentauditlog.OrderIDEQ(strconv.FormatInt(oid, 10)), paymentauditlog.ActionEQ("REFUND_PENDING")).
 		Order(paymentauditlog.ByID(sql.OrderDesc()))
-	if beforeAuditID > 0 {
-		query = query.Where(paymentauditlog.IDLT(beforeAuditID))
-	}
 	logEntry, err := query.First(ctx)
 	if err != nil {
 		if dbent.IsNotFound(err) {
@@ -948,15 +957,16 @@ func (s *PaymentService) markRefundOkTx(ctx context.Context, client *dbent.Clien
 // 订单状态与审计记录同事务写入，确保终态收敛时能读到保留的扣减。
 func (s *PaymentService) markRefundPending(ctx context.Context, p *RefundPlan, resp *payment.RefundResponse) (_ *RefundResult, err error) {
 	detail, err := json.Marshal(refundPendingAuditDetail{
-		RefundID:        refundResponseID(resp),
-		RefundAmount:    p.RefundAmount,
-		Reason:          p.Reason,
-		Force:           p.Force,
-		DeductionHeld:   true,
-		DeductionType:   p.DeductionType,
-		BalanceDeducted: p.BalanceToDeduct,
-		SubDaysDeducted: p.SubDaysToDeduct,
-		SubscriptionID:  p.SubscriptionID,
+		RefundID:            refundResponseID(resp),
+		RefundAmount:        p.RefundAmount,
+		Reason:              p.Reason,
+		Force:               p.Force,
+		DeductionHeld:       true,
+		DeductionType:       p.DeductionType,
+		BalanceDeducted:     p.BalanceToDeduct,
+		SubDaysDeducted:     p.SubDaysToDeduct,
+		SubscriptionID:      p.SubscriptionID,
+		SubscriptionRevoked: p.subscriptionRevoked,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("marshal refund pending audit: %w", err)

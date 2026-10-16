@@ -136,6 +136,9 @@ type RefundPlan struct {
 	SubscriptionID  int64
 	// deductionHeld 表示扣减已在进入 REFUND_PENDING 前执行并保留，终态收敛时不再重复扣减。
 	deductionHeld bool
+	// subscriptionRevoked records a deduction that revoked the original row
+	// without shortening its expiry. Repayment restores that row without adding days.
+	subscriptionRevoked bool
 	// pendingAuditID 标识本次查单对应的持久退款尝试，防止旧结果认领重试产生的新 pending。
 	pendingAuditID int64
 }
