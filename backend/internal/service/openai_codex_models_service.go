@@ -946,6 +946,28 @@ func (s *GatewayService) BuildCodexModelsManifestForGroup(
 	platformOverride string,
 	modelIDs []string,
 ) ([]byte, error) {
+	return s.buildCodexModelsManifestForGroup(ctx, group, platformOverride, modelIDs, nil)
+}
+
+// BuildCodexModelsManifestForDirectory uses the listing snapshot for retirement
+// eligibility while retaining the broader catalog for capability metadata.
+func (s *GatewayService) BuildCodexModelsManifestForDirectory(
+	ctx context.Context,
+	group *Group,
+	platformOverride string,
+	modelIDs []string,
+	directory AvailableModelDirectory,
+) ([]byte, error) {
+	return s.buildCodexModelsManifestForGroup(ctx, group, platformOverride, modelIDs, &directory)
+}
+
+func (s *GatewayService) buildCodexModelsManifestForGroup(
+	ctx context.Context,
+	group *Group,
+	platformOverride string,
+	modelIDs []string,
+	directory *AvailableModelDirectory,
+) ([]byte, error) {
 	if s == nil || s.accountRepo == nil || group == nil {
 		return BuildCodexModelsManifest(modelIDs)
 	}
@@ -969,10 +991,15 @@ func (s *GatewayService) BuildCodexModelsManifestForGroup(
 			compositeRoutesAvailable = false
 		}
 	}
-	return buildCodexModelsManifestForAccounts(
+	retirementAccounts := catalog
+	if directory != nil && domain.UsesOpenAIGateway(effectivePlatform) {
+		retirementAccounts = append([]Account(nil), directory.accounts...)
+	}
+	return buildCodexModelsManifestForAccountPools(
 		effectivePlatform,
 		modelIDs,
 		catalog,
+		retirementAccounts,
 		group,
 		compositeRoutes,
 		compositeRoutesAvailable,
@@ -987,8 +1014,22 @@ func buildCodexModelsManifestForAccounts(
 	compositeRoutes []CompositeModelRoute,
 	compositeRoutesAvailable bool,
 ) ([]byte, error) {
-	if effectivePlatform == PlatformOpenAI {
-		modelIDs = filterRetiredOpenAIModelIDs(accounts, modelIDs)
+	return buildCodexModelsManifestForAccountPools(
+		effectivePlatform, modelIDs, accounts, accounts, group, compositeRoutes, compositeRoutesAvailable,
+	)
+}
+
+func buildCodexModelsManifestForAccountPools(
+	effectivePlatform string,
+	modelIDs []string,
+	accounts []Account,
+	retirementAccounts []Account,
+	group *Group,
+	compositeRoutes []CompositeModelRoute,
+	compositeRoutesAvailable bool,
+) ([]byte, error) {
+	if domain.UsesOpenAIGateway(effectivePlatform) {
+		modelIDs = filterRetiredOpenAIModelIDsForGroup(retirementAccounts, modelIDs, group)
 	} else if effectivePlatform == PlatformComposite {
 		filtered := make([]string, 0, len(modelIDs))
 		for _, modelID := range modelIDs {

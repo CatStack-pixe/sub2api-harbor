@@ -3,7 +3,45 @@ package service
 import (
 	"encoding/json"
 	"strings"
+
+	"github.com/Wei-Shaw/sub2api/internal/domain"
 )
+
+// AvailableModelDirectory keeps listing candidates and their account pool in
+// one snapshot, including when candidates are served from the short cache.
+type AvailableModelDirectory struct {
+	ModelIDs []string
+	accounts []Account
+	platform string
+}
+
+func (d AvailableModelDirectory) clone() AvailableModelDirectory {
+	if d.ModelIDs != nil {
+		models := make([]string, len(d.ModelIDs))
+		copy(models, d.ModelIDs)
+		d.ModelIDs = models
+	}
+	d.accounts = append([]Account(nil), d.accounts...)
+	return d
+}
+
+// FilterRetiredModels must also run after custom-list or allowlist expansion:
+// a surviving wildcard can otherwise reintroduce a retired exact mapping.
+func (d AvailableModelDirectory) FilterRetiredModels(models []string) []string {
+	return d.FilterRetiredModelsForGroup(models, nil)
+}
+
+// FilterRetiredModelsForGroup resolves group aliases before account mappings,
+// while retaining the public names used by the catalog and API-key permissions.
+func (d AvailableModelDirectory) FilterRetiredModelsForGroup(models []string, group *Group) []string {
+	if !domain.UsesOpenAIGateway(d.platform) {
+		return models
+	}
+	// Account model lookups memoize mappings. Keep those writes local to this
+	// invocation rather than mutating an account slice shared with the cache.
+	accounts := append([]Account(nil), d.accounts...)
+	return filterRetiredOpenAIModelIDsForGroup(accounts, models, group)
+}
 
 // GPT-5.5 retired from Codex with ChatGPT sign-in on 2026-10-14 at
 // 19:00 UTC. API-key upstreams remain supported. Do not infer upstream
@@ -40,9 +78,17 @@ func openAIModelRetiredForAccounts(accounts []Account, modelID string) bool {
 }
 
 func filterRetiredOpenAIModelIDs(accounts []Account, models []string) []string {
+	return filterRetiredOpenAIModelIDsForGroup(accounts, models, nil)
+}
+
+func filterRetiredOpenAIModelIDsForGroup(accounts []Account, models []string, group *Group) []string {
+	if models == nil {
+		return nil
+	}
 	filtered := make([]string, 0, len(models))
 	for _, model := range models {
-		if !openAIModelRetiredForAccounts(accounts, model) {
+		requestedModel, _ := group.ResolveRequestModel(model)
+		if !openAIModelRetiredForAccounts(accounts, requestedModel) {
 			filtered = append(filtered, model)
 		}
 	}

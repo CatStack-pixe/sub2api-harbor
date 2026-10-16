@@ -1420,6 +1420,12 @@ func (s *GatewayService) GetAvailableModels(ctx context.Context, groupID *int64,
 	return s.getAvailableModels(ctx, groupID, platform, false)
 }
 
+// GetAvailableModelDirectory retains the exact account pool used to build the
+// catalog so handlers can filter concrete selections without another lookup.
+func (s *GatewayService) GetAvailableModelDirectory(ctx context.Context, groupID *int64, platform string) AvailableModelDirectory {
+	return s.getAvailableModelDirectory(ctx, groupID, platform, false)
+}
+
 // GetAvailableModelsForExactPlatform returns model mappings from accounts whose
 // concrete platform exactly matches the requested platform. Composite model
 // listing uses this to keep each platform's defaults and mappings isolated
@@ -1429,13 +1435,18 @@ func (s *GatewayService) GetAvailableModelsForExactPlatform(ctx context.Context,
 }
 
 func (s *GatewayService) getAvailableModels(ctx context.Context, groupID *int64, platform string, exactPlatform bool) []string {
+	return s.getAvailableModelDirectory(ctx, groupID, platform, exactPlatform).ModelIDs
+}
+
+func (s *GatewayService) getAvailableModelDirectory(ctx context.Context, groupID *int64, platform string, exactPlatform bool) AvailableModelDirectory {
+	directory := AvailableModelDirectory{platform: platform}
 	cacheKey := modelsListCacheKey(groupID, platform)
 	cacheEnabled := s.modelsListCache != nil && !exactPlatform
 	if cacheEnabled {
 		if cached, found := s.modelsListCache.Get(cacheKey); found {
-			if models, ok := cached.([]string); ok {
+			if cachedDirectory, ok := cached.(AvailableModelDirectory); ok {
 				modelsListCacheHitTotal.Add(1)
-				return cloneStringSlice(models)
+				return cachedDirectory.clone()
 			}
 		}
 	}
@@ -1451,7 +1462,7 @@ func (s *GatewayService) getAvailableModels(ctx context.Context, groupID *int64,
 	}
 
 	if err != nil || len(accounts) == 0 {
-		return nil
+		return directory
 	}
 
 	// Filter by platform if specified. Mixed scheduling (a gemini group routing
@@ -1469,6 +1480,7 @@ func (s *GatewayService) getAvailableModels(ctx context.Context, groupID *int64,
 		}
 		accounts = filtered
 	}
+	directory.accounts = accounts
 
 	// Collect unique models from all accounts
 	modelSet := make(map[string]struct{})
@@ -1501,15 +1513,16 @@ func (s *GatewayService) getAvailableModels(ctx context.Context, groupID *int64,
 	if !hasAnyMapping && platform == PlatformOpenAI {
 		models := filterRetiredOpenAIModelIDs(accounts, openai.DefaultModelIDs())
 		if len(models) != len(openai.DefaultModels) {
-			return models
+			directory.ModelIDs = models
+			return directory
 		}
 	}
 	if !hasAnyMapping {
 		if cacheEnabled {
-			s.modelsListCache.Set(cacheKey, []string(nil), s.modelsListCacheTTL)
+			s.modelsListCache.Set(cacheKey, directory.clone(), s.modelsListCacheTTL)
 			modelsListCacheStoreTotal.Add(1)
 		}
-		return nil
+		return directory
 	}
 
 	// Convert to slice
@@ -1521,19 +1534,14 @@ func (s *GatewayService) getAvailableModels(ctx context.Context, groupID *int64,
 
 	if platform == PlatformOpenAI {
 		models = supplementUnmappedOpenAIModels(accounts, models)
-		models = filterRetiredOpenAIModelIDs(accounts, models)
-		// nil means "use defaults" to listing callers; an empty filtered catalog
-		// must remain authoritative instead of resurrecting retired defaults.
-		if len(models) == 0 {
-			return models
-		}
 	}
+	directory.ModelIDs = directory.FilterRetiredModels(models)
 
 	if cacheEnabled {
-		s.modelsListCache.Set(cacheKey, cloneStringSlice(models), s.modelsListCacheTTL)
+		s.modelsListCache.Set(cacheKey, directory.clone(), s.modelsListCacheTTL)
 		modelsListCacheStoreTotal.Add(1)
 	}
-	return cloneStringSlice(models)
+	return directory.clone()
 }
 
 func (s *GatewayService) resolveCompositeModelOwnership(ctx context.Context, groupID int64, model string) (CompositeModelOwnership, error) {

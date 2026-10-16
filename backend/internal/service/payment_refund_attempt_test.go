@@ -403,7 +403,7 @@ func TestRefundRetryRestoresOriginalHeldRefundAmount(t *testing.T) {
 		{
 			name: "legacy failure precedes current pending", refundAmount: 60, storedAmount: 60, deduct: true,
 			pendingDetail: `{"refundID":"rf_previous","refundAmount":100}`,
-			failedDetail: `{"balanceDeducted":60}`, pendingAfter: true,
+			failedDetail:  `{"balanceDeducted":60}`, pendingAfter: true,
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

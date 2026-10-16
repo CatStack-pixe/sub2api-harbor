@@ -319,6 +319,7 @@ func (s *PaymentService) outstandingRefundDeduction(ctx context.Context, oid int
 		}
 		if detail.SubscriptionID == 0 {
 			detail.SubscriptionID = pending.SubscriptionID
+			detail.SubscriptionRevoked = pending.SubscriptionRevoked
 		}
 	}
 	if detail.RefundAmount == 0 || (detail.DeductionType == payment.DeductionTypeSubscription && detail.SubscriptionID == 0) {
@@ -842,7 +843,7 @@ type refundPendingAuditDetail struct {
 	BalanceDeducted     float64 `json:"balanceDeducted"`
 	SubDaysDeducted     int     `json:"subDaysDeducted"`
 	SubscriptionID      int64   `json:"subscriptionID,omitempty"`
-	SubscriptionRevoked bool   `json:"subscriptionRevoked,omitempty"`
+	SubscriptionRevoked bool    `json:"subscriptionRevoked,omitempty"`
 	// requestedAt 取自审计记录的创建时间，不参与序列化。
 	requestedAt time.Time
 	auditID     int64

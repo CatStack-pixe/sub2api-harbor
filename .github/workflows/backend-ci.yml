@@ -212,6 +212,9 @@ jobs:
       - name: Verify refund retry and stale-result concurrency
         working-directory: backend
         run: go test -race -tags=unit ./internal/service -run '^(TestRefundRetry.*|TestRefundQueryCannotFinalizeLaterAttempt)$' -count=1
+      - name: Verify model directory snapshot concurrency
+        working-directory: backend
+        run: go test -race -tags=unit ./internal/service -run '^TestAvailableModelDirectory' -count=1
 
   proxy-pool-import:
     needs: [generated, test, integration, golangci-lint]
