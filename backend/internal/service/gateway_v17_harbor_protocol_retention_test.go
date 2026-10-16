@@ -20,28 +20,28 @@ func TestV17AnthropicEndpointSelectionRetainsHarborProviderAuthentication(t *tes
 		wantURL  string
 	}{
 		{
-			name: "ChatAnywhere",
+			name:     "ChatAnywhere",
 			platform: PlatformChatAnywhere,
-			baseURL: ChatAnywhereGlobalBaseURL,
-			wantURL: ChatAnywhereGlobalBaseURL + "/messages",
+			baseURL:  ChatAnywhereGlobalBaseURL,
+			wantURL:  ChatAnywhereGlobalBaseURL + "/messages",
 		},
 		{
-			name: "TokenRhythm",
+			name:     "TokenRhythm",
 			platform: PlatformTokenRhythm,
-			baseURL: "https://tokenrhythm.example",
-			wantURL: "https://tokenrhythm.example/v1/messages?beta=true",
+			baseURL:  "https://tokenrhythm.example",
+			wantURL:  "https://tokenrhythm.example/v1/messages?beta=true",
 		},
 		{
-			name: "SenseAudio",
+			name:     "SenseAudio",
 			platform: PlatformSenseAudio,
-			baseURL: "https://senseaudio.example",
-			wantURL: "https://senseaudio.example/v1/messages?beta=true",
+			baseURL:  "https://senseaudio.example",
+			wantURL:  "https://senseaudio.example/v1/messages?beta=true",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			account := &Account{
-				Platform: tc.platform,
-				Type: AccountTypeAPIKey,
+				Platform:    tc.platform,
+				Type:        AccountTypeAPIKey,
 				Credentials: map[string]any{"base_url": tc.baseURL},
 			}
 			svc := &GatewayService{cfg: &config.Config{}}

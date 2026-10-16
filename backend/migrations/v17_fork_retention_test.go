@@ -16,10 +16,10 @@ func TestV17RetainsAllDeployedHarborMigrations(t *testing.T) {
 		t.Fatal(err)
 	}
 	var fixture struct {
-		Baseline string `json:"baseline"`
+		Baseline   string `json:"baseline"`
 		Migrations []struct {
 			Filename string `json:"filename"`
-			SHA256 string `json:"sha256"`
+			SHA256   string `json:"sha256"`
 		} `json:"migrations"`
 	}
 	if err := json.Unmarshal(data, &fixture); err != nil {
