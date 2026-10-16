@@ -1199,38 +1199,42 @@ func (h *GatewayHandler) Models(c *gin.Context) {
 	}
 
 	// Get available models from account configurations for the selected group platform.
-	availableModels := h.gatewayService.GetAvailableModels(c.Request.Context(), groupID, platform)
+	directory := h.gatewayService.GetAvailableModelDirectory(c.Request.Context(), groupID, platform)
+	availableModels := directory.ModelIDs
 	if apiKey != nil && apiKey.Group != nil && apiKey.Group.RequestModelMappingEnabled() {
 		availableModels = groupRequestModelAliases(apiKey.Group)
 		if apiKey.Group.CustomModelsListEnabled() {
 			availableModels = filterModelsByCustomList(availableModels, nil, apiKey.Group.ModelsListConfig.Models)
 		}
+		availableModels = directory.FilterRetiredModelsForGroup(availableModels, apiKey.Group)
 		availableModels = filterAPIKeyModels(apiKey, availableModels)
 		writeCustomModelsList(c, platform, availableModels)
 		return
 	}
 	if apiKey != nil && apiKey.Group != nil && apiKey.Group.CustomModelsListEnabled() {
 		fallbackModels := defaultModelIDsForPlatform(platform)
-		availableModels = filterModelsByCustomList(customModelsListSource(platform, availableModels, fallbackModels), fallbackModels, apiKey.Group.ModelsListConfig.Models)
+		availableModels = filterModelsByCustomListForPlatform(platform, availableModels, fallbackModels, apiKey.Group.ModelsListConfig.Models)
+		availableModels = directory.FilterRetiredModels(availableModels)
 		availableModels = filterAPIKeyModels(apiKey, availableModels)
 		writeCustomModelsList(c, platform, availableModels)
 		return
 	}
 	if apiKey != nil && apiKey.Group != nil && apiKey.Group.ModelAllowlistEnabled() {
 		source := modelListingSource(platform, availableModels, defaultModelIDsForPlatform(platform))
-		writeAllowlistedModelsList(c, platform, filterAPIKeyModels(apiKey, apiKey.Group.ModelAllowlist.FilterForListing(source)))
+		availableModels = directory.FilterRetiredModels(apiKey.Group.ModelAllowlist.FilterForListing(source))
+		writeAllowlistedModelsList(c, platform, filterAPIKeyModels(apiKey, availableModels))
 		return
 	}
 
 	availableModels = filterAPIKeyModels(apiKey, availableModels)
-	if len(availableModels) > 0 {
+	if len(availableModels) > 0 || (domain.UsesOpenAIGateway(platform) && availableModels != nil) {
 		writeModelsList(c, platform, availableModels)
 		return
 	}
 
 	// Fallback to default models
 	if platform == service.PlatformOpenAI {
-		writeOpenAIModelsList(c, filterAPIKeyModels(apiKey, defaultModelIDsForPlatform(platform)))
+		writeOpenAIModelsList(c, filterAPIKeyModels(apiKey, directory.FilterRetiredModels(defaultModelIDsForPlatform(platform))))
 		return
 	}
 
@@ -1239,7 +1243,7 @@ func (h *GatewayHandler) Models(c *gin.Context) {
 		return
 	}
 	if platform == service.PlatformGrok {
-		writeGrokModelsList(c, filterAPIKeyModels(apiKey, xai.DefaultModelIDs()))
+		writeGrokModelsList(c, filterAPIKeyModels(apiKey, directory.FilterRetiredModels(xai.DefaultModelIDs())))
 		return
 	}
 	if platform == service.PlatformTypeSafe {
@@ -1247,11 +1251,12 @@ func (h *GatewayHandler) Models(c *gin.Context) {
 		return
 	}
 
-	writeModelsList(c, platform, filterAPIKeyModels(apiKey, defaultModelIDsForPlatform(platform)))
+	writeModelsList(c, platform, filterAPIKeyModels(apiKey, directory.FilterRetiredModels(defaultModelIDsForPlatform(platform))))
 }
 
 func filterAPIKeyModels(apiKey *service.APIKey, modelIDs []string) []string {
-	if apiKey == nil {
+	// nil asks the caller to use defaults; a non-nil empty catalog is authoritative.
+	if apiKey == nil || modelIDs == nil {
 		return modelIDs
 	}
 	filtered := make([]string, 0, len(modelIDs))
@@ -1292,13 +1297,15 @@ func (h *GatewayHandler) CodexModels(c *gin.Context) {
 	if value, exists := middleware2.GetForcePlatformFromContext(c); exists {
 		forcedPlatform = strings.TrimSpace(value)
 	}
-	modelIDs := h.codexModelIDsForGroup(c.Request.Context(), apiKey.Group, forcedPlatform)
+	modelIDs, directory := h.codexModelIDsForGroup(c.Request.Context(), apiKey.Group, forcedPlatform)
 	modelIDs = filterAPIKeyModels(apiKey, service.FilterCodexModelIDsForGroup(modelIDs, apiKey.Group))
-	body, err := h.gatewayService.BuildCodexModelsManifestForGroup(
+	modelIDs = directory.FilterRetiredModelsForGroup(modelIDs, apiKey.Group)
+	body, err := h.gatewayService.BuildCodexModelsManifestForDirectory(
 		c.Request.Context(),
 		apiKey.Group,
 		forcedPlatform,
 		modelIDs,
+		directory,
 	)
 	if err != nil {
 		h.errorResponse(c, http.StatusInternalServerError, "api_error", "Failed to build Codex models manifest")
@@ -1314,17 +1321,17 @@ func (h *GatewayHandler) CodexModels(c *gin.Context) {
 	c.Data(http.StatusOK, "application/json", body)
 }
 
-func (h *GatewayHandler) codexModelIDsForGroup(ctx context.Context, group *service.Group, platformOverride string) []string {
-	models := h.forkCodexModelIDsForGroup(ctx, group, platformOverride)
+func (h *GatewayHandler) codexModelIDsForGroup(ctx context.Context, group *service.Group, platformOverride string) ([]string, service.AvailableModelDirectory) {
+	models, directory := h.forkCodexModelIDsForGroup(ctx, group, platformOverride)
 	if group != nil && group.ModelAllowlistEnabled() {
-		return group.ModelAllowlist.FilterForListing(models)
+		models = group.ModelAllowlist.FilterForListing(models)
 	}
-	return models
+	return directory.FilterRetiredModelsForGroup(models, group), directory
 }
 
-func (h *GatewayHandler) forkCodexModelIDsForGroup(ctx context.Context, group *service.Group, platformOverride string) []string {
+func (h *GatewayHandler) forkCodexModelIDsForGroup(ctx context.Context, group *service.Group, platformOverride string) ([]string, service.AvailableModelDirectory) {
 	if h == nil || h.gatewayService == nil || group == nil {
-		return nil
+		return nil, service.AvailableModelDirectory{}
 	}
 
 	groupID := &group.ID
@@ -1345,24 +1352,33 @@ func (h *GatewayHandler) forkCodexModelIDsForGroup(ctx context.Context, group *s
 			models = group.ModelAllowlist.FilterForListing(models)
 		}
 		if filtered, err := h.gatewayService.FilterCompositeCodexModels(ctx, group.ID, models); err == nil {
-			return filtered
+			return filtered, service.AvailableModelDirectory{}
 		}
-		return models
+		return models, service.AvailableModelDirectory{}
 	}
 
-	availableModels := h.gatewayService.GetAvailableModels(ctx, groupID, platform)
+	directory := h.gatewayService.GetAvailableModelDirectory(ctx, groupID, platform)
+	availableModels := directory.ModelIDs
 	fallbackModels := defaultCodexModelIDsForPlatform(platform)
+	if group.RequestModelMappingEnabled() {
+		models := groupRequestModelAliases(group)
+		if group.CustomModelsListEnabled() {
+			models = filterModelsByCustomList(models, nil, group.ModelsListConfig.Models)
+		}
+		return models, directory
+	}
 	if group.CustomModelsListEnabled() {
-		return filterModelsByCustomList(
-			customModelsListSource(platform, availableModels, fallbackModels),
+		return filterModelsByCustomListForPlatform(
+			platform,
+			availableModels,
 			fallbackModels,
 			group.ModelsListConfig.Models,
-		)
+		), directory
 	}
-	if len(availableModels) > 0 {
-		return availableModels
+	if len(availableModels) > 0 || (domain.UsesOpenAIGateway(platform) && availableModels != nil) {
+		return availableModels, directory
 	}
-	return fallbackModels
+	return fallbackModels, directory
 }
 
 // compositeAvailableModels lists the models the composite group can serve.
@@ -1381,7 +1397,7 @@ func (h *GatewayHandler) compositeAvailableModelsAndAliases(ctx context.Context,
 			continue
 		}
 		platformModels := h.gatewayService.GetAvailableModelsForExactPlatform(ctx, groupID, platform)
-		if len(platformModels) == 0 {
+		if len(platformModels) == 0 && (platform != service.PlatformOpenAI || platformModels == nil) {
 			// CN 供应商没有静态默认模型列表（defaultModelIDsForPlatform 的
 			// default 分支是 Claude 列表），composite 下只暴露账号映射键。
 			if _, ok := schedulablePlatforms[platform]; ok && !service.IsMultiProtocolAPIKeyProvider(platform) {
@@ -1531,6 +1547,9 @@ func writeOpenAIModelsList(c *gin.Context, modelIDs []string) {
 // 与平台默认列表（fallbackModels）。账号映射为空时回落默认列表；Anthropic
 // 平台两者取并集，其余平台以账号映射键为准。
 func modelListingSource(platform string, availableModels, fallbackModels []string) []string {
+	if domain.UsesOpenAIGateway(platform) && availableModels != nil {
+		return availableModels
+	}
 	if len(availableModels) == 0 {
 		return fallbackModels
 	}
@@ -2759,6 +2778,15 @@ func customModelsListSource(platform string, availableModels, fallbackModels []s
 		return mergeModelIDs(availableModels, fallbackModels)
 	}
 	return availableModels
+}
+
+func filterModelsByCustomListForPlatform(platform string, availableModels, fallbackModels, selectedModels []string) []string {
+	// Retirement filtering can empty an OpenAI-compatible catalog. Custom
+	// selections must not turn that catalog back into the unfiltered defaults.
+	if domain.UsesOpenAIGateway(platform) && availableModels != nil && len(availableModels) == 0 {
+		return availableModels
+	}
+	return filterModelsByCustomList(customModelsListSource(platform, availableModels, fallbackModels), fallbackModels, selectedModels)
 }
 
 func filterModelsByCustomList(availableModels, fallbackModels, selectedModels []string) []string {

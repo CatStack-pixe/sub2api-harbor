@@ -193,6 +193,29 @@ jobs:
       - name: Integration tests
         working-directory: backend
         run: make test-integration
+
+  payment-race:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: backend/go.mod
+          check-latest: false
+          cache: true
+          cache-dependency-path: backend/go.sum
+      - name: Verify Go version
+        run: test "$(go env GOVERSION)" = "go1.27.2"
+      - name: Generate Ent and Wire
+        working-directory: backend
+        run: go generate ./ent ./cmd/server
+      - name: Verify refund retry and stale-result concurrency
+        working-directory: backend
+        run: go test -race -tags=unit ./internal/service -run '^(TestRefundRetry.*|TestRefundQueryCannotFinalizeLaterAttempt)$' -count=1
+      - name: Verify model directory snapshot concurrency
+        working-directory: backend
+        run: go test -race -tags=unit ./internal/service -run '^TestAvailableModelDirectory' -count=1
+
   proxy-pool-import:
     needs: [generated, test, integration, golangci-lint]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'

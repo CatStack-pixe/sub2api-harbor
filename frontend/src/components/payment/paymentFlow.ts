@@ -94,7 +94,7 @@ type CreateOrderFlowResult = CreateOrderResult & {
   resume_token?: string
 }
 
-type StorageWriter = Pick<Storage, 'removeItem' | 'setItem'>
+type StorageWriter = Pick<Storage, 'getItem' | 'removeItem' | 'setItem'>
 
 export function normalizeVisibleMethod(method: string): VisiblePaymentMethod | '' {
   const normalized = VISIBLE_METHOD_ALIASES[method.trim() as keyof typeof VISIBLE_METHOD_ALIASES]
@@ -261,14 +261,65 @@ export function writePaymentRecoverySnapshot(
   snapshot: PaymentRecoverySnapshot,
   key = PAYMENT_RECOVERY_STORAGE_KEY,
 ): void {
+  const previous = [
+    ...readStripeRecoverySnapshots(storage.getItem(`${key}.stripe`)),
+    readPaymentRecoverySnapshot(storage.getItem(key)),
+  ].filter(saved => saved?.orderId !== snapshot.orderId)
+  const snapshots = readStripeRecoverySnapshots(JSON.stringify([...previous, snapshot]))
+  const byOrder = new Map(snapshots.map(saved => [saved.orderId, saved]))
+  storeStripeRecoverySnapshots(storage, [...byOrder.values()], key)
   storage.setItem(key, JSON.stringify(snapshot))
 }
 
 export function clearPaymentRecoverySnapshot(
-  storage: Pick<Storage, 'removeItem'>,
+  storage: StorageWriter,
   key = PAYMENT_RECOVERY_STORAGE_KEY,
+  orderId?: number,
 ): void {
-  storage.removeItem(key)
+  const current = readPaymentRecoverySnapshot(storage.getItem(key))
+  const clearedOrderId = orderId ?? current?.orderId
+  if (!orderId || !current || current.orderId === orderId) {
+    storage.removeItem(key)
+  }
+  storeStripeRecoverySnapshots(storage, readStripeRecoverySnapshots(storage.getItem(`${key}.stripe`))
+    .filter(saved => saved.orderId !== clearedOrderId), key)
+}
+
+function readStripeRecoverySnapshots(raw: string | null): PaymentRecoverySnapshot[] {
+  try {
+    const entries: unknown = JSON.parse(raw || '[]')
+    if (!Array.isArray(entries)) return []
+    return entries.map(entry => readPaymentRecoverySnapshot(JSON.stringify(entry)))
+      .filter((snapshot): snapshot is PaymentRecoverySnapshot =>
+        !!snapshot?.clientSecret && snapshot.paymentType !== 'airwallex')
+  } catch {
+    return []
+  }
+}
+
+function storeStripeRecoverySnapshots(
+  storage: Pick<Storage, 'removeItem' | 'setItem'>,
+  snapshots: PaymentRecoverySnapshot[],
+  key: string,
+): void {
+  if (snapshots.length) {
+    storage.setItem(`${key}.stripe`, JSON.stringify(snapshots))
+  } else {
+    storage.removeItem(`${key}.stripe`)
+  }
+}
+
+/** Keep pending Stripe checkouts independent when another tab replaces the current order. */
+export function readStripePaymentRecoverySnapshot(
+  storage: Pick<Storage, 'getItem'>,
+  orderId: number,
+  options: { resumeToken?: string } = {},
+): PaymentRecoverySnapshot | null {
+  const current = readPaymentRecoverySnapshot(storage.getItem(PAYMENT_RECOVERY_STORAGE_KEY), options)
+  if (current?.orderId === orderId && current.paymentType !== 'airwallex') return current
+  const saved = readStripeRecoverySnapshots(storage.getItem(`${PAYMENT_RECOVERY_STORAGE_KEY}.stripe`))
+    .find(snapshot => snapshot.orderId === orderId)
+  return saved ? readPaymentRecoverySnapshot(JSON.stringify(saved), options) : null
 }
 
 export function readPaymentRecoverySnapshot(

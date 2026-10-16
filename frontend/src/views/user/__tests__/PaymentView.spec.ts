@@ -23,6 +23,7 @@ const showWarning = vi.hoisted(() => vi.fn())
 const getCheckoutInfo = vi.hoisted(() => vi.fn())
 const bridgeInvoke = vi.hoisted(() => vi.fn())
 const translate = vi.hoisted(() => vi.fn((key: string) => key))
+const deviceState = vi.hoisted(() => ({ mobile: true }))
 // Public settings live in a reactive holder so tests can flip feature flags after mount
 // and exercise the watchers that react to them.
 const appStoreState = vi.hoisted(() => ({
@@ -100,7 +101,7 @@ vi.mock('@/api/payment', () => ({
 }))
 
 vi.mock('@/utils/device', () => ({
-  isMobileDevice: () => true,
+  isMobileDevice: () => deviceState.mobile,
 }))
 
 function checkoutInfoFixture(overrides: Partial<CheckoutInfoResponse> = {}) {
@@ -845,5 +846,109 @@ describe('PaymentView subscription feature flag', () => {
     expect(wrapper.text()).not.toContain('payment.rechargeAccount')
     expect(wrapper.findAllComponents(SubscriptionPlanCard).length).toBeGreaterThan(0)
     wrapper.unmount()
+  })
+})
+
+describe('PaymentView Stripe launch and recovery', () => {
+  const originalLocation = window.location
+  const cleanUrl = '/payment/stripe?order_id=42&resume_token=resume-42'
+  let locationState: { href: string; origin: string }
+
+  beforeEach(() => {
+    vi.useRealTimers()
+    routeState.path = '/purchase'
+    routeState.query = {}
+    deviceState.mobile = true
+    appStoreState.setPublicSettings(undefined)
+    window.localStorage.clear()
+    routerResolve.mockReset().mockReturnValue({ href: cleanUrl })
+    fetchActiveSubscriptions.mockReset().mockResolvedValue(undefined)
+    createOrder.mockReset().mockResolvedValue({
+      order_id: 42, amount: 88, pay_amount: 88, fee_rate: 0,
+      expires_at: '2099-01-01T00:10:00.000Z', payment_type: 'stripe',
+      client_secret: 'pi_secret_42', resume_token: 'resume-42',
+    })
+    getCheckoutInfo.mockReset().mockResolvedValue(checkoutInfoFixture())
+    let currentHref = 'http://localhost/purchase'
+    locationState = {
+      origin: 'http://localhost',
+      get href() { return currentHref },
+      set href(value: string) {
+        if (value === cleanUrl) {
+          expect(JSON.parse(window.localStorage.getItem(PAYMENT_RECOVERY_STORAGE_KEY)!))
+            .toMatchObject({ orderId: 42, clientSecret: 'pi_secret_42', payUrl: cleanUrl })
+        }
+        currentHref = value
+      },
+    }
+    Object.defineProperty(window, 'location', { configurable: true, value: locationState })
+  })
+
+  afterEach(() => {
+    deviceState.mobile = true
+    Object.defineProperty(window, 'location', { configurable: true, value: originalLocation })
+    vi.restoreAllMocks()
+    routerResolve.mockReset().mockReturnValue({ href: '/payment/stripe?mock=1' })
+  })
+
+  function mountCheckout() {
+    return shallowMount(PaymentView, {
+      global: {
+        stubs: {
+          AppLayout: { template: '<div><slot /></div>' },
+          Teleport: true,
+          Transition: false,
+        },
+      },
+    })
+  }
+
+  it.each([
+    ['stripe', true, undefined, false],
+    ['alipay', true, 'alipay', false],
+    ['alipay', false, 'alipay', false],
+    ['wxpay', true, 'wechat_pay', false],
+    ['alipay', false, 'alipay', true],
+  ] as const)('keeps the %s mobile=%s secret in storage before navigation and restores the order (method=%s blocked=%s)', async (method, mobile, stripeMethod, blocked) => {
+    deviceState.mobile = mobile
+    const methodLimit = checkoutInfoFixture().data.methods.wxpay
+    getCheckoutInfo.mockResolvedValue(checkoutInfoFixture({ methods: { [method]: methodLimit } }))
+    const snapshotAtNavigation = () => {
+      expect(JSON.parse(window.localStorage.getItem(PAYMENT_RECOVERY_STORAGE_KEY)!)).toMatchObject({
+        orderId: 42, clientSecret: 'pi_secret_42', resumeToken: 'resume-42', payUrl: cleanUrl,
+      })
+      return blocked ? null : { closed: false } as Window
+    }
+    const open = vi.spyOn(window, 'open').mockImplementation(snapshotAtNavigation)
+    const wrapper = mountCheckout()
+    await flushPromises()
+    wrapper.getComponent({ name: 'AmountInput' }).vm.$emit('update:modelValue', 88)
+    await flushPromises()
+    const submit = wrapper.findAll('button').find(button => button.text().includes('payment.createOrder'))!
+    await submit.trigger('click')
+    await flushPromises()
+    await flushPromises()
+
+    expect(routerResolve).toHaveBeenCalledWith({
+      path: '/payment/stripe',
+      query: { order_id: '42', method: stripeMethod, resume_token: 'resume-42' },
+    })
+    if (method === 'alipay' && !mobile) {
+      expect(open).toHaveBeenCalledWith(cleanUrl, 'paymentPopup', expect.any(String))
+    }
+    if (method !== 'alipay' || mobile || blocked) {
+      expect(locationState.href).toBe(cleanUrl)
+    }
+    const snapshot = JSON.parse(window.localStorage.getItem(PAYMENT_RECOVERY_STORAGE_KEY)!)
+    expect(snapshot).toMatchObject({ orderId: 42, clientSecret: 'pi_secret_42', payUrl: cleanUrl })
+    expect(snapshot.payUrl).not.toContain('client_secret')
+    wrapper.unmount()
+
+    const restored = mountCheckout()
+    await flushPromises()
+    const panel = restored.getComponent({ name: 'PaymentStatusPanel' })
+    expect(panel.props()).toMatchObject({ orderId: 42, payUrl: cleanUrl, paymentType: method })
+    expect(createOrder).toHaveBeenCalledTimes(1)
+    restored.unmount()
   })
 })
