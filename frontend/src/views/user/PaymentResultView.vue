@@ -335,7 +335,17 @@ function clearStatusRefreshTimer(): void {
 
 function clearRecoverySnapshot(): void {
   if (typeof window === 'undefined') return
-  clearPaymentRecoverySnapshot(window.localStorage, PAYMENT_RECOVERY_STORAGE_KEY)
+  const orderId = order.value && 'id' in order.value
+    ? order.value.id
+    : Number(readRouteQueryString('order_id')) || undefined
+  const resumeToken = readRouteQueryString('resume_token')
+  if (resumeToken) {
+    const resumed = readPaymentRecoverySnapshot(window.localStorage.getItem(PAYMENT_RECOVERY_STORAGE_KEY), { resumeToken })
+    if (resumed) {
+      clearPaymentRecoverySnapshot(window.localStorage, PAYMENT_RECOVERY_STORAGE_KEY, resumed.orderId)
+    }
+  }
+  clearPaymentRecoverySnapshot(window.localStorage, PAYMENT_RECOVERY_STORAGE_KEY, orderId)
 }
 
 function clearRecoverySnapshotForTerminalStatus(status: string | null | undefined): void {

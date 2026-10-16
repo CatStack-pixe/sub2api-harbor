@@ -84,6 +84,7 @@ const EditAccountModalStub = defineComponent({
 })
 
 const AccountTestModalStub = defineComponent({
+  name: 'AccountTestModal',
   props: { show: Boolean, account: { type: Object, default: null } },
   template: '<div data-test="test-account">{{ show ? account?.name : "" }}</div>'
 })
@@ -110,6 +111,8 @@ function mountView(stubActionMenu = true) {
         ImportDataModal: true,
         ReAuthAccountModal: true,
         AccountTestModal: AccountTestModalStub,
+        AccountUpstreamTraceModal: true,
+        CreateUpstreamTraceAccountModal: true,
         AccountStatsModal: AccountStatsModalStub,
         ScheduledTestsPanel: true,
         SyncFromCrsModal: true,
@@ -258,6 +261,41 @@ describe('admin AccountsView lite account list', () => {
     await flushPromises()
     expect(getById).toHaveBeenCalledTimes(3)
     expect(wrapper.get('[data-test="stats-account"]').text()).toBe('compact row')
+    wrapper.unmount()
+  })
+
+  it.each([
+    ['admin.accounts.testConnection', 'AccountTestModal'],
+    ['上游 Trace / 计费复现', 'AccountUpstreamTraceModal']
+  ])('opens %s from the real Harbor menu with full account details', async (label, modalName) => {
+    const wrapper = mountView(false)
+    await flushPromises()
+    const trigger = wrapper.findAll('button').find(button => button.text() === 'common.more')!
+    await trigger.trigger('click')
+    const menu = new DOMWrapper(document.body.querySelector('.action-menu-content')!)
+    const action = menu.findAll('button').find(button => button.text() === label)!
+    expect(action).toBeDefined()
+    await action.trigger('click')
+    await flushPromises()
+
+    expect(getById).toHaveBeenCalledWith(42)
+    expect(wrapper.getComponent({ name: modalName }).props()).toMatchObject({
+      show: true, account: fullAccount
+    })
+    expect(wrapper.getComponent(AccountActionMenu).props('show')).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('retains the Harbor trace account creation action beside inline filters', async () => {
+    const wrapper = mountView()
+    await flushPromises()
+    const create = wrapper.findAll('button').find(button => button.text() === '创建测试账户')!
+    await create.trigger('click')
+    const modal = wrapper.getComponent({ name: 'CreateUpstreamTraceAccountModal' })
+    expect(modal.props('show')).toBe(true)
+    modal.vm.$emit('close')
+    await flushPromises()
+    expect(modal.props('show')).toBe(false)
     wrapper.unmount()
   })
 

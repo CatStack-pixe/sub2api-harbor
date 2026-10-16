@@ -1,13 +1,13 @@
 {
   "repository": "Wei-Shaw/sub2api",
-  "tag": "v0.2.16",
-  "commit": "4d9ac3e482106d2da3a39fe3e546d8d6801f1cc1",
-  "previous_tag": "v0.2.15",
-  "previous_commit": "e468262294eb962206ce2d6e4b83f2e8bc43ef02",
-  "fork_baseline": "c032824fe1a3322ac4b661f73f25e0eaf21a9e84",
-  "application_version": "0.2.16-harbor.1",
+  "tag": "v0.2.17",
+  "commit": "b0a02a3304a0a78cdd003ddda1dd23ba02c03084",
+  "previous_tag": "v0.2.16",
+  "previous_commit": "4d9ac3e482106d2da3a39fe3e546d8d6801f1cc1",
+  "fork_baseline": "8b294102d964ca0f30f25a3320f94694e8854450",
+  "application_version": "0.2.17-harbor.1",
   "conflict_policy": "Preserve fork behavior and integrate compatible upstream changes.",
   "history_note": "Squash merges do not retain upstream ancestry. Use the recorded upstream commit as the content merge baseline for the next synchronization, and audit fork differences before merging.",
-  "release_tag_commit": "01842576b3d5c1e2545b5a99ad555d36e28ed306",
-  "synced_at": "2026-10-14"
+  "release_tag_commit": "060d0160417782cd962a0c7f460f6cd4565d4916",
+  "synced_at": "2026-10-16"
 }

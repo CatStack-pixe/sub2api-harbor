@@ -52,7 +52,7 @@ vi.mock('@/api/payment', () => ({
 }))
 
 import PaymentResultView from '../PaymentResultView.vue'
-import { PAYMENT_RECOVERY_STORAGE_KEY } from '@/components/payment/paymentFlow'
+import { PAYMENT_RECOVERY_STORAGE_KEY, readStripePaymentRecoverySnapshot, writePaymentRecoverySnapshot } from '@/components/payment/paymentFlow'
 import { formatPaymentAmount } from '@/components/payment/currency'
 
 const orderFactory = (status: string) => ({
@@ -305,6 +305,24 @@ describe('PaymentResultView', () => {
     expect(verifyOrderPublic).not.toHaveBeenCalled()
     expect(wrapper.text()).toContain('payment.result.success')
     expect(window.localStorage.getItem(PAYMENT_RECOVERY_STORAGE_KEY)).toBeNull()
+  })
+
+  it('settles one Stripe order without clearing another tab’s pending checkout', async () => {
+    routeState.query = { order_id: '42', resume_token: 'resume-42' }
+    writePaymentRecoverySnapshot(window.localStorage, {
+      ...recoverySnapshotFactory('resume-42'), clientSecret: 'pi_secret_42'
+    })
+    writePaymentRecoverySnapshot(window.localStorage, {
+      ...recoverySnapshotFactory('resume-43'), orderId: 43, clientSecret: 'pi_secret_43'
+    })
+    resolveOrderPublicByResumeToken.mockResolvedValueOnce({ data: orderFactory('PAID') })
+    const wrapper = mount(PaymentResultView, { global: { stubs: { OrderStatusBadge: true } } })
+    await flushPromises()
+    expect(wrapper.text()).toContain('payment.result.success')
+    expect(readStripePaymentRecoverySnapshot(window.localStorage, 42)).toBeNull()
+    expect(readStripePaymentRecoverySnapshot(window.localStorage, 43)?.clientSecret).toBe('pi_secret_43')
+    expect(JSON.parse(window.localStorage.getItem(PAYMENT_RECOVERY_STORAGE_KEY)!).orderId).toBe(43)
+    wrapper.unmount()
   })
 
   it('falls back to public out_trade_no verification when resume_token recovery fails in legacy return flows', async () => {
