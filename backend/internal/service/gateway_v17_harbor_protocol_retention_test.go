@@ -52,8 +52,8 @@ func TestV17AnthropicEndpointSelectionRetainsHarborProviderAuthentication(t *tes
 			)
 			require.NoError(t, err)
 			require.Equal(t, tc.wantURL, req.URL.String())
-			require.Equal(t, "Bearer fixture-key", req.Header.Get("Authorization"))
-			require.Empty(t, req.Header.Get("X-Api-Key"))
+			require.Equal(t, "Bearer fixture-key", getHeaderRaw(req.Header, "authorization"))
+			require.Empty(t, getHeaderRaw(req.Header, "x-api-key"))
 		})
 	}
 }

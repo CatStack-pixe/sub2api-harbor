@@ -343,7 +343,7 @@ func TestGatewayModels_UnmappedOpenAIAccountsSupplementMappedModels(t *testing.T
 		{
 			name:     "unmapped API key account also contributes defaults",
 			accounts: append([]service.Account{{ID: 4, Platform: service.PlatformOpenAI, Type: service.AccountTypeAPIKey}}, accounts[1:]...),
-			want:     append(append([]string{}, subscriptionDefaults...), alias),
+			want:     append(openai.DefaultModelIDs(), alias),
 		},
 		{
 			name:     "unmapped accounts alone retain default response shape",

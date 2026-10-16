@@ -1211,7 +1211,7 @@ func (h *GatewayHandler) Models(c *gin.Context) {
 	}
 	if apiKey != nil && apiKey.Group != nil && apiKey.Group.CustomModelsListEnabled() {
 		fallbackModels := defaultModelIDsForPlatform(platform)
-		availableModels = filterModelsByCustomList(customModelsListSource(platform, availableModels, fallbackModels), fallbackModels, apiKey.Group.ModelsListConfig.Models)
+		availableModels = filterModelsByCustomListForPlatform(platform, availableModels, fallbackModels, apiKey.Group.ModelsListConfig.Models)
 		availableModels = filterAPIKeyModels(apiKey, availableModels)
 		writeCustomModelsList(c, platform, availableModels)
 		return
@@ -1251,7 +1251,8 @@ func (h *GatewayHandler) Models(c *gin.Context) {
 }
 
 func filterAPIKeyModels(apiKey *service.APIKey, modelIDs []string) []string {
-	if apiKey == nil {
+	// nil asks the caller to use defaults; a non-nil empty catalog is authoritative.
+	if apiKey == nil || modelIDs == nil {
 		return modelIDs
 	}
 	filtered := make([]string, 0, len(modelIDs))
@@ -1353,8 +1354,9 @@ func (h *GatewayHandler) forkCodexModelIDsForGroup(ctx context.Context, group *s
 	availableModels := h.gatewayService.GetAvailableModels(ctx, groupID, platform)
 	fallbackModels := defaultCodexModelIDsForPlatform(platform)
 	if group.CustomModelsListEnabled() {
-		return filterModelsByCustomList(
-			customModelsListSource(platform, availableModels, fallbackModels),
+		return filterModelsByCustomListForPlatform(
+			platform,
+			availableModels,
 			fallbackModels,
 			group.ModelsListConfig.Models,
 		)
@@ -2762,6 +2764,15 @@ func customModelsListSource(platform string, availableModels, fallbackModels []s
 		return mergeModelIDs(availableModels, fallbackModels)
 	}
 	return availableModels
+}
+
+func filterModelsByCustomListForPlatform(platform string, availableModels, fallbackModels, selectedModels []string) []string {
+	// Retirement filtering can intentionally remove every OpenAI model. Custom
+	// selections must not turn that catalog back into the unfiltered defaults.
+	if platform == service.PlatformOpenAI && availableModels != nil && len(availableModels) == 0 {
+		return availableModels
+	}
+	return filterModelsByCustomList(customModelsListSource(platform, availableModels, fallbackModels), fallbackModels, selectedModels)
 }
 
 func filterModelsByCustomList(availableModels, fallbackModels, selectedModels []string) []string {

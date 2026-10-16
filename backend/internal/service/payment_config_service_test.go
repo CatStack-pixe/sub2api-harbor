@@ -385,8 +385,10 @@ func TestGetPaymentConfigKeepsStoredEnabledTypes(t *testing.T) {
 func newPaymentConfigServiceTestClient(t *testing.T) *dbent.Client {
 	t.Helper()
 
+	// Store timestamps without Go monotonic clock suffixes so persisted
+	// updated_at values can round-trip through compare-and-swap predicates.
 	dbName := fmt.Sprintf(
-		"file:%s?mode=memory&cache=shared",
+		"file:%s?mode=memory&cache=shared&_time_format=sqlite",
 		strings.NewReplacer("/", "_", " ", "_").Replace(t.Name()),
 	)
 	db, err := sql.Open("sqlite", dbName)
