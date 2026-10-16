@@ -16,6 +16,8 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/paymentauditlog"
 	"github.com/Wei-Shaw/sub2api/ent/paymentorder"
 	"github.com/Wei-Shaw/sub2api/ent/paymentproviderinstance"
+	"github.com/Wei-Shaw/sub2api/ent/schema/mixins"
+	"github.com/Wei-Shaw/sub2api/ent/usersubscription"
 	"github.com/Wei-Shaw/sub2api/internal/payment"
 	"github.com/Wei-Shaw/sub2api/internal/payment/provider"
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
@@ -231,8 +233,20 @@ func (s *PaymentService) PrepareRefund(ctx context.Context, oid int64, amt float
 	if math.IsNaN(amt) || math.IsInf(amt, 0) {
 		return nil, nil, infraerrors.BadRequest("INVALID_AMOUNT", "invalid refund amount")
 	}
+	held, err := s.outstandingRefundDeduction(ctx, oid)
+	if err != nil {
+		return nil, nil, err
+	}
 	if amt <= 0 {
 		amt = o.Amount
+		if held != nil {
+			amt = held.RefundAmount
+		}
+	}
+	// A held deduction belongs to one refund amount, including historical force
+	// refunds whose actual deduction was smaller. Force cannot change that amount.
+	if held != nil && amt != held.RefundAmount {
+		return nil, nil, infraerrors.BadRequest("REFUND_AMOUNT_CHANGED", "refund amount must match the original refund while its deduction is held")
 	}
 	orderCurrency := PaymentOrderCurrency(o)
 	if amt-o.Amount > paymentAmountToleranceForCurrency(orderCurrency) {
@@ -247,10 +261,6 @@ func (s *PaymentService) PrepareRefund(ctx context.Context, oid int64, amt float
 		rr = fmt.Sprintf("refund order:%d", o.ID)
 	}
 	p := &RefundPlan{OrderID: oid, Order: o, RefundAmount: amt, GatewayAmount: ga, Reason: rr, Force: force, DeductBalance: deduct, DeductionType: payment.DeductionTypeNone}
-	held, err := s.outstandingRefundDeduction(ctx, oid)
-	if err != nil {
-		return nil, nil, err
-	}
 	if held != nil {
 		held.applyTo(p)
 	} else if deduct {
@@ -284,8 +294,8 @@ func (s *PaymentService) outstandingRefundDeduction(ctx context.Context, oid int
 	if err := json.Unmarshal([]byte(entry.Detail), &detail); err != nil {
 		return nil, fmt.Errorf("parse outstanding refund deduction: %w", err)
 	}
-	// Older rollback-failure records only stored amounts. Infer their kind and
-	// recover the original subscription binding from the pending audit.
+	// Older rollback-failure records only stored deducted amounts. Those amounts
+	// can be smaller than the refund itself, so never infer RefundAmount from them.
 	if detail.DeductionType == "" {
 		switch {
 		case detail.BalanceDeducted > 0:
@@ -296,14 +306,44 @@ func (s *PaymentService) outstandingRefundDeduction(ctx context.Context, oid int
 			return nil, fmt.Errorf("outstanding refund deduction has no recorded amount")
 		}
 	}
-	if detail.DeductionType == payment.DeductionTypeSubscription && detail.SubscriptionID == 0 {
-		pending, err := s.latestRefundPendingDetail(ctx, oid)
+	if detail.RefundAmount == 0 || (detail.DeductionType == payment.DeductionTypeSubscription && detail.SubscriptionID == 0) {
+		pending, err := refundPendingDetailBefore(ctx, s.entClient, oid, entry.ID)
 		if err != nil {
 			return nil, err
 		}
-		detail.SubscriptionID = pending.SubscriptionID
+		if detail.RefundAmount == 0 {
+			detail.RefundAmount = pending.RefundAmount
+		}
+		if detail.SubscriptionID == 0 {
+			detail.SubscriptionID = pending.SubscriptionID
+		}
 	}
-	if math.IsNaN(detail.BalanceDeducted) || math.IsInf(detail.BalanceDeducted, 0) ||
+	if detail.RefundAmount == 0 || (detail.DeductionType == payment.DeductionTypeSubscription && detail.SubscriptionID == 0) {
+		order, err := s.entClient.PaymentOrder.Get(ctx, oid)
+		if err != nil {
+			return nil, fmt.Errorf("load original refund order: %w", err)
+		}
+		if detail.RefundAmount == 0 {
+			detail.RefundAmount = order.RefundAmount
+		}
+		if detail.DeductionType == payment.DeductionTypeSubscription && detail.SubscriptionID == 0 {
+			if order.OrderType != payment.OrderTypeSubscription || order.SubscriptionGroupID == nil || *order.SubscriptionGroupID <= 0 {
+				return nil, fmt.Errorf("legacy refund subscription binding is missing from the order")
+			}
+			// Revocation soft-deletes the original subscription. Include every
+			// historical row and require uniqueness; today's active row is not
+			// evidence of the subscription originally deducted for this order.
+			sub, err := s.entClient.UserSubscription.Query().
+				Where(usersubscription.UserIDEQ(order.UserID), usersubscription.GroupIDEQ(*order.SubscriptionGroupID)).
+				Only(mixins.SkipSoftDelete(ctx))
+			if err != nil {
+				return nil, fmt.Errorf("resolve unique legacy refund subscription binding: %w", err)
+			}
+			detail.SubscriptionID = sub.ID
+		}
+	}
+	if math.IsNaN(detail.RefundAmount) || math.IsInf(detail.RefundAmount, 0) || detail.RefundAmount <= 0 ||
+		math.IsNaN(detail.BalanceDeducted) || math.IsInf(detail.BalanceDeducted, 0) ||
 		detail.BalanceDeducted < 0 || detail.SubDaysDeducted < 0 ||
 		(detail.DeductionType != payment.DeductionTypeBalance && detail.DeductionType != payment.DeductionTypeSubscription) ||
 		(detail.DeductionType == payment.DeductionTypeBalance && detail.BalanceDeducted <= 0) ||
@@ -750,6 +790,7 @@ func (s *PaymentService) returnHeldRefundDeduction(ctx context.Context, p *Refun
 
 func refundDeductionAuditDetail(p *RefundPlan) map[string]any {
 	return map[string]any{
+		"refundAmount":    p.RefundAmount,
 		"deductionType":   p.DeductionType,
 		"balanceDeducted": p.BalanceToDeduct,
 		"subDaysDeducted": p.SubDaysToDeduct,
@@ -810,11 +851,19 @@ func (s *PaymentService) latestRefundPendingDetail(ctx context.Context, oid int6
 }
 
 func latestRefundPendingDetailWithClient(ctx context.Context, client *dbent.Client, oid int64) (refundPendingAuditDetail, error) {
+	return refundPendingDetailBefore(ctx, client, oid, 0)
+}
+
+// beforeAuditID pins legacy recovery to a pending record preceding the failure.
+func refundPendingDetailBefore(ctx context.Context, client *dbent.Client, oid, beforeAuditID int64) (refundPendingAuditDetail, error) {
 	detail := refundPendingAuditDetail{DeductionRollbackOK: true}
-	logEntry, err := client.PaymentAuditLog.Query().
+	query := client.PaymentAuditLog.Query().
 		Where(paymentauditlog.OrderIDEQ(strconv.FormatInt(oid, 10)), paymentauditlog.ActionEQ("REFUND_PENDING")).
-		Order(paymentauditlog.ByID(sql.OrderDesc())).
-		First(ctx)
+		Order(paymentauditlog.ByID(sql.OrderDesc()))
+	if beforeAuditID > 0 {
+		query = query.Where(paymentauditlog.IDLT(beforeAuditID))
+	}
+	logEntry, err := query.First(ctx)
 	if err != nil {
 		if dbent.IsNotFound(err) {
 			return detail, nil
