@@ -21,6 +21,58 @@ env:
   GOTOOLCHAIN: local
 
 jobs:
+  tls-security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.27.2'
+          cache: false
+      - name: Prove the certificate regression detects the vulnerable runtime
+        working-directory: .github/security-tools/x509check
+        run: |
+          test "$(go env GOVERSION)" = "go1.27.2"
+          python ci.py --expect vulnerable --output "$RUNNER_TEMP/x509check-old"
+          set +e
+          "$RUNNER_TEMP/x509check-old" -check crypto -json > "$RUNNER_TEMP/x509-vulnerable.json"
+          result=$?
+          set -e
+          test "$result" -ne 0
+          python -c 'import json,os; from pathlib import Path; d=json.loads((Path(os.environ["RUNNER_TEMP"])/"x509-vulnerable.json").read_text()); assert d["exit_code"]==1; assert any(r["check"]=="crypto" and r["status"]=="fail" for r in d["results"])'
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: backend/go.mod
+          cache: false
+      - name: Verify the patched certificate validation behavior
+        working-directory: .github/security-tools/x509check
+        run: |
+          test "$(go env GOVERSION)" = "go1.27.3"
+          python ci.py --expect patched --output "$RUNNER_TEMP/x509check-patched"
+          "$RUNNER_TEMP/x509check-patched" -check crypto -json > "$RUNNER_TEMP/x509-patched.json"
+      - name: Build the production runtime context
+        run: |
+          mkdir -p "$RUNNER_TEMP/tls-image/deploy" "$RUNNER_TEMP/tls-image/backend/resources" "$RUNNER_TEMP/tls-image/.github/security-tools"
+          cp Dockerfile.goreleaser "$RUNNER_TEMP/tls-image/Dockerfile"
+          cp deploy/docker-entrypoint.sh deploy/harden-ca-trust.sh "$RUNNER_TEMP/tls-image/deploy/"
+          cp -R .github/security-tools/x509check "$RUNNER_TEMP/tls-image/.github/security-tools/"
+          go build -C .github/security-tools/x509check -o "$RUNNER_TEMP/tls-image/sub2api" .
+          docker build --pull --build-arg TARGETARCH=amd64 -t sub2api-tls-runtime-check "$RUNNER_TEMP/tls-image"
+      - name: Verify the actual runtime trust bundle and PostgreSQL tools
+        run: |
+          docker run --rm --network none --entrypoint /usr/local/bin/sub2api-x509-check sub2api-tls-runtime-check -json > "$RUNNER_TEMP/x509-runtime.json"
+          docker run --rm --network none --entrypoint pg_dump sub2api-tls-runtime-check --version
+          docker run --rm --network none --entrypoint psql sub2api-tls-runtime-check --version
+          docker run --rm --network none --entrypoint openssl sub2api-tls-runtime-check version
+      - name: Upload certificate validation evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: x509-security-${{ github.sha }}
+          path: ${{ runner.temp }}/x509-*.json
+          if-no-files-found: error
+          retention-days: 14
+
   generated:
     runs-on: ubuntu-latest
     steps:
@@ -31,7 +83,7 @@ jobs:
           check-latest: false
           cache-dependency-path: backend/go.sum
       - name: Verify Go version
-        run: test "$(go env GOVERSION)" = "go1.27.2"
+        run: test "$(go env GOVERSION)" = "go1.27.3"
       # The generation directives use the module graph, including x/tools v0.50.0,
       # so Ent and Wire read the export format produced by this Go toolchain.
       - name: Generate Ent
@@ -74,7 +126,7 @@ jobs:
           check-latest: false
           cache-dependency-path: backend/go.sum
       - name: Verify Go version
-        run: test "$(go env GOVERSION)" = "go1.27.2"
+        run: test "$(go env GOVERSION)" = "go1.27.3"
       - name: Record pinned historical routing baseline
         id: record
         working-directory: .
@@ -154,7 +206,7 @@ jobs:
           cache: true
           cache-dependency-path: backend/go.sum
       - name: Verify Go version
-        run: test "$(go env GOVERSION)" = "go1.27.2"
+        run: test "$(go env GOVERSION)" = "go1.27.3"
       - name: Generate Ent and Wire
         working-directory: backend
         run: go generate ./ent ./cmd/server
@@ -186,7 +238,7 @@ jobs:
           cache: true
           cache-dependency-path: backend/go.sum
       - name: Verify Go version
-        run: test "$(go env GOVERSION)" = "go1.27.2"
+        run: test "$(go env GOVERSION)" = "go1.27.3"
       - name: Generate Ent and Wire
         working-directory: backend
         run: go generate ./ent ./cmd/server
@@ -205,7 +257,7 @@ jobs:
           cache: true
           cache-dependency-path: backend/go.sum
       - name: Verify Go version
-        run: test "$(go env GOVERSION)" = "go1.27.2"
+        run: test "$(go env GOVERSION)" = "go1.27.3"
       - name: Generate Ent and Wire
         working-directory: backend
         run: go generate ./ent ./cmd/server
@@ -229,7 +281,7 @@ jobs:
           cache: true
           cache-dependency-path: backend/go.sum
       - name: Verify Go version
-        run: test "$(go env GOVERSION)" = "go1.27.2"
+        run: test "$(go env GOVERSION)" = "go1.27.3"
       - name: Generate Ent and Wire
         working-directory: backend
         run: go generate ./ent ./cmd/server
@@ -285,7 +337,7 @@ jobs:
           cache: true
           cache-dependency-path: backend/go.sum
       - name: Verify Go version
-        run: test "$(go env GOVERSION)" = "go1.27.2"
+        run: test "$(go env GOVERSION)" = "go1.27.3"
       - name: Generate Ent and Wire
         working-directory: backend
         run: go generate ./ent ./cmd/server

@@ -26,7 +26,7 @@ jobs:
           check-latest: false
           cache-dependency-path: backend/go.sum
       - name: Verify Go version
-        run: test "$(go env GOVERSION)" = "go1.27.2"
+        run: test "$(go env GOVERSION)" = "go1.27.3"
       - name: Generate Ent and Wire
         working-directory: backend
         run: go generate ./ent ./cmd/server

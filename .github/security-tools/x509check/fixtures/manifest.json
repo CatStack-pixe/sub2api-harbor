@@ -1,0 +1,127 @@
+{
+  "schema": 1,
+  "go_fix_sha256": "de2956c776441195e75541f71713306b696dddccfe22a17ef42c1bfaef8e22c6",
+  "provenance": {
+    "go_patch_url": "https://github.com/golang/go/commit/7f86f957633ee31a1c17a1eb8452ca7a3d9bc141",
+    "root_bundle_url": "https://raw.githubusercontent.com/certifi/python-certifi/2024.12.14/certifi/cacert.pem",
+    "root_bundle_sha256": "807897254f383a27f45e44f49656f378abab2141ede43a4ad3c2420a597dd23f",
+    "root_bundle_version": "certifi 2024.12.14 (Mozilla root store)",
+    "retrieved_utc_date": "2026-10-22",
+    "notes": "Historical root bundle supplies identities, not the runtime trust store. Probe leaf certificates use public intermediate SPKIs, signed by an offline synthetic test root. No external intermediate private key is used. All signing keys discarded."
+  },
+  "certificates": [
+    {
+      "id": "system_comodo_aaa",
+      "file": "comodo-aaa.pem",
+      "pem_sha256": "a5ddabd1602ae1c66ce11ad078e734cc473dcb8e9f573037832d8536ae3de90b",
+      "der_sha256": "d7a7a0fb5d7e2731d771e9484ebcdef71d5f0c3e0a2948782bc83ee0ea699ef4",
+      "spki_sha256": "bd153ed7b0434f6886b17bce8bbe84ed340c7132d702a8f4fa318f756ecbd6f3",
+      "source": "https://raw.githubusercontent.com/certifi/python-certifi/2024.12.14/certifi/cacert.pem"
+    },
+    {
+      "id": "system_emsign_ecc_g3",
+      "file": "emsign-ecc-g3.pem",
+      "pem_sha256": "36e68e205b53c67c7a013894e0d5c8583063468118d1ce78ecbc2200d1dd185c",
+      "der_sha256": "86a1ecba089c4a8d3bbe2734c612ba341d813e043cf9e8a862cd5c57a36bbe6b",
+      "spki_sha256": "8d417db2dd8bf5e3084d1e3f196d583849d81bdd4c00c70b9d39369e96b8c782",
+      "source": "https://raw.githubusercontent.com/certifi/python-certifi/2024.12.14/certifi/cacert.pem"
+    },
+    {
+      "id": "system_healthy_isrg_x1",
+      "file": "isrg-root-x1.pem",
+      "pem_sha256": "22b557a27055b33606b6559f37703928d3e4ad79f110b407d04986e1843543d1",
+      "der_sha256": "96bcec06264976f37460779acf28c5a7cfe8a3c0aae11a8ffcee05c0bddf08c6",
+      "spki_sha256": "0b9fa5a59eed715c26c1020c711b4f6ec42d58b0015e14337a39dad301c5afc3",
+      "source": "https://raw.githubusercontent.com/certifi/python-certifi/2024.12.14/certifi/cacert.pem"
+    },
+    {
+      "id": "source_ebed6475c2c2d80fcb199f3fe8dd6e6b3ce60b77eb15d4e42c3dec0c6f5b5105",
+      "file": "source_ebed6475c2c2d80fcb199f3fe8dd6e6b3ce60b77eb15d4e42c3dec0c6f5b5105.pem",
+      "pem_sha256": "bd1577a225ff7555c0476db0aa3c91678519b2203f8e05ed1c8f2f50db22a27b",
+      "der_sha256": "45a883f349aedfd5f3a649b5498ffb121712ba8b448f3f2a91dbc5a766fcddbe",
+      "spki_sha256": "ebed6475c2c2d80fcb199f3fe8dd6e6b3ce60b77eb15d4e42c3dec0c6f5b5105",
+      "source": "https://crt.sh/?d=18519019583"
+    },
+    {
+      "id": "source_63ecefee431d49523bc1136c4e72d0206a477086caf606cd5cf025686c109cf8",
+      "file": "source_63ecefee431d49523bc1136c4e72d0206a477086caf606cd5cf025686c109cf8.pem",
+      "pem_sha256": "fb3cb2e68b2f9b6954f68155828b6e09030e63b310016a57caf1608adea1edbe",
+      "der_sha256": "7485b51c0ed192878fa1d2f948fb529ae1842cc5086c4b67f7be5b2039de9489",
+      "spki_sha256": "63ecefee431d49523bc1136c4e72d0206a477086caf606cd5cf025686c109cf8",
+      "source": "https://crt.sh/?d=18518875953"
+    },
+    {
+      "id": "source_ec4ffa1ad0ac88081314b7aaffef6a91f97cd57291bb5ba686c5415f5eb4f6b6",
+      "file": "source_ec4ffa1ad0ac88081314b7aaffef6a91f97cd57291bb5ba686c5415f5eb4f6b6.pem",
+      "pem_sha256": "8d1a3d1fa5b94bbe8a5293867ce286b0216b732b919073fca1c6b973d623e195",
+      "der_sha256": "a496e23ac0cab8155fc9b117b97eae368efcbb9041aec8804d5a308d2d01c2d8",
+      "spki_sha256": "ec4ffa1ad0ac88081314b7aaffef6a91f97cd57291bb5ba686c5415f5eb4f6b6",
+      "source": "https://crt.sh/?d=18519019578"
+    },
+    {
+      "id": "test_root",
+      "file": "test-root.pem",
+      "pem_sha256": "b5d59b324b47413fc60d1db552e59c68d121024abeec25c01096f1f60063ca8c",
+      "der_sha256": "2bdd27d974fec649e9cf8ef054d697a3b09b9ac1758130fcb87db4d6909996e5",
+      "spki_sha256": "8bab19fde0a78b2d4f202d5c3558c199a48b3e1dbc093e6e3dd1e95cb279ae1f",
+      "source": "Synthetic; generated offline by regenerate_fixtures.py; signing keys discarded"
+    },
+    {
+      "id": "control",
+      "file": "control.pem",
+      "pem_sha256": "f6fdf629d4b291d6a841d9bc12ba37ec450b98a07ce6b83303ff6823c896eb96",
+      "der_sha256": "9642a818d2d97767431f0dbb2211cacd6ebf2b2d0ac7979eec07d337006d9614",
+      "spki_sha256": "4f2212babefc1cc427bf9331ead221142c1deda350b4b396a1129b844a3befe7",
+      "source": "Synthetic; generated offline by regenerate_fixtures.py; signing keys discarded"
+    },
+    {
+      "id": "probe_63ecefee431d49523bc1136c4e72d0206a477086caf606cd5cf025686c109cf8",
+      "file": "probe_63ecefee431d49523bc1136c4e72d0206a477086caf606cd5cf025686c109cf8.pem",
+      "pem_sha256": "d333cfcd8602b39af4f270bd6c334ca77702674106e0a7a8cfcba62f8615dffa",
+      "der_sha256": "5d02dc68bf099acc1c5736d5e8b20613508dbc718bf29721401efadc9efde52c",
+      "spki_sha256": "63ecefee431d49523bc1136c4e72d0206a477086caf606cd5cf025686c109cf8",
+      "source": "Synthetic; generated offline by regenerate_fixtures.py; signing keys discarded"
+    },
+    {
+      "id": "probe_ebed6475c2c2d80fcb199f3fe8dd6e6b3ce60b77eb15d4e42c3dec0c6f5b5105",
+      "file": "probe_ebed6475c2c2d80fcb199f3fe8dd6e6b3ce60b77eb15d4e42c3dec0c6f5b5105.pem",
+      "pem_sha256": "011abd806e56a616514272430f65be0b28652916890ed43ea2d1063da0e17d92",
+      "der_sha256": "f2c686f88bd86ea3816e9ca7560c04ba81f05dc2a0d8296a9d5fb9a94d875296",
+      "spki_sha256": "ebed6475c2c2d80fcb199f3fe8dd6e6b3ce60b77eb15d4e42c3dec0c6f5b5105",
+      "source": "Synthetic; generated offline by regenerate_fixtures.py; signing keys discarded"
+    },
+    {
+      "id": "probe_ec4ffa1ad0ac88081314b7aaffef6a91f97cd57291bb5ba686c5415f5eb4f6b6",
+      "file": "probe_ec4ffa1ad0ac88081314b7aaffef6a91f97cd57291bb5ba686c5415f5eb4f6b6.pem",
+      "pem_sha256": "1aedf9f2ceaa04f07789741e5b0bd80af6da2ce87d89aafc632d51781c4cedef",
+      "der_sha256": "26fecd43430a3c039e519681566cfb74a545e67049e08dad1efbb26191219a12",
+      "spki_sha256": "ec4ffa1ad0ac88081314b7aaffef6a91f97cd57291bb5ba686c5415f5eb4f6b6",
+      "source": "Synthetic; generated offline by regenerate_fixtures.py; signing keys discarded"
+    }
+  ],
+  "probes": [
+    {
+      "certificate_id": "probe_63ecefee431d49523bc1136c4e72d0206a477086caf606cd5cf025686c109cf8",
+      "source_id": "source_63ecefee431d49523bc1136c4e72d0206a477086caf606cd5cf025686c109cf8",
+      "spki_sha256": "63ecefee431d49523bc1136c4e72d0206a477086caf606cd5cf025686c109cf8"
+    },
+    {
+      "certificate_id": "probe_ebed6475c2c2d80fcb199f3fe8dd6e6b3ce60b77eb15d4e42c3dec0c6f5b5105",
+      "source_id": "source_ebed6475c2c2d80fcb199f3fe8dd6e6b3ce60b77eb15d4e42c3dec0c6f5b5105",
+      "spki_sha256": "ebed6475c2c2d80fcb199f3fe8dd6e6b3ce60b77eb15d4e42c3dec0c6f5b5105"
+    },
+    {
+      "certificate_id": "probe_ec4ffa1ad0ac88081314b7aaffef6a91f97cd57291bb5ba686c5415f5eb4f6b6",
+      "source_id": "source_ec4ffa1ad0ac88081314b7aaffef6a91f97cd57291bb5ba686c5415f5eb4f6b6",
+      "spki_sha256": "ec4ffa1ad0ac88081314b7aaffef6a91f97cd57291bb5ba686c5415f5eb4f6b6"
+    }
+  ],
+  "generation": {
+    "script": "regenerate_fixtures.py",
+    "cryptography_version": "50.0.1",
+    "test_root_signature": "Ed25519",
+    "control_and_probe_keys": "P-384",
+    "private_keys_stored": false,
+    "verification_time": "2026-10-22T12:00:00Z"
+  }
+}

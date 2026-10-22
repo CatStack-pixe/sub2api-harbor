@@ -151,6 +151,8 @@ def contexts(args):
         shutil.copy2('Dockerfile.goreleaser', dest / 'Dockerfile')
         (dest / 'deploy').mkdir(exist_ok=True)
         shutil.copy2('deploy/docker-entrypoint.sh', dest / 'deploy/docker-entrypoint.sh')
+        shutil.copy2('deploy/harden-ca-trust.sh', dest / 'deploy/harden-ca-trust.sh')
+        shutil.copytree('.github/security-tools/x509check', dest / '.github/security-tools/x509check', dirs_exist_ok=True)
         shutil.copytree('backend/resources', dest / 'backend/resources', dirs_exist_ok=True)
 
 
