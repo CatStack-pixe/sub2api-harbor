@@ -7,8 +7,8 @@
 # =============================================================================
 
 ARG NODE_IMAGE=node:24-alpine
-ARG GOLANG_IMAGE=golang:1.27.2-alpine
-ARG ALPINE_IMAGE=alpine:3.20
+ARG GOLANG_IMAGE=golang:1.27.3-alpine
+ARG ALPINE_IMAGE=alpine:3.24.3
 ARG GOPROXY=https://goproxy.cn,direct
 ARG GOSUMDB=sum.golang.google.cn
 
@@ -78,6 +78,10 @@ RUN VERSION_VALUE="${VERSION}" && \
     -o /app/sub2api \
     ./cmd/server
 
+COPY .github/security-tools/x509check/ /app/x509check/
+RUN cd /app/x509check && CGO_ENABLED=0 GOOS=linux \
+    go build -trimpath -ldflags="-s -w" -o /app/sub2api-x509-check .
+
 # -----------------------------------------------------------------------------
 # Stage 3: Final Runtime Image
 # -----------------------------------------------------------------------------
@@ -91,10 +95,14 @@ LABEL org.opencontainers.image.source="https://github.com/Wei-Shaw/sub2api"
 # Install runtime dependencies
 RUN apk add --no-cache \
     ca-certificates \
+    openssl \
     tzdata \
     curl \
     su-exec \
     && rm -rf /var/cache/apk/*
+
+COPY deploy/harden-ca-trust.sh /tmp/harden-ca-trust.sh
+RUN /bin/sh /tmp/harden-ca-trust.sh && rm /tmp/harden-ca-trust.sh
 
 # Create non-root user
 RUN addgroup -g 1000 sub2api && \
@@ -105,6 +113,8 @@ WORKDIR /app
 
 # Copy binary and runtime fallback resources from builder
 COPY --from=backend-builder /app/sub2api /app/sub2api
+COPY --from=backend-builder /app/sub2api-x509-check /usr/local/bin/sub2api-x509-check
+RUN /usr/local/bin/sub2api-x509-check
 COPY --from=backend-builder --chown=sub2api:sub2api /app/backend/resources /app/resources
 
 # Create data directory

@@ -1,0 +1,2 @@
+fixtures/*.pem text eol=lf
+fixtures/*.json text eol=lf

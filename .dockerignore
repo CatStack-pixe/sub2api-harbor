@@ -78,6 +78,9 @@ deploy/redis_data/
 
 # GitHub
 .github/
+!.github/security-tools/
+!.github/security-tools/x509check/
+!.github/security-tools/x509check/**
 
 # Claude files
 .claude/

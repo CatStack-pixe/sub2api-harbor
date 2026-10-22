@@ -8,8 +8,8 @@
 # =============================================================================
 
 ARG NODE_IMAGE=node:24-alpine
-ARG GOLANG_IMAGE=golang:1.27.2-alpine
-ARG ALPINE_IMAGE=alpine:3.21
+ARG GOLANG_IMAGE=golang:1.27.3-alpine
+ARG ALPINE_IMAGE=alpine:3.24.3
 ARG POSTGRES_IMAGE=postgres:18-alpine
 ARG GOPROXY=https://goproxy.cn,direct
 ARG GOSUMDB=sum.golang.google.cn
@@ -100,6 +100,12 @@ RUN --mount=type=cache,id=sub2api-gomod,target=/go/pkg/mod \
     -o /app/sub2api \
     ./cmd/server
 
+# The trust verifier uses the same patched Go standard library as the server.
+COPY .github/security-tools/x509check/ /app/x509check/
+RUN cd /app/x509check && \
+    CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} \
+    go build -trimpath -ldflags="-s -w" -o /app/sub2api-x509-check .
+
 # -----------------------------------------------------------------------------
 # Stage 3: PostgreSQL Client (version-matched with docker-compose)
 # -----------------------------------------------------------------------------
@@ -118,6 +124,7 @@ LABEL org.opencontainers.image.source="https://github.com/Wei-Shaw/sub2api"
 # Install runtime dependencies
 RUN apk add --no-cache \
     ca-certificates \
+    openssl \
     tzdata \
     su-exec \
     libpq \
@@ -127,6 +134,9 @@ RUN apk add --no-cache \
     libldap \
     libedit \
     && rm -rf /var/cache/apk/*
+
+COPY deploy/harden-ca-trust.sh /tmp/harden-ca-trust.sh
+RUN /bin/sh /tmp/harden-ca-trust.sh && rm /tmp/harden-ca-trust.sh
 
 # Copy pg_dump and psql from the same postgres image used in docker-compose
 # This ensures version consistency between backup tools and the database server
@@ -143,6 +153,8 @@ WORKDIR /app
 
 # Copy binary/resources with ownership to avoid extra full-layer chown copy
 COPY --from=backend-builder --chown=sub2api:sub2api /app/sub2api /app/sub2api
+COPY --from=backend-builder /app/sub2api-x509-check /usr/local/bin/sub2api-x509-check
+RUN /usr/local/bin/sub2api-x509-check
 COPY --from=backend-builder --chown=sub2api:sub2api /app/backend/resources /app/resources
 
 # Create data directory

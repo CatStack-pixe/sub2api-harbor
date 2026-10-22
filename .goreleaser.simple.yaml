@@ -50,6 +50,8 @@ dockers:
     use: buildx
     extra_files:
       - deploy/docker-entrypoint.sh
+      - deploy/harden-ca-trust.sh
+      - .github/security-tools/x509check
       - backend/resources
     build_flag_templates:
       - "--platform=linux/amd64"

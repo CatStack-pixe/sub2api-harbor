@@ -5,8 +5,16 @@
 # It only packages the pre-built binary, no compilation needed.
 # =============================================================================
 
-ARG ALPINE_IMAGE=alpine:3.21
+ARG ALPINE_IMAGE=alpine:3.24.3
 ARG POSTGRES_IMAGE=postgres:18-alpine
+ARG GOLANG_IMAGE=golang:1.27.3-alpine
+
+FROM --platform=${BUILDPLATFORM} ${GOLANG_IMAGE} AS trust-check-builder
+ARG TARGETARCH
+WORKDIR /src
+COPY .github/security-tools/x509check/ ./
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} \
+    go build -trimpath -ldflags="-s -w" -o /sub2api-x509-check .
 
 FROM ${POSTGRES_IMAGE} AS pg-client
 
@@ -19,6 +27,7 @@ LABEL org.opencontainers.image.source="https://github.com/Wei-Shaw/sub2api"
 # Install runtime dependencies
 RUN apk add --no-cache \
     ca-certificates \
+    openssl \
     tzdata \
     curl \
     su-exec \
@@ -29,6 +38,11 @@ RUN apk add --no-cache \
     libldap \
     libedit \
     && rm -rf /var/cache/apk/*
+
+COPY deploy/harden-ca-trust.sh /tmp/harden-ca-trust.sh
+RUN /bin/sh /tmp/harden-ca-trust.sh && rm /tmp/harden-ca-trust.sh
+COPY --from=trust-check-builder /sub2api-x509-check /usr/local/bin/sub2api-x509-check
+RUN /usr/local/bin/sub2api-x509-check
 
 # Copy pg_dump and psql from a version-matched PostgreSQL image so backup and
 # restore work in the runtime container without requiring Docker socket access.
