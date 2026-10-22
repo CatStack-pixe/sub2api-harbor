@@ -39,8 +39,8 @@ func run(args []string, stdout, stderr io.Writer) int {
 	r := report{
 		Schema: 1, GoVersion: runtime.Version(), Platform: runtime.GOOS + "/" + runtime.GOARCH,
 		VerificationTime: verificationTime.Format("2006-01-02T15:04:05Z07:00"),
-		Environment: map[string]string{"SSL_CERT_FILE": os.Getenv("SSL_CERT_FILE"), "SSL_CERT_DIR": os.Getenv("SSL_CERT_DIR")},
-		OfficialSPKIs: len(distrustedSPKIs),
+		Environment:      map[string]string{"SSL_CERT_FILE": os.Getenv("SSL_CERT_FILE"), "SSL_CERT_DIR": os.Getenv("SSL_CERT_DIR")},
+		OfficialSPKIs:    len(distrustedSPKIs),
 	}
 	f, err := loadFixtures()
 	if err != nil {
