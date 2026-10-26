@@ -4,6 +4,7 @@ import { defineComponent } from 'vue'
 
 import AccountsView from '../AccountsView.vue'
 import AccountActionMenu from '@/components/admin/account/AccountActionMenu.vue'
+import AccountTableFilters from '@/components/admin/account/AccountTableFilters.vue'
 
 const {
   listAccounts,
@@ -187,6 +188,106 @@ describe('admin AccountsView lite account list', () => {
       1,
       20,
       expect.objectContaining({ lite: '1' }),
+      expect.objectContaining({ signal: expect.any(AbortSignal) })
+    )
+    wrapper.unmount()
+  })
+
+  it('restores Harbor platform and status filters on the initial request', async () => {
+    localStorage.setItem('account-filter-values', JSON.stringify({
+      platform: 'tierflow', status: 'rate_limited', type: 'apikey', search: 'private query'
+    }))
+    const wrapper = mountView()
+    await flushPromises()
+
+    expect(listAccounts).toHaveBeenCalledWith(
+      1,
+      20,
+      expect.objectContaining({
+        platform: 'tierflow', status: 'rate_limited', type: '', search: '', lite: '1'
+      }),
+      expect.objectContaining({ signal: expect.any(AbortSignal) })
+    )
+    expect(wrapper.getComponent(AccountTableFilters).props('filters')).toMatchObject({
+      platform: 'tierflow', status: 'rate_limited'
+    })
+    wrapper.unmount()
+  })
+
+  it.each([
+    ['malformed JSON', '{', '', ''],
+    ['null', 'null', '', ''],
+    ['an array', '[]', '', ''],
+    ['unknown values', JSON.stringify({ platform: 'unknown', status: 'unknown' }), '', ''],
+    ['an invalid status', JSON.stringify({ platform: 'tierflow', status: 7 }), 'tierflow', ''],
+    ['an invalid platform', JSON.stringify({ platform: 7, status: 'unschedulable' }), '', 'unschedulable']
+  ])('handles %s in stored account filters', async (_label, stored, platform, status) => {
+    localStorage.setItem('account-filter-values', stored)
+    const wrapper = mountView()
+    await flushPromises()
+
+    expect(wrapper.getComponent(AccountTableFilters).props('filters')).toMatchObject({
+      platform, status
+    })
+    wrapper.unmount()
+  })
+
+  it('persists only platform and status changes and restores them after remounting', async () => {
+    vi.useFakeTimers()
+    const wrapper = mountView()
+    await flushPromises()
+    const filters = wrapper.getComponent(AccountTableFilters)
+    filters.vm.$emit('update:filters', {
+      platform: 'tierflow', status: 'inactive', type: 'apikey', search: 'private query'
+    })
+    filters.vm.$emit('change')
+    await vi.advanceTimersByTimeAsync(350)
+    await flushPromises()
+
+    expect(JSON.parse(localStorage.getItem('account-filter-values')!)).toEqual({
+      platform: 'tierflow', status: 'inactive'
+    })
+    expect(listAccounts).toHaveBeenLastCalledWith(
+      1,
+      20,
+      expect.objectContaining({ platform: 'tierflow', status: 'inactive', search: 'private query' }),
+      expect.objectContaining({ signal: expect.any(AbortSignal) })
+    )
+    wrapper.unmount()
+
+    const restored = mountView()
+    await flushPromises()
+    expect(restored.getComponent(AccountTableFilters).props('filters')).toMatchObject({
+      platform: 'tierflow', status: 'inactive', type: '', search: ''
+    })
+    restored.unmount()
+  })
+
+  it('keeps filters usable when browser storage rejects filter reads and writes', async () => {
+    vi.useFakeTimers()
+    const getItem = Storage.prototype.getItem
+    const setItem = Storage.prototype.setItem
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(function (key) {
+      if (key === 'account-filter-values') throw new Error('Storage unavailable')
+      return getItem.call(this, key)
+    })
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (key, value) {
+      if (key === 'account-filter-values') throw new Error('Storage unavailable')
+      return setItem.call(this, key, value)
+    })
+    const wrapper = mountView()
+    await flushPromises()
+    const filters = wrapper.getComponent(AccountTableFilters)
+    expect(filters.props('filters')).toMatchObject({ platform: '', status: '' })
+    filters.vm.$emit('update:filters', { platform: 'tierflow', status: 'error' })
+    filters.vm.$emit('change')
+    await vi.advanceTimersByTimeAsync(350)
+    await flushPromises()
+
+    expect(listAccounts).toHaveBeenLastCalledWith(
+      1,
+      20,
+      expect.objectContaining({ platform: 'tierflow', status: 'error' }),
       expect.objectContaining({ signal: expect.any(AbortSignal) })
     )
     wrapper.unmount()

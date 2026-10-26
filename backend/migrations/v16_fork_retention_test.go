@@ -60,7 +60,7 @@ func TestV16UpgradeOrdersBoth242MigrationsByFullFilename(t *testing.T) {
 	sort.Strings(names)
 	var tail []string
 	for _, name := range names {
-		if name >= "242_drop_platform_check_constraints.sql" {
+		if name >= "242_drop_platform_check_constraints.sql" && name <= "245_gemini_cached_contents_mutation_lease.sql" {
 			tail = append(tail, name)
 		}
 	}

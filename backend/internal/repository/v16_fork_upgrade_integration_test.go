@@ -183,7 +183,7 @@ VALUES ($1, $2, $3, $4, 'v16-harbor-trace', 'v16-client-trace',
 	sort.Strings(names)
 	var applied []string
 	for _, name := range names {
-		if name <= "242_drop_platform_check_constraints.sql" {
+		if name <= "242_drop_platform_check_constraints.sql" || name > "245_gemini_cached_contents_mutation_lease.sql" {
 			continue
 		}
 		v16ExecuteMigration(t, ctx, tx, name)

@@ -72,6 +72,7 @@ type dashboardSnapshotV2CacheKey struct {
 }
 
 func (h *DashboardHandler) GetSnapshotV2(c *gin.Context) {
+	setAdminSensitiveCacheHeaders(c, "Authorization", "X-API-Key", "If-None-Match")
 	startTime, endTime := parseTimeRange(c)
 	granularity := strings.TrimSpace(c.DefaultQuery("granularity", "day"))
 	if granularity != "hour" {
@@ -138,16 +139,26 @@ func (h *DashboardHandler) GetSnapshotV2(c *gin.Context) {
 		response.Error(c, 500, err.Error())
 		return
 	}
-	if cached.ETag != "" {
-		c.Header("ETag", cached.ETag)
-		c.Header("Vary", "If-None-Match")
-		if ifNoneMatchMatched(c.GetHeader("If-None-Match"), cached.ETag) {
+	snapshot, ok := cached.Payload.(*dashboardSnapshotV2Response)
+	if !ok {
+		response.Error(c, 500, "Invalid dashboard snapshot cache")
+		return
+	}
+	payload := any(snapshot)
+	etag := cached.ETag
+	if scopedAdminWriteOnly(c, "users.read") {
+		payload = adminDashboardSnapshotV2Response(c, snapshot)
+		etag = buildETagFromAny(payload)
+	}
+	if etag != "" {
+		c.Header("ETag", etag)
+		if ifNoneMatchMatched(c.GetHeader("If-None-Match"), etag) {
 			c.Status(http.StatusNotModified)
 			return
 		}
 	}
 	c.Header("X-Snapshot-Cache", cacheStatusValue(hit))
-	response.Success(c, cached.Payload)
+	response.Success(c, payload)
 }
 
 func (h *DashboardHandler) buildSnapshotV2Response(

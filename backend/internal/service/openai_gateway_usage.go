@@ -614,7 +614,11 @@ func (s *OpenAIGatewayService) calculateOpenAIRecordUsageCost(
 	}
 
 	if result != nil && result.ImageCount > 0 {
-		// 渠道定价为 token 计费时走 token 路径，否则走图片计费
+		// 分组显式开启按张计费且来自图片端点时强制走图片计费；否则渠道 token 定价优先。
+		// 混合的 Responses/Chat/WS 请求即使产出了图片，也不能因开关丢失文本 token 费用。
+		if imageCountBillingApplies(apiKey, result.ImageEndpoint) {
+			return s.calculateOpenAIImageCost(ctx, billingModel, apiKey, result, imageMultiplier, pricingAt), nil
+		}
 		if resolved := s.resolveOpenAIChannelPricingAt(ctx, billingModel, apiKey, pricingAt); resolved == nil || resolved.Mode != BillingModeToken {
 			return s.calculateOpenAIImageCost(ctx, billingModel, apiKey, result, imageMultiplier, pricingAt), nil
 		}
@@ -764,13 +768,21 @@ func (s *OpenAIGatewayService) calculateOpenAIImageCost(
 	pricingAt time.Time,
 ) *CostBreakdown {
 	sizeTier := NormalizeImageBillingTierOrDefault(result.ImageSize)
+	// OpenAI input_tokens 已包含缓存；先拆成互斥桶，避免上下文分档重复计数。
+	tokens := UsageTokens{
+		InputTokens:         max(result.Usage.InputTokens-result.Usage.CacheReadInputTokens-result.Usage.CacheCreationInputTokens, 0),
+		OutputTokens:        result.Usage.OutputTokens,
+		CacheCreationTokens: result.Usage.CacheCreationInputTokens,
+		CacheReadTokens:     result.Usage.CacheReadInputTokens,
+		ImageOutputTokens:   result.Usage.ImageOutputTokens,
+	}
 	resolved := s.resolveOpenAIChannelPricingAt(ctx, billingModel, apiKey, pricingAt)
 	if resolved != nil && resolved.Source == PricingSourceGroup &&
 		(resolved.Mode == BillingModePerRequest || resolved.Mode == BillingModeImage) {
 		gid := apiKey.Group.ID
 		cost, err := s.billingService.CalculateCostUnified(CostInput{
 			Ctx: ctx, Model: billingModel, GroupID: &gid, Group: apiKey.Group,
-			RequestCount: result.ImageCount, SizeTier: sizeTier,
+			Tokens: tokens, RequestCount: result.ImageCount, SizeTier: sizeTier,
 			RateMultiplier: multiplier, Resolver: s.resolver, Resolved: resolved, PricingAt: pricingAt,
 			ReasoningEffort: optionalStringValue(result.ReasoningEffort),
 		})
@@ -797,6 +809,7 @@ func (s *OpenAIGatewayService) calculateOpenAIImageCost(
 			Model:           billingModel,
 			GroupID:         &gid,
 			Group:           apiKey.Group,
+			Tokens:          tokens,
 			RequestCount:    result.ImageCount,
 			SizeTier:        sizeTier,
 			ReasoningEffort: optionalStringValue(result.ReasoningEffort),

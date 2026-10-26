@@ -508,6 +508,7 @@ import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
 import { useAuthStore } from '@/stores/auth'
 import { adminAPI } from '@/api/admin'
+import { CONCRETE_PLATFORM_OPTIONS } from '@/constants/platforms'
 import { useTableLoader } from '@/composables/useTableLoader'
 import { useSwipeSelect, type SwipeSelectVirtualContext } from '@/composables/useSwipeSelect'
 import { useTableSelection } from '@/composables/useTableSelection'
@@ -675,6 +676,31 @@ const HIDDEN_COLUMNS_VERSION_KEY = 'account-hidden-columns-version'
 // after the account table gained upstream balance support. Older browser layouts
 // may have persisted `usage` as hidden before that support existed.
 const HIDDEN_COLUMNS_CURRENT_VERSION = 'tierflow-balance-visible-v2'
+
+// Account filter settings
+const ACCOUNT_FILTER_STORAGE_KEY = 'account-filter-values'
+type AccountFilterValues = {
+  platform: string
+  status: string
+}
+const loadInitialAccountFilterValues = (): AccountFilterValues => {
+  const fallback: AccountFilterValues = { platform: '', status: '' }
+  try {
+    const raw = localStorage.getItem(ACCOUNT_FILTER_STORAGE_KEY)
+    if (!raw) return fallback
+    const parsed: unknown = JSON.parse(raw)
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return fallback
+    const values = parsed as Record<string, unknown>
+    return {
+      platform: typeof values.platform === 'string' && CONCRETE_PLATFORM_OPTIONS.some(option => option.value === values.platform)
+        ? values.platform : '',
+      status: typeof values.status === 'string' && ['active', 'inactive', 'error', 'rate_limited', 'temp_unschedulable', 'unschedulable'].includes(values.status)
+        ? values.status : ''
+    }
+  } catch {
+    return fallback
+  }
+}
 
 // Sorting settings
 const ACCOUNT_SORT_STORAGE_KEY = 'account-table-sort'
@@ -1117,9 +1143,8 @@ const {
 } = useTableLoader<AccountListItem, any>({
   fetchFn: adminAPI.accounts.list,
   initialParams: {
-    platform: '',
+    ...loadInitialAccountFilterValues(),
     type: '',
-    status: '',
     privacy_mode: '',
     group: '',
     search: '',
@@ -1325,7 +1350,19 @@ const refreshUpstreamBillingSortedList = async (force = false) => {
 
 useIntervalFn(() => { void refreshUpstreamBillingRates() }, 5 * 60_000, { immediate: false })
 
+const saveAccountFilterValues = () => {
+  try {
+    localStorage.setItem(ACCOUNT_FILTER_STORAGE_KEY, JSON.stringify({
+      platform: params.platform,
+      status: params.status
+    }))
+  } catch {
+    // Filtering must remain available when browser storage is unavailable.
+  }
+}
+
 const debouncedReload = () => {
+  saveAccountFilterValues()
   clearSelection()
   syncAccountListDerivedParams()
   hasPendingListSync.value = false

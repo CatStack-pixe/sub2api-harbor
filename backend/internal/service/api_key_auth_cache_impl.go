@@ -14,7 +14,7 @@ import (
 	"github.com/dgraph-io/ristretto"
 )
 
-const apiKeyAuthSnapshotVersion = 25 // v25: preserve independent fork model listings, mappings and upstream allowlist
+const apiKeyAuthSnapshotVersion = 26 // v26: retain Harbor model access and add image-count billing
 
 type apiKeyAuthCacheConfig struct {
 	l1Size        int
@@ -396,6 +396,7 @@ func (s *APIKeyService) snapshotFromAPIKey(ctx context.Context, apiKey *APIKey) 
 			GlobalPrompt:                    apiKey.Group.GlobalPrompt,
 			AllowImageGeneration:            apiKey.Group.AllowImageGeneration,
 			AllowBatchImageGeneration:       apiKey.Group.AllowBatchImageGeneration,
+			ImageCountBilling:               apiKey.Group.ImageCountBilling,
 			ImageRateIndependent:            apiKey.Group.ImageRateIndependent,
 			ImageRateMultiplier:             apiKey.Group.ImageRateMultiplier,
 			ImagePrice1K:                    apiKey.Group.ImagePrice1K,
@@ -502,6 +503,7 @@ func (s *APIKeyService) snapshotToAPIKey(key string, snapshot *APIKeyAuthSnapsho
 			GlobalPrompt:                    snapshot.Group.GlobalPrompt,
 			AllowImageGeneration:            snapshot.Group.AllowImageGeneration,
 			AllowBatchImageGeneration:       snapshot.Group.AllowBatchImageGeneration,
+			ImageCountBilling:               snapshot.Group.ImageCountBilling,
 			ImageRateIndependent:            snapshot.Group.ImageRateIndependent,
 			ImageRateMultiplier:             snapshot.Group.ImageRateMultiplier,
 			ImagePrice1K:                    snapshot.Group.ImagePrice1K,

@@ -495,6 +495,7 @@ func (h *DashboardHandler) GetAPIKeyUsageTrend(c *gin.Context) {
 // GET /api/v1/admin/dashboard/users-trend
 // Query params: start_date, end_date (YYYY-MM-DD), granularity (day/hour), limit (default 12)
 func (h *DashboardHandler) GetUserUsageTrend(c *gin.Context) {
+	setAdminSensitiveCacheHeaders(c)
 	startTime, endTime := parseTimeRange(c)
 	granularity := c.DefaultQuery("granularity", "day")
 	limitStr := c.DefaultQuery("limit", "12")
@@ -515,7 +516,7 @@ func (h *DashboardHandler) GetUserUsageTrend(c *gin.Context) {
 	c.Header("X-Snapshot-Cache", cacheStatusValue(hit))
 
 	response.Success(c, gin.H{
-		"trend":       trend,
+		"trend":       adminUserUsageTrendResponse(c, trend),
 		"start_date":  startTime.Format("2006-01-02"),
 		"end_date":    endTime.Add(-24 * time.Hour).Format("2006-01-02"),
 		"granularity": granularity,
@@ -545,6 +546,7 @@ func parseRankingLimit(raw string) int {
 // GetUserSpendingRanking handles getting user spending ranking data.
 // GET /api/v1/admin/dashboard/users-ranking
 func (h *DashboardHandler) GetUserSpendingRanking(c *gin.Context) {
+	setAdminSensitiveCacheHeaders(c)
 	startTime, endTime := parseTimeRange(c)
 	limit := parseRankingLimit(c.DefaultQuery("limit", "12"))
 
@@ -560,7 +562,11 @@ func (h *DashboardHandler) GetUserSpendingRanking(c *gin.Context) {
 	cacheKey := string(keyRaw)
 	if cached, ok := dashboardUsersRankingCache.Get(cacheKey); ok {
 		c.Header("X-Snapshot-Cache", "hit")
-		response.Success(c, cached.Payload)
+		if payload, ok := cached.Payload.(dashboardUserSpendingRankingResponse); ok {
+			response.Success(c, adminUserSpendingRankingResponse(c, payload))
+			return
+		}
+		response.Error(c, 500, "Invalid user spending ranking cache")
 		return
 	}
 
@@ -570,17 +576,17 @@ func (h *DashboardHandler) GetUserSpendingRanking(c *gin.Context) {
 		return
 	}
 
-	payload := gin.H{
-		"ranking":           ranking.Ranking,
-		"total_actual_cost": ranking.TotalActualCost,
-		"total_requests":    ranking.TotalRequests,
-		"total_tokens":      ranking.TotalTokens,
-		"start_date":        startTime.Format("2006-01-02"),
-		"end_date":          endTime.Add(-24 * time.Hour).Format("2006-01-02"),
+	payload := dashboardUserSpendingRankingResponse{
+		Ranking:         ranking.Ranking,
+		TotalActualCost: ranking.TotalActualCost,
+		TotalRequests:   ranking.TotalRequests,
+		TotalTokens:     ranking.TotalTokens,
+		StartDate:       startTime.Format("2006-01-02"),
+		EndDate:         endTime.Add(-24 * time.Hour).Format("2006-01-02"),
 	}
 	dashboardUsersRankingCache.Set(cacheKey, payload)
 	c.Header("X-Snapshot-Cache", "miss")
-	response.Success(c, payload)
+	response.Success(c, adminUserSpendingRankingResponse(c, payload))
 }
 
 // GetBatchUsersUsage handles getting usage stats for multiple users
@@ -675,6 +681,7 @@ func (h *DashboardHandler) GetBatchAPIKeysUsage(c *gin.Context) {
 // GET /api/v1/admin/dashboard/user-breakdown
 // Query params: start_date, end_date, group_id, model, endpoint, endpoint_type, limit
 func (h *DashboardHandler) GetUserBreakdown(c *gin.Context) {
+	setAdminSensitiveCacheHeaders(c)
 	startTime, endTime := parseTimeRange(c)
 
 	dim := usagestats.UserBreakdownDimension{}
@@ -757,7 +764,7 @@ func (h *DashboardHandler) GetUserBreakdown(c *gin.Context) {
 	}
 
 	response.Success(c, gin.H{
-		"users":      stats,
+		"users":      adminUserBreakdownResponse(c, stats),
 		"start_date": startTime.Format("2006-01-02"),
 		"end_date":   endTime.Add(-24 * time.Hour).Format("2006-01-02"),
 	})

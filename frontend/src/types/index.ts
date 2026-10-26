@@ -590,6 +590,7 @@ export interface Group {
   // 图片生成计费配置
   allow_image_generation: boolean
   allow_batch_image_generation: boolean
+  image_count_billing: boolean
   image_rate_independent: boolean
   image_rate_multiplier: number
   batch_image_discount_multiplier: number
@@ -826,6 +827,7 @@ export interface CreateGroupRequest {
   global_prompt?: string
   allow_image_generation?: boolean
   allow_batch_image_generation?: boolean
+  image_count_billing?: boolean
   image_rate_independent?: boolean
   image_rate_multiplier?: number
   batch_image_discount_multiplier?: number
@@ -894,6 +896,7 @@ export interface UpdateGroupRequest {
   global_prompt?: string
   allow_image_generation?: boolean
   allow_batch_image_generation?: boolean
+  image_count_billing?: boolean
   image_rate_independent?: boolean
   image_rate_multiplier?: number
   batch_image_discount_multiplier?: number
