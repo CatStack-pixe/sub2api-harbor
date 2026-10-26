@@ -100,7 +100,7 @@ func (h *OpsHandler) GetUserConcurrencyStats(c *gin.Context) {
 
 	payload := gin.H{
 		"enabled": true,
-		"user":    users,
+		"user":    adminUserConcurrencyResponse(c, users),
 	}
 	if collectedAt != nil {
 		payload["timestamp"] = collectedAt.UTC()

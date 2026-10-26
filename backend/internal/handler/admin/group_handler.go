@@ -1022,7 +1022,7 @@ func (h *GroupHandler) GetGroupRateMultipliers(c *gin.Context) {
 	if entries == nil {
 		entries = []service.UserGroupRateEntry{}
 	}
-	response.Success(c, entries)
+	response.Success(c, adminGroupRateMultipliersResponse(c, entries))
 }
 
 // ClearGroupRateMultipliers handles clearing all rate multipliers for a group

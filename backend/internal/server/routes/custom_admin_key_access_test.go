@@ -403,7 +403,7 @@ func TestScopedAdminProxyReadPermissionAndBoundedRoutes(t *testing.T) {
 	}
 }
 
-func TestScopedAdminRegisteredRoutesExcludeForkOnlyEndpoints(t *testing.T) {
+func TestScopedAdminRegisteredRoutesPreserveLegacyModelCandidates(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
 	RegisterAdminRoutes(r.Group("/api/v1"), &handler.Handlers{Admin: &handler.AdminHandlers{}}, middleware.AdminAuthMiddleware(func(c *gin.Context) { c.Next() }), middleware.AuditLogMiddleware(func(c *gin.Context) { c.Next() }), middleware.StepUpAuthMiddleware(func(c *gin.Context) { c.Next() }), nil, nil)
@@ -411,10 +411,34 @@ func TestScopedAdminRegisteredRoutesExcludeForkOnlyEndpoints(t *testing.T) {
 	for _, route := range r.Routes() {
 		paths[route.Method+" "+route.Path] = true
 	}
-	for _, path := range []string{"GET /api/v1/admin/model-catalog", "GET /api/v1/admin/proxies/options", "GET /api/v1/admin/groups/:id/models-list-candidates"} {
+	for _, path := range []string{"GET /api/v1/admin/model-catalog", "GET /api/v1/admin/proxies/options"} {
 		require.False(t, paths[path], path)
 	}
-	for _, path := range []string{"GET /api/v1/admin/proxies", "GET /api/v1/admin/proxies/all", "GET /api/v1/admin/groups/:id/model-allowlist-candidates", "POST /api/v1/admin/accounts/import/codex-session"} {
+	for _, path := range []string{"GET /api/v1/admin/proxies", "GET /api/v1/admin/proxies/all", "GET /api/v1/admin/groups/:id/models-list-candidates", "GET /api/v1/admin/groups/:id/model-allowlist-candidates", "POST /api/v1/admin/accounts/import/codex-session"} {
 		require.True(t, paths[path], path)
 	}
+	t.Run("scoped_keys_default_deny_legacy_candidates", func(t *testing.T) {
+		policy := adminaccess.Policy{}
+		for _, permission := range adminaccess.PermissionCatalog() {
+			if permission.Scope == "global" {
+				policy.GlobalPermissions = append(policy.GlobalPermissions, permission.ID)
+			} else {
+				policy.Rules = append(policy.Rules, adminaccess.Rule{Permissions: []string{permission.ID}, AllGroups: true, IncludeUngrouped: true, AccountTypes: []string{"oauth", "apikey"}})
+			}
+		}
+		settings := service.NewSettingService(nil, nil)
+		settings.SetScopedAdminKeyRepository(&scopedRouteKeys{})
+		key, _, err := settings.CreateScopedAdminKey(context.Background(), service.ScopedAdminKeyInput{Name: "legacy-candidates-denied", Enabled: true, Policy: policy}, 9)
+		require.NoError(t, err)
+		users := service.NewUserService(&scopedRouteUsers{}, nil, nil, nil)
+		auth := middleware.NewAdminAuthMiddleware(nil, users, settings, nil)
+		authenticated := gin.New()
+		RegisterAdminRoutes(authenticated.Group("/api/v1"), &handler.Handlers{Admin: &handler.AdminHandlers{}}, auth, middleware.AuditLogMiddleware(func(c *gin.Context) { c.Next() }), middleware.StepUpAuthMiddleware(func(c *gin.Context) { c.Next() }), nil, nil)
+		req := httptest.NewRequest("GET", "/api/v1/admin/groups/1/models-list-candidates", nil)
+		req.Header.Set("x-api-key", key)
+		w := httptest.NewRecorder()
+		authenticated.ServeHTTP(w, req)
+		require.Equal(t, 403, w.Code, w.Body.String())
+		require.Contains(t, w.Body.String(), `"FORBIDDEN"`)
+	})
 }
