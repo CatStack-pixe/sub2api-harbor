@@ -282,7 +282,7 @@ func (h *DashboardHandler) GetUsageTrend(c *gin.Context) {
 	c.Header("X-Snapshot-Cache", cacheStatusValue(hit))
 
 	response.Success(c, gin.H{
-		"trend":       adminUserUsageTrendResponse(c, trend),
+		"trend":       trend,
 		"start_date":  startTime.Format("2006-01-02"),
 		"end_date":    endTime.Add(-24 * time.Hour).Format("2006-01-02"),
 		"granularity": granularity,
@@ -515,7 +515,7 @@ func (h *DashboardHandler) GetUserUsageTrend(c *gin.Context) {
 	c.Header("X-Snapshot-Cache", cacheStatusValue(hit))
 
 	response.Success(c, gin.H{
-		"trend":       trend,
+		"trend":       adminUserUsageTrendResponse(c, trend),
 		"start_date":  startTime.Format("2006-01-02"),
 		"end_date":    endTime.Add(-24 * time.Hour).Format("2006-01-02"),
 		"granularity": granularity,
