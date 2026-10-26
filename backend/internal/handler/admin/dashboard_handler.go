@@ -282,7 +282,7 @@ func (h *DashboardHandler) GetUsageTrend(c *gin.Context) {
 	c.Header("X-Snapshot-Cache", cacheStatusValue(hit))
 
 	response.Success(c, gin.H{
-		"trend":       trend,
+		"trend":       adminUserUsageTrendResponse(c, trend),
 		"start_date":  startTime.Format("2006-01-02"),
 		"end_date":    endTime.Add(-24 * time.Hour).Format("2006-01-02"),
 		"granularity": granularity,
@@ -560,7 +560,11 @@ func (h *DashboardHandler) GetUserSpendingRanking(c *gin.Context) {
 	cacheKey := string(keyRaw)
 	if cached, ok := dashboardUsersRankingCache.Get(cacheKey); ok {
 		c.Header("X-Snapshot-Cache", "hit")
-		response.Success(c, cached.Payload)
+		if payload, ok := cached.Payload.(dashboardUserSpendingRankingResponse); ok {
+			response.Success(c, adminUserSpendingRankingResponse(c, payload))
+			return
+		}
+		response.Error(c, 500, "Invalid user spending ranking cache")
 		return
 	}
 
@@ -570,17 +574,17 @@ func (h *DashboardHandler) GetUserSpendingRanking(c *gin.Context) {
 		return
 	}
 
-	payload := gin.H{
-		"ranking":           ranking.Ranking,
-		"total_actual_cost": ranking.TotalActualCost,
-		"total_requests":    ranking.TotalRequests,
-		"total_tokens":      ranking.TotalTokens,
-		"start_date":        startTime.Format("2006-01-02"),
-		"end_date":          endTime.Add(-24 * time.Hour).Format("2006-01-02"),
+	payload := dashboardUserSpendingRankingResponse{
+		Ranking:         ranking.Ranking,
+		TotalActualCost: ranking.TotalActualCost,
+		TotalRequests:   ranking.TotalRequests,
+		TotalTokens:     ranking.TotalTokens,
+		StartDate:       startTime.Format("2006-01-02"),
+		EndDate:         endTime.Add(-24 * time.Hour).Format("2006-01-02"),
 	}
 	dashboardUsersRankingCache.Set(cacheKey, payload)
 	c.Header("X-Snapshot-Cache", "miss")
-	response.Success(c, payload)
+	response.Success(c, adminUserSpendingRankingResponse(c, payload))
 }
 
 // GetBatchUsersUsage handles getting usage stats for multiple users
@@ -757,7 +761,7 @@ func (h *DashboardHandler) GetUserBreakdown(c *gin.Context) {
 	}
 
 	response.Success(c, gin.H{
-		"users":      stats,
+		"users":      adminUserBreakdownResponse(c, stats),
 		"start_date": startTime.Format("2006-01-02"),
 		"end_date":   endTime.Add(-24 * time.Hour).Format("2006-01-02"),
 	})
