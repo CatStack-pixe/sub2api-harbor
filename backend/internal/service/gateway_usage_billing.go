@@ -137,7 +137,7 @@ func (p *postUsageBillingParams) shouldUpdateRateLimits() bool {
 }
 
 func (p *postUsageBillingParams) shouldUpdateAccountQuota() bool {
-	return p.Cost.TotalCost > 0 && p.Account.IsAPIKeyOrBedrock() && p.Account.HasAnyQuotaLimit()
+	return p.Cost.TotalCost > 0 && p.Account.SupportsAccountQuota() && p.Account.HasAnyQuotaLimit()
 }
 
 // postUsageBilling is the legacy fallback billing path used when the unified
@@ -345,6 +345,8 @@ func buildUsageBillingCommand(requestID string, usageLog *UsageLog, p *postUsage
 	}
 	if p.shouldUpdateAccountQuota() {
 		cmd.AccountQuotaCost = p.Cost.TotalCost * p.AccountRateMultiplier
+		cmd.AccountQuotaHasDailyLimit = p.Account.GetQuotaDailyLimit() > 0
+		cmd.AccountQuotaHasWeeklyLimit = p.Account.GetQuotaWeeklyLimit() > 0
 	}
 	cmd.Normalize()
 	return cmd
@@ -539,11 +541,12 @@ func notifyAccountQuota(p *postUsageBillingParams, deps *billingDeps, result *Us
 			slog.Error("panic in notifyAccountQuota", "recover", r)
 		}
 	}()
-	if p.Cost.TotalCost <= 0 || p.Account == nil || !p.Account.IsAPIKeyOrBedrock() || deps.balanceNotifyService == nil {
+	if p.Cost.TotalCost <= 0 || p.Account == nil || !p.Account.SupportsAccountQuota() || !p.Account.HasAnyQuotaLimit() || deps.balanceNotifyService == nil {
 		slog.Debug("notifyAccountQuota: skipped",
 			"total_cost", p.Cost.TotalCost,
 			"account_nil", p.Account == nil,
-			"is_apikey_or_bedrock", p.Account != nil && p.Account.IsAPIKeyOrBedrock(),
+			"supports_account_quota", p.Account != nil && p.Account.SupportsAccountQuota(),
+			"has_quota_limit", p.Account != nil && p.Account.HasAnyQuotaLimit(),
 			"service_nil", deps.balanceNotifyService == nil,
 		)
 		return
@@ -552,6 +555,10 @@ func notifyAccountQuota(p *postUsageBillingParams, deps *billingDeps, result *Us
 	var quotaState *AccountQuotaState
 	if result != nil {
 		quotaState = result.QuotaState
+		// 本应累加却无递增后状态（账号已删除，计数被跳过）：没有新用量，不做阈值判定。
+		if quotaState == nil && p.shouldUpdateAccountQuota() {
+			return
+		}
 	}
 	slog.Debug("notifyAccountQuota: calling CheckAccountQuotaAfterIncrement",
 		"account_id", p.Account.ID,
@@ -1069,10 +1076,13 @@ func (s *GatewayService) calculateRecordUsageCost(
 	pricingAt time.Time,
 	opts *recordUsageOpts,
 ) *CostBreakdown {
-	// 图片生成：渠道定价为 token 计费时走 token 路径，否则走图片计费
+	// 图片生成：渠道定价为 token 计费时走 token 路径，否则走图片计费。
+	// 分组按张计费开关只对专用图片端点生效，混合请求仍按 token 计费。
 	if result.ImageCount > 0 {
-		if resolved := s.resolveChannelPricingAt(ctx, billingModel, apiKey, pricingAt); resolved != nil && resolved.Mode == BillingModeToken {
-			return s.calculateTokenCost(ctx, result, apiKey, billingModel, multiplier, pricingAt, opts)
+		if !imageCountBillingApplies(apiKey, result.ImageEndpoint) {
+			if resolved := s.resolveChannelPricingAt(ctx, billingModel, apiKey, pricingAt); resolved != nil && resolved.Mode == BillingModeToken {
+				return s.calculateTokenCost(ctx, result, apiKey, billingModel, multiplier, pricingAt, opts)
+			}
 		}
 		return s.calculateImageCost(ctx, result, apiKey, billingModel, imageMultiplier, pricingAt)
 	}
@@ -1212,7 +1222,7 @@ func (s *GatewayService) resolveChannelPricingAt(ctx context.Context, billingMod
 	return nil
 }
 
-// calculateImageCost 计算图片生成费用：渠道级别定价优先，否则走按次计费。
+// calculateImageCost 计算图片费用：分组模型卡 > 分组图片价 > 渠道价 > 默认图片价。
 func (s *GatewayService) calculateImageCost(
 	ctx context.Context,
 	result *ForwardResult,
@@ -1222,12 +1232,23 @@ func (s *GatewayService) calculateImageCost(
 	pricingAt time.Time,
 ) *CostBreakdown {
 	sizeTier := NormalizeImageBillingTierOrDefault(result.ImageSize)
+	forcePerImage := imageCountBillingApplies(apiKey, result.ImageEndpoint)
+	tokens := UsageTokens{
+		InputTokens:         result.Usage.InputTokens,
+		OutputTokens:        result.Usage.OutputTokens,
+		CacheCreationTokens: result.Usage.CacheCreationInputTokens,
+		CacheReadTokens:     result.Usage.CacheReadInputTokens,
+		ImageOutputTokens:   result.Usage.ImageOutputTokens,
+	}
 	resolved := s.resolveChannelPricingAt(ctx, billingModel, apiKey, pricingAt)
-	if resolved != nil && resolved.Source == PricingSourceGroup {
+	// 分组定价只有按次/图片模式才能按张结算。token 模式缺少 token 输入时会算出
+	// $0，必须回落到分组图片价或默认图片价，避免开关开启后图片完全免费。
+	if resolved != nil && resolved.Source == PricingSourceGroup &&
+		(resolved.Mode == BillingModePerRequest || resolved.Mode == BillingModeImage) {
 		gid := apiKey.Group.ID
 		cost, err := s.billingService.CalculateCostUnified(CostInput{
 			Ctx: ctx, Model: billingModel, GroupID: &gid, Group: apiKey.Group,
-			RequestCount: result.ImageCount, SizeTier: sizeTier,
+			Tokens: tokens, RequestCount: result.ImageCount, SizeTier: sizeTier,
 			RateMultiplier: multiplier, Resolver: s.resolver, Resolved: resolved, PricingAt: pricingAt,
 			ReasoningEffort: optionalStringValue(result.ReasoningEffort),
 		})
@@ -1239,12 +1260,9 @@ func (s *GatewayService) calculateImageCost(
 	if apiKeyHasConfiguredImagePrice(apiKey, sizeTier) {
 		return s.billingService.CalculateImageCost(billingModel, sizeTier, result.ImageCount, groupConfig, multiplier)
 	}
-	if resolved != nil && resolved.Source == PricingSourceChannel {
-		tokens := UsageTokens{
-			InputTokens:       result.Usage.InputTokens,
-			OutputTokens:      result.Usage.OutputTokens,
-			ImageOutputTokens: result.Usage.ImageOutputTokens,
-		}
+	// 强制按张时跳过渠道 token 价；按次/图片价仍保留 Tokens 供上下文档位选择。
+	if resolved != nil && resolved.Source == PricingSourceChannel &&
+		(resolved.Mode == BillingModePerRequest || resolved.Mode == BillingModeImage || !forcePerImage) {
 		gid := apiKey.Group.ID
 		cost, err := s.billingService.CalculateCostUnified(CostInput{
 			Ctx:             ctx,
@@ -1261,7 +1279,7 @@ func (s *GatewayService) calculateImageCost(
 			PricingAt:       pricingAt,
 		})
 		if err != nil {
-			logger.LegacyPrintf("service.gateway", "Calculate image token cost failed: %v", err)
+			logger.LegacyPrintf("service.gateway", "Calculate image channel cost failed: %v", err)
 			return &CostBreakdown{ActualCost: 0}
 		}
 		return cost
