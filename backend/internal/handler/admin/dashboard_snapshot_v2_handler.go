@@ -72,6 +72,7 @@ type dashboardSnapshotV2CacheKey struct {
 }
 
 func (h *DashboardHandler) GetSnapshotV2(c *gin.Context) {
+	setAdminSensitiveCacheHeaders(c, "Authorization", "X-API-Key", "If-None-Match")
 	startTime, endTime := parseTimeRange(c)
 	granularity := strings.TrimSpace(c.DefaultQuery("granularity", "day"))
 	if granularity != "hour" {
@@ -151,7 +152,6 @@ func (h *DashboardHandler) GetSnapshotV2(c *gin.Context) {
 	}
 	if etag != "" {
 		c.Header("ETag", etag)
-		c.Header("Vary", "If-None-Match")
 		if ifNoneMatchMatched(c.GetHeader("If-None-Match"), etag) {
 			c.Status(http.StatusNotModified)
 			return

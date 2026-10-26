@@ -1,9 +1,37 @@
 package admin
 
 import (
+	"strings"
+
 	"github.com/Wei-Shaw/sub2api/internal/pkg/usagestats"
 	"github.com/gin-gonic/gin"
 )
+
+func setAdminSensitiveCacheHeaders(c *gin.Context, vary ...string) {
+	c.Header("Cache-Control", "private, no-store")
+	if len(vary) == 0 {
+		vary = []string{"Authorization", "X-API-Key"}
+	}
+	fields := c.Writer.Header().Values("Vary")
+	for _, requested := range vary {
+		found := false
+		for _, existing := range fields {
+			for _, field := range strings.Split(existing, ",") {
+				if strings.EqualFold(strings.TrimSpace(field), requested) {
+					found = true
+					break
+				}
+			}
+			if found {
+				break
+			}
+		}
+		if !found {
+			fields = append(fields, requested)
+		}
+	}
+	c.Writer.Header().Set("Vary", strings.Join(fields, ", "))
+}
 
 type scopedUserUsageTrendPoint struct {
 	Date       string  `json:"date"`

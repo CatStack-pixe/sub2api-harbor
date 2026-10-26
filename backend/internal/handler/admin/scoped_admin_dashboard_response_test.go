@@ -71,6 +71,10 @@ func scopedDashboardPrivacyRouter(permissions []string) *gin.Engine {
 	handler := NewDashboardHandler(svc, nil)
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
+		c.Header("Vary", "Origin")
+		c.Next()
+	})
+	router.Use(func(c *gin.Context) {
 		if permissions != nil {
 			c.Request = c.Request.WithContext(adminaccess.WithPrincipal(
 				c.Request.Context(),
@@ -109,6 +113,10 @@ func TestScopedAdminDashboardUserContactProjection(t *testing.T) {
 				recorder := httptest.NewRecorder()
 				router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, path, nil))
 				require.Equal(t, http.StatusOK, recorder.Code, path+": "+recorder.Body.String())
+				require.Equal(t, "private, no-store", recorder.Header().Get("Cache-Control"), path)
+				require.Contains(t, recorder.Header().Get("Vary"), "Origin", path)
+				require.Contains(t, recorder.Header().Get("Vary"), "Authorization", path)
+				require.Contains(t, recorder.Header().Get("Vary"), "X-API-Key", path)
 				if identity.redacted {
 					require.NotContains(t, recorder.Body.String(), "private-dashboard@example.invalid", path)
 					require.NotContains(t, recorder.Body.String(), "private-dashboard-user", path)
