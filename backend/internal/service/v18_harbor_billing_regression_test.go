@@ -33,8 +33,8 @@ func v18HarborImageUsageCost(t *testing.T, pipeline string, resolver *ModelPrici
 	cost, err := svc.calculateOpenAIRecordUsageCost(context.Background(), &OpenAIForwardResult{
 		Model: model, ImageCount: count, ImageSize: "1K", ImageEndpoint: endpoint, ReasoningEffort: &effort,
 		Usage: OpenAIUsage{
-			InputTokens: tokens.InputTokens + tokens.CacheCreationTokens + tokens.CacheReadTokens,
-			OutputTokens: tokens.OutputTokens,
+			InputTokens:              tokens.InputTokens + tokens.CacheCreationTokens + tokens.CacheReadTokens,
+			OutputTokens:             tokens.OutputTokens,
 			CacheCreationInputTokens: tokens.CacheCreationTokens, CacheReadInputTokens: tokens.CacheReadTokens,
 			ImageOutputTokens: tokens.ImageOutputTokens,
 		},
@@ -345,7 +345,7 @@ func TestV18HarborBilling_MixedImagesKeepFreeFastAndSolExemption(t *testing.T) {
 					},
 				},
 				APIKey: &APIKey{ID: 1, GroupID: &groupID, Group: group}, User: &User{ID: 2},
-				Account: &Account{ID: 3, Platform: PlatformOpenAI, Type: accountType},
+				Account:   &Account{ID: 3, Platform: PlatformOpenAI, Type: accountType},
 				PricingAt: time.Date(2026, 9, 18, 8, 0, 0, 0, time.UTC),
 			}))
 			standardCost := 0.478
