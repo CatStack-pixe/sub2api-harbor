@@ -102,7 +102,7 @@
         {{ t('admin.accounts.fillRelatedModels') }}
       </button>
       <button
-        v-if="canSyncUpstream"
+        v-if="canSyncUpstream && showSyncButton"
         type="button"
         data-testid="sync-upstream-models"
         @click="syncUpstreamModels"
@@ -160,7 +160,7 @@ import { extractApiErrorMessage } from '@/utils/apiError'
 
 const { t } = useI18n()
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   modelValue: string[]
   modelMappings?: { from: string; to: string }[]
   platform?: string
@@ -172,11 +172,13 @@ const props = defineProps<{
     base_url?: string
     api_key: string
   }
-}>()
+  showSyncButton?: boolean
+}>(), { showSyncButton: true })
 
 const emit = defineEmits<{
   'update:modelValue': [value: string[]]
   'upstream-synced': []
+  'upstream-sync-finished': []
 }>()
 
 const appStore = useAppStore()
@@ -187,6 +189,7 @@ const searchQuery = ref('')
 const customModel = ref('')
 const isComposing = ref(false)
 const isSyncingUpstream = ref(false)
+
 const normalizedPlatforms = computed(() => {
   const rawPlatforms =
     props.platforms && props.platforms.length > 0
@@ -331,6 +334,11 @@ const syncUpstreamModels = async () => {
     }
     if (version !== syncRequestVersion) return
 
+    if (result.discovery_source === 'configured_fallback') {
+      appStore.showWarning(t('admin.accounts.grokModelDiagnostics.configuredFallback'))
+      return
+    }
+
     const upstreamModels = result.models.map(model => model.trim()).filter(Boolean)
     if (upstreamModels.length === 0) {
       if (isTokenRhythmPlatform.value) {
@@ -399,9 +407,16 @@ const syncUpstreamModels = async () => {
     const message = extractApiErrorMessage(error, t('admin.accounts.syncUpstreamModelsFailed'))
     appStore.showError(t('admin.accounts.syncUpstreamModelsError', { message }))
   } finally {
-    if (version === syncRequestVersion) isSyncingUpstream.value = false
+    if (version === syncRequestVersion) {
+      isSyncingUpstream.value = false
+      if (accountId) {
+        emit('upstream-sync-finished')
+      }
+    }
   }
 }
+
+defineExpose({ syncUpstreamModels, isSyncingUpstream })
 
 const clearAll = () => {
   emit('update:modelValue', [])

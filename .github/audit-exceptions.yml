@@ -1,5 +1,12 @@
 version: 1
 exceptions:
+  - package: follow-redirects
+    advisory: "GHSA-mrwp-f3q8-3g9p"
+    severity: high
+    reason: "Forced to follow-redirects >=1.16.1 via package override; the lockfile resolves the patched release"
+    mitigation: "Keep the direct override and verify the resolved lockfile entry on every security scan"
+    expires_on: "2027-01-06"
+    owner: "security@your-domain"
   - package: source-map-js
     advisory: "GHSA-68fv-2mgg-jv7q"
     severity: high
