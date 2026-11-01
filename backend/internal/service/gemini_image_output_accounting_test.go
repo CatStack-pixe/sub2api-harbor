@@ -272,7 +272,7 @@ func TestHandleNativeNonStreamingResponse_FileDataImageBilling(t *testing.T) {
 	cost := svc.calculateRecordUsageCost(context.Background(),
 		&ForwardResult{Model: model, ImageCount: count, ImageSize: "1K"},
 		&APIKey{GroupID: i64p(groupID), Group: &Group{ID: groupID}},
-		model, 0.15, 1.0, time.Time{})
+		model, 0.15, 1.0, time.Time{}, &recordUsageOpts{})
 	require.NotNil(t, cost)
 	require.Equal(t, string(BillingModeImage), cost.BillingMode)
 	require.InDelta(t, 0.50, cost.TotalCost, 1e-12)
