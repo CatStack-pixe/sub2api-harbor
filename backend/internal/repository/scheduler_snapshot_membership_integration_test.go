@@ -82,7 +82,7 @@ func TestSchedulerSnapshotConfiguredMembership(t *testing.T) {
 							wantMembers = append(wantMembers, ids[gid]["ready"], ids[gid]["cooling"], ids[gid]["expired"])
 							// Harbor OpenAI groups use the shared OpenAI-compatible
 							// account pool, which includes Grok accounts.
-							if platform == service.PlatformOpenAI {
+							if scope == "group" && platform == service.PlatformOpenAI {
 								wantReady = append(wantReady, ids[gid]["other_platform"])
 								wantMembers = append(wantMembers, ids[gid]["other_platform"])
 							}
