@@ -497,7 +497,6 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 		)
 	}
 
-
 	reqStream, ok := parseOpenAICompatibleStream(body)
 	if !ok {
 		h.errorResponse(c, http.StatusBadRequest, "invalid_request_error", invalidStreamFieldTypeMessage)

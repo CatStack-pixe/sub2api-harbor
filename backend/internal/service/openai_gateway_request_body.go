@@ -692,7 +692,6 @@ func gjsonArrayHasElements(value gjson.Result) bool {
 	return nonEmpty
 }
 
-
 // normalizeOpenAIResponsesReasoningContentReplay removes non-portable
 // reasoning content arrays before history is sent to a real OpenAI Responses
 // endpoint. Compatible providers may return visible reasoning blocks there,

@@ -480,7 +480,6 @@ func WithOpenAIReasoningEffortPolicyForMessages(ctx context.Context, body []byte
 	return WithOpenAIReasoningEffortPolicy(ctx, maxEffort, mappings, overLimit)
 }
 
-
 // ApplyOpenAIReasoningEffortPolicyFromContext applies a policy previously bound
 // to the request. An unbound request is returned byte-for-byte unchanged.
 func ApplyOpenAIReasoningEffortPolicyFromContext(ctx context.Context, body []byte) ([]byte, bool, error) {

@@ -176,9 +176,9 @@ type AdminGroup struct {
 	// group responses intentionally omit them.
 	ForceOpenAIFast      bool   `json:"force_openai_fast"`
 	ForceOpenAIUltrafast bool   `json:"force_openai_ultrafast"`
-	FreeOpenAIFast      bool   `json:"free_openai_fast"`
-	GlobalPromptEnabled bool   `json:"global_prompt_enabled"`
-	GlobalPrompt        string `json:"global_prompt"`
+	FreeOpenAIFast       bool   `json:"free_openai_fast"`
+	GlobalPromptEnabled  bool   `json:"global_prompt_enabled"`
+	GlobalPrompt         string `json:"global_prompt"`
 	// 分组利润控制（支持的 token 平台分组可启用；margin/buffer 为小数存储）。
 	// 仅管理员可见：这三个字段与同响应中的 rate_multiplier 相乘即可反推出
 	// 运营方的上游成本上限，属于内部经营信息，不得下放到 dto.Group。

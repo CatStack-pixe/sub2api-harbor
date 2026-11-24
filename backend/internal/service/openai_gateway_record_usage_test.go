@@ -3286,7 +3286,6 @@ func TestGroupBillsOpenAIFastAtStandardExcludesUltrafast(t *testing.T) {
 	))
 }
 
-
 func TestOpenAIGatewayServiceRecordUsage_ServiceTierNeverRaisedByUpstreamResponse(t *testing.T) {
 	usageRepo := &openAIRecordUsageLogRepoStub{inserted: true}
 	userRepo := &openAIRecordUsageUserRepoStub{}
