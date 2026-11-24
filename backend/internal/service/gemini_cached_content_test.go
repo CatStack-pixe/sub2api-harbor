@@ -414,7 +414,7 @@ func TestUpstreamPriceMultiplierScalesTokenCostOnly(t *testing.T) {
 		Usage:                   ClaudeUsage{InputTokens: inputTokens, OutputTokens: outputTokens, CacheReadInputTokens: cacheTokens},
 		CacheStorageTokenHours:  tokenHours,
 		UpstreamPriceMultiplier: 1.1,
-	}, apiKey, "gemini-3.7-flash", 2, 2, time.Now())
+	}, apiKey, "gemini-3.7-flash", 2, 2, time.Now(), &recordUsageOpts{})
 	require.InDelta(t, baseInput*1.1, cost.InputCost, 1e-12)
 	require.InDelta(t, baseOutput*1.1, cost.OutputCost, 1e-12)
 	require.InDelta(t, baseCacheRead*1.1, cost.CacheReadCost, 1e-12)
@@ -425,14 +425,14 @@ func TestUpstreamPriceMultiplierScalesTokenCostOnly(t *testing.T) {
 	unset := gateway.calculateRecordUsageCost(context.Background(), &ForwardResult{
 		Model: "gemini-3.7-flash",
 		Usage: ClaudeUsage{InputTokens: inputTokens, OutputTokens: outputTokens, CacheReadInputTokens: cacheTokens},
-	}, apiKey, "gemini-3.7-flash", 1, 1, time.Now())
+	}, apiKey, "gemini-3.7-flash", 1, 1, time.Now(), &recordUsageOpts{})
 	require.InDelta(t, baseInput+baseOutput+baseCacheRead, unset.TotalCost, 1e-12)
 
 	storageOnly := gateway.calculateRecordUsageCost(context.Background(), &ForwardResult{
 		Model:                   "gemini-3.7-flash",
 		CacheStorageTokenHours:  tokenHours,
 		UpstreamPriceMultiplier: 1.1,
-	}, apiKey, "gemini-3.7-flash", 1, 1, time.Now())
+	}, apiKey, "gemini-3.7-flash", 1, 1, time.Now(), &recordUsageOpts{})
 	require.InDelta(t, storage, storageOnly.TotalCost, 1e-12)
 }
 
@@ -458,14 +458,14 @@ func TestUpstreamPriceMultiplierSkipsConfiguredPricing(t *testing.T) {
 	}}}}
 	cost := gateway.calculateRecordUsageCost(context.Background(), &ForwardResult{
 		Model: "gemini-3.7-flash", Usage: usage, UpstreamPriceMultiplier: 1.1,
-	}, configured, "gemini-3.7-flash", 1, 1, time.Now())
+	}, configured, "gemini-3.7-flash", 1, 1, time.Now(), &recordUsageOpts{})
 	require.InDelta(t, inputTokens*groupInput+outputTokens*groupOutput, cost.TotalCost, 1e-12)
 
 	defaultGroupID := int64(6)
 	defaultPriced := &APIKey{GroupID: &defaultGroupID, Group: &Group{ID: defaultGroupID, Hydrated: true}}
 	cost = gateway.calculateRecordUsageCost(context.Background(), &ForwardResult{
 		Model: "gemini-3.7-flash", Usage: usage, UpstreamPriceMultiplier: 1.1,
-	}, defaultPriced, "gemini-3.7-flash", 1, 1, time.Now())
+	}, defaultPriced, "gemini-3.7-flash", 1, 1, time.Now(), &recordUsageOpts{})
 	require.InDelta(t, (inputTokens*0.00000075+outputTokens*0.00000375)*1.1, cost.TotalCost, 1e-12)
 }
 
