@@ -76,22 +76,26 @@ func TestApplyServiceTierBillingResolutionOnlyRewritesDowngrades(t *testing.T) {
 }
 
 func TestApplyOpenAIServiceTierBillingResolutionForUntieredRequest(t *testing.T) {
-	observed := "priority"
-	result := &OpenAIForwardResult{
-		ServiceTier:                 &observed,
-		UpstreamResponseServiceTier: observed,
-		RequestedServiceTierKnown:   true,
+	for _, platform := range []string{PlatformOpenAI, PlatformGrok, PlatformDeepseek, PlatformCline} {
+		t.Run(platform, func(t *testing.T) {
+			observed := "priority"
+			result := &OpenAIForwardResult{
+				ServiceTier:                 &observed,
+				UpstreamResponseServiceTier: observed,
+				RequestedServiceTierKnown:   true,
+			}
+
+			resolution := applyOpenAIServiceTierBillingResolutionForAccount(
+				&Account{Platform: platform, Type: AccountTypeAPIKey},
+				result,
+			)
+
+			require.Equal(t, "", resolution.Requested)
+			require.Equal(t, "priority", resolution.Observed)
+			require.Empty(t, resolution.Billing)
+			require.Nil(t, result.ServiceTier)
+		})
 	}
-
-	resolution := applyOpenAIServiceTierBillingResolutionForAccount(
-		&Account{Platform: PlatformOpenAI, Type: AccountTypeAPIKey},
-		result,
-	)
-
-	require.Equal(t, "", resolution.Requested)
-	require.Equal(t, "priority", resolution.Observed)
-	require.Empty(t, resolution.Billing)
-	require.Nil(t, result.ServiceTier)
 }
 
 func TestApplyOpenAIServiceTierBillingResolutionForCodexOAuthDefaultEcho(t *testing.T) {

@@ -80,10 +80,10 @@ func applyOpenAIServiceTierBillingResolutionForAccount(account *Account, result 
 	if result == nil {
 		return ServiceTierBillingResolution{}
 	}
-	if account != nil && account.Platform == PlatformOpenAI && result.RequestedServiceTierKnown {
+	if result.RequestedServiceTierKnown {
 		requested := normalizeBillingServiceTier(optionalStringValue(result.RequestedServiceTier))
 		observed := normalizeBillingServiceTier(result.UpstreamResponseServiceTier)
-		if account.IsOpenAIOAuthLike() &&
+		if account != nil && account.Platform == PlatformOpenAI && account.IsOpenAIOAuthLike() &&
 			(requested == "priority" || requested == "fast") && observed == "default" {
 			billingTier := requested
 			result.ServiceTier = &billingTier

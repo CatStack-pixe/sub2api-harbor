@@ -116,6 +116,38 @@ func TestOpenAICapacityShedModelRule_HTTP(t *testing.T) {
 	require.False(t, c.Writer.Written())
 }
 
+func TestOpenAICapacityShedModelRule_PassthroughBareErrorAfterOutput(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	for _, accountType := range []string{AccountTypeOAuth, AccountTypeSetupToken} {
+		t.Run(accountType, func(t *testing.T) {
+			repo := &modelNotFoundAccountRepoStub{}
+			svc := &OpenAIGatewayService{rateLimitService: &RateLimitService{accountRepo: repo}}
+			account := openAICapacityShedModelRuleAccount(accountType)
+			rec := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(rec)
+			c.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", nil)
+			body := "data: " + `{"type":"response.output_text.delta","delta":"hello"}` + "\n\n" +
+				"data: " + `{"type":"error","error":{"code":"server_is_overloaded","message":"overloaded"}}` + "\n\n"
+			resp := &http.Response{
+				StatusCode: http.StatusOK,
+				Header:     http.Header{"Content-Type": {"text/event-stream"}},
+				Body:       io.NopCloser(strings.NewReader(body)),
+			}
+
+			_, err := svc.handleStreamingResponsePassthrough(
+				context.Background(), resp, c, account, time.Now(), "alias", "gpt-6.1-sol",
+			)
+
+			require.Error(t, err)
+			require.Contains(t, rec.Body.String(), "hello")
+			require.Contains(t, rec.Body.String(), "response.failed")
+			require.Len(t, repo.modelRateLimitCalls, 1)
+			require.Equal(t, "gpt-6.1-sol", repo.modelRateLimitCalls[0].scope)
+			require.Zero(t, repo.tempCalls)
+		})
+	}
+}
+
 func TestOpenAICapacityShedModelRule_ProtectionBoundaries(t *testing.T) {
 	for _, tt := range []struct {
 		name   string
