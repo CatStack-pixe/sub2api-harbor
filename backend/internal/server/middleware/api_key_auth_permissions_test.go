@@ -194,6 +194,7 @@ func permissionAdminService(cfg *config.Config, users service.UserRepository, ke
 		nil, // composite routes
 		nil, // composite resolver
 		nil, // channel invalidator
+		nil, // user platform quotas
 	)
 }
 
