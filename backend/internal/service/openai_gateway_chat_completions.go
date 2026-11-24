@@ -822,6 +822,7 @@ func (s *OpenAIGatewayService) handleChatBufferedStreamingResponse(
 		UpstreamResponseModelConflict: observedUpstreamResponseModelConflict(c),
 		UpstreamResponseServiceTier:   observedUpstreamResponseServiceTier(c),
 		RequestedServiceTier:          requestedServiceTier,
+		RequestedServiceTierKnown:     true,
 		Stream:                        false,
 		Duration:                      time.Since(startTime),
 	}
@@ -947,6 +948,7 @@ func (s *OpenAIGatewayService) handleChatStreamingResponse(
 			UpstreamResponseModelConflict: observedUpstreamResponseModelConflict(c),
 			UpstreamResponseServiceTier:   observedUpstreamResponseServiceTier(c),
 			RequestedServiceTier:          requestedServiceTier,
+			RequestedServiceTierKnown:     true,
 			Stream:                        true,
 			Duration:                      time.Since(startTime),
 			FirstTokenMs:                  firstTokenMs,

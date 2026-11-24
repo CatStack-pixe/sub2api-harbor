@@ -48,16 +48,16 @@ func expectCompatibilityWindowInsert(mock sqlmock.Sqlmock, window *service.Prici
 }
 
 func expectCompatibilityPricingRead(mock sqlmock.Sqlmock, storedJSON string, batch bool) {
-	query := `(?s)SELECT .*cache_write_1h_price.*reasoning_effort_multipliers.*FROM channel_model_pricing.*channel_id = \$1`
+	query := `(?s)SELECT .*cache_write_12h_price.*ultrafast_multiplier.*reasoning_effort_multipliers.*FROM channel_model_pricing.*channel_id = \$1`
 	var arg any = int64(7)
 	if batch {
-		query = `(?s)SELECT .*cache_write_1h_price.*reasoning_effort_multipliers.*FROM channel_model_pricing.*channel_id = ANY`
+		query = `(?s)SELECT .*cache_write_12h_price.*ultrafast_multiplier.*reasoning_effort_multipliers.*FROM channel_model_pricing.*channel_id = ANY`
 		arg = pq.Array([]int64{7})
 	}
 	mock.ExpectQuery(query).WithArgs(arg).
 		WillReturnRows(sqlmock.NewRows(channelModelPricingTimePricingColumns).AddRow(
 			int64(11), int64(7), "sensenova", `["custom-model"]`, service.BillingModeToken,
-			nil, nil, 1e-6, 2e-6, nil, nil, nil, storedJSON, nil, nil, nil, compatibilityTimePricingJSON,
+			nil, nil, 1e-6, 2e-6, nil, nil, nil, nil, nil, storedJSON, nil, nil, nil, compatibilityTimePricingJSON,
 			time.Time{}, time.Time{},
 		))
 	expectEmptyModelPricingIntervals(mock)
@@ -77,9 +77,9 @@ func TestChannelModelPricingCompatibilityRoundTrip(t *testing.T) {
 			stored := &capturedReasoningMultipliersJSON{}
 			if operation == "update" {
 				mock.ExpectBegin()
-				mock.ExpectExec(`(?s)UPDATE channel_model_pricing.*cache_write_1h_price = \$6.*reasoning_effort_multipliers = \$10.*WHERE id = \$16`).
+				mock.ExpectExec(`(?s)UPDATE channel_model_pricing.*cache_write_12h_price = \$7.*ultrafast_multiplier = \$11.*reasoning_effort_multipliers = \$12.*WHERE id = \$18`).
 					WithArgs([]byte(`["custom-model"]`), service.BillingModeToken,
-						nil, nil, 1e-6, 2e-6, nil, nil, nil, stored, nil, nil, nil,
+						nil, nil, 1e-6, 2e-6, nil, nil, nil, nil, nil, stored, nil, nil, nil,
 						compatibilityTimePricingJSON, "sensenova", int64(11)).
 					WillReturnResult(sqlmock.NewResult(0, 1))
 				mock.ExpectExec(`DELETE FROM channel_pricing_time_windows WHERE pricing_id = \$1`).
@@ -92,7 +92,7 @@ func TestChannelModelPricingCompatibilityRoundTrip(t *testing.T) {
 				}
 				mock.ExpectQuery(`INSERT INTO channel_model_pricing .*cache_write_1h_price.*reasoning_effort_multipliers`).
 					WithArgs(int64(7), "sensenova", []byte(`["custom-model"]`), service.BillingModeToken,
-						nil, nil, 1e-6, 2e-6, nil, nil, nil, stored, nil, nil, nil, compatibilityTimePricingJSON).
+						nil, nil, 1e-6, 2e-6, nil, nil, nil, nil, nil, stored, nil, nil, nil, compatibilityTimePricingJSON).
 					WillReturnRows(sqlmock.NewRows([]string{"id", "created_at", "updated_at"}).
 						AddRow(int64(11), time.Time{}, time.Time{}))
 			}
@@ -147,9 +147,9 @@ func TestChannelModelPricingCompatibilityUpdateRollback(t *testing.T) {
 			pricing := compatibilityPricing()
 			failure := errors.New("fixture write failure")
 			mock.ExpectBegin()
-			update := mock.ExpectExec(`(?s)UPDATE channel_model_pricing.*reasoning_effort_multipliers = \$10.*WHERE id = \$16`).
+			update := mock.ExpectExec(`(?s)UPDATE channel_model_pricing.*ultrafast_multiplier = \$11.*reasoning_effort_multipliers = \$12.*WHERE id = \$18`).
 				WithArgs([]byte(`["custom-model"]`), service.BillingModeToken,
-					nil, nil, 1e-6, 2e-6, nil, nil, nil, `{"high":1.5,"max":4}`, nil, nil, nil,
+					nil, nil, 1e-6, 2e-6, nil, nil, nil, nil, nil, `{"high":1.5,"max":4}`, nil, nil, nil,
 					compatibilityTimePricingJSON, "sensenova", int64(11))
 			switch stage {
 			case "update":
@@ -205,20 +205,20 @@ func TestChannelPricingIntervalCacheWrite1hRoundTrip(t *testing.T) {
 				CacheWritePrice: &cacheWrite, CacheWrite1hPrice: cacheWrite1h, CacheReadPrice: &cacheRead,
 				SortOrder: 2,
 			}
-			mock.ExpectQuery(`(?s)INSERT INTO channel_pricing_intervals.*cache_write_price, cache_write_1h_price, cache_read_price`).
-				WithArgs(int64(11), 100, nil, "large", nil, nil, cacheWrite, cacheWrite1h, cacheRead,
+			mock.ExpectQuery(`(?s)INSERT INTO channel_pricing_intervals.*cache_write_price, cache_write_1h_price, cache_write_12h_price, cache_read_price`).
+				WithArgs(int64(11), 100, nil, "large", nil, nil, cacheWrite, cacheWrite1h, nil, cacheRead,
 					nil, nil, nil, nil, nil, 2).
 				WillReturnRows(sqlmock.NewRows([]string{"id", "created_at", "updated_at"}).
 					AddRow(int64(21), time.Time{}, time.Time{}))
 			require.NoError(t, createIntervalExec(context.Background(), repo.db, interval))
-			mock.ExpectQuery(`(?s)SELECT .*cache_write_price, cache_write_1h_price, cache_read_price.*FROM channel_pricing_intervals`).
+			mock.ExpectQuery(`(?s)SELECT .*cache_write_price, cache_write_1h_price, cache_write_12h_price, cache_read_price.*FROM channel_pricing_intervals`).
 				WithArgs(pq.Array([]int64{11})).
 				WillReturnRows(sqlmock.NewRows([]string{
 					"id", "pricing_id", "min_tokens", "max_tokens", "tier_label",
-					"input_price", "output_price", "cache_write_price", "cache_write_1h_price", "cache_read_price",
+					"input_price", "output_price", "cache_write_price", "cache_write_1h_price", "cache_write_12h_price", "cache_read_price",
 					"input_multiplier", "output_multiplier", "cache_write_multiplier", "cache_read_multiplier",
 					"per_request_price", "sort_order", "created_at", "updated_at",
-				}).AddRow(int64(21), int64(11), 100, nil, "large", nil, nil, cacheWrite, cacheWrite1h, cacheRead,
+				}).AddRow(int64(21), int64(11), 100, nil, "large", nil, nil, cacheWrite, cacheWrite1h, nil, cacheRead,
 					nil, nil, nil, nil, nil, 2, time.Time{}, time.Time{}))
 			loaded, err := repo.batchLoadIntervals(context.Background(), []int64{11})
 			require.NoError(t, err)

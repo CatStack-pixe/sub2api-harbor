@@ -268,6 +268,9 @@ type OpenAIForwardResult struct {
 	ServiceTier *string
 	// RequestedServiceTier is the tier sent upstream before applying any response echo.
 	RequestedServiceTier *string
+	// RequestedServiceTierKnown distinguishes a captured untiered request from
+	// result producers that predate request-tier propagation.
+	RequestedServiceTierKnown bool
 	// ReasoningEffort is extracted from request body (reasoning.effort) or derived from model suffix
 	// after group policy rewriting and model-family remapping.
 	// Stored for usage records display; nil means not provided / not applicable.

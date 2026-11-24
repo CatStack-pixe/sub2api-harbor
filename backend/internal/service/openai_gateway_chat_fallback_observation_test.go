@@ -133,7 +133,7 @@ func TestChatFallbackResponseObservationReachesUsage(t *testing.T) {
 				}
 				require.Equal(t, tt.model, observedUpstreamResponseModel(c), "the shared pipeline already saw the upstream model")
 				wantTier := "default"
-				if tt.model == "" {
+				if tt.stream && tt.model == "" {
 					wantTier = ""
 				}
 				require.Equal(t, wantTier, result.UpstreamResponseServiceTier)

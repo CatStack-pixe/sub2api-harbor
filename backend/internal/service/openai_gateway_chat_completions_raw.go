@@ -560,6 +560,7 @@ streamLoop:
 				firstOutputCh = nil
 			}
 			if sawDone {
+				writeLine("")
 				flushPendingToClient()
 				break streamLoop
 			}
@@ -647,6 +648,7 @@ streamLoop:
 			ReasoningEffort:               reasoningEffort,
 			ServiceTier:                   resolvedOpenAIUpstreamServiceTier(c, serviceTier),
 			RequestedServiceTier:          serviceTier,
+			RequestedServiceTierKnown:     true,
 			Stream:                        true,
 			Duration:                      time.Since(startTime),
 			FirstTokenMs:                  firstTokenMs,
@@ -851,6 +853,7 @@ func (s *OpenAIGatewayService) bufferRawChatCompletions(
 		ReasoningEffort:               reasoningEffort,
 		ServiceTier:                   resolvedOpenAIUpstreamServiceTier(c, serviceTier),
 		RequestedServiceTier:          serviceTier,
+		RequestedServiceTierKnown:     true,
 		Stream:                        false,
 		Duration:                      time.Since(startTime),
 	}, nil
