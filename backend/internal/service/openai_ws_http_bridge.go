@@ -2,7 +2,6 @@ package service
 
 import (
 	"bufio"
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -244,47 +243,6 @@ func skipOpenAIWSJSONValue(payload []byte, i int) int {
 		}
 	}
 	return len(payload)
-}
-
-// hasDuplicateOpenAIWSJSONObjectKeys detects duplicate keys in the top-level
-// JSON object without accepting the last-write-wins behavior of json.Unmarshal.
-// Duplicate routing controls are ambiguous and must stay on the native relay.
-func hasDuplicateOpenAIWSJSONObjectKeys(payload []byte, keys ...string) bool {
-	dec := json.NewDecoder(bytes.NewReader(payload))
-	tok, err := dec.Token()
-	if err != nil {
-		return false
-	}
-	delim, ok := tok.(json.Delim)
-	if !ok || delim != '{' {
-		return false
-	}
-	wanted := make(map[string]struct{}, len(keys))
-	for _, key := range keys {
-		wanted[key] = struct{}{}
-	}
-	seen := make(map[string]struct{}, len(keys))
-	for dec.More() {
-		tok, err = dec.Token()
-		if err != nil {
-			return false
-		}
-		key, ok := tok.(string)
-		if !ok {
-			return false
-		}
-		if _, interested := wanted[key]; interested {
-			if _, duplicate := seen[key]; duplicate {
-				return true
-			}
-			seen[key] = struct{}{}
-		}
-		var value json.RawMessage
-		if err := dec.Decode(&value); err != nil {
-			return false
-		}
-	}
-	return false
 }
 
 func prepareOpenAIWSHTTPBridgeBody(account *Account, payload []byte) ([]byte, error) {
