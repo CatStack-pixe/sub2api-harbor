@@ -47,7 +47,7 @@ jobs:
       - name: Verify the patched certificate validation behavior
         working-directory: .github/security-tools/x509check
         run: |
-          test "$(go env GOVERSION)" = "go1.27.3"
+          test "$(go env GOVERSION)" = "go1.27.4"
           python ci.py --expect patched --output "$RUNNER_TEMP/x509check-patched"
           "$RUNNER_TEMP/x509check-patched" -check crypto -json > "$RUNNER_TEMP/x509-patched.json"
       - name: Build the production runtime context
@@ -83,7 +83,7 @@ jobs:
           check-latest: false
           cache-dependency-path: backend/go.sum
       - name: Verify Go version
-        run: test "$(go env GOVERSION)" = "go1.27.3"
+        run: test "$(go env GOVERSION)" = "go1.27.4"
       # The generation directives use the module graph, including x/tools v0.50.0,
       # so Ent and Wire read the export format produced by this Go toolchain.
       - name: Generate Ent
@@ -126,7 +126,7 @@ jobs:
           check-latest: false
           cache-dependency-path: backend/go.sum
       - name: Verify Go version
-        run: test "$(go env GOVERSION)" = "go1.27.3"
+        run: test "$(go env GOVERSION)" = "go1.27.4"
       - name: Record pinned historical routing baseline
         id: record
         working-directory: .
@@ -206,7 +206,7 @@ jobs:
           cache: true
           cache-dependency-path: backend/go.sum
       - name: Verify Go version
-        run: test "$(go env GOVERSION)" = "go1.27.3"
+        run: test "$(go env GOVERSION)" = "go1.27.4"
       - name: Generate Ent and Wire
         working-directory: backend
         run: go generate ./ent ./cmd/server
@@ -238,7 +238,7 @@ jobs:
           cache: true
           cache-dependency-path: backend/go.sum
       - name: Verify Go version
-        run: test "$(go env GOVERSION)" = "go1.27.3"
+        run: test "$(go env GOVERSION)" = "go1.27.4"
       - name: Generate Ent and Wire
         working-directory: backend
         run: go generate ./ent ./cmd/server
@@ -257,7 +257,7 @@ jobs:
           cache: true
           cache-dependency-path: backend/go.sum
       - name: Verify Go version
-        run: test "$(go env GOVERSION)" = "go1.27.3"
+        run: test "$(go env GOVERSION)" = "go1.27.4"
       - name: Generate Ent and Wire
         working-directory: backend
         run: go generate ./ent ./cmd/server
@@ -281,7 +281,7 @@ jobs:
           cache: true
           cache-dependency-path: backend/go.sum
       - name: Verify Go version
-        run: test "$(go env GOVERSION)" = "go1.27.3"
+        run: test "$(go env GOVERSION)" = "go1.27.4"
       - name: Generate Ent and Wire
         working-directory: backend
         run: go generate ./ent ./cmd/server
@@ -337,7 +337,7 @@ jobs:
           cache: true
           cache-dependency-path: backend/go.sum
       - name: Verify Go version
-        run: test "$(go env GOVERSION)" = "go1.27.3"
+        run: test "$(go env GOVERSION)" = "go1.27.4"
       - name: Generate Ent and Wire
         working-directory: backend
         run: go generate ./ent ./cmd/server

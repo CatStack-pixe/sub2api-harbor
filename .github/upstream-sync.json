@@ -1,14 +1,13 @@
 {
   "repository": "Wei-Shaw/sub2api",
-  "tag": "v0.2.18",
-  "commit": "ba81c7fd758e425d67f856d601147ef0c5263d3f",
-  "previous_tag": "v0.2.17",
-  "previous_commit": "b0a02a3304a0a78cdd003ddda1dd23ba02c03084",
-  "fork_baseline": "6e8c46560abc2afef23355af6e23faac5b38d314",
-  "application_version": "0.2.18-harbor.1",
+  "tag": "v0.2.25",
+  "commit": "0f6671457132425d1b84f3d80536b53e02942424",
+  "previous_tag": "v0.2.19",
+  "previous_commit": "d851a38477597157e78450d30af2d8504764d085",
+  "fork_baseline": "6671e9b9bf451ebc91bd5a9e6348ca4f664cb034",
+  "application_version": "0.2.25-harbor.1",
   "conflict_policy": "Preserve fork behavior and integrate compatible upstream changes.",
   "history_note": "Squash merges do not retain upstream ancestry. Use the recorded upstream commit as the content merge baseline for the next synchronization, and audit fork differences before merging.",
-  "release_tag_commit": "de86961b627e48db75d61fff8c05535d44a00cbe",
-  "synced_at": "2026-10-26",
-  "target_note": "Includes post-v0.2.18 scoped administrator API keys and multi-image billing fixes through the frozen main commit."
+  "synced_at": "2026-11-24",
+  "target_note": "Upstream v0.2.25 through 0f6671457; Harbor snapshot based on main 6671e9b9 and prior upstream baseline d851a3847."
 }

@@ -4,38 +4,17 @@
     data-test="cn-provider-quota"
     class="min-w-[220px] space-y-1"
   >
-    <!-- Tier rows: 5h + weekly utilization bars (snapshot renders on mount) -->
+    <!-- Reuse the account table's quota bar and reset-time formatting. -->
     <div v-if="data?.success && data.tiers?.length" class="space-y-1">
-      <div
+      <UsageProgressBar
         v-for="tier in data.tiers"
         :key="tier.window"
         data-test="cn-provider-quota-tier"
-        class="flex min-w-0 items-center gap-1.5 text-[10px] leading-4"
-      >
-        <span
-          data-test="cn-provider-quota-label"
-          class="w-14 shrink-0 whitespace-nowrap text-gray-500 dark:text-gray-400"
-        >
-          {{ windowLabel(tier.window) }}
-        </span>
-        <div class="h-1.5 w-16 shrink-0 overflow-hidden rounded-full bg-gray-200 dark:bg-dark-600">
-          <div
-            class="h-full rounded-full transition-all"
-            :class="utilizationColor(tier.used_percent)"
-            :style="{ width: `${Math.min(100, Math.max(0, tier.used_percent))}%` }"
-          />
-        </div>
-        <span :class="['shrink-0 font-medium', utilizationTextColor(tier.used_percent)]">
-          {{ Math.round(tier.used_percent) }}%
-        </span>
-        <span
-          v-if="tier.reset_at"
-          class="min-w-0 truncate text-gray-400 dark:text-gray-500"
-          :title="tier.reset_at"
-        >
-          · {{ formatReset(tier.reset_at) }}
-        </span>
-      </div>
+        :label="windowLabel(tier.window)"
+        :utilization="tier.used_percent"
+        :resets-at="tier.reset_at"
+        :color="tier.window === '5h' ? 'indigo' : tier.window === 'weekly' ? 'emerald' : 'purple'"
+      />
     </div>
 
     <!-- Explicit refresh action (aligned with the OpenAI "Query" / Grok "Probe"
@@ -92,6 +71,7 @@ import { adminAPI } from '@/api/admin'
 import type { CNProviderBalanceResult, CNProviderQuotaProbeResult } from '@/api/admin/cnProviders'
 import type { Account } from '@/types'
 import { cnQuotaCellVisible } from './credentialsBuilder'
+import UsageProgressBar from './UsageProgressBar.vue'
 
 const props = defineProps<{
   account: Account
@@ -106,7 +86,8 @@ const visible = computed(() => cnQuotaCellVisible(props.account))
 
 const loading = ref(false)
 const error = ref<string | null>(null)
-const data = ref<CNProviderQuotaProbeResult | null>(null)
+const probeData = ref<CNProviderQuotaProbeResult | null>(null)
+let probeGeneration = 0
 
 // 后端周期任务/手动探测写入的 extra 快照键（<provider>_ 前缀，与后端
 // cnQuotaExtraUpdates 对齐）。页面加载即有数据，无需等待探测。
@@ -142,6 +123,18 @@ const snapshotData = computed<CNProviderQuotaProbeResult | null>(() => {
   return { success: true, tiers } as CNProviderQuotaProbeResult
 })
 
+const data = computed(() => probeData.value ?? snapshotData.value)
+
+// A list refresh replaces account.extra even when its quota snapshot is
+// unchanged. Keep a manual probe until the quota values or snapshot version
+// actually change, rather than reverting it on unrelated account updates.
+watch(
+  [snapshotData, () => readExtraString(`${props.account.platform}_usage_updated_at`)],
+  (next, previous) => {
+    if (JSON.stringify(next) !== JSON.stringify(previous)) probeData.value = null
+  }
+)
+
 // 快照是否过期（无更新时间或超过 staleness 窗口）→ 挂载时需要自动探测。
 const snapshotIsStale = computed(() => {
   const updatedAt = readExtraString(`${props.account.platform}_usage_updated_at`)
@@ -154,7 +147,6 @@ const snapshotIsStale = computed(() => {
 // 避免静默失败导致单元格空白无提示）。
 onMounted(() => {
   if (!visible.value) return
-  data.value = snapshotData.value
   if (!snapshotIsStale.value) return
   // 模块级去抖：列表页每行一个实例，翻页/筛选/刷新会重复挂载；同一账号
   // 短时间内已自动探测过则跳过，避免对上游形成探测风暴。
@@ -194,57 +186,34 @@ const windowLabel = (window: string) => {
   return t('admin.accounts.cnProviders.window5h')
 }
 
-const utilizationColor = (pct: number) => {
-  if (pct >= 90) return 'bg-red-500'
-  if (pct >= 75) return 'bg-amber-500'
-  return 'bg-emerald-500'
-}
-
-const utilizationTextColor = (pct: number) => {
-  if (pct >= 90) return 'text-red-600 dark:text-red-400'
-  if (pct >= 75) return 'text-amber-600 dark:text-amber-400'
-  return 'text-emerald-600 dark:text-emerald-400'
-}
-
-// 重置时间相对/绝对简短显示。
-const formatReset = (iso: string) => {
-  const d = new Date(iso)
-  if (isNaN(d.getTime())) return iso
-  const now = Date.now()
-  const diffMs = d.getTime() - now
-  if (diffMs <= 0) return t('admin.accounts.cnProviders.resetSoon')
-  if (diffMs < 3_600_000) return `${Math.max(1, Math.round(diffMs / 60_000))}m`
-  const hours = Math.round(diffMs / 3_600_000)
-  if (hours < 48) return `${hours}h`
-  const mm = String(d.getMonth() + 1).padStart(2, '0')
-  const dd = String(d.getDate()).padStart(2, '0')
-  return `${mm}-${dd}`
-}
-
 const handleProbe = async () => {
   if (loading.value) return
+  const generation = ++probeGeneration
+  const accountID = props.account.id
   loading.value = true
   error.value = null
   try {
-    const result = await adminAPI.cnProviders.queryQuota(props.account.id)
+    const result = await adminAPI.cnProviders.queryQuota(accountID)
+    if (generation !== probeGeneration) return
     // 失败时保留已渲染的快照条形图（仅显示错误行），成功才覆盖。
     if (result.success) {
-      data.value = result
+      probeData.value = result
       if (result.balance?.success) emit('balance-updated', result.balance)
     } else {
       error.value = result.error || t('common.error')
     }
   } catch (e) {
-    error.value = extractErrorMessage(e)
+    if (generation === probeGeneration) error.value = extractErrorMessage(e)
   } finally {
-    loading.value = false
+    if (generation === probeGeneration) loading.value = false
   }
 }
 
 watch(
-  () => props.account.id,
+  [() => props.account.id, () => props.account.platform],
   () => {
-    data.value = null
+    probeGeneration++
+    probeData.value = null
     error.value = null
     loading.value = false
   }

@@ -87,7 +87,7 @@ func (s *OpenAIGatewayService) forwardAsRawChatCompletionsWithStartTime(
 		billingModel = fallbackModel
 	}
 	upstreamModel := normalizeOpenAIModelForUpstream(account, billingModel)
-	if err := validateGPT61SolCompatRequest(body, upstreamModel); err != nil {
+	if err := validateGPT61CompatRequest(body, upstreamModel); err != nil {
 		writeChatCompletionsError(c, http.StatusBadRequest, "invalid_request_error", err.Error())
 		return nil, err
 	}
@@ -354,7 +354,6 @@ func (s *OpenAIGatewayService) streamRawChatCompletions(
 	}
 	requestID := resp.Header.Get("x-request-id")
 	writeStreamHeaders := s.newStreamHeaderWriter(c, resp.Header)
-	scanner := s.newUpstreamSSEScanner(resp.Body)
 	keepaliveStop := func() {}
 	var keepaliveOwner *openAIResponsesSSEKeepaliveOwner
 	var keepaliveInterval time.Duration
@@ -373,6 +372,28 @@ func (s *OpenAIGatewayService) streamRawChatCompletions(
 	clientOutputStarted := false
 	sawDone := false
 	var terminal openAIRawStreamTerminalState
+	flushPending := false
+	drainDone := make(chan struct{})
+	flushRequests := make(chan chan struct{})
+	flushToClient := func() {
+		ack := make(chan struct{})
+		select {
+		case flushRequests <- ack:
+		case <-drainDone:
+			return
+		}
+		select {
+		case <-ack:
+		case <-drainDone:
+		}
+	}
+	scanner := s.newUpstreamSSEScanner(&flushBeforeUpstreamRead{r: resp.Body, flush: flushToClient})
+	flushPendingToClient := func() {
+		if flushPending && !clientDisconnected && clientOutputStarted {
+			c.Writer.Flush()
+		}
+		flushPending = false
+	}
 	pendingLines := make([]string, 0, 8)
 	refusalDetector := newOpenAIChatSilentRefusalDetector(requestBodyLen)
 
@@ -432,15 +453,8 @@ func (s *OpenAIGatewayService) streamRawChatCompletions(
 
 		line = s.replaceModelInSSELine(line, upstreamModel, originalModel)
 		writeLine(line)
-		if line == "" {
-			if !clientDisconnected && clientOutputStarted {
-				c.Writer.Flush()
-			}
-			return
-		}
-		if !clientDisconnected && clientOutputStarted {
-			c.Writer.Flush()
-		}
+		// 不逐行 flush：scanner 下次向上游读取前统一 flush（见 flushBeforeUpstreamRead）。
+		flushPending = true
 	}
 
 	// Scanner reads block on the upstream body. Always move it to a worker so
@@ -451,8 +465,7 @@ func (s *OpenAIGatewayService) streamRawChatCompletions(
 		line string
 		err  error
 	}
-	events := make(chan scanEvent, 16)
-	drainDone := make(chan struct{})
+	events := make(chan scanEvent)
 	sendEvent := func(event scanEvent) bool {
 		select {
 		case events <- event:
@@ -547,11 +560,16 @@ streamLoop:
 				firstOutputCh = nil
 			}
 			if sawDone {
+				flushPendingToClient()
 				break streamLoop
 			}
+		case flushAck := <-flushRequests:
+			flushPendingToClient()
+			close(flushAck)
 		case <-clientDone:
 			clientDisconnected = true
 			clientDone = nil
+			keepaliveCh = nil
 			logger.L().Debug("openai chat_completions raw: client request canceled, continuing to drain upstream for billing",
 				zap.String("request_id", requestID),
 			)
@@ -594,16 +612,19 @@ streamLoop:
 			break streamLoop
 		case <-keepaliveCh:
 			if clientDisconnected {
+				keepaliveCh = nil
 				continue
 			}
 			if !keepaliveOwner.beat() {
 				clientDisconnected = true
+				keepaliveCh = nil
 				logger.L().Debug("openai chat_completions raw: client disconnected during keepalive, continuing to drain upstream for billing",
 					zap.String("request_id", requestID),
 				)
 			}
 		}
 	}
+	flushPendingToClient()
 
 	if streamErr != nil && !errors.Is(streamErr, context.Canceled) && !errors.Is(streamErr, context.DeadlineExceeded) {
 		logger.L().Warn("openai chat_completions raw: stream read error",

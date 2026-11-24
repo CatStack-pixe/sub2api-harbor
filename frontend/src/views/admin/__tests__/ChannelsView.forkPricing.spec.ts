@@ -161,13 +161,36 @@ describe('ChannelsView fork pricing preservation', () => {
     expect(mocks.update).toHaveBeenCalledWith(7, expect.objectContaining({
       group_ids: expect.arrayContaining(original.group_ids),
       model_mapping: original.model_mapping,
-      model_pricing: expect.arrayContaining(original.model_pricing),
-      account_stats_pricing_rules: expect.arrayContaining(original.account_stats_pricing_rules),
       features_config: expect.objectContaining(original.features_config),
     }))
     const payload = mocks.update.mock.calls[0][1]
     expect(payload.model_pricing).toHaveLength(platforms.length)
     expect(payload.account_stats_pricing_rules).toHaveLength(platforms.length)
+    for (const pricing of original.model_pricing) {
+      expect(payload.model_pricing).toContainEqual(expect.objectContaining({
+        platform: pricing.platform,
+        models: pricing.models,
+        input_price: pricing.input_price,
+        output_price: pricing.output_price,
+        cache_write_price: pricing.cache_write_price,
+        cache_write_1h_price: pricing.cache_write_1h_price,
+        reasoning_effort_multipliers: pricing.reasoning_effort_multipliers,
+        time_windows: pricing.time_windows,
+        time_pricing: pricing.time_pricing,
+      }))
+    }
+    for (const rule of original.account_stats_pricing_rules ?? []) {
+      expect(payload.account_stats_pricing_rules).toContainEqual(expect.objectContaining({
+        ...rule,
+        pricing: expect.arrayContaining(rule.pricing.map(pricing => expect.objectContaining({
+          platform: pricing.platform,
+          models: pricing.models,
+          input_price: pricing.input_price,
+          output_price: pricing.output_price,
+          time_windows: pricing.time_windows,
+        }))),
+      }))
+    }
     wrapper.unmount()
   })
 

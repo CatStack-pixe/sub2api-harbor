@@ -39,7 +39,6 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/promocode"
 	"github.com/Wei-Shaw/sub2api/ent/promocodeusage"
 	"github.com/Wei-Shaw/sub2api/ent/proxy"
-	"github.com/Wei-Shaw/sub2api/ent/proxygroup"
 	"github.com/Wei-Shaw/sub2api/ent/redeemcode"
 	"github.com/Wei-Shaw/sub2api/ent/securitysecret"
 	"github.com/Wei-Shaw/sub2api/ent/setting"
@@ -91,7 +90,6 @@ const (
 	TypePromoCode                     = "PromoCode"
 	TypePromoCodeUsage                = "PromoCodeUsage"
 	TypeProxy                         = "Proxy"
-	TypeProxyGroup                    = "ProxyGroup"
 	TypeRedeemCode                    = "RedeemCode"
 	TypeSecuritySecret                = "SecuritySecret"
 	TypeSetting                       = "Setting"
@@ -110,53 +108,51 @@ const (
 // APIKeyMutation represents an operation that mutates the APIKey nodes in the graph.
 type APIKeyMutation struct {
 	config
-	op                    Op
-	typ                   string
-	id                    *int64
-	created_at            *time.Time
-	updated_at            *time.Time
-	deleted_at            *time.Time
-	key                   *string
-	name                  *string
-	status                *string
-	last_used_at          *time.Time
-	ip_whitelist          *[]string
-	appendip_whitelist    []string
-	ip_blacklist          *[]string
-	appendip_blacklist    []string
-	model_whitelist       *[]string
-	appendmodel_whitelist []string
-	quota                 *float64
-	addquota              *float64
-	quota_used            *float64
-	addquota_used         *float64
-	expires_at            *time.Time
-	rate_limit_5h         *float64
-	addrate_limit_5h      *float64
-	rate_limit_1d         *float64
-	addrate_limit_1d      *float64
-	rate_limit_7d         *float64
-	addrate_limit_7d      *float64
-	usage_5h              *float64
-	addusage_5h           *float64
-	usage_1d              *float64
-	addusage_1d           *float64
-	usage_7d              *float64
-	addusage_7d           *float64
-	window_5h_start       *time.Time
-	window_1d_start       *time.Time
-	window_7d_start       *time.Time
-	clearedFields         map[string]struct{}
-	user                  *int64
-	cleareduser           bool
-	group                 *int64
-	clearedgroup          bool
-	usage_logs            map[int64]struct{}
-	removedusage_logs     map[int64]struct{}
-	clearedusage_logs     bool
-	done                  bool
-	oldValue              func(context.Context) (*APIKey, error)
-	predicates            []predicate.APIKey
+	op                 Op
+	typ                string
+	id                 *int64
+	created_at         *time.Time
+	updated_at         *time.Time
+	deleted_at         *time.Time
+	key                *string
+	name               *string
+	status             *string
+	last_used_at       *time.Time
+	ip_whitelist       *[]string
+	appendip_whitelist []string
+	ip_blacklist       *[]string
+	appendip_blacklist []string
+	quota              *float64
+	addquota           *float64
+	quota_used         *float64
+	addquota_used      *float64
+	expires_at         *time.Time
+	rate_limit_5h      *float64
+	addrate_limit_5h   *float64
+	rate_limit_1d      *float64
+	addrate_limit_1d   *float64
+	rate_limit_7d      *float64
+	addrate_limit_7d   *float64
+	usage_5h           *float64
+	addusage_5h        *float64
+	usage_1d           *float64
+	addusage_1d        *float64
+	usage_7d           *float64
+	addusage_7d        *float64
+	window_5h_start    *time.Time
+	window_1d_start    *time.Time
+	window_7d_start    *time.Time
+	clearedFields      map[string]struct{}
+	user               *int64
+	cleareduser        bool
+	group              *int64
+	clearedgroup       bool
+	usage_logs         map[int64]struct{}
+	removedusage_logs  map[int64]struct{}
+	clearedusage_logs  bool
+	done               bool
+	oldValue           func(context.Context) (*APIKey, error)
+	predicates         []predicate.APIKey
 }
 
 var _ ent.Mutation = (*APIKeyMutation)(nil)
@@ -748,71 +744,6 @@ func (m *APIKeyMutation) ResetIPBlacklist() {
 	m.ip_blacklist = nil
 	m.appendip_blacklist = nil
 	delete(m.clearedFields, apikey.FieldIPBlacklist)
-}
-
-// SetModelWhitelist sets the "model_whitelist" field.
-func (m *APIKeyMutation) SetModelWhitelist(s []string) {
-	m.model_whitelist = &s
-	m.appendmodel_whitelist = nil
-}
-
-// ModelWhitelist returns the value of the "model_whitelist" field in the mutation.
-func (m *APIKeyMutation) ModelWhitelist() (r []string, exists bool) {
-	v := m.model_whitelist
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldModelWhitelist returns the old "model_whitelist" field's value of the APIKey entity.
-// If the APIKey object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *APIKeyMutation) OldModelWhitelist(ctx context.Context) (v []string, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldModelWhitelist is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldModelWhitelist requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldModelWhitelist: %w", err)
-	}
-	return oldValue.ModelWhitelist, nil
-}
-
-// AppendModelWhitelist adds s to the "model_whitelist" field.
-func (m *APIKeyMutation) AppendModelWhitelist(s []string) {
-	m.appendmodel_whitelist = append(m.appendmodel_whitelist, s...)
-}
-
-// AppendedModelWhitelist returns the list of values that were appended to the "model_whitelist" field in this mutation.
-func (m *APIKeyMutation) AppendedModelWhitelist() ([]string, bool) {
-	if len(m.appendmodel_whitelist) == 0 {
-		return nil, false
-	}
-	return m.appendmodel_whitelist, true
-}
-
-// ClearModelWhitelist clears the value of the "model_whitelist" field.
-func (m *APIKeyMutation) ClearModelWhitelist() {
-	m.model_whitelist = nil
-	m.appendmodel_whitelist = nil
-	m.clearedFields[apikey.FieldModelWhitelist] = struct{}{}
-}
-
-// ModelWhitelistCleared returns if the "model_whitelist" field was cleared in this mutation.
-func (m *APIKeyMutation) ModelWhitelistCleared() bool {
-	_, ok := m.clearedFields[apikey.FieldModelWhitelist]
-	return ok
-}
-
-// ResetModelWhitelist resets all changes to the "model_whitelist" field.
-func (m *APIKeyMutation) ResetModelWhitelist() {
-	m.model_whitelist = nil
-	m.appendmodel_whitelist = nil
-	delete(m.clearedFields, apikey.FieldModelWhitelist)
 }
 
 // SetQuota sets the "quota" field.
@@ -1601,7 +1532,7 @@ func (m *APIKeyMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *APIKeyMutation) Fields() []string {
-	fields := make([]string, 0, 24)
+	fields := make([]string, 0, 23)
 	if m.created_at != nil {
 		fields = append(fields, apikey.FieldCreatedAt)
 	}
@@ -1634,9 +1565,6 @@ func (m *APIKeyMutation) Fields() []string {
 	}
 	if m.ip_blacklist != nil {
 		fields = append(fields, apikey.FieldIPBlacklist)
-	}
-	if m.model_whitelist != nil {
-		fields = append(fields, apikey.FieldModelWhitelist)
 	}
 	if m.quota != nil {
 		fields = append(fields, apikey.FieldQuota)
@@ -1704,8 +1632,6 @@ func (m *APIKeyMutation) Field(name string) (ent.Value, bool) {
 		return m.IPWhitelist()
 	case apikey.FieldIPBlacklist:
 		return m.IPBlacklist()
-	case apikey.FieldModelWhitelist:
-		return m.ModelWhitelist()
 	case apikey.FieldQuota:
 		return m.Quota()
 	case apikey.FieldQuotaUsed:
@@ -1761,8 +1687,6 @@ func (m *APIKeyMutation) OldField(ctx context.Context, name string) (ent.Value, 
 		return m.OldIPWhitelist(ctx)
 	case apikey.FieldIPBlacklist:
 		return m.OldIPBlacklist(ctx)
-	case apikey.FieldModelWhitelist:
-		return m.OldModelWhitelist(ctx)
 	case apikey.FieldQuota:
 		return m.OldQuota(ctx)
 	case apikey.FieldQuotaUsed:
@@ -1872,13 +1796,6 @@ func (m *APIKeyMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetIPBlacklist(v)
-		return nil
-	case apikey.FieldModelWhitelist:
-		v, ok := value.([]string)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetModelWhitelist(v)
 		return nil
 	case apikey.FieldQuota:
 		v, ok := value.(float64)
@@ -2108,9 +2025,6 @@ func (m *APIKeyMutation) ClearedFields() []string {
 	if m.FieldCleared(apikey.FieldIPBlacklist) {
 		fields = append(fields, apikey.FieldIPBlacklist)
 	}
-	if m.FieldCleared(apikey.FieldModelWhitelist) {
-		fields = append(fields, apikey.FieldModelWhitelist)
-	}
 	if m.FieldCleared(apikey.FieldExpiresAt) {
 		fields = append(fields, apikey.FieldExpiresAt)
 	}
@@ -2151,9 +2065,6 @@ func (m *APIKeyMutation) ClearField(name string) error {
 		return nil
 	case apikey.FieldIPBlacklist:
 		m.ClearIPBlacklist()
-		return nil
-	case apikey.FieldModelWhitelist:
-		m.ClearModelWhitelist()
 		return nil
 	case apikey.FieldExpiresAt:
 		m.ClearExpiresAt()
@@ -2207,9 +2118,6 @@ func (m *APIKeyMutation) ResetField(name string) error {
 		return nil
 	case apikey.FieldIPBlacklist:
 		m.ResetIPBlacklist()
-		return nil
-	case apikey.FieldModelWhitelist:
-		m.ResetModelWhitelist()
 		return nil
 	case apikey.FieldQuota:
 		m.ResetQuota()
@@ -22238,8 +22146,6 @@ type GroupMutation struct {
 	long_context_pricing_enabled            *bool
 	model_pricing                           *jsontext.Value
 	appendmodel_pricing                     jsontext.Value
-	global_prompt_enabled                   *bool
-	global_prompt                           *string
 	claude_code_only                        *bool
 	fallback_group_id                       *int64
 	addfallback_group_id                    *int64
@@ -22255,12 +22161,12 @@ type GroupMutation struct {
 	allow_messages_dispatch                 *bool
 	allow_live                              *bool
 	force_openai_fast                       *bool
+	force_openai_ultrafast                  *bool
 	free_openai_fast                        *bool
 	require_oauth_only                      *bool
 	require_privacy_set                     *bool
 	default_mapped_model                    *string
 	messages_dispatch_model_config          *domain.OpenAIMessagesDispatchModelConfig
-	models_list_config                      *domain.GroupModelsListConfig
 	model_allowlist                         *domain.GroupModelAllowlist
 	codex_models_manifest_config            *domain.GroupCodexModelsManifestConfig
 	rpm_limit                               *int
@@ -24641,78 +24547,6 @@ func (m *GroupMutation) ResetModelPricing() {
 	delete(m.clearedFields, group.FieldModelPricing)
 }
 
-// SetGlobalPromptEnabled sets the "global_prompt_enabled" field.
-func (m *GroupMutation) SetGlobalPromptEnabled(b bool) {
-	m.global_prompt_enabled = &b
-}
-
-// GlobalPromptEnabled returns the value of the "global_prompt_enabled" field in the mutation.
-func (m *GroupMutation) GlobalPromptEnabled() (r bool, exists bool) {
-	v := m.global_prompt_enabled
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldGlobalPromptEnabled returns the old "global_prompt_enabled" field's value of the Group entity.
-// If the Group object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *GroupMutation) OldGlobalPromptEnabled(ctx context.Context) (v bool, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldGlobalPromptEnabled is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldGlobalPromptEnabled requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldGlobalPromptEnabled: %w", err)
-	}
-	return oldValue.GlobalPromptEnabled, nil
-}
-
-// ResetGlobalPromptEnabled resets all changes to the "global_prompt_enabled" field.
-func (m *GroupMutation) ResetGlobalPromptEnabled() {
-	m.global_prompt_enabled = nil
-}
-
-// SetGlobalPrompt sets the "global_prompt" field.
-func (m *GroupMutation) SetGlobalPrompt(s string) {
-	m.global_prompt = &s
-}
-
-// GlobalPrompt returns the value of the "global_prompt" field in the mutation.
-func (m *GroupMutation) GlobalPrompt() (r string, exists bool) {
-	v := m.global_prompt
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldGlobalPrompt returns the old "global_prompt" field's value of the Group entity.
-// If the Group object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *GroupMutation) OldGlobalPrompt(ctx context.Context) (v string, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldGlobalPrompt is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldGlobalPrompt requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldGlobalPrompt: %w", err)
-	}
-	return oldValue.GlobalPrompt, nil
-}
-
-// ResetGlobalPrompt resets all changes to the "global_prompt" field.
-func (m *GroupMutation) ResetGlobalPrompt() {
-	m.global_prompt = nil
-}
-
 // SetClaudeCodeOnly sets the "claude_code_only" field.
 func (m *GroupMutation) SetClaudeCodeOnly(b bool) {
 	m.claude_code_only = &b
@@ -25225,6 +25059,42 @@ func (m *GroupMutation) ResetForceOpenaiFast() {
 	m.force_openai_fast = nil
 }
 
+// SetForceOpenaiUltrafast sets the "force_openai_ultrafast" field.
+func (m *GroupMutation) SetForceOpenaiUltrafast(b bool) {
+	m.force_openai_ultrafast = &b
+}
+
+// ForceOpenaiUltrafast returns the value of the "force_openai_ultrafast" field in the mutation.
+func (m *GroupMutation) ForceOpenaiUltrafast() (r bool, exists bool) {
+	v := m.force_openai_ultrafast
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldForceOpenaiUltrafast returns the old "force_openai_ultrafast" field's value of the Group entity.
+// If the Group object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *GroupMutation) OldForceOpenaiUltrafast(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldForceOpenaiUltrafast is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldForceOpenaiUltrafast requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldForceOpenaiUltrafast: %w", err)
+	}
+	return oldValue.ForceOpenaiUltrafast, nil
+}
+
+// ResetForceOpenaiUltrafast resets all changes to the "force_openai_ultrafast" field.
+func (m *GroupMutation) ResetForceOpenaiUltrafast() {
+	m.force_openai_ultrafast = nil
+}
+
 // SetFreeOpenaiFast sets the "free_openai_fast" field.
 func (m *GroupMutation) SetFreeOpenaiFast(b bool) {
 	m.free_openai_fast = &b
@@ -25403,42 +25273,6 @@ func (m *GroupMutation) OldMessagesDispatchModelConfig(ctx context.Context) (v d
 // ResetMessagesDispatchModelConfig resets all changes to the "messages_dispatch_model_config" field.
 func (m *GroupMutation) ResetMessagesDispatchModelConfig() {
 	m.messages_dispatch_model_config = nil
-}
-
-// SetModelsListConfig sets the "models_list_config" field.
-func (m *GroupMutation) SetModelsListConfig(dmlc domain.GroupModelsListConfig) {
-	m.models_list_config = &dmlc
-}
-
-// ModelsListConfig returns the value of the "models_list_config" field in the mutation.
-func (m *GroupMutation) ModelsListConfig() (r domain.GroupModelsListConfig, exists bool) {
-	v := m.models_list_config
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldModelsListConfig returns the old "models_list_config" field's value of the Group entity.
-// If the Group object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *GroupMutation) OldModelsListConfig(ctx context.Context) (v domain.GroupModelsListConfig, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldModelsListConfig is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldModelsListConfig requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldModelsListConfig: %w", err)
-	}
-	return oldValue.ModelsListConfig, nil
-}
-
-// ResetModelsListConfig resets all changes to the "models_list_config" field.
-func (m *GroupMutation) ResetModelsListConfig() {
-	m.models_list_config = nil
 }
 
 // SetModelAllowlist sets the "model_allowlist" field.
@@ -26198,7 +26032,7 @@ func (m *GroupMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *GroupMutation) Fields() []string {
-	fields := make([]string, 0, 71)
+	fields := make([]string, 0, 69)
 	if m.created_at != nil {
 		fields = append(fields, group.FieldCreatedAt)
 	}
@@ -26328,12 +26162,6 @@ func (m *GroupMutation) Fields() []string {
 	if m.model_pricing != nil {
 		fields = append(fields, group.FieldModelPricing)
 	}
-	if m.global_prompt_enabled != nil {
-		fields = append(fields, group.FieldGlobalPromptEnabled)
-	}
-	if m.global_prompt != nil {
-		fields = append(fields, group.FieldGlobalPrompt)
-	}
 	if m.claude_code_only != nil {
 		fields = append(fields, group.FieldClaudeCodeOnly)
 	}
@@ -26367,6 +26195,9 @@ func (m *GroupMutation) Fields() []string {
 	if m.force_openai_fast != nil {
 		fields = append(fields, group.FieldForceOpenaiFast)
 	}
+	if m.force_openai_ultrafast != nil {
+		fields = append(fields, group.FieldForceOpenaiUltrafast)
+	}
 	if m.free_openai_fast != nil {
 		fields = append(fields, group.FieldFreeOpenaiFast)
 	}
@@ -26381,9 +26212,6 @@ func (m *GroupMutation) Fields() []string {
 	}
 	if m.messages_dispatch_model_config != nil {
 		fields = append(fields, group.FieldMessagesDispatchModelConfig)
-	}
-	if m.models_list_config != nil {
-		fields = append(fields, group.FieldModelsListConfig)
 	}
 	if m.model_allowlist != nil {
 		fields = append(fields, group.FieldModelAllowlist)
@@ -26506,10 +26334,6 @@ func (m *GroupMutation) Field(name string) (ent.Value, bool) {
 		return m.LongContextPricingEnabled()
 	case group.FieldModelPricing:
 		return m.ModelPricing()
-	case group.FieldGlobalPromptEnabled:
-		return m.GlobalPromptEnabled()
-	case group.FieldGlobalPrompt:
-		return m.GlobalPrompt()
 	case group.FieldClaudeCodeOnly:
 		return m.ClaudeCodeOnly()
 	case group.FieldFallbackGroupID:
@@ -26532,6 +26356,8 @@ func (m *GroupMutation) Field(name string) (ent.Value, bool) {
 		return m.AllowLive()
 	case group.FieldForceOpenaiFast:
 		return m.ForceOpenaiFast()
+	case group.FieldForceOpenaiUltrafast:
+		return m.ForceOpenaiUltrafast()
 	case group.FieldFreeOpenaiFast:
 		return m.FreeOpenaiFast()
 	case group.FieldRequireOauthOnly:
@@ -26542,8 +26368,6 @@ func (m *GroupMutation) Field(name string) (ent.Value, bool) {
 		return m.DefaultMappedModel()
 	case group.FieldMessagesDispatchModelConfig:
 		return m.MessagesDispatchModelConfig()
-	case group.FieldModelsListConfig:
-		return m.ModelsListConfig()
 	case group.FieldModelAllowlist:
 		return m.ModelAllowlist()
 	case group.FieldCodexModelsManifestConfig:
@@ -26657,10 +26481,6 @@ func (m *GroupMutation) OldField(ctx context.Context, name string) (ent.Value, e
 		return m.OldLongContextPricingEnabled(ctx)
 	case group.FieldModelPricing:
 		return m.OldModelPricing(ctx)
-	case group.FieldGlobalPromptEnabled:
-		return m.OldGlobalPromptEnabled(ctx)
-	case group.FieldGlobalPrompt:
-		return m.OldGlobalPrompt(ctx)
 	case group.FieldClaudeCodeOnly:
 		return m.OldClaudeCodeOnly(ctx)
 	case group.FieldFallbackGroupID:
@@ -26683,6 +26503,8 @@ func (m *GroupMutation) OldField(ctx context.Context, name string) (ent.Value, e
 		return m.OldAllowLive(ctx)
 	case group.FieldForceOpenaiFast:
 		return m.OldForceOpenaiFast(ctx)
+	case group.FieldForceOpenaiUltrafast:
+		return m.OldForceOpenaiUltrafast(ctx)
 	case group.FieldFreeOpenaiFast:
 		return m.OldFreeOpenaiFast(ctx)
 	case group.FieldRequireOauthOnly:
@@ -26693,8 +26515,6 @@ func (m *GroupMutation) OldField(ctx context.Context, name string) (ent.Value, e
 		return m.OldDefaultMappedModel(ctx)
 	case group.FieldMessagesDispatchModelConfig:
 		return m.OldMessagesDispatchModelConfig(ctx)
-	case group.FieldModelsListConfig:
-		return m.OldModelsListConfig(ctx)
 	case group.FieldModelAllowlist:
 		return m.OldModelAllowlist(ctx)
 	case group.FieldCodexModelsManifestConfig:
@@ -27023,20 +26843,6 @@ func (m *GroupMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetModelPricing(v)
 		return nil
-	case group.FieldGlobalPromptEnabled:
-		v, ok := value.(bool)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetGlobalPromptEnabled(v)
-		return nil
-	case group.FieldGlobalPrompt:
-		v, ok := value.(string)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetGlobalPrompt(v)
-		return nil
 	case group.FieldClaudeCodeOnly:
 		v, ok := value.(bool)
 		if !ok {
@@ -27114,6 +26920,13 @@ func (m *GroupMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetForceOpenaiFast(v)
 		return nil
+	case group.FieldForceOpenaiUltrafast:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetForceOpenaiUltrafast(v)
+		return nil
 	case group.FieldFreeOpenaiFast:
 		v, ok := value.(bool)
 		if !ok {
@@ -27148,13 +26961,6 @@ func (m *GroupMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetMessagesDispatchModelConfig(v)
-		return nil
-	case group.FieldModelsListConfig:
-		v, ok := value.(domain.GroupModelsListConfig)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetModelsListConfig(v)
 		return nil
 	case group.FieldModelAllowlist:
 		v, ok := value.(domain.GroupModelAllowlist)
@@ -27859,12 +27665,6 @@ func (m *GroupMutation) ResetField(name string) error {
 	case group.FieldModelPricing:
 		m.ResetModelPricing()
 		return nil
-	case group.FieldGlobalPromptEnabled:
-		m.ResetGlobalPromptEnabled()
-		return nil
-	case group.FieldGlobalPrompt:
-		m.ResetGlobalPrompt()
-		return nil
 	case group.FieldClaudeCodeOnly:
 		m.ResetClaudeCodeOnly()
 		return nil
@@ -27898,6 +27698,9 @@ func (m *GroupMutation) ResetField(name string) error {
 	case group.FieldForceOpenaiFast:
 		m.ResetForceOpenaiFast()
 		return nil
+	case group.FieldForceOpenaiUltrafast:
+		m.ResetForceOpenaiUltrafast()
+		return nil
 	case group.FieldFreeOpenaiFast:
 		m.ResetFreeOpenaiFast()
 		return nil
@@ -27912,9 +27715,6 @@ func (m *GroupMutation) ResetField(name string) error {
 		return nil
 	case group.FieldMessagesDispatchModelConfig:
 		m.ResetMessagesDispatchModelConfig()
-		return nil
-	case group.FieldModelsListConfig:
-		m.ResetModelsListConfig()
 		return nil
 	case group.FieldModelAllowlist:
 		m.ResetModelAllowlist()
@@ -37842,8 +37642,6 @@ type ProxyMutation struct {
 	clearedprimary_proxies bool
 	backup_proxy           *int64
 	clearedbackup_proxy    bool
-	proxy_group            *int64
-	clearedproxy_group     bool
 	done                   bool
 	oldValue               func(context.Context) (*Proxy, error)
 	predicates             []predicate.Proxy
@@ -38556,55 +38354,6 @@ func (m *ProxyMutation) ResetExpiryWarnDays() {
 	m.addexpiry_warn_days = nil
 }
 
-// SetProxyGroupID sets the "proxy_group_id" field.
-func (m *ProxyMutation) SetProxyGroupID(i int64) {
-	m.proxy_group = &i
-}
-
-// ProxyGroupID returns the value of the "proxy_group_id" field in the mutation.
-func (m *ProxyMutation) ProxyGroupID() (r int64, exists bool) {
-	v := m.proxy_group
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldProxyGroupID returns the old "proxy_group_id" field's value of the Proxy entity.
-// If the Proxy object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *ProxyMutation) OldProxyGroupID(ctx context.Context) (v *int64, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldProxyGroupID is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldProxyGroupID requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldProxyGroupID: %w", err)
-	}
-	return oldValue.ProxyGroupID, nil
-}
-
-// ClearProxyGroupID clears the value of the "proxy_group_id" field.
-func (m *ProxyMutation) ClearProxyGroupID() {
-	m.proxy_group = nil
-	m.clearedFields[proxy.FieldProxyGroupID] = struct{}{}
-}
-
-// ProxyGroupIDCleared returns if the "proxy_group_id" field was cleared in this mutation.
-func (m *ProxyMutation) ProxyGroupIDCleared() bool {
-	_, ok := m.clearedFields[proxy.FieldProxyGroupID]
-	return ok
-}
-
-// ResetProxyGroupID resets all changes to the "proxy_group_id" field.
-func (m *ProxyMutation) ResetProxyGroupID() {
-	m.proxy_group = nil
-	delete(m.clearedFields, proxy.FieldProxyGroupID)
-}
-
 // AddAccountIDs adds the "accounts" edge to the Account entity by ids.
 func (m *ProxyMutation) AddAccountIDs(ids ...int64) {
 	if m.accounts == nil {
@@ -38740,33 +38489,6 @@ func (m *ProxyMutation) ResetBackupProxy() {
 	m.clearedbackup_proxy = false
 }
 
-// ClearProxyGroup clears the "proxy_group" edge to the ProxyGroup entity.
-func (m *ProxyMutation) ClearProxyGroup() {
-	m.clearedproxy_group = true
-	m.clearedFields[proxy.FieldProxyGroupID] = struct{}{}
-}
-
-// ProxyGroupCleared reports if the "proxy_group" edge to the ProxyGroup entity was cleared.
-func (m *ProxyMutation) ProxyGroupCleared() bool {
-	return m.ProxyGroupIDCleared() || m.clearedproxy_group
-}
-
-// ProxyGroupIDs returns the "proxy_group" edge IDs in the mutation.
-// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
-// ProxyGroupID instead. It exists only for internal usage by the builders.
-func (m *ProxyMutation) ProxyGroupIDs() (ids []int64) {
-	if id := m.proxy_group; id != nil {
-		ids = append(ids, *id)
-	}
-	return
-}
-
-// ResetProxyGroup resets all changes to the "proxy_group" edge.
-func (m *ProxyMutation) ResetProxyGroup() {
-	m.proxy_group = nil
-	m.clearedproxy_group = false
-}
-
 // Where appends a list predicates to the ProxyMutation builder.
 func (m *ProxyMutation) Where(ps ...predicate.Proxy) {
 	m.predicates = append(m.predicates, ps...)
@@ -38801,7 +38523,7 @@ func (m *ProxyMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *ProxyMutation) Fields() []string {
-	fields := make([]string, 0, 15)
+	fields := make([]string, 0, 14)
 	if m.created_at != nil {
 		fields = append(fields, proxy.FieldCreatedAt)
 	}
@@ -38844,9 +38566,6 @@ func (m *ProxyMutation) Fields() []string {
 	if m.expiry_warn_days != nil {
 		fields = append(fields, proxy.FieldExpiryWarnDays)
 	}
-	if m.proxy_group != nil {
-		fields = append(fields, proxy.FieldProxyGroupID)
-	}
 	return fields
 }
 
@@ -38883,8 +38602,6 @@ func (m *ProxyMutation) Field(name string) (ent.Value, bool) {
 		return m.BackupProxyID()
 	case proxy.FieldExpiryWarnDays:
 		return m.ExpiryWarnDays()
-	case proxy.FieldProxyGroupID:
-		return m.ProxyGroupID()
 	}
 	return nil, false
 }
@@ -38922,8 +38639,6 @@ func (m *ProxyMutation) OldField(ctx context.Context, name string) (ent.Value, e
 		return m.OldBackupProxyID(ctx)
 	case proxy.FieldExpiryWarnDays:
 		return m.OldExpiryWarnDays(ctx)
-	case proxy.FieldProxyGroupID:
-		return m.OldProxyGroupID(ctx)
 	}
 	return nil, fmt.Errorf("unknown Proxy field %s", name)
 }
@@ -39031,13 +38746,6 @@ func (m *ProxyMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetExpiryWarnDays(v)
 		return nil
-	case proxy.FieldProxyGroupID:
-		v, ok := value.(int64)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetProxyGroupID(v)
-		return nil
 	}
 	return fmt.Errorf("unknown Proxy field %s", name)
 }
@@ -39110,9 +38818,6 @@ func (m *ProxyMutation) ClearedFields() []string {
 	if m.FieldCleared(proxy.FieldBackupProxyID) {
 		fields = append(fields, proxy.FieldBackupProxyID)
 	}
-	if m.FieldCleared(proxy.FieldProxyGroupID) {
-		fields = append(fields, proxy.FieldProxyGroupID)
-	}
 	return fields
 }
 
@@ -39141,9 +38846,6 @@ func (m *ProxyMutation) ClearField(name string) error {
 		return nil
 	case proxy.FieldBackupProxyID:
 		m.ClearBackupProxyID()
-		return nil
-	case proxy.FieldProxyGroupID:
-		m.ClearProxyGroupID()
 		return nil
 	}
 	return fmt.Errorf("unknown Proxy nullable field %s", name)
@@ -39195,16 +38897,13 @@ func (m *ProxyMutation) ResetField(name string) error {
 	case proxy.FieldExpiryWarnDays:
 		m.ResetExpiryWarnDays()
 		return nil
-	case proxy.FieldProxyGroupID:
-		m.ResetProxyGroupID()
-		return nil
 	}
 	return fmt.Errorf("unknown Proxy field %s", name)
 }
 
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *ProxyMutation) AddedEdges() []string {
-	edges := make([]string, 0, 4)
+	edges := make([]string, 0, 3)
 	if m.accounts != nil {
 		edges = append(edges, proxy.EdgeAccounts)
 	}
@@ -39213,9 +38912,6 @@ func (m *ProxyMutation) AddedEdges() []string {
 	}
 	if m.backup_proxy != nil {
 		edges = append(edges, proxy.EdgeBackupProxy)
-	}
-	if m.proxy_group != nil {
-		edges = append(edges, proxy.EdgeProxyGroup)
 	}
 	return edges
 }
@@ -39240,17 +38936,13 @@ func (m *ProxyMutation) AddedIDs(name string) []ent.Value {
 		if id := m.backup_proxy; id != nil {
 			return []ent.Value{*id}
 		}
-	case proxy.EdgeProxyGroup:
-		if id := m.proxy_group; id != nil {
-			return []ent.Value{*id}
-		}
 	}
 	return nil
 }
 
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *ProxyMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 4)
+	edges := make([]string, 0, 3)
 	if m.removedaccounts != nil {
 		edges = append(edges, proxy.EdgeAccounts)
 	}
@@ -39282,7 +38974,7 @@ func (m *ProxyMutation) RemovedIDs(name string) []ent.Value {
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *ProxyMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 4)
+	edges := make([]string, 0, 3)
 	if m.clearedaccounts {
 		edges = append(edges, proxy.EdgeAccounts)
 	}
@@ -39291,9 +38983,6 @@ func (m *ProxyMutation) ClearedEdges() []string {
 	}
 	if m.clearedbackup_proxy {
 		edges = append(edges, proxy.EdgeBackupProxy)
-	}
-	if m.clearedproxy_group {
-		edges = append(edges, proxy.EdgeProxyGroup)
 	}
 	return edges
 }
@@ -39308,8 +38997,6 @@ func (m *ProxyMutation) EdgeCleared(name string) bool {
 		return m.clearedprimary_proxies
 	case proxy.EdgeBackupProxy:
 		return m.clearedbackup_proxy
-	case proxy.EdgeProxyGroup:
-		return m.clearedproxy_group
 	}
 	return false
 }
@@ -39320,9 +39007,6 @@ func (m *ProxyMutation) ClearEdge(name string) error {
 	switch name {
 	case proxy.EdgeBackupProxy:
 		m.ClearBackupProxy()
-		return nil
-	case proxy.EdgeProxyGroup:
-		m.ClearProxyGroup()
 		return nil
 	}
 	return fmt.Errorf("unknown Proxy unique edge %s", name)
@@ -39341,538 +39025,8 @@ func (m *ProxyMutation) ResetEdge(name string) error {
 	case proxy.EdgeBackupProxy:
 		m.ResetBackupProxy()
 		return nil
-	case proxy.EdgeProxyGroup:
-		m.ResetProxyGroup()
-		return nil
 	}
 	return fmt.Errorf("unknown Proxy edge %s", name)
-}
-
-// ProxyGroupMutation represents an operation that mutates the ProxyGroup nodes in the graph.
-type ProxyGroupMutation struct {
-	config
-	op             Op
-	typ            string
-	id             *int64
-	created_at     *time.Time
-	updated_at     *time.Time
-	name           *string
-	clearedFields  map[string]struct{}
-	proxies        map[int64]struct{}
-	removedproxies map[int64]struct{}
-	clearedproxies bool
-	done           bool
-	oldValue       func(context.Context) (*ProxyGroup, error)
-	predicates     []predicate.ProxyGroup
-}
-
-var _ ent.Mutation = (*ProxyGroupMutation)(nil)
-
-// proxygroupOption allows management of the mutation configuration using functional options.
-type proxygroupOption func(*ProxyGroupMutation)
-
-// newProxyGroupMutation creates new mutation for the ProxyGroup entity.
-func newProxyGroupMutation(c config, op Op, opts ...proxygroupOption) *ProxyGroupMutation {
-	m := &ProxyGroupMutation{
-		config:        c,
-		op:            op,
-		typ:           TypeProxyGroup,
-		clearedFields: make(map[string]struct{}),
-	}
-	for _, opt := range opts {
-		opt(m)
-	}
-	return m
-}
-
-// withProxyGroupID sets the ID field of the mutation.
-func withProxyGroupID(id int64) proxygroupOption {
-	return func(m *ProxyGroupMutation) {
-		var (
-			err   error
-			once  sync.Once
-			value *ProxyGroup
-		)
-		m.oldValue = func(ctx context.Context) (*ProxyGroup, error) {
-			once.Do(func() {
-				if m.done {
-					err = errors.New("querying old values post mutation is not allowed")
-				} else {
-					value, err = m.Client().ProxyGroup.Get(ctx, id)
-				}
-			})
-			return value, err
-		}
-		m.id = &id
-	}
-}
-
-// withProxyGroup sets the old ProxyGroup of the mutation.
-func withProxyGroup(node *ProxyGroup) proxygroupOption {
-	return func(m *ProxyGroupMutation) {
-		m.oldValue = func(context.Context) (*ProxyGroup, error) {
-			return node, nil
-		}
-		m.id = &node.ID
-	}
-}
-
-// Client returns a new `ent.Client` from the mutation. If the mutation was
-// executed in a transaction (ent.Tx), a transactional client is returned.
-func (m ProxyGroupMutation) Client() *Client {
-	client := &Client{config: m.config}
-	client.init()
-	return client
-}
-
-// Tx returns an `ent.Tx` for mutations that were executed in transactions;
-// it returns an error otherwise.
-func (m ProxyGroupMutation) Tx() (*Tx, error) {
-	if _, ok := m.driver.(*txDriver); !ok {
-		return nil, errors.New("ent: mutation is not running in a transaction")
-	}
-	tx := &Tx{config: m.config}
-	tx.init()
-	return tx, nil
-}
-
-// ID returns the ID value in the mutation. Note that the ID is only available
-// if it was provided to the builder or after it was returned from the database.
-func (m *ProxyGroupMutation) ID() (id int64, exists bool) {
-	if m.id == nil {
-		return
-	}
-	return *m.id, true
-}
-
-// IDs queries the database and returns the entity ids that match the mutation's predicate.
-// That means, if the mutation is applied within a transaction with an isolation level such
-// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
-// or updated by the mutation.
-func (m *ProxyGroupMutation) IDs(ctx context.Context) ([]int64, error) {
-	switch {
-	case m.op.Is(OpUpdateOne | OpDeleteOne):
-		id, exists := m.ID()
-		if exists {
-			return []int64{id}, nil
-		}
-		fallthrough
-	case m.op.Is(OpUpdate | OpDelete):
-		return m.Client().ProxyGroup.Query().Where(m.predicates...).IDs(ctx)
-	default:
-		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
-	}
-}
-
-// SetCreatedAt sets the "created_at" field.
-func (m *ProxyGroupMutation) SetCreatedAt(t time.Time) {
-	m.created_at = &t
-}
-
-// CreatedAt returns the value of the "created_at" field in the mutation.
-func (m *ProxyGroupMutation) CreatedAt() (r time.Time, exists bool) {
-	v := m.created_at
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldCreatedAt returns the old "created_at" field's value of the ProxyGroup entity.
-// If the ProxyGroup object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *ProxyGroupMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
-	}
-	return oldValue.CreatedAt, nil
-}
-
-// ResetCreatedAt resets all changes to the "created_at" field.
-func (m *ProxyGroupMutation) ResetCreatedAt() {
-	m.created_at = nil
-}
-
-// SetUpdatedAt sets the "updated_at" field.
-func (m *ProxyGroupMutation) SetUpdatedAt(t time.Time) {
-	m.updated_at = &t
-}
-
-// UpdatedAt returns the value of the "updated_at" field in the mutation.
-func (m *ProxyGroupMutation) UpdatedAt() (r time.Time, exists bool) {
-	v := m.updated_at
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldUpdatedAt returns the old "updated_at" field's value of the ProxyGroup entity.
-// If the ProxyGroup object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *ProxyGroupMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldUpdatedAt is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldUpdatedAt requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldUpdatedAt: %w", err)
-	}
-	return oldValue.UpdatedAt, nil
-}
-
-// ResetUpdatedAt resets all changes to the "updated_at" field.
-func (m *ProxyGroupMutation) ResetUpdatedAt() {
-	m.updated_at = nil
-}
-
-// SetName sets the "name" field.
-func (m *ProxyGroupMutation) SetName(s string) {
-	m.name = &s
-}
-
-// Name returns the value of the "name" field in the mutation.
-func (m *ProxyGroupMutation) Name() (r string, exists bool) {
-	v := m.name
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldName returns the old "name" field's value of the ProxyGroup entity.
-// If the ProxyGroup object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *ProxyGroupMutation) OldName(ctx context.Context) (v string, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldName is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldName requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldName: %w", err)
-	}
-	return oldValue.Name, nil
-}
-
-// ResetName resets all changes to the "name" field.
-func (m *ProxyGroupMutation) ResetName() {
-	m.name = nil
-}
-
-// AddProxyIDs adds the "proxies" edge to the Proxy entity by ids.
-func (m *ProxyGroupMutation) AddProxyIDs(ids ...int64) {
-	if m.proxies == nil {
-		m.proxies = make(map[int64]struct{})
-	}
-	for i := range ids {
-		m.proxies[ids[i]] = struct{}{}
-	}
-}
-
-// ClearProxies clears the "proxies" edge to the Proxy entity.
-func (m *ProxyGroupMutation) ClearProxies() {
-	m.clearedproxies = true
-}
-
-// ProxiesCleared reports if the "proxies" edge to the Proxy entity was cleared.
-func (m *ProxyGroupMutation) ProxiesCleared() bool {
-	return m.clearedproxies
-}
-
-// RemoveProxyIDs removes the "proxies" edge to the Proxy entity by IDs.
-func (m *ProxyGroupMutation) RemoveProxyIDs(ids ...int64) {
-	if m.removedproxies == nil {
-		m.removedproxies = make(map[int64]struct{})
-	}
-	for i := range ids {
-		delete(m.proxies, ids[i])
-		m.removedproxies[ids[i]] = struct{}{}
-	}
-}
-
-// RemovedProxies returns the removed IDs of the "proxies" edge to the Proxy entity.
-func (m *ProxyGroupMutation) RemovedProxiesIDs() (ids []int64) {
-	for id := range m.removedproxies {
-		ids = append(ids, id)
-	}
-	return
-}
-
-// ProxiesIDs returns the "proxies" edge IDs in the mutation.
-func (m *ProxyGroupMutation) ProxiesIDs() (ids []int64) {
-	for id := range m.proxies {
-		ids = append(ids, id)
-	}
-	return
-}
-
-// ResetProxies resets all changes to the "proxies" edge.
-func (m *ProxyGroupMutation) ResetProxies() {
-	m.proxies = nil
-	m.clearedproxies = false
-	m.removedproxies = nil
-}
-
-// Where appends a list predicates to the ProxyGroupMutation builder.
-func (m *ProxyGroupMutation) Where(ps ...predicate.ProxyGroup) {
-	m.predicates = append(m.predicates, ps...)
-}
-
-// WhereP appends storage-level predicates to the ProxyGroupMutation builder. Using this method,
-// users can use type-assertion to append predicates that do not depend on any generated package.
-func (m *ProxyGroupMutation) WhereP(ps ...func(*sql.Selector)) {
-	p := make([]predicate.ProxyGroup, len(ps))
-	for i := range ps {
-		p[i] = ps[i]
-	}
-	m.Where(p...)
-}
-
-// Op returns the operation name.
-func (m *ProxyGroupMutation) Op() Op {
-	return m.op
-}
-
-// SetOp allows setting the mutation operation.
-func (m *ProxyGroupMutation) SetOp(op Op) {
-	m.op = op
-}
-
-// Type returns the node type of this mutation (ProxyGroup).
-func (m *ProxyGroupMutation) Type() string {
-	return m.typ
-}
-
-// Fields returns all fields that were changed during this mutation. Note that in
-// order to get all numeric fields that were incremented/decremented, call
-// AddedFields().
-func (m *ProxyGroupMutation) Fields() []string {
-	fields := make([]string, 0, 3)
-	if m.created_at != nil {
-		fields = append(fields, proxygroup.FieldCreatedAt)
-	}
-	if m.updated_at != nil {
-		fields = append(fields, proxygroup.FieldUpdatedAt)
-	}
-	if m.name != nil {
-		fields = append(fields, proxygroup.FieldName)
-	}
-	return fields
-}
-
-// Field returns the value of a field with the given name. The second boolean
-// return value indicates that this field was not set, or was not defined in the
-// schema.
-func (m *ProxyGroupMutation) Field(name string) (ent.Value, bool) {
-	switch name {
-	case proxygroup.FieldCreatedAt:
-		return m.CreatedAt()
-	case proxygroup.FieldUpdatedAt:
-		return m.UpdatedAt()
-	case proxygroup.FieldName:
-		return m.Name()
-	}
-	return nil, false
-}
-
-// OldField returns the old value of the field from the database. An error is
-// returned if the mutation operation is not UpdateOne, or the query to the
-// database failed.
-func (m *ProxyGroupMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
-	switch name {
-	case proxygroup.FieldCreatedAt:
-		return m.OldCreatedAt(ctx)
-	case proxygroup.FieldUpdatedAt:
-		return m.OldUpdatedAt(ctx)
-	case proxygroup.FieldName:
-		return m.OldName(ctx)
-	}
-	return nil, fmt.Errorf("unknown ProxyGroup field %s", name)
-}
-
-// SetField sets the value of a field with the given name. It returns an error if
-// the field is not defined in the schema, or if the type mismatched the field
-// type.
-func (m *ProxyGroupMutation) SetField(name string, value ent.Value) error {
-	switch name {
-	case proxygroup.FieldCreatedAt:
-		v, ok := value.(time.Time)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetCreatedAt(v)
-		return nil
-	case proxygroup.FieldUpdatedAt:
-		v, ok := value.(time.Time)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetUpdatedAt(v)
-		return nil
-	case proxygroup.FieldName:
-		v, ok := value.(string)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetName(v)
-		return nil
-	}
-	return fmt.Errorf("unknown ProxyGroup field %s", name)
-}
-
-// AddedFields returns all numeric fields that were incremented/decremented during
-// this mutation.
-func (m *ProxyGroupMutation) AddedFields() []string {
-	return nil
-}
-
-// AddedField returns the numeric value that was incremented/decremented on a field
-// with the given name. The second boolean return value indicates that this field
-// was not set, or was not defined in the schema.
-func (m *ProxyGroupMutation) AddedField(name string) (ent.Value, bool) {
-	return nil, false
-}
-
-// AddField adds the value to the field with the given name. It returns an error if
-// the field is not defined in the schema, or if the type mismatched the field
-// type.
-func (m *ProxyGroupMutation) AddField(name string, value ent.Value) error {
-	switch name {
-	}
-	return fmt.Errorf("unknown ProxyGroup numeric field %s", name)
-}
-
-// ClearedFields returns all nullable fields that were cleared during this
-// mutation.
-func (m *ProxyGroupMutation) ClearedFields() []string {
-	return nil
-}
-
-// FieldCleared returns a boolean indicating if a field with the given name was
-// cleared in this mutation.
-func (m *ProxyGroupMutation) FieldCleared(name string) bool {
-	_, ok := m.clearedFields[name]
-	return ok
-}
-
-// ClearField clears the value of the field with the given name. It returns an
-// error if the field is not defined in the schema.
-func (m *ProxyGroupMutation) ClearField(name string) error {
-	return fmt.Errorf("unknown ProxyGroup nullable field %s", name)
-}
-
-// ResetField resets all changes in the mutation for the field with the given name.
-// It returns an error if the field is not defined in the schema.
-func (m *ProxyGroupMutation) ResetField(name string) error {
-	switch name {
-	case proxygroup.FieldCreatedAt:
-		m.ResetCreatedAt()
-		return nil
-	case proxygroup.FieldUpdatedAt:
-		m.ResetUpdatedAt()
-		return nil
-	case proxygroup.FieldName:
-		m.ResetName()
-		return nil
-	}
-	return fmt.Errorf("unknown ProxyGroup field %s", name)
-}
-
-// AddedEdges returns all edge names that were set/added in this mutation.
-func (m *ProxyGroupMutation) AddedEdges() []string {
-	edges := make([]string, 0, 1)
-	if m.proxies != nil {
-		edges = append(edges, proxygroup.EdgeProxies)
-	}
-	return edges
-}
-
-// AddedIDs returns all IDs (to other nodes) that were added for the given edge
-// name in this mutation.
-func (m *ProxyGroupMutation) AddedIDs(name string) []ent.Value {
-	switch name {
-	case proxygroup.EdgeProxies:
-		ids := make([]ent.Value, 0, len(m.proxies))
-		for id := range m.proxies {
-			ids = append(ids, id)
-		}
-		return ids
-	}
-	return nil
-}
-
-// RemovedEdges returns all edge names that were removed in this mutation.
-func (m *ProxyGroupMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 1)
-	if m.removedproxies != nil {
-		edges = append(edges, proxygroup.EdgeProxies)
-	}
-	return edges
-}
-
-// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
-// the given name in this mutation.
-func (m *ProxyGroupMutation) RemovedIDs(name string) []ent.Value {
-	switch name {
-	case proxygroup.EdgeProxies:
-		ids := make([]ent.Value, 0, len(m.removedproxies))
-		for id := range m.removedproxies {
-			ids = append(ids, id)
-		}
-		return ids
-	}
-	return nil
-}
-
-// ClearedEdges returns all edge names that were cleared in this mutation.
-func (m *ProxyGroupMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 1)
-	if m.clearedproxies {
-		edges = append(edges, proxygroup.EdgeProxies)
-	}
-	return edges
-}
-
-// EdgeCleared returns a boolean which indicates if the edge with the given name
-// was cleared in this mutation.
-func (m *ProxyGroupMutation) EdgeCleared(name string) bool {
-	switch name {
-	case proxygroup.EdgeProxies:
-		return m.clearedproxies
-	}
-	return false
-}
-
-// ClearEdge clears the value of the edge with the given name. It returns an error
-// if that edge is not defined in the schema.
-func (m *ProxyGroupMutation) ClearEdge(name string) error {
-	switch name {
-	}
-	return fmt.Errorf("unknown ProxyGroup unique edge %s", name)
-}
-
-// ResetEdge resets all changes to the edge with the given name in this mutation.
-// It returns an error if the edge is not defined in the schema.
-func (m *ProxyGroupMutation) ResetEdge(name string) error {
-	switch name {
-	case proxygroup.EdgeProxies:
-		m.ResetProxies()
-		return nil
-	}
-	return fmt.Errorf("unknown ProxyGroup edge %s", name)
 }
 
 // RedeemCodeMutation represents an operation that mutates the RedeemCode nodes in the graph.
@@ -45648,6 +44802,10 @@ type UsageLogMutation struct {
 	addcache_creation_5m_tokens  *int
 	cache_creation_1h_tokens     *int
 	addcache_creation_1h_tokens  *int
+	cache_creation_30m_tokens    *int
+	addcache_creation_30m_tokens *int
+	cache_creation_12h_tokens    *int
+	addcache_creation_12h_tokens *int
 	input_cost                   *float64
 	addinput_cost                *float64
 	output_cost                  *float64
@@ -46827,6 +45985,118 @@ func (m *UsageLogMutation) AddedCacheCreation1hTokens() (r int, exists bool) {
 func (m *UsageLogMutation) ResetCacheCreation1hTokens() {
 	m.cache_creation_1h_tokens = nil
 	m.addcache_creation_1h_tokens = nil
+}
+
+// SetCacheCreation30mTokens sets the "cache_creation_30m_tokens" field.
+func (m *UsageLogMutation) SetCacheCreation30mTokens(i int) {
+	m.cache_creation_30m_tokens = &i
+	m.addcache_creation_30m_tokens = nil
+}
+
+// CacheCreation30mTokens returns the value of the "cache_creation_30m_tokens" field in the mutation.
+func (m *UsageLogMutation) CacheCreation30mTokens() (r int, exists bool) {
+	v := m.cache_creation_30m_tokens
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCacheCreation30mTokens returns the old "cache_creation_30m_tokens" field's value of the UsageLog entity.
+// If the UsageLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UsageLogMutation) OldCacheCreation30mTokens(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCacheCreation30mTokens is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCacheCreation30mTokens requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCacheCreation30mTokens: %w", err)
+	}
+	return oldValue.CacheCreation30mTokens, nil
+}
+
+// AddCacheCreation30mTokens adds i to the "cache_creation_30m_tokens" field.
+func (m *UsageLogMutation) AddCacheCreation30mTokens(i int) {
+	if m.addcache_creation_30m_tokens != nil {
+		*m.addcache_creation_30m_tokens += i
+	} else {
+		m.addcache_creation_30m_tokens = &i
+	}
+}
+
+// AddedCacheCreation30mTokens returns the value that was added to the "cache_creation_30m_tokens" field in this mutation.
+func (m *UsageLogMutation) AddedCacheCreation30mTokens() (r int, exists bool) {
+	v := m.addcache_creation_30m_tokens
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetCacheCreation30mTokens resets all changes to the "cache_creation_30m_tokens" field.
+func (m *UsageLogMutation) ResetCacheCreation30mTokens() {
+	m.cache_creation_30m_tokens = nil
+	m.addcache_creation_30m_tokens = nil
+}
+
+// SetCacheCreation12hTokens sets the "cache_creation_12h_tokens" field.
+func (m *UsageLogMutation) SetCacheCreation12hTokens(i int) {
+	m.cache_creation_12h_tokens = &i
+	m.addcache_creation_12h_tokens = nil
+}
+
+// CacheCreation12hTokens returns the value of the "cache_creation_12h_tokens" field in the mutation.
+func (m *UsageLogMutation) CacheCreation12hTokens() (r int, exists bool) {
+	v := m.cache_creation_12h_tokens
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCacheCreation12hTokens returns the old "cache_creation_12h_tokens" field's value of the UsageLog entity.
+// If the UsageLog object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UsageLogMutation) OldCacheCreation12hTokens(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCacheCreation12hTokens is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCacheCreation12hTokens requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCacheCreation12hTokens: %w", err)
+	}
+	return oldValue.CacheCreation12hTokens, nil
+}
+
+// AddCacheCreation12hTokens adds i to the "cache_creation_12h_tokens" field.
+func (m *UsageLogMutation) AddCacheCreation12hTokens(i int) {
+	if m.addcache_creation_12h_tokens != nil {
+		*m.addcache_creation_12h_tokens += i
+	} else {
+		m.addcache_creation_12h_tokens = &i
+	}
+}
+
+// AddedCacheCreation12hTokens returns the value that was added to the "cache_creation_12h_tokens" field in this mutation.
+func (m *UsageLogMutation) AddedCacheCreation12hTokens() (r int, exists bool) {
+	v := m.addcache_creation_12h_tokens
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetCacheCreation12hTokens resets all changes to the "cache_creation_12h_tokens" field.
+func (m *UsageLogMutation) ResetCacheCreation12hTokens() {
+	m.cache_creation_12h_tokens = nil
+	m.addcache_creation_12h_tokens = nil
 }
 
 // SetInputCost sets the "input_cost" field.
@@ -48374,7 +47644,7 @@ func (m *UsageLogMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *UsageLogMutation) Fields() []string {
-	fields := make([]string, 0, 47)
+	fields := make([]string, 0, 49)
 	if m.user != nil {
 		fields = append(fields, usagelog.FieldUserID)
 	}
@@ -48437,6 +47707,12 @@ func (m *UsageLogMutation) Fields() []string {
 	}
 	if m.cache_creation_1h_tokens != nil {
 		fields = append(fields, usagelog.FieldCacheCreation1hTokens)
+	}
+	if m.cache_creation_30m_tokens != nil {
+		fields = append(fields, usagelog.FieldCacheCreation30mTokens)
+	}
+	if m.cache_creation_12h_tokens != nil {
+		fields = append(fields, usagelog.FieldCacheCreation12hTokens)
 	}
 	if m.input_cost != nil {
 		fields = append(fields, usagelog.FieldInputCost)
@@ -48566,6 +47842,10 @@ func (m *UsageLogMutation) Field(name string) (ent.Value, bool) {
 		return m.CacheCreation5mTokens()
 	case usagelog.FieldCacheCreation1hTokens:
 		return m.CacheCreation1hTokens()
+	case usagelog.FieldCacheCreation30mTokens:
+		return m.CacheCreation30mTokens()
+	case usagelog.FieldCacheCreation12hTokens:
+		return m.CacheCreation12hTokens()
 	case usagelog.FieldInputCost:
 		return m.InputCost()
 	case usagelog.FieldOutputCost:
@@ -48669,6 +47949,10 @@ func (m *UsageLogMutation) OldField(ctx context.Context, name string) (ent.Value
 		return m.OldCacheCreation5mTokens(ctx)
 	case usagelog.FieldCacheCreation1hTokens:
 		return m.OldCacheCreation1hTokens(ctx)
+	case usagelog.FieldCacheCreation30mTokens:
+		return m.OldCacheCreation30mTokens(ctx)
+	case usagelog.FieldCacheCreation12hTokens:
+		return m.OldCacheCreation12hTokens(ctx)
 	case usagelog.FieldInputCost:
 		return m.OldInputCost(ctx)
 	case usagelog.FieldOutputCost:
@@ -48876,6 +48160,20 @@ func (m *UsageLogMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetCacheCreation1hTokens(v)
+		return nil
+	case usagelog.FieldCacheCreation30mTokens:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCacheCreation30mTokens(v)
+		return nil
+	case usagelog.FieldCacheCreation12hTokens:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCacheCreation12hTokens(v)
 		return nil
 	case usagelog.FieldInputCost:
 		v, ok := value.(float64)
@@ -49088,6 +48386,12 @@ func (m *UsageLogMutation) AddedFields() []string {
 	if m.addcache_creation_1h_tokens != nil {
 		fields = append(fields, usagelog.FieldCacheCreation1hTokens)
 	}
+	if m.addcache_creation_30m_tokens != nil {
+		fields = append(fields, usagelog.FieldCacheCreation30mTokens)
+	}
+	if m.addcache_creation_12h_tokens != nil {
+		fields = append(fields, usagelog.FieldCacheCreation12hTokens)
+	}
 	if m.addinput_cost != nil {
 		fields = append(fields, usagelog.FieldInputCost)
 	}
@@ -49152,6 +48456,10 @@ func (m *UsageLogMutation) AddedField(name string) (ent.Value, bool) {
 		return m.AddedCacheCreation5mTokens()
 	case usagelog.FieldCacheCreation1hTokens:
 		return m.AddedCacheCreation1hTokens()
+	case usagelog.FieldCacheCreation30mTokens:
+		return m.AddedCacheCreation30mTokens()
+	case usagelog.FieldCacheCreation12hTokens:
+		return m.AddedCacheCreation12hTokens()
 	case usagelog.FieldInputCost:
 		return m.AddedInputCost()
 	case usagelog.FieldOutputCost:
@@ -49237,6 +48545,20 @@ func (m *UsageLogMutation) AddField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.AddCacheCreation1hTokens(v)
+		return nil
+	case usagelog.FieldCacheCreation30mTokens:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddCacheCreation30mTokens(v)
+		return nil
+	case usagelog.FieldCacheCreation12hTokens:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddCacheCreation12hTokens(v)
 		return nil
 	case usagelog.FieldInputCost:
 		v, ok := value.(float64)
@@ -49560,6 +48882,12 @@ func (m *UsageLogMutation) ResetField(name string) error {
 		return nil
 	case usagelog.FieldCacheCreation1hTokens:
 		m.ResetCacheCreation1hTokens()
+		return nil
+	case usagelog.FieldCacheCreation30mTokens:
+		m.ResetCacheCreation30mTokens()
+		return nil
+	case usagelog.FieldCacheCreation12hTokens:
+		m.ResetCacheCreation12hTokens()
 		return nil
 	case usagelog.FieldInputCost:
 		m.ResetInputCost()
