@@ -7,7 +7,7 @@
 
 ARG ALPINE_IMAGE=alpine:3.24.3
 ARG POSTGRES_IMAGE=postgres:18-alpine
-ARG GOLANG_IMAGE=golang:1.27.3-alpine
+ARG GOLANG_IMAGE=golang:1.27.4-alpine
 
 FROM --platform=${BUILDPLATFORM} ${GOLANG_IMAGE} AS trust-check-builder
 ARG TARGETARCH

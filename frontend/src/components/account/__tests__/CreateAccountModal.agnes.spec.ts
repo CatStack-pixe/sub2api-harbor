@@ -6,6 +6,8 @@ const source = readFileSync(
   resolve(process.cwd(), 'src/components/account/CreateAccountModal.vue'),
   'utf8'
 )
+const genericProbeExclusions =
+  source.match(/const genericUpstreamBillingProbeExcludedPlatforms = new Set\(\[([\s\S]*?)\]\)/)?.[1] ?? ''
 
 describe('CreateAccountModal Agnes account type', () => {
   it('offers API-key setup with the documented Agnes defaults', () => {
@@ -24,7 +26,7 @@ describe('CreateAccountModal DeepSeek account type', () => {
     expect(source).toContain("newPlatform === 'deepseek'")
     expect(source).toContain("? 'https://api.deepseek.com'")
     expect(source).toContain('allowedModels.value = [...getModelsByPlatform(newPlatform)]')
-    expect(source).toContain("form.platform === 'deepseek' || form.platform === 'kimi' || form.platform === 'chatanywhere'")
+    expect(genericProbeExclusions).toContain("'deepseek'")
   })
 })
 
@@ -56,7 +58,7 @@ describe('CreateAccountModal ChatAnywhere account type', () => {
     expect(source).toContain("newPlatform === 'chatanywhere'")
     expect(source).toContain('https://api.chatanywhere.tech/v1')
     expect(source).toContain('https://api.chatanywhere.org/v1')
-    expect(source).toContain("form.platform !== 'tokenrhythm' && form.platform !== 'chatanywhere'")
+    expect(genericProbeExclusions).toContain("'chatanywhere'")
   })
 })
 
@@ -66,6 +68,6 @@ describe('CreateAccountModal GLM account type', () => {
     expect(source).toContain('data-testid="glm-account-type-api-key"')
     expect(source).toContain("newPlatform === 'glm'")
     expect(source).toContain('https://open.bigmodel.cn/api/paas/v4')
-    expect(source).toContain("form.platform !== 'chatanywhere' && form.platform !== 'glm'")
+    expect(genericProbeExclusions).toContain("'glm'")
   })
 })

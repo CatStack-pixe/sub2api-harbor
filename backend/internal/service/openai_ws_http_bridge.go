@@ -2,7 +2,6 @@ package service
 
 import (
 	"bufio"
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -128,59 +127,122 @@ func (s *OpenAIGatewayService) shouldBridgeOpenAIWSPassthroughFirstMessage(accou
 	if !s.openAIWSHTTPBridgeEnabled() || int64(len(payload)) < s.openAIWSHTTPBridgeThresholdBytes() {
 		return false
 	}
-	if hasDuplicateOpenAIWSJSONObjectKeys(payload, "type", "previous_response_id") {
+	if !json.Valid(payload) {
 		return false
 	}
-	var body struct {
-		Type               string `json:"type"`
-		PreviousResponseID string `json:"previous_response_id"`
-	}
-	if err := json.Unmarshal(payload, &body); err != nil {
+
+	i := skipOpenAIWSJSONSpace(payload, 0)
+	if i >= len(payload) || payload[i] != '{' {
 		return false
 	}
-	typeValue := strings.TrimSpace(body.Type)
-	return (typeValue == "" || typeValue == "response.create") && strings.TrimSpace(body.PreviousResponseID) == ""
+	i++
+	eventType := "response.create"
+	previousResponseID := ""
+	typeSeen, previousResponseIDSeen := false, false
+	for {
+		i = skipOpenAIWSJSONSpace(payload, i)
+		if payload[i] == '}' {
+			break
+		}
+		keyStart := i
+		keyEnd := scanOpenAIWSJSONString(payload, keyStart)
+		i = skipOpenAIWSJSONSpace(payload, keyEnd)
+		i++ // json.Valid guarantees the colon.
+		i = skipOpenAIWSJSONSpace(payload, i)
+		valueStart := i
+		i = skipOpenAIWSJSONValue(payload, i)
+
+		key := ""
+		// A critical key is at most 20 decoded bytes. The generous encoded bound
+		// covers escaped spellings without allocating attacker-sized key strings.
+		if keyEnd-keyStart <= 128 {
+			_ = json.Unmarshal(payload[keyStart:keyEnd], &key)
+		}
+		switch key {
+		case "type":
+			if typeSeen {
+				return false
+			}
+			typeSeen = true
+			var value *string
+			if err := json.Unmarshal(payload[valueStart:i], &value); err != nil {
+				return false
+			}
+			if value == nil || strings.TrimSpace(*value) == "" {
+				eventType = "response.create"
+			} else {
+				eventType = strings.TrimSpace(*value)
+			}
+		case "previous_response_id":
+			if previousResponseIDSeen {
+				return false
+			}
+			previousResponseIDSeen = true
+			var value *string
+			if err := json.Unmarshal(payload[valueStart:i], &value); err != nil {
+				return false
+			}
+			if value != nil {
+				previousResponseID = strings.TrimSpace(*value)
+			}
+		}
+		i = skipOpenAIWSJSONSpace(payload, i)
+		if payload[i] == ',' {
+			i++
+		}
+	}
+	return eventType == "response.create" && previousResponseID == ""
 }
 
-// hasDuplicateOpenAIWSJSONObjectKeys detects duplicate keys in the top-level
-// JSON object without accepting the last-write-wins behavior of json.Unmarshal.
-// Duplicate routing controls are ambiguous and must stay on the native relay.
-func hasDuplicateOpenAIWSJSONObjectKeys(payload []byte, keys ...string) bool {
-	dec := json.NewDecoder(bytes.NewReader(payload))
-	tok, err := dec.Token()
-	if err != nil {
-		return false
-	}
-	delim, ok := tok.(json.Delim)
-	if !ok || delim != '{' {
-		return false
-	}
-	wanted := make(map[string]struct{}, len(keys))
-	for _, key := range keys {
-		wanted[key] = struct{}{}
-	}
-	seen := make(map[string]struct{}, len(keys))
-	for dec.More() {
-		tok, err = dec.Token()
-		if err != nil {
-			return false
+func skipOpenAIWSJSONSpace(payload []byte, i int) int {
+	for i < len(payload) {
+		switch payload[i] {
+		case ' ', '\t', '\r', '\n':
+			i++
+		default:
+			return i
 		}
-		key, ok := tok.(string)
-		if !ok {
-			return false
+	}
+	return i
+}
+
+func scanOpenAIWSJSONString(payload []byte, i int) int {
+	for i++; i < len(payload); i++ {
+		switch payload[i] {
+		case '\\':
+			i++
+		case '"':
+			return i + 1
 		}
-		if _, interested := wanted[key]; interested {
-			if _, duplicate := seen[key]; duplicate {
-				return true
+	}
+	return len(payload)
+}
+
+func skipOpenAIWSJSONValue(payload []byte, i int) int {
+	if payload[i] == '"' {
+		return scanOpenAIWSJSONString(payload, i)
+	}
+	if payload[i] != '{' && payload[i] != '[' {
+		for i < len(payload) && payload[i] != ',' && payload[i] != '}' {
+			i++
+		}
+		return i
+	}
+	depth := 0
+	for ; i < len(payload); i++ {
+		switch payload[i] {
+		case '"':
+			i = scanOpenAIWSJSONString(payload, i) - 1
+		case '{', '[':
+			depth++
+		case '}', ']':
+			depth--
+			if depth == 0 {
+				return i + 1
 			}
-			seen[key] = struct{}{}
-		}
-		var value json.RawMessage
-		if err := dec.Decode(&value); err != nil {
-			return false
 		}
 	}
-	return false
+	return len(payload)
 }
 
 func prepareOpenAIWSHTTPBridgeBody(account *Account, payload []byte) ([]byte, error) {
@@ -389,6 +451,27 @@ func (s *OpenAIGatewayService) proxyOpenAIWSHTTPBridgeTurn(
 	body, err := prepareOpenAIWSHTTPBridgeBody(account, payload)
 	if err != nil {
 		return nil, fmt.Errorf("prepare http bridge body: %w", err)
+	}
+	// Codex fingerprint convergence, same as Forward / forwardOpenAIPassthrough. Builders only read
+	// staged IDs; without staging, the bridge sends no account-level session_id, so clients without
+	// prompt_cache_key get random upstream prompt-cache routing and rarely hit the cache.
+	stageCodexFingerprintIDs(c, nil)
+	if account.UsesOpenAICodexProtocol() {
+		var clientHeaders http.Header
+		if c != nil && c.Request != nil {
+			clientHeaders = c.Request.Header
+		}
+		fpIDs := resolveCodexFingerprintIDsFromRequest(account, clientHeaders)
+		if fpIDs != nil {
+			fpBody, fpChanged, fpErr := applyCodexFingerprintClientMetadataRaw(body, fpIDs)
+			if fpErr != nil {
+				return nil, fmt.Errorf("apply http bridge codex fingerprint: %w", fpErr)
+			}
+			if fpChanged {
+				body = fpBody
+			}
+		}
+		stageCodexFingerprintIDs(c, fpIDs)
 	}
 	grokIntentSourceBody := append([]byte(nil), body...)
 	_, grokExplicitToolsField := openAIWSHTTPBridgeRawField(grokIntentSourceBody, "tools")
@@ -617,6 +700,8 @@ func (s *OpenAIGatewayService) proxyOpenAIWSHTTPBridgeTurn(
 			UpstreamResponseModelConflict: responseModelObserver.Conflict(),
 			UpstreamResponseServiceTier:   responseModelObserver.ServiceTier(),
 			ServiceTier:                   resolvedOpenAIUpstreamServiceTierFromObserver(responseModelObserver, extractOpenAIServiceTierFromBody(body)),
+			RequestedServiceTier:          extractOpenAIServiceTierFromBody(body),
+			RequestedServiceTierKnown:     true,
 			ReasoningEffort:               ApplyThinkingEnabledFallback(extractOpenAIReasoningEffortFromBody(body, mappedModel, originalModel), body, mappedModel),
 			Stream:                        reqStream,
 			OpenAIWSMode:                  true,
@@ -645,11 +730,12 @@ func (s *OpenAIGatewayService) proxyOpenAIWSHTTPBridgeTurn(
 		maxLineSize = s.cfg.Gateway.MaxLineSize
 	}
 	if hasResponsesClientToolMapping(clientToolMapping) {
-		resp.Body = newResponsesClientToolStreamBody(resp.Body, clientToolMapping, maxLineSize)
+		resp.Body = newResponsesClientToolStreamBody(resp.Body, clientToolMapping, maxLineSize, s.cfg)
 	}
 	scanner := bufio.NewScanner(resp.Body)
 	scanBuf := getSSEScannerBuf64K()
 	scanner.Buffer(scanBuf[:0], maxLineSize)
+	scanner.Split(newBoundedSSESplit(s.cfg, maxLineSize, nil))
 	defer putSSEScannerBuf64K(scanBuf)
 
 	pendingSSEEventType := ""

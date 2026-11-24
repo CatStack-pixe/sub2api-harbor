@@ -27,7 +27,7 @@ import tempfile
 CADDY_VERSION = "v2.11.7"
 CADDY_REVISION = "72dd0fb067f6d7826c7f79907670ba4a713bfe37"
 CADDY_MODULE = "github.com/caddyserver/caddy/v2"
-GO_VERSION = "go1.27.3"
+GO_VERSION = "go1.27.4"
 ARCHIVE_NAME = "caddy-linux-amd64.tar.gz"
 REQUIRED_MODULES = {
     "http",

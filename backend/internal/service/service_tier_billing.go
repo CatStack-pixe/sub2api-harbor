@@ -75,6 +75,36 @@ func ApplyOpenAIServiceTierBillingResolution(result *OpenAIForwardResult) Servic
 	return resolution
 }
 
+// OAuth-backed Codex may echo "default" for a request that was sent as priority.
+func applyOpenAIServiceTierBillingResolutionForAccount(account *Account, result *OpenAIForwardResult) ServiceTierBillingResolution {
+	if result == nil {
+		return ServiceTierBillingResolution{}
+	}
+	if result.RequestedServiceTierKnown {
+		requested := normalizeBillingServiceTier(optionalStringValue(result.RequestedServiceTier))
+		observed := normalizeBillingServiceTier(result.UpstreamResponseServiceTier)
+		if account != nil && account.Platform == PlatformOpenAI && account.IsOpenAIOAuthLike() &&
+			(requested == "priority" || requested == "fast") && observed == "default" {
+			billingTier := requested
+			result.ServiceTier = &billingTier
+			return ServiceTierBillingResolution{
+				Requested: requested,
+				Observed:  observed,
+				Billing:   requested,
+			}
+		}
+		resolution := ResolveBillingServiceTier(requested, observed)
+		if resolution.Billing == "" {
+			result.ServiceTier = nil
+		} else {
+			billingTier := resolution.Billing
+			result.ServiceTier = &billingTier
+		}
+		return resolution
+	}
+	return ApplyOpenAIServiceTierBillingResolution(result)
+}
+
 // ApplyForwardServiceTierBillingResolution is the ForwardResult counterpart of
 // ApplyOpenAIServiceTierBillingResolution.
 func ApplyForwardServiceTierBillingResolution(result *ForwardResult) ServiceTierBillingResolution {

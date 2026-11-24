@@ -28,7 +28,7 @@ def elf_bytes(machine=62, program_type=1):
 
 def build_info(**overrides):
     settings = dict(builder.EXPECTED_SETTINGS, **overrides)
-    return "caddy: go1.27.3\n" + "".join(
+    return "caddy: go1.27.4\n" + "".join(
         f"\tbuild\t{key}={value}\n" for key, value in settings.items()
     )
 
@@ -80,7 +80,7 @@ class BuildBoundary:
         if args[1] == "version":
             return self.version + "\n"
         if args[1] == "build-info":
-            return "go\tgo1.27.3\n"
+            return "go\tgo1.27.4\n"
         if args[1] == "list-modules":
             return "\n".join(sorted(self.modules)) + "\n"
         if args[1] == "adapt":
@@ -155,7 +155,7 @@ class BuildTests(unittest.TestCase):
 
     def test_wrong_go_version_stops_before_compilation(self):
         self.boundary.go_version = "go1.27.2"
-        with self.assertRaisesRegex(ValueError, "Expected go1.27.3"):
+        with self.assertRaisesRegex(ValueError, "Expected go1.27.4"):
             self.build()
         self.assertFalse(any(c[0][:2] == ["go", "build"] for c in self.boundary.calls))
         self.assertFalse(self.output.exists())
@@ -236,8 +236,8 @@ class VerificationTests(unittest.TestCase):
             with self.subTest(key=key):
                 with self.assertRaisesRegex(ValueError, key):
                     builder.verify_build_info(build_info(**{key: value}))
-        with self.assertRaisesRegex(ValueError, "go1.27.3"):
-            builder.verify_build_info(build_info().replace("go1.27.3", "go1.26.3"))
+        with self.assertRaisesRegex(ValueError, "go1.27.4"):
+            builder.verify_build_info(build_info().replace("go1.27.4", "go1.26.3"))
 
     def test_missing_embedded_revision_is_rejected(self):
         info = build_info().replace(f"\tbuild\tvcs.revision={builder.CADDY_REVISION}\n", "")

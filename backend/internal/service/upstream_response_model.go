@@ -73,11 +73,6 @@ func (o *upstreamResponseModelObserver) ObserveOpenAI(payload []byte, eventType 
 	model := firstValidTrimmedGJSONString(payload, "response.model", "model")
 	terminal := isUpstreamResponseModelTerminalEvent(eventType)
 	o.Observe(model, terminal)
-	// Every payload that declares a service tier also declares a model, so
-	// model-free delta frames skip the extra lookups entirely.
-	if model == "" {
-		return
-	}
 	// Non-terminal Responses API events echo the requested tier rather than the
 	// tier actually used. Only terminal events and untyped payloads (chat
 	// completions chunks, non-streaming bodies) report the processing tier.

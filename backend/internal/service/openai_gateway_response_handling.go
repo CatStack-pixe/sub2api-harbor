@@ -165,8 +165,9 @@ func (s *OpenAIGatewayService) handleStreamingResponseWithReasoning(ctx context.
 	scanner := bufio.NewScanner(resp.Body)
 	scanBuf := getSSEScannerBuf64K()
 	scanner.Buffer(scanBuf[:0], maxLineSize)
+	scanner.Split(newBoundedSSESplit(s.cfg, maxLineSize, nil))
 	if stageFirstOutput {
-		scanner.Split(openAIFirstOutputDynamicScanLines(&firstOutputScanGuard))
+		scanner.Split(newBoundedSSESplit(s.cfg, maxLineSize, openAIFirstOutputDynamicScanLines(&firstOutputScanGuard)))
 	}
 	documentScanner := newOpenAISSEJSONDocumentScanner(scanner)
 
@@ -185,14 +186,14 @@ func (s *OpenAIGatewayService) handleStreamingResponseWithReasoning(ctx context.
 		streamInterval = resolveGrokStreamIdleTimeout(cfgSec)
 	}
 	// 仅监控上游数据间隔超时，不被下游写入阻塞影响
-	var intervalTicker *time.Ticker
+	var intervalTimer *time.Timer
 	if streamInterval > 0 {
-		intervalTicker = time.NewTicker(streamInterval)
-		defer intervalTicker.Stop()
+		intervalTimer = time.NewTimer(streamInterval)
+		defer intervalTimer.Stop()
 	}
 	var intervalCh <-chan time.Time
-	if intervalTicker != nil {
-		intervalCh = intervalTicker.C
+	if intervalTimer != nil {
+		intervalCh = intervalTimer.C
 	}
 
 	keepaliveInterval := time.Duration(0)
@@ -345,6 +346,7 @@ func (s *OpenAIGatewayService) handleStreamingResponseWithReasoning(ctx context.
 	needModelReplace := originalModel != mappedModel
 	var createdAtStamper responsesCreatedAtStamper
 	streamOutputAccumulator := apicompat.NewBufferedResponseAccumulator()
+	streamOutputAccumulator.XAIServerSideSearch = account != nil && account.IsGrok()
 	streamDoneItems := newResponsesStreamOutputItems()
 	streamImageOutputs := make([]json.RawMessage, 0, 1)
 	streamSeenImages := make(map[string]struct{})
@@ -380,7 +382,7 @@ func (s *OpenAIGatewayService) handleStreamingResponseWithReasoning(ctx context.
 			completeGuardedEvent(true)
 		}
 		if codexFailureTerminal && sawBareError && !sawResponseFailed && bareErrorAccountSideEffectsPending {
-			s.handleOpenAIStreamTerminalAccountSideEffects(c, account, bareErrorPayload, failedMessage, resp.Header)
+			s.handleOpenAIStreamTerminalAccountSideEffects(c, account, bareErrorPayload, failedMessage, resp.Header, mappedModel)
 			bareErrorAccountSideEffectsPending = false
 		}
 		if codexFailureTerminal && sawBareError && !sawResponseFailed && !clientDisconnected {
@@ -395,13 +397,14 @@ func (s *OpenAIGatewayService) handleStreamingResponseWithReasoning(ctx context.
 			s.clearOpenAIProxyStreamDisconnect(account)
 		}
 		if !sawTerminalEvent && !openAIStreamClientOutputStarted(c, clientOutputStarted) && !eventShouldFlush {
-			return resultWithUsage(), s.newOpenAIStreamFailoverError(
+			return resultWithUsage(), s.newOpenAIStreamFailoverErrorWithModel(
 				c,
 				account,
 				false,
 				upstreamRequestID,
 				nil,
 				"OpenAI stream ended before a terminal event",
+				mappedModel,
 			)
 		}
 		flushPending("Client disconnected during final flush, returning collected usage")
@@ -423,9 +426,20 @@ func (s *OpenAIGatewayService) handleStreamingResponseWithReasoning(ctx context.
 		}
 		if errors.Is(scanErr, errOpenAIFirstOutputScannerLimit) && !firstOutputProgressObserved {
 			logger.LegacyPrintf("service.openai_gateway", "SSE token exceeded guarded first-output limit: account=%d limit=%d error=%v", account.ID, openAIFirstOutputStageMaxBytes+openAIFirstOutputScannerFramingAllowance, scanErr)
-			failoverErr := s.newOpenAIStreamFailoverError(
+			failoverErr := s.newOpenAIStreamFailoverErrorWithModel(
 				c, account, false, upstreamRequestID, nil,
 				"OpenAI SSE line exceeds guarded first-output limit",
+				mappedModel,
+			)
+			failoverErr.SafeToFailoverAfterWrite = true
+			return resultWithUsage(), failoverErr, true
+		}
+		if errors.Is(scanErr, errSSETransportLimit) && stageFirstOutput && !firstOutputProgressObserved {
+			logger.LegacyPrintf("service.openai_gateway", "SSE event exceeded transport limit before first output: account=%d error=%v", account.ID, scanErr)
+			failoverErr := s.newOpenAIStreamFailoverErrorWithModel(
+				c, account, false, upstreamRequestID, nil,
+				"OpenAI SSE event exceeds first-output transport limit: "+scanErr.Error(),
+				mappedModel,
 			)
 			failoverErr.SafeToFailoverAfterWrite = true
 			return resultWithUsage(), failoverErr, true
@@ -465,7 +479,7 @@ func (s *OpenAIGatewayService) handleStreamingResponseWithReasoning(ctx context.
 			if errText := strings.TrimSpace(scanErr.Error()); errText != "" {
 				msg += ": " + errText
 			}
-			return resultWithUsage(), s.newOpenAIStreamFailoverError(c, account, false, upstreamRequestID, nil, msg), true
+			return resultWithUsage(), s.newOpenAIStreamFailoverErrorWithModel(c, account, false, upstreamRequestID, nil, msg, mappedModel), true
 		}
 		// 客户端已断开时，上游出错仅影响体验，不影响计费；返回已收集 usage
 		if clientDisconnected {
@@ -476,6 +490,25 @@ func (s *OpenAIGatewayService) handleStreamingResponseWithReasoning(ctx context.
 		sendErrorEvent(code, message)
 		return resultWithUsage(), fmt.Errorf("stream read error: %w", scanErr), true
 	}
+	// Upstream keepalive events bypass the first-output stage the same way the
+	// comment keepalive does: Codex resets its stream idle timer only on parsed
+	// SSE events, while the attempt's lifecycle events and account headers stay
+	// private until semantic output. The bytes do not count as client output.
+	keepaliveEventDirect := false
+	forwardsKeepaliveDirect := func(eventType string) bool {
+		return eventType == "keepalive" && stageFirstOutput && !firstOutputStage.closed && !failureDelivered && !suppressCurrentEvent
+	}
+	writeKeepaliveDirect := func(value string) {
+		if clientDisconnected {
+			return
+		}
+		n, err := w.Write([]byte(value))
+		recordOpenAIStreamKeepaliveBytes(c, n)
+		if err != nil {
+			clientDisconnected = true
+			logger.LegacyPrintf("service.openai_gateway", "Client disconnected during streaming, continuing to drain upstream for billing")
+		}
+	}
 	processSSELine := func(line string, queueDrained bool) {
 		if streamEarlyErr != nil {
 			return
@@ -484,11 +517,23 @@ func (s *OpenAIGatewayService) handleStreamingResponseWithReasoning(ctx context.
 			pendingSSEEventType = eventType
 			eventType = strings.TrimSpace(eventType)
 			suppressCurrentEvent = codexFailureTerminal && (eventType == "error" || (sawBareError && !sawResponseFailed && eventType != "response.failed"))
+			if forwardsKeepaliveDirect(eventType) {
+				keepaliveEventDirect = true
+				eventInProgress = true
+				writeKeepaliveDirect(line + "\n")
+				return
+			}
 		}
 		// Extract data from SSE line (supports both "data: " and "data:" formats)
 		if data, ok := extractOpenAISSEDataLine(line); ok {
 			dataBytes := []byte(data)
 			eventType := effectiveOpenAISSEEventType(dataBytes, pendingSSEEventType)
+			if keepaliveEventDirect || forwardsKeepaliveDirect(eventType) {
+				keepaliveEventDirect = true
+				eventInProgress = true
+				writeKeepaliveDirect(line + "\n")
+				return
+			}
 			if codexFailureTerminal && sawBareError && !sawResponseFailed &&
 				(eventType == "response.completed" || eventType == "response.done") {
 				// A later successful terminal is authoritative over a pending bare
@@ -566,7 +611,7 @@ func (s *OpenAIGatewayService) handleStreamingResponseWithReasoning(ctx context.
 						// Defer account health updates so the pair is applied once.
 						bareErrorAccountSideEffectsPending = true
 					} else {
-						s.handleOpenAIStreamTerminalAccountSideEffects(c, account, dataBytes, failedMessage, resp.Header)
+						s.handleOpenAIStreamTerminalAccountSideEffects(c, account, dataBytes, failedMessage, resp.Header, mappedModel)
 						bareErrorAccountSideEffectsPending = false
 					}
 					if eventType == "response.failed" {
@@ -590,7 +635,7 @@ func (s *OpenAIGatewayService) handleStreamingResponseWithReasoning(ctx context.
 					}
 					if shouldFailover {
 						sawFailedEvent = true
-						streamEarlyErr = s.newOpenAIStreamFailoverError(c, account, false, upstreamRequestID, dataBytes, failedMessage, resp.Header)
+						streamEarlyErr = s.newOpenAIStreamFailoverErrorWithModel(c, account, false, upstreamRequestID, dataBytes, failedMessage, mappedModel, resp.Header)
 						return
 					}
 					if !cyberHit && !sawBareError {
@@ -623,6 +668,7 @@ func (s *OpenAIGatewayService) handleStreamingResponseWithReasoning(ctx context.
 			}
 			imageCounter.AddSSEData(dataBytes)
 			searchCounter += countGrokNativeSearchCallsInSSEDataDedup(dataBytes, streamSearchSeen)
+			searchCounter = grokSearchCountWithTerminalUsage(searchCounter, dataBytes)
 
 			// Correct Codex tool calls if needed (apply_patch -> edit, etc.)
 			if correctedData, corrected := s.toolCorrector.CorrectToolCallsInSSEBytes(dataBytes); corrected {
@@ -658,6 +704,7 @@ func (s *OpenAIGatewayService) handleStreamingResponseWithReasoning(ctx context.
 				return
 			}
 			restoredData = restoreCodexToolNamesFromSSEContext(c, restoredData, eventType)
+			restoredData = restoreOpenAIResponsesInstructionsEchoInEvent(c, restoredData)
 			if !bytes.Equal(restoredData, dataBytes) {
 				dataBytes = restoredData
 				data = string(restoredData)
@@ -743,6 +790,16 @@ func (s *OpenAIGatewayService) handleStreamingResponseWithReasoning(ctx context.
 		// A blank line dispatches a guarded event from the attempt-local stage.
 		if stageFirstOutput && line == "" {
 			pendingSSEEventType = ""
+			if keepaliveEventDirect {
+				keepaliveEventDirect = false
+				eventInProgress = false
+				writeKeepaliveDirect("\n")
+				if !clientDisconnected {
+					flusher.Flush()
+					lastDownstreamWriteAt = time.Now()
+				}
+				return
+			}
 			if suppressCurrentEvent {
 				suppressCurrentEvent = false
 				terminalFailurePending = false
@@ -850,13 +907,18 @@ func (s *OpenAIGatewayService) handleStreamingResponseWithReasoning(ctx context.
 	// the timeout-disabled path preserves the legacy depth of 16.
 	events := make(chan scanEvent, openAIFirstOutputEventQueueSize(guardFirstOutput))
 	done := make(chan struct{})
+	queueBudget := newSSEQueueBudget(s.cfg)
 	sendEvent := func(ev scanEvent) bool {
+		if !queueBudget.acquire(len(ev.line), done) {
+			return false
+		}
 		if firstOutputScanGuard.Load() {
 			ev.processed = make(chan struct{})
 		}
 		select {
 		case events <- ev:
 		case <-done:
+			queueBudget.release(len(ev.line))
 			return false
 		}
 		if ev.processed == nil {
@@ -894,6 +956,9 @@ func (s *OpenAIGatewayService) handleStreamingResponseWithReasoning(ctx context.
 	for {
 		select {
 		case ev, ok := <-events:
+			if ok {
+				queueBudget.release(len(ev.line))
+			}
 			if !ok {
 				if stageFirstOutput && eventInProgress {
 					// EOF dispatches the final SSE event even without a trailing blank
@@ -926,7 +991,9 @@ func (s *OpenAIGatewayService) handleStreamingResponseWithReasoning(ctx context.
 				return resultWithUsage(), fmt.Errorf("upstream response failed: %s", failedMessage)
 			}
 			lastRead := time.Unix(0, atomic.LoadInt64(&lastReadAt))
-			if time.Since(lastRead) < streamInterval {
+			if remaining := streamInterval - time.Since(lastRead); remaining > 0 {
+				// Re-arm for the actual last-read deadline.
+				intervalTimer.Reset(remaining)
 				continue
 			}
 			if codexFailureTerminal && sawBareError && !sawResponseFailed {
@@ -940,6 +1007,20 @@ func (s *OpenAIGatewayService) handleStreamingResponseWithReasoning(ctx context.
 			// 处理流超时，可能标记账户为临时不可调度或错误状态
 			if s.rateLimitService != nil {
 				s.rateLimitService.HandleStreamTimeout(ctx, account, originalModel)
+			}
+			if account != nil && account.Platform == PlatformOpenAI &&
+				!openAIStreamClientOutputStarted(c, clientOutputStarted) && !eventShouldFlush {
+				_ = resp.Body.Close()
+				failoverErr := s.newOpenAIStreamFailoverErrorWithModel(
+					c, account, false, upstreamRequestID, nil,
+					"OpenAI upstream stream idle timeout before model output", mappedModel, resp.Header,
+				)
+				// Only keepalive comments can have reached the client. Joining the
+				// first-output failover budget also bounds the replay to one account
+				// switch, so one stalled request cannot walk the whole pool and apply
+				// HandleStreamTimeout to every account it touches.
+				failoverErr.SafeToFailoverAfterWrite = true
+				return resultWithUsage(), failoverErr
 			}
 			// Grok: short cool + account failover when no client-visible bytes
 			// were committed yet (pre-commit). After output started we keep the
@@ -1279,6 +1360,8 @@ func mergeOpenAIUsageNonZero(dst *OpenAIUsage, src OpenAIUsage) {
 	}
 	if src.CacheCreationInputTokens > 0 {
 		dst.CacheCreationInputTokens = src.CacheCreationInputTokens
+		dst.CacheCreation30mInputTokens = src.CacheCreation30mInputTokens
+		dst.CacheCreation12hInputTokens = src.CacheCreation12hInputTokens
 	}
 	if src.CacheReadInputTokens > 0 {
 		dst.CacheReadInputTokens = src.CacheReadInputTokens
@@ -1552,6 +1635,7 @@ func openAIUsageFromGJSON(value gjson.Result) (OpenAIUsage, bool) {
 	}
 	cacheReadTokens := openAICacheReadTokensFromUsage(value)
 	cacheCreationTokens := openAICacheCreationTokensFromUsage(value)
+	cache30m, cache12h := openAICacheCreationTTLTokensFromUsage(value, cacheCreationTokens)
 	imageOutputTokens := value.Get("output_tokens_details.image_tokens").Int()
 	if imageOutputTokens == 0 {
 		imageOutputTokens = value.Get("completion_tokens_details.image_tokens").Int()
@@ -1564,12 +1648,14 @@ func openAIUsageFromGJSON(value gjson.Result) (OpenAIUsage, bool) {
 		value.Get("prompt_tokens_details.image_tokens"),
 	)
 	return OpenAIUsage{
-		InputTokens:              int(inputTokens),
-		ImageInputTokens:         imageInputTokens,
-		OutputTokens:             int(outputTokens),
-		CacheCreationInputTokens: cacheCreationTokens,
-		CacheReadInputTokens:     cacheReadTokens,
-		ImageOutputTokens:        int(imageOutputTokens),
+		InputTokens:                 int(inputTokens),
+		ImageInputTokens:            imageInputTokens,
+		OutputTokens:                int(outputTokens),
+		CacheCreationInputTokens:    cacheCreationTokens,
+		CacheCreation30mInputTokens: cache30m,
+		CacheCreation12hInputTokens: cache12h,
+		CacheReadInputTokens:        cacheReadTokens,
+		ImageOutputTokens:           int(imageOutputTokens),
 	}, true
 }
 
@@ -1609,6 +1695,28 @@ func openAICacheCreationTokensFromUsage(value gjson.Result) int {
 		value.Get("cache_write_input_tokens"),
 		value.Get("cache_creation_tokens"),
 	)
+}
+
+// Only reported usage determines the lifetime. Missing, partial or inconsistent
+// details keep the aggregate's legacy price; request TTLs cannot prove writes.
+func openAICacheCreationTTLTokensFromUsage(value gjson.Result, aggregate int) (int, int) {
+	for _, path := range []string{"input_tokens_details", "prompt_tokens_details"} {
+		details := value.Get(path + ".cache_write_tokens_details")
+		if !details.Exists() {
+			continue
+		}
+		short, long := details.Get("ttl_30m_tokens"), details.Get("ttl_12h_tokens")
+		if short.Type != gjson.Number || long.Type != gjson.Number {
+			return 0, 0
+		}
+		a, b := short.Int(), long.Int()
+		if a < 0 || b < 0 || float64(a) != short.Float() || float64(b) != long.Float() ||
+			a > int64(aggregate) || b != int64(aggregate)-a {
+			return 0, 0
+		}
+		return int(a), int(b)
+	}
+	return 0, 0
 }
 
 func (s *OpenAIGatewayService) handleNonStreamingResponse(ctx context.Context, resp *http.Response, c *gin.Context, account *Account, originalModel, mappedModel string) (*openaiNonStreamingResult, error) {
@@ -1682,6 +1790,7 @@ func (s *OpenAIGatewayService) handleNonStreamingResponse(ctx context.Context, r
 		return nil, fmt.Errorf("restore OpenAI namespace response: %w", err)
 	}
 	body = restoreCodexToolNamesFromContext(c, body)
+	body = restoreOpenAIResponsesInstructionsEchoInResponse(c, body)
 	body = ensureOpenAIResponseObjectCreatedAt(body)
 	responseheaders.WriteFilteredHeaders(c.Writer.Header(), resp.Header, s.responseHeaderFilter)
 	// Codex 协议要求 /responses/compact JSON 响应携带 x-codex-turn-state
@@ -1792,11 +1901,13 @@ func (s *OpenAIGatewayService) handleSSEToJSON(resp *http.Response, c *gin.Conte
 			return nil, fmt.Errorf("restore OpenAI namespace response: %w", restoreErr)
 		}
 		restoredBody = restoreCodexToolNamesFromContext(c, restoredBody)
+		restoredBody = restoreOpenAIResponsesInstructionsEchoInResponse(c, restoredBody)
 		body = ensureOpenAIResponseObjectCreatedAt(restoredBody)
 	} else {
 		if originalModel != mappedModel {
 			bodyText = s.replaceModelInSSEBody(bodyText, mappedModel, originalModel)
 		}
+		bodyText = restoreOpenAIResponsesInstructionsEchoInSSEBody(c, bodyText)
 		body = []byte(bodyText)
 	}
 

@@ -4,6 +4,7 @@ package repository
 
 import (
 	"context"
+	"errors"
 	"regexp"
 	"strings"
 	"testing"
@@ -16,7 +17,7 @@ import (
 
 var channelModelPricingTimePricingColumns = []string{
 	"id", "channel_id", "platform", "models", "billing_mode", "input_price", "output_price",
-	"cache_write_price", "cache_write_1h_price", "cache_read_price", "fast_multiplier", "flex_multiplier", "reasoning_effort_multipliers", "image_input_price", "image_output_price",
+	"cache_write_price", "cache_write_1h_price", "cache_write_12h_price", "cache_read_price", "fast_multiplier", "flex_multiplier", "ultrafast_multiplier", "reasoning_effort_multipliers", "image_input_price", "image_output_price",
 	"per_request_price", "time_pricing", "created_at", "updated_at",
 }
 
@@ -33,7 +34,7 @@ func newChannelModelPricingTimePricingRepo(t *testing.T) (*channelRepository, sq
 func modelPricingTimePricingRow(timePricing any) *sqlmock.Rows {
 	return sqlmock.NewRows(channelModelPricingTimePricingColumns).AddRow(
 		int64(11), int64(7), "openai", `["gpt-5"]`, service.BillingModeToken,
-		nil, nil, nil, nil, nil, nil, nil, "{}", nil, nil, nil, timePricing,
+		nil, nil, nil, nil, nil, nil, nil, nil, nil, "{}", nil, nil, nil, timePricing,
 		time.Date(2026, 8, 17, 0, 0, 0, 0, time.UTC), time.Date(2026, 8, 17, 1, 0, 0, 0, time.UTC),
 	)
 }
@@ -98,27 +99,38 @@ func TestChannelModelPricingTimePricingListNullAndMalformed(t *testing.T) {
 }
 
 func TestChannelModelPricingTimePricingCreateAndUpdateRoundTrip(t *testing.T) {
+	cacheWrite12hPrice := 12.5
+	ultrafastMultiplier := 1.75
+	windowInputPrice := 0.25
 	pricing := &service.ChannelModelPricing{
-		ID:        11,
-		ChannelID: 7,
-		Platform:  "openai",
-		Models:    []string{"gpt-5"},
+		ID:                  11,
+		ChannelID:           7,
+		Platform:            "openai",
+		Models:              []string{"gpt-5"},
+		CacheWrite12hPrice:  &cacheWrite12hPrice,
+		UltrafastMultiplier: &ultrafastMultiplier,
 		TimePricing: &service.ChannelTimePricing{
 			Timezone: "Asia/Shanghai",
 			Periods: []service.ChannelTimePricingPeriod{{
 				StartTime: "09:00", EndTime: "12:00", Multiplier: 2,
 			}},
 		},
+		TimeWindows: []service.PricingTimeWindow{{
+			StartMinute: 540, EndMinute: 720, InputPrice: &windowInputPrice, SortOrder: 1,
+		}},
 	}
 
 	t.Run("create writes JSON", func(t *testing.T) {
 		repo, mock := newChannelModelPricingTimePricingRepo(t)
-		mock.ExpectQuery(regexp.QuoteMeta("INSERT INTO channel_model_pricing (channel_id, platform, models, billing_mode, input_price, output_price, cache_write_price, cache_write_1h_price, cache_read_price, fast_multiplier, flex_multiplier, reasoning_effort_multipliers, image_input_price, image_output_price, per_request_price, time_pricing)")).
+		mock.ExpectQuery(regexp.QuoteMeta("INSERT INTO channel_model_pricing (channel_id, platform, models, billing_mode, input_price, output_price, cache_write_price, cache_write_1h_price, cache_write_12h_price, cache_read_price, fast_multiplier, flex_multiplier, ultrafast_multiplier, reasoning_effort_multipliers, image_input_price, image_output_price, per_request_price, time_pricing)")).
 			WithArgs(
 				int64(7), "openai", []byte(`["gpt-5"]`), service.BillingModeToken,
-				nil, nil, nil, nil, nil, nil, nil, "{}", nil, nil, nil, channelModelPricingTimePricingJSON,
+				nil, nil, nil, nil, cacheWrite12hPrice, nil, nil, nil, ultrafastMultiplier, "{}", nil, nil, nil, channelModelPricingTimePricingJSON,
 			).
 			WillReturnRows(sqlmock.NewRows([]string{"id", "created_at", "updated_at"}).AddRow(int64(11), time.Time{}, time.Time{}))
+		mock.ExpectQuery(regexp.QuoteMeta("INSERT INTO channel_pricing_time_windows")).
+			WithArgs(int64(11), 540, 720, windowInputPrice, nil, nil, nil, 1).
+			WillReturnRows(sqlmock.NewRows([]string{"id", "created_at", "updated_at"}).AddRow(int64(22), time.Time{}, time.Time{}))
 
 		require.NoError(t, repo.CreateModelPricing(context.Background(), pricing))
 		require.NoError(t, mock.ExpectationsWereMet())
@@ -127,18 +139,80 @@ func TestChannelModelPricingTimePricingCreateAndUpdateRoundTrip(t *testing.T) {
 	t.Run("update writes JSON and entry ID", func(t *testing.T) {
 		repo, mock := newChannelModelPricingTimePricingRepo(t)
 		mock.ExpectBegin()
-		mock.ExpectExec(`(?s)UPDATE channel_model_pricing.*per_request_price = \$13, time_pricing = \$14, platform = \$15.*WHERE id = \$16`).
+		mock.ExpectExec(`(?s)UPDATE channel_model_pricing.*cache_write_12h_price = \$7.*ultrafast_multiplier = \$11.*per_request_price = \$15, time_pricing = \$16, platform = \$17.*WHERE id = \$18`).
 			WithArgs(
 				[]byte(`["gpt-5"]`), service.BillingModeToken,
-				nil, nil, nil, nil, nil, nil, nil, "{}", nil, nil, nil, channelModelPricingTimePricingJSON, "openai", int64(11),
+				nil, nil, nil, nil, cacheWrite12hPrice, nil, nil, nil, ultrafastMultiplier, "{}", nil, nil, nil, channelModelPricingTimePricingJSON, "openai", int64(11),
 			).
 			WillReturnResult(sqlmock.NewResult(0, 1))
 		mock.ExpectExec(`DELETE FROM channel_pricing_time_windows WHERE pricing_id = \$1`).
 			WithArgs(int64(11)).
 			WillReturnResult(sqlmock.NewResult(0, 0))
+		mock.ExpectQuery(regexp.QuoteMeta("INSERT INTO channel_pricing_time_windows")).
+			WithArgs(int64(11), 540, 720, windowInputPrice, nil, nil, nil, 1).
+			WillReturnRows(sqlmock.NewRows([]string{"id", "created_at", "updated_at"}).AddRow(int64(22), time.Time{}, time.Time{}))
 		mock.ExpectCommit()
 
 		require.NoError(t, repo.UpdateModelPricing(context.Background(), pricing))
+		require.Equal(t, int64(11), pricing.TimeWindows[0].PricingID)
+		require.Equal(t, int64(22), pricing.TimeWindows[0].ID)
+		require.NoError(t, mock.ExpectationsWereMet())
+	})
+}
+
+func TestChannelModelPricingUpdateRollsBackOnMissingRowOrWindowFailure(t *testing.T) {
+	newPricing := func() *service.ChannelModelPricing {
+		return &service.ChannelModelPricing{
+			ID: 11, Models: []string{"gpt-5"},
+			TimeWindows: []service.PricingTimeWindow{{StartMinute: 540, EndMinute: 720}},
+		}
+	}
+
+	t.Run("zero updated rows rolls back before replacing windows", func(t *testing.T) {
+		repo, mock := newChannelModelPricingTimePricingRepo(t)
+		mock.ExpectBegin()
+		mock.ExpectExec(`(?s)UPDATE channel_model_pricing.*cache_write_12h_price = \$7.*ultrafast_multiplier = \$11.*WHERE id = \$18`).
+			WithArgs([]byte(`["gpt-5"]`), service.BillingModeToken,
+				nil, nil, nil, nil, nil, nil, nil, nil, nil, "{}", nil, nil, nil, nil, "", int64(11)).
+			WillReturnResult(sqlmock.NewResult(0, 0))
+		mock.ExpectRollback()
+
+		err := repo.UpdateModelPricing(context.Background(), newPricing())
+		require.ErrorContains(t, err, "pricing entry not found: 11")
+		require.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("window insert failure rolls back main update and deletion", func(t *testing.T) {
+		repo, mock := newChannelModelPricingTimePricingRepo(t)
+		mock.ExpectBegin()
+		mock.ExpectExec(`(?s)UPDATE channel_model_pricing.*cache_write_12h_price = \$7.*ultrafast_multiplier = \$11.*WHERE id = \$18`).
+			WithArgs([]byte(`["gpt-5"]`), service.BillingModeToken,
+				nil, nil, nil, nil, nil, nil, nil, nil, nil, "{}", nil, nil, nil, nil, "", int64(11)).
+			WillReturnResult(sqlmock.NewResult(0, 1))
+		mock.ExpectExec(`DELETE FROM channel_pricing_time_windows WHERE pricing_id = \$1`).
+			WithArgs(int64(11)).
+			WillReturnResult(sqlmock.NewResult(0, 1))
+		mock.ExpectQuery(regexp.QuoteMeta("INSERT INTO channel_pricing_time_windows")).
+			WithArgs(int64(11), 540, 720, nil, nil, nil, nil, 0).
+			WillReturnError(errors.New("insert failed"))
+		mock.ExpectRollback()
+
+		err := repo.UpdateModelPricing(context.Background(), newPricing())
+		require.ErrorContains(t, err, "insert pricing time window")
+		require.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("rows affected error rolls back", func(t *testing.T) {
+		repo, mock := newChannelModelPricingTimePricingRepo(t)
+		mock.ExpectBegin()
+		mock.ExpectExec(`(?s)UPDATE channel_model_pricing.*WHERE id = \$18`).
+			WithArgs([]byte(`["gpt-5"]`), service.BillingModeToken,
+				nil, nil, nil, nil, nil, nil, nil, nil, nil, "{}", nil, nil, nil, nil, "", int64(11)).
+			WillReturnResult(sqlmock.NewErrorResult(errors.New("rows unavailable")))
+		mock.ExpectRollback()
+
+		err := repo.UpdateModelPricing(context.Background(), newPricing())
+		require.ErrorContains(t, err, "check updated model pricing rows")
 		require.NoError(t, mock.ExpectationsWereMet())
 	})
 }
@@ -166,10 +240,10 @@ func TestChannelModelPricingTimePricingCreateAndUpdateWriteNullWhenDisabled(t *t
 
 			t.Run("create writes SQL NULL", func(t *testing.T) {
 				repo, mock := newChannelModelPricingTimePricingRepo(t)
-				mock.ExpectQuery(regexp.QuoteMeta("INSERT INTO channel_model_pricing (channel_id, platform, models, billing_mode, input_price, output_price, cache_write_price, cache_write_1h_price, cache_read_price, fast_multiplier, flex_multiplier, reasoning_effort_multipliers, image_input_price, image_output_price, per_request_price, time_pricing)")).
+				mock.ExpectQuery(regexp.QuoteMeta("INSERT INTO channel_model_pricing (channel_id, platform, models, billing_mode, input_price, output_price, cache_write_price, cache_write_1h_price, cache_write_12h_price, cache_read_price, fast_multiplier, flex_multiplier, ultrafast_multiplier, reasoning_effort_multipliers, image_input_price, image_output_price, per_request_price, time_pricing)")).
 					WithArgs(
 						int64(7), "openai", []byte(`["gpt-5"]`), service.BillingModeToken,
-						nil, nil, nil, nil, nil, nil, nil, "{}", nil, nil, nil, nil,
+						nil, nil, nil, nil, nil, nil, nil, nil, nil, "{}", nil, nil, nil, nil,
 					).
 					WillReturnRows(sqlmock.NewRows([]string{"id", "created_at", "updated_at"}).AddRow(int64(11), time.Time{}, time.Time{}))
 
@@ -180,10 +254,10 @@ func TestChannelModelPricingTimePricingCreateAndUpdateWriteNullWhenDisabled(t *t
 			t.Run("update writes SQL NULL", func(t *testing.T) {
 				repo, mock := newChannelModelPricingTimePricingRepo(t)
 				mock.ExpectBegin()
-				mock.ExpectExec(`(?s)UPDATE channel_model_pricing.*per_request_price = \$13, time_pricing = \$14, platform = \$15.*WHERE id = \$16`).
+				mock.ExpectExec(`(?s)UPDATE channel_model_pricing.*per_request_price = \$15, time_pricing = \$16, platform = \$17.*WHERE id = \$18`).
 					WithArgs(
 						[]byte(`["gpt-5"]`), service.BillingModeToken,
-						nil, nil, nil, nil, nil, nil, nil, "{}", nil, nil, nil, nil, "openai", int64(11),
+						nil, nil, nil, nil, nil, nil, nil, nil, nil, "{}", nil, nil, nil, nil, "openai", int64(11),
 					).
 					WillReturnResult(sqlmock.NewResult(0, 1))
 				mock.ExpectExec(`DELETE FROM channel_pricing_time_windows WHERE pricing_id = \$1`).

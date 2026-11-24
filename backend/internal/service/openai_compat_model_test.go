@@ -1971,7 +1971,7 @@ func TestHandleAnthropicBufferedStreamingResponse_OverridesUpstreamContentType(t
 	}
 
 	result, err := svc.handleAnthropicBufferedStreamingResponse(
-		resp, c, &Account{}, "claude-sonnet-4-5", "gpt-5.4", "gpt-5.4", time.Now(),
+		resp, c, &Account{}, "claude-sonnet-4-5", "gpt-5.4", "gpt-5.4", time.Now(), nil,
 	)
 	require.NoError(t, err)
 	require.NotNil(t, result)
@@ -2159,7 +2159,10 @@ func TestForwardAsAnthropic_MissingTerminalAfterClientDisconnectSkipsOpsAndFailo
 	c, _ := gin.CreateTestContext(rec)
 	c.Writer = &openAICompatFailingWriter{ResponseWriter: c.Writer, failAfter: 0}
 	body := []byte(`{"model":"gpt-5.4","max_tokens":16,"messages":[{"role":"user","content":"hello"}],"stream":true}`)
-	c.Request = httptest.NewRequest(http.MethodPost, "/v1/messages", bytes.NewReader(body))
+	// A real disconnect also cancels the request context.
+	reqCtx, cancel := context.WithCancel(context.Background())
+	cancel()
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/messages", bytes.NewReader(body)).WithContext(reqCtx)
 	c.Request.Header.Set("Content-Type", "application/json")
 
 	upstreamBody := strings.Join([]string{

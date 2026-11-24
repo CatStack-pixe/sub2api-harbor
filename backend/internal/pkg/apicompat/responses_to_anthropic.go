@@ -21,6 +21,7 @@ func ResponsesToAnthropic(resp *ResponsesResponse, model string) *AnthropicRespo
 		Type:  "message",
 		Role:  "assistant",
 		Model: model,
+		Usage: anthropicUsageFromResponsesUsage(nil),
 	}
 
 	var blocks []AnthropicContentBlock
@@ -28,19 +29,14 @@ func ResponsesToAnthropic(resp *ResponsesResponse, model string) *AnthropicRespo
 	for _, item := range resp.Output {
 		switch item.Type {
 		case "reasoning":
-			summaryText := ""
-			for _, s := range item.Summary {
-				if s.Type == "summary_text" && s.Text != "" {
-					summaryText += s.Text
-				}
-			}
+			reasoningText := responsesReasoningText(item)
 			// Always surface encrypted_content as thinking.signature so Claude
 			// Code / multi-turn clients can send it back. Signature-only
 			// thinking blocks are valid when the model omits a visible summary.
-			if summaryText != "" || strings.TrimSpace(item.EncryptedContent) != "" {
+			if reasoningText != "" || strings.TrimSpace(item.EncryptedContent) != "" {
 				blocks = append(blocks, AnthropicContentBlock{
 					Type:      "thinking",
-					Thinking:  summaryText,
+					Thinking:  reasoningText,
 					Signature: item.EncryptedContent,
 				})
 			}
@@ -58,9 +54,24 @@ func ResponsesToAnthropic(resp *ResponsesResponse, model string) *AnthropicRespo
 				Type:  "tool_use",
 				ID:    fromResponsesCallID(item.CallID),
 				Name:  item.Name,
-				Input: sanitizeAnthropicToolUseInput(item.Name, item.Arguments),
+				Input: anthropicToolUseInput(item.Type, item.Name, item.Arguments),
 			})
+		case "custom_tool_call":
+			if !resp.RenderCustomToolCalls || (resp.XAIServerSideSearch && IsServerSideSearchCall(item.Type, item.CallID)) {
+				continue
+			}
+			blocks = append(blocks, AnthropicContentBlock{
+				Type:  "tool_use",
+				ID:    fromResponsesCallID(item.CallID),
+				Name:  item.Name,
+				Input: anthropicToolUseInput(item.Type, item.Name, item.Input),
+			})
+		case "tool_search_call":
+			blocks = append(blocks, toolSearchCallToolUse(item))
 		case "web_search_call":
+			if item.Status != "completed" {
+				continue
+			}
 			toolUseID := "srvtoolu_" + item.ID
 			query := ""
 			if item.Action != nil {
@@ -73,11 +84,10 @@ func ResponsesToAnthropic(resp *ResponsesResponse, model string) *AnthropicRespo
 				Name:  "web_search",
 				Input: inputJSON,
 			})
-			emptyResults, _ := json.Marshal([]struct{}{})
 			blocks = append(blocks, AnthropicContentBlock{
 				Type:      "web_search_tool_result",
 				ToolUseID: toolUseID,
-				Content:   emptyResults,
+				Content:   webSearchCallResults(&item),
 			})
 		}
 	}
@@ -98,7 +108,7 @@ func ResponsesToAnthropic(resp *ResponsesResponse, model string) *AnthropicRespo
 
 func anthropicUsageFromResponsesUsage(usage *ResponsesUsage) AnthropicUsage {
 	if usage == nil {
-		return AnthropicUsage{}
+		return AnthropicUsage{CacheCreationInputTokensPresent: true, CacheReadInputTokensPresent: true}
 	}
 
 	cachedTokens := 0
@@ -112,10 +122,12 @@ func anthropicUsageFromResponsesUsage(usage *ResponsesUsage) AnthropicUsage {
 	}
 
 	return AnthropicUsage{
-		InputTokens:              inputTokens,
-		OutputTokens:             usage.OutputTokens,
-		CacheReadInputTokens:     cachedTokens,
-		CacheCreationInputTokens: usage.CacheCreationInputTokens,
+		InputTokens:                     inputTokens,
+		OutputTokens:                    usage.OutputTokens,
+		CacheReadInputTokens:            cachedTokens,
+		CacheCreationInputTokens:        usage.CacheCreationInputTokens,
+		CacheCreationInputTokensPresent: true,
+		CacheReadInputTokensPresent:     true,
 	}
 }
 
@@ -143,6 +155,26 @@ func containsAnthropicToolUseBlock(blocks []AnthropicContentBlock) bool {
 		}
 	}
 	return false
+}
+
+// anthropicToolUseInput returns the input of a non-streaming tool_use block,
+// which must be a JSON object. An object is kept as it is. A function_call whose
+// arguments are not an object (truncated by max_output_tokens, or empty) gets {};
+// a custom_tool_call's free-form input is wrapped in the same {"input": ...}
+// shape that downgrades a custom tool to a function tool, so that
+// extractCustomToolCallInput gives the text back; an empty custom input is {} as
+// it is in the streamed tool_use.
+func anthropicToolUseInput(itemType, name, raw string) json.RawMessage {
+	if trimmed := strings.TrimSpace(raw); strings.HasPrefix(trimmed, "{") && json.Valid([]byte(trimmed)) {
+		return sanitizeAnthropicToolUseInput(name, raw)
+	}
+	if itemType == "custom_tool_call" && raw != "" {
+		wrapped, err := json.Marshal(map[string]string{"input": raw})
+		if err == nil {
+			return wrapped
+		}
+	}
+	return json.RawMessage("{}")
 }
 
 func sanitizeAnthropicToolUseInput(name string, raw string) json.RawMessage {
@@ -180,14 +212,16 @@ type responsesTextPart struct {
 // ResponsesEventToAnthropicState tracks state for converting a sequence of
 // Responses SSE events directly into Anthropic SSE events.
 type responsesAnthropicToolBlockState struct {
-	OutputIndex int
-	BlockIndex  int
-	CallID      string
-	Name        string
-	Arguments   string
-	HadDelta    bool
-	Open        bool
-	StopSent    bool
+	OutputIndex         int
+	BlockIndex          int
+	CallID              string
+	Name                string
+	Arguments           string
+	ArgumentsBuffer     *strings.Builder
+	ArgumentsValidation *streamStringBytes
+	HadDelta            bool
+	Open                bool
+	StopSent            bool
 }
 
 type ResponsesEventToAnthropicState struct {
@@ -203,10 +237,20 @@ type ResponsesEventToAnthropicState struct {
 	CurrentToolName     string
 	CurrentToolArgs     string
 	CurrentToolHadDelta bool
+	// These mirrors preserve the legacy active-tool accumulation state. They
+	// are also the copy-on-write boundary when callers shallow-copy the stream
+	// state while a Read tool is being validated.
+	currentToolArgsBuffer     *strings.Builder
+	currentToolArgsValidation *streamStringBytes
 	// PendingThinkingSignature is filled from reasoning.encrypted_content and
 	// emitted as signature_delta before the thinking block is closed.
 	PendingThinkingSignature string
 	HasToolCall              bool
+
+	// XAIServerSideSearch is set by callers whose upstream is xAI. A
+	// custom_tool_call that IsServerSideSearchCall then never becomes a tool_use
+	// block, because xAI runs it itself.
+	XAIServerSideSearch bool
 
 	// OutputIndexToBlockIdx maps Responses output_index → Anthropic content block index.
 	OutputIndexToBlockIdx map[int]int
@@ -311,10 +355,12 @@ func FinalizeResponsesAnthropicStream(state *ResponsesEventToAnthropicState) []A
 				StopReason: stopReason,
 			},
 			Usage: &AnthropicUsage{
-				InputTokens:              state.InputTokens,
-				OutputTokens:             state.OutputTokens,
-				CacheReadInputTokens:     state.CacheReadInputTokens,
-				CacheCreationInputTokens: state.CacheCreationInputTokens,
+				InputTokens:                     state.InputTokens,
+				OutputTokens:                    state.OutputTokens,
+				CacheReadInputTokens:            state.CacheReadInputTokens,
+				CacheCreationInputTokens:        state.CacheCreationInputTokens,
+				CacheCreationInputTokensPresent: true,
+				CacheReadInputTokensPresent:     true,
 			},
 		},
 		AnthropicStreamEvent{Type: "message_stop"},
@@ -362,8 +408,10 @@ func resToAnthHandleCreated(evt *ResponsesStreamEvent, state *ResponsesEventToAn
 			Model:      state.Model,
 			StopReason: nil,
 			Usage: AnthropicUsage{
-				InputTokens:  0,
-				OutputTokens: 0,
+				InputTokens:                     0,
+				OutputTokens:                    0,
+				CacheCreationInputTokensPresent: true,
+				CacheReadInputTokensPresent:     true,
 			},
 		},
 	}}
@@ -380,6 +428,9 @@ func resToAnthHandleOutputItemAdded(evt *ResponsesStreamEvent, state *ResponsesE
 	case "function_call", "custom_tool_call":
 		state.ensureToolBlockMaps()
 		if existing := state.findToolBlock(evt); existing != nil {
+			return nil
+		}
+		if state.XAIServerSideSearch && IsServerSideSearchCall(evt.Item.Type, evt.Item.CallID) {
 			return nil
 		}
 
@@ -584,16 +635,27 @@ func resToAnthHandleFuncArgsDelta(evt *ResponsesStreamEvent, state *ResponsesEve
 		return nil
 	}
 
-	tool := state.findOrCreateLegacyToolBlock(evt)
+	tool := state.writableToolBlock(evt)
 	if tool == nil || !tool.Open || tool.StopSent {
 		return nil
 	}
 
-	tool.Arguments += evt.Delta
+	previousArgs := tool.Arguments
+	if state.isMirroredToolBlock(tool) {
+		previousArgs = state.CurrentToolArgs
+		tool.ArgumentsBuffer = state.currentToolArgsBuffer
+		tool.ArgumentsValidation = state.currentToolArgsValidation
+	}
+	tool.Arguments = appendStreamString(&tool.ArgumentsBuffer, previousArgs, evt.Delta)
 	state.mirrorToolBlock(tool)
 
 	if tool.Name == "Read" {
-		if tool.HadDelta || !json.Valid([]byte(tool.Arguments)) {
+		if tool.HadDelta {
+			return nil
+		}
+		validatedArgs := appendStreamStringBytes(&tool.ArgumentsValidation, previousArgs, tool.Arguments, evt.Delta)
+		state.mirrorToolValidation(tool)
+		if !json.Valid(validatedArgs) {
 			return nil
 		}
 
@@ -624,7 +686,7 @@ func resToAnthHandleFuncArgsDelta(evt *ResponsesStreamEvent, state *ResponsesEve
 }
 
 func resToAnthHandleFuncArgsDone(evt *ResponsesStreamEvent, state *ResponsesEventToAnthropicState) []AnthropicStreamEvent {
-	tool := state.findOrCreateLegacyToolBlock(evt)
+	tool := state.writableToolBlock(evt)
 	if tool == nil || !tool.Open || tool.StopSent {
 		return nil
 	}
@@ -677,10 +739,14 @@ func resToAnthHandleOutputItemDone(evt *ResponsesStreamEvent, state *ResponsesEv
 	if evt.Item.Type == "web_search_call" && evt.Item.Status == "completed" {
 		return resToAnthHandleWebSearchDone(evt, state)
 	}
+	// The native tool_search_call carries its arguments only on done.
+	if evt.Item.Type == "tool_search_call" {
+		return resToAnthHandleToolSearchDone(evt, state)
+	}
 
 	switch evt.Item.Type {
 	case "function_call", "custom_tool_call":
-		tool := state.findOrCreateLegacyToolBlock(evt)
+		tool := state.writableToolBlock(evt)
 		if tool == nil || !tool.Open || tool.StopSent {
 			return nil
 		}
@@ -739,9 +805,7 @@ func resToAnthHandleWebSearchDone(evt *ResponsesStreamEvent, state *ResponsesEve
 	})
 
 	// Emit web_search_tool_result block (start + stop).
-	// Content is empty because OpenAI does not expose individual search results;
-	// the model consumes them internally and produces text output.
-	emptyResults, _ := json.Marshal([]struct{}{})
+	// Use result metadata when available; some providers expose no result details.
 	idx2 := allocateAnthropicContentBlockIndex(state)
 	events = append(events, AnthropicStreamEvent{
 		Type:  "content_block_start",
@@ -749,7 +813,7 @@ func resToAnthHandleWebSearchDone(evt *ResponsesStreamEvent, state *ResponsesEve
 		ContentBlock: &AnthropicContentBlock{
 			Type:      "web_search_tool_result",
 			ToolUseID: toolUseID,
-			Content:   emptyResults,
+			Content:   webSearchCallResults(evt.Item),
 		},
 	})
 	events = append(events, AnthropicStreamEvent{
@@ -837,10 +901,12 @@ func resToAnthHandleCompleted(evt *ResponsesStreamEvent, state *ResponsesEventTo
 				StopReason: stopReason,
 			},
 			Usage: &AnthropicUsage{
-				InputTokens:              state.InputTokens,
-				OutputTokens:             state.OutputTokens,
-				CacheReadInputTokens:     state.CacheReadInputTokens,
-				CacheCreationInputTokens: state.CacheCreationInputTokens,
+				InputTokens:                     state.InputTokens,
+				OutputTokens:                    state.OutputTokens,
+				CacheReadInputTokens:            state.CacheReadInputTokens,
+				CacheCreationInputTokens:        state.CacheCreationInputTokens,
+				CacheCreationInputTokensPresent: true,
+				CacheReadInputTokensPresent:     true,
 			},
 		},
 		AnthropicStreamEvent{Type: "message_stop"},
@@ -854,7 +920,7 @@ func closeCurrentBlock(state *ResponsesEventToAnthropicState) []AnthropicStreamE
 		return nil
 	}
 	if state.CurrentBlockType == "tool_use" {
-		tool := state.findOrCreateLegacyToolBlock(&ResponsesStreamEvent{OutputIndex: state.CurrentOutputIndex})
+		tool := state.writableToolBlock(&ResponsesStreamEvent{OutputIndex: state.CurrentOutputIndex})
 		return closeToolBlock(state, tool)
 	}
 
@@ -965,23 +1031,74 @@ func (state *ResponsesEventToAnthropicState) findOrCreateLegacyToolBlock(evt *Re
 	}
 
 	tool := &responsesAnthropicToolBlockState{
-		OutputIndex: evt.OutputIndex,
-		BlockIndex:  blockIdx,
-		CallID:      callID,
-		Name:        name,
-		Arguments:   state.CurrentToolArgs,
-		HadDelta:    state.CurrentToolHadDelta,
-		Open:        true,
+		OutputIndex:         evt.OutputIndex,
+		BlockIndex:          blockIdx,
+		CallID:              callID,
+		Name:                name,
+		Arguments:           state.CurrentToolArgs,
+		ArgumentsBuffer:     state.currentToolArgsBuffer,
+		ArgumentsValidation: state.currentToolArgsValidation,
+		HadDelta:            state.CurrentToolHadDelta,
+		Open:                true,
 	}
-	state.toolBlocksByOutput[evt.OutputIndex] = tool
-	state.OutputIndexToBlockIdx[evt.OutputIndex] = blockIdx
+	blocks := make(map[int]*responsesAnthropicToolBlockState, len(state.toolBlocksByOutput)+1)
+	for outputIndex, existing := range state.toolBlocksByOutput {
+		blocks[outputIndex] = existing
+	}
+	blocks[evt.OutputIndex] = tool
+	state.toolBlocksByOutput = blocks
+
+	blockIndices := make(map[int]int, len(state.OutputIndexToBlockIdx)+1)
+	for outputIndex, existing := range state.OutputIndexToBlockIdx {
+		blockIndices[outputIndex] = existing
+	}
+	blockIndices[evt.OutputIndex] = blockIdx
+	state.OutputIndexToBlockIdx = blockIndices
 	if callID != "" {
-		state.toolOutputByCallID[callID] = evt.OutputIndex
+		outputByCallID := make(map[string]int, len(state.toolOutputByCallID)+1)
+		for existingCallID, outputIndex := range state.toolOutputByCallID {
+			outputByCallID[existingCallID] = outputIndex
+		}
+		outputByCallID[callID] = evt.OutputIndex
+		state.toolOutputByCallID = outputByCallID
 	}
 	if state.ContentBlockIndex <= blockIdx {
 		state.ContentBlockIndex = blockIdx + 1
 	}
 	return tool
+}
+
+// writableToolBlock gives this state its own tool record and map before a
+// mutation. A shallow copy may share the maps and records, while its public
+// active-tool fields remain independent and are the source of truth for the
+// currently mirrored tool.
+func (state *ResponsesEventToAnthropicState) writableToolBlock(evt *ResponsesStreamEvent) *responsesAnthropicToolBlockState {
+	tool := state.findOrCreateLegacyToolBlock(evt)
+	if tool == nil {
+		return nil
+	}
+
+	copyOfTool := *tool
+	if state.isMirroredToolBlock(tool) {
+		copyOfTool.Arguments = state.CurrentToolArgs
+		copyOfTool.ArgumentsBuffer = state.currentToolArgsBuffer
+		copyOfTool.ArgumentsValidation = state.currentToolArgsValidation
+		copyOfTool.HadDelta = state.CurrentToolHadDelta
+	}
+	blocks := make(map[int]*responsesAnthropicToolBlockState, len(state.toolBlocksByOutput))
+	for outputIndex, existing := range state.toolBlocksByOutput {
+		blocks[outputIndex] = existing
+	}
+	blocks[copyOfTool.OutputIndex] = &copyOfTool
+	state.toolBlocksByOutput = blocks
+	return &copyOfTool
+}
+
+func (state *ResponsesEventToAnthropicState) isMirroredToolBlock(tool *responsesAnthropicToolBlockState) bool {
+	return tool != nil &&
+		state.CurrentBlockType == "tool_use" &&
+		state.CurrentBlockIndex == tool.BlockIndex &&
+		state.CurrentOutputIndex == tool.OutputIndex
 }
 
 func (state *ResponsesEventToAnthropicState) mirrorToolBlock(tool *responsesAnthropicToolBlockState) {
@@ -995,6 +1112,15 @@ func (state *ResponsesEventToAnthropicState) mirrorToolBlock(tool *responsesAnth
 	state.CurrentToolName = tool.Name
 	state.CurrentToolArgs = tool.Arguments
 	state.CurrentToolHadDelta = tool.HadDelta
+	state.currentToolArgsBuffer = tool.ArgumentsBuffer
+	state.currentToolArgsValidation = tool.ArgumentsValidation
+}
+
+func (state *ResponsesEventToAnthropicState) mirrorToolValidation(tool *responsesAnthropicToolBlockState) {
+	if !state.isMirroredToolBlock(tool) {
+		return
+	}
+	state.currentToolArgsValidation = tool.ArgumentsValidation
 }
 
 func emitToolArgumentsAndClose(
@@ -1022,6 +1148,7 @@ func emitToolArgumentsAndClose(
 			})
 			tool.Arguments = raw
 			tool.HadDelta = true
+			state.mirrorToolBlock(tool)
 		}
 	} else if tool.HadDelta && tool.Name != "Read" && strings.HasPrefix(raw, tool.Arguments) && len(raw) > len(tool.Arguments) {
 		remaining := raw[len(tool.Arguments):]
@@ -1054,7 +1181,11 @@ func closeToolBlock(state *ResponsesEventToAnthropicState, tool *responsesAnthro
 		state.CurrentToolName = ""
 		state.CurrentToolArgs = ""
 		state.CurrentToolHadDelta = false
+		state.currentToolArgsBuffer = nil
+		state.currentToolArgsValidation = nil
 	}
+	tool.ArgumentsBuffer = nil
+	tool.ArgumentsValidation = nil
 	idx := tool.BlockIndex
 	return []AnthropicStreamEvent{{Type: "content_block_stop", Index: &idx}}
 }
@@ -1066,21 +1197,38 @@ func closeAllOpenBlocks(state *ResponsesEventToAnthropicState) []AnthropicStream
 	}
 
 	type openBlock struct {
-		index  int
-		tool   *responsesAnthropicToolBlockState
-		serial bool
+		index       int
+		outputIndex int
+		callID      string
+		tool        *responsesAnthropicToolBlockState
+		serial      bool
 	}
 	blocks := make([]openBlock, 0, len(state.toolBlocksByOutput)+1)
+	seenTools := make(map[*responsesAnthropicToolBlockState]bool)
 	if state.ContentBlockOpen && state.CurrentBlockType != "tool_use" {
 		blocks = append(blocks, openBlock{index: state.CurrentBlockIndex, serial: true})
+	} else if state.ContentBlockOpen && state.CurrentBlockType == "tool_use" {
+		if tool := state.writableToolBlock(&ResponsesStreamEvent{OutputIndex: state.CurrentOutputIndex}); tool != nil {
+			seenTools[tool] = true
+			blocks = append(blocks, openBlock{
+				index:       tool.BlockIndex,
+				outputIndex: tool.OutputIndex,
+				callID:      tool.CallID,
+				tool:        tool,
+			})
+		}
 	}
-	seenTools := make(map[*responsesAnthropicToolBlockState]bool)
 	for _, tool := range state.toolBlocksByOutput {
 		if tool == nil || !tool.Open || tool.StopSent || seenTools[tool] {
 			continue
 		}
 		seenTools[tool] = true
-		blocks = append(blocks, openBlock{index: tool.BlockIndex, tool: tool})
+		blocks = append(blocks, openBlock{
+			index:       tool.BlockIndex,
+			outputIndex: tool.OutputIndex,
+			callID:      tool.CallID,
+			tool:        tool,
+		})
 	}
 	sort.Slice(blocks, func(i, j int) bool { return blocks[i].index < blocks[j].index })
 
@@ -1090,7 +1238,11 @@ func closeAllOpenBlocks(state *ResponsesEventToAnthropicState) []AnthropicStream
 			events = append(events, closeCurrentBlock(state)...)
 			continue
 		}
-		events = append(events, closeToolBlock(state, block.tool)...)
+		tool := state.writableToolBlock(&ResponsesStreamEvent{
+			OutputIndex: block.outputIndex,
+			CallID:      block.callID,
+		})
+		events = append(events, closeToolBlock(state, tool)...)
 	}
 	return events
 }

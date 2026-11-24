@@ -45,7 +45,7 @@ func (r *batchAccountQueryRepo) ListSchedulableByGroupIDAndPlatform(_ context.Co
 }
 
 func (r *batchAccountQueryRepo) ListSchedulableByGroupIDAndPlatforms(_ context.Context, groupID int64, platforms []string) ([]Account, error) {
-	return r.run(batchAccountQueryKey{groupID: groupID, platform: platforms[0], mixed: batchQueryIsMixed(platforms)})
+	return r.run(batchAccountQueryKey{groupID: groupID, platform: batchQueryPlatform(platforms), mixed: batchQueryIsMixed(platforms)})
 }
 
 func (r *batchAccountQueryRepo) ListSchedulableUngroupedByPlatform(_ context.Context, platform string) ([]Account, error) {
@@ -53,23 +53,43 @@ func (r *batchAccountQueryRepo) ListSchedulableUngroupedByPlatform(_ context.Con
 }
 
 func (r *batchAccountQueryRepo) ListSchedulableUngroupedByPlatforms(_ context.Context, platforms []string) ([]Account, error) {
-	return r.run(batchAccountQueryKey{platform: platforms[0], mixed: batchQueryIsMixed(platforms)})
+	return r.run(batchAccountQueryKey{platform: batchQueryPlatform(platforms), mixed: batchQueryIsMixed(platforms)})
 }
 
 func batchQueryIsMixed(platforms []string) bool {
-	if len(platforms) == 2 && platforms[0] == PlatformOpenAI && platforms[1] == PlatformChatAnywhere {
+	if len(platforms) <= 1 {
 		return false
 	}
-	if len(platforms) > 2 && platforms[0] == PlatformOpenAI {
-		// OpenAI-compatible grouped buckets now share the complete compatible
-		// account pool; this is still an ordinary (non-mixed) query.
+	if batchQueryContains(platforms, PlatformOpenAI) {
+		// OpenAI-compatible grouped buckets share the complete compatible
+		// account pool; Anthropic/Gemini mixed pools add Antigravity explicitly.
 		return false
 	}
 	return true
 }
 
-func (r *batchAccountQueryRepo) ListModelAvailabilityCandidates(context.Context, *int64, []string, bool) ([]Account, error) {
-	panic("unexpected ListModelAvailabilityCandidates call")
+func batchQueryPlatform(platforms []string) string {
+	if batchQueryContains(platforms, PlatformOpenAI) {
+		return PlatformOpenAI
+	}
+	return platforms[0]
+}
+
+func batchQueryContains(platforms []string, platform string) bool {
+	for _, candidate := range platforms {
+		if candidate == platform {
+			return true
+		}
+	}
+	return false
+}
+
+func (r *batchAccountQueryRepo) ListModelAvailabilityCandidates(_ context.Context, groupID *int64, platforms []string, _ bool) ([]Account, error) {
+	key := batchAccountQueryKey{platform: batchQueryPlatform(platforms), mixed: batchQueryIsMixed(platforms)}
+	if groupID != nil {
+		key.groupID = *groupID
+	}
+	return r.run(key)
 }
 
 func (r *batchAccountQueryRepo) ListSchedulableByPlatform(_ context.Context, platform string) ([]Account, error) {
@@ -77,7 +97,7 @@ func (r *batchAccountQueryRepo) ListSchedulableByPlatform(_ context.Context, pla
 }
 
 func (r *batchAccountQueryRepo) ListSchedulableByPlatforms(_ context.Context, platforms []string) ([]Account, error) {
-	return r.run(batchAccountQueryKey{platform: platforms[0], mixed: true})
+	return r.run(batchAccountQueryKey{platform: batchQueryPlatform(platforms), mixed: batchQueryIsMixed(platforms)})
 }
 
 func (r *batchAccountQueryRepo) run(key batchAccountQueryKey) ([]Account, error) {
@@ -737,7 +757,7 @@ type batchQueryBenchmarkRepo struct {
 	accounts []Account
 }
 
-func (r *batchQueryBenchmarkRepo) ListSchedulableByGroupIDAndPlatform(context.Context, int64, string) ([]Account, error) {
+func (r *batchQueryBenchmarkRepo) ListModelAvailabilityCandidates(context.Context, *int64, []string, bool) ([]Account, error) {
 	return r.accounts, nil
 }
 

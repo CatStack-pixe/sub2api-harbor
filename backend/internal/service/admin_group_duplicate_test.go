@@ -312,6 +312,7 @@ func TestDuplicateGroupCopiesConfigurationDeeplyAndResetsRuntimeState(t *testing
 	require.Equal(t, source.ModelRouting, duplicate.ModelRouting)
 	require.Equal(t, source.MessagesDispatchModelConfig, duplicate.MessagesDispatchModelConfig)
 	require.Equal(t, source.ForceOpenAIFast, duplicate.ForceOpenAIFast)
+	require.Equal(t, source.ForceOpenAIUltrafast, duplicate.ForceOpenAIUltrafast)
 	require.Equal(t, source.FreeOpenAIFast, duplicate.FreeOpenAIFast)
 	require.Equal(t, source.ModelsListConfig, duplicate.ModelsListConfig)
 	require.Equal(t, source.ModelAllowlist, duplicate.ModelAllowlist)

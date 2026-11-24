@@ -86,7 +86,7 @@ services:
       # =======================================================================
       # Admin Account (auto-created on first run)
       # =======================================================================
-      - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@sub2api.local}
+      - ADMIN_EMAIL=${ADMIN_EMAIL:-}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
 
       # =======================================================================
@@ -183,6 +183,7 @@ services:
       - GATEWAY_OPENAI_COMPACT_MODEL=${GATEWAY_OPENAI_COMPACT_MODEL:-gpt-5.5}
       - SUB2API_IMAGES_MAIN_MODEL=${SUB2API_IMAGES_MAIN_MODEL:-gpt-5.6-luna}
       - GATEWAY_OPENAI_RESPONSE_HEADER_TIMEOUT=${GATEWAY_OPENAI_RESPONSE_HEADER_TIMEOUT:-0}
+      - GATEWAY_DISABLE_OPENAI_TRANSPORT_ERROR_COOLDOWN=${GATEWAY_DISABLE_OPENAI_TRANSPORT_ERROR_COOLDOWN:-false}
       - GATEWAY_OPENAI_RAW_CHAT_FIRST_OUTPUT_TIMEOUT_SECONDS=${GATEWAY_OPENAI_RAW_CHAT_FIRST_OUTPUT_TIMEOUT_SECONDS:-0}
       - GATEWAY_OPENAI_WS_FORCE_HTTP=${GATEWAY_OPENAI_WS_FORCE_HTTP:-false}
       - GATEWAY_OPENAI_HTTP2_ENABLED=${GATEWAY_OPENAI_HTTP2_ENABLED:-true}

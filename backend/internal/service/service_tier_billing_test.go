@@ -74,3 +74,68 @@ func TestApplyServiceTierBillingResolutionOnlyRewritesDowngrades(t *testing.T) {
 		require.False(t, ApplyForwardServiceTierBillingResolution(nil).Downgraded)
 	})
 }
+
+func TestApplyOpenAIServiceTierBillingResolutionForUntieredRequest(t *testing.T) {
+	for _, platform := range []string{PlatformOpenAI, PlatformGrok, PlatformDeepseek, PlatformCline} {
+		t.Run(platform, func(t *testing.T) {
+			observed := "priority"
+			result := &OpenAIForwardResult{
+				ServiceTier:                 &observed,
+				UpstreamResponseServiceTier: observed,
+				RequestedServiceTierKnown:   true,
+			}
+
+			resolution := applyOpenAIServiceTierBillingResolutionForAccount(
+				&Account{Platform: platform, Type: AccountTypeAPIKey},
+				result,
+			)
+
+			require.Equal(t, "", resolution.Requested)
+			require.Equal(t, "priority", resolution.Observed)
+			require.Empty(t, resolution.Billing)
+			require.Nil(t, result.ServiceTier)
+		})
+	}
+}
+
+func TestApplyOpenAIServiceTierBillingResolutionForCodexOAuthDefaultEcho(t *testing.T) {
+	requested := "priority"
+	observed := "default"
+	result := &OpenAIForwardResult{
+		ServiceTier:                 &observed,
+		RequestedServiceTier:        &requested,
+		RequestedServiceTierKnown:   true,
+		UpstreamResponseServiceTier: observed,
+	}
+
+	resolution := applyOpenAIServiceTierBillingResolutionForAccount(
+		&Account{Platform: PlatformOpenAI, Type: AccountTypeOAuth},
+		result,
+	)
+
+	require.False(t, resolution.Downgraded)
+	require.Equal(t, "priority", resolution.Requested)
+	require.Equal(t, "default", resolution.Observed)
+	require.Equal(t, "priority", resolution.Billing)
+	require.Equal(t, "priority", *result.ServiceTier)
+}
+
+func TestApplyOpenAIServiceTierBillingResolutionForNonOAuthDefaultEcho(t *testing.T) {
+	requested := "priority"
+	observed := "default"
+	result := &OpenAIForwardResult{
+		ServiceTier:                 &observed,
+		RequestedServiceTier:        &requested,
+		RequestedServiceTierKnown:   true,
+		UpstreamResponseServiceTier: observed,
+	}
+
+	resolution := applyOpenAIServiceTierBillingResolutionForAccount(
+		&Account{Platform: PlatformOpenAI, Type: AccountTypeAPIKey},
+		result,
+	)
+
+	require.True(t, resolution.Downgraded)
+	require.Equal(t, "default", resolution.Billing)
+	require.Equal(t, "default", *result.ServiceTier)
+}
