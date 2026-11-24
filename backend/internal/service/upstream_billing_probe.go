@@ -633,72 +633,8 @@ func (s *UpstreamBillingProbeService) fetchBilling(ctx context.Context, account 
 	if s.accountTestService == nil || s.accountTestService.httpUpstream == nil {
 		return result, errors.New("transport_unavailable")
 	}
-	if account.IsTierflow() {
-		result, err := s.accountTestService.FetchTierflowBalance(ctx, account.ID)
-		if err != nil {
-			return s.persistProbeFailure(ctx, account, intervalMinutes, now, infraerrors.Code(err), "tierflow_balance_failed", 0)
-		}
-		snapshot := &UpstreamBillingProbeSnapshot{
-			Status: UpstreamBillingProbeStatusOK,
-			Data: map[string]any{
-				"provider":          PlatformTierflow,
-				"is_available":      result.IsAvailable,
-				"remaining_balance": result.RemainingBalance,
-				"total_usage":       result.TotalUsage,
-				"currency":          result.Currency,
-				"quota_per_unit":    result.QuotaPerUnit,
-				"request_count":     result.RequestCount,
-				"fetched_at":        result.FetchedAt,
-			},
-			ReceivedAt:    probeTimePtr(now),
-			FreshUntil:    probeTimePtr(now.Add(2 * time.Duration(intervalMinutes) * time.Minute)),
-			LastAttemptAt: now,
-			NextProbeAt:   now.Add(nextProbeDelay(intervalMinutes, 0)),
-			HTTPStatus:    result.StatusCode,
-		}
-		// Wallet observations never declare or synthesize a billing multiplier.
-		if err := s.updateSnapshot(ctx, account, snapshot, nil); err != nil {
-			return nil, err
-		}
-		return snapshot, nil
-	}
-	if account.IsTokenRhythm() {
-		result, err := s.accountTestService.FetchTokenRhythmBalance(ctx, account.ID)
-		if err != nil {
-			return s.persistProbeFailure(ctx, account, intervalMinutes, now, 0, "tokenrhythm_balance_failed", 0)
-		}
-		data := map[string]any{
-			"provider":              PlatformTokenRhythm,
-			"balance_cny":           result.BalanceCNY,
-			"available_balance_cny": result.AvailableBalanceCNY,
-			"frozen_balance_cny":    result.FrozenBalanceCNY,
-			"expiring_balance_cny":  result.ExpiringBalanceCNY,
-			"cost_cny":              result.CostCNY,
-			"currency":              result.Currency,
-			"calls":                 result.Calls,
-			"success_calls":         result.SuccessCalls,
-			"error_calls":           result.ErrorCalls,
-			"aborted_calls":         result.AbortedCalls,
-			"input_tokens":          result.InputTokens,
-			"output_tokens":         result.OutputTokens,
-			"fetched_at":            result.FetchedAt,
-		}
-		if result.NextExpiryAt != "" {
-			data["next_expiry_at"] = result.NextExpiryAt
-		}
-		snapshot := &UpstreamBillingProbeSnapshot{
-			Status:        UpstreamBillingProbeStatusOK,
-			Data:          data,
-			ReceivedAt:    probeTimePtr(now),
-			FreshUntil:    probeTimePtr(now.Add(2 * time.Duration(intervalMinutes) * time.Minute)),
-			LastAttemptAt: now,
-			NextProbeAt:   now.Add(nextProbeDelay(intervalMinutes, 0)),
-			HTTPStatus:    result.StatusCode,
-		}
-		if err := s.updateSnapshot(ctx, account, snapshot, nil); err != nil {
-			return nil, err
-		}
-		return snapshot, nil
+	if account.IsTierflow() || account.IsTokenRhythm() {
+		return result, errBillingUnsupported
 	}
 	// 平台放宽后取数直读 credentials：所有 API-key 平台的密钥与自定义上游
 	// 统一存放在 credentials.api_key / credentials.base_url。
@@ -851,6 +787,76 @@ func upstreamBillingGroupInfo(body []byte) BillingGroupInfo {
 
 func (s *UpstreamBillingProbeService) probeLoadedAccount(ctx context.Context, account *Account, intervalMinutes int) (*UpstreamBillingProbeSnapshot, error) {
 	now := s.currentTime().UTC()
+	if s.accountTestService == nil || s.accountTestService.httpUpstream == nil {
+		return s.persistProbeFailure(ctx, account, intervalMinutes, now, 0, "transport_unavailable", 0)
+	}
+	if account.IsTierflow() {
+		result, err := s.accountTestService.FetchTierflowBalance(ctx, account.ID)
+		if err != nil {
+			return s.persistProbeFailure(ctx, account, intervalMinutes, now, infraerrors.Code(err), "tierflow_balance_failed", 0)
+		}
+		snapshot := &UpstreamBillingProbeSnapshot{
+			Status: UpstreamBillingProbeStatusOK,
+			Data: map[string]any{
+				"provider":          PlatformTierflow,
+				"is_available":      result.IsAvailable,
+				"remaining_balance": result.RemainingBalance,
+				"total_usage":       result.TotalUsage,
+				"currency":          result.Currency,
+				"quota_per_unit":    result.QuotaPerUnit,
+				"request_count":     result.RequestCount,
+				"fetched_at":        result.FetchedAt,
+			},
+			ReceivedAt:    probeTimePtr(now),
+			FreshUntil:    probeTimePtr(now.Add(2 * time.Duration(intervalMinutes) * time.Minute)),
+			LastAttemptAt: now,
+			NextProbeAt:   now.Add(nextProbeDelay(intervalMinutes, 0)),
+			HTTPStatus:    result.StatusCode,
+		}
+		// Wallet observations never declare or synthesize a billing multiplier.
+		if err := s.updateSnapshot(ctx, account, snapshot, nil, BillingGroupInfo{}); err != nil {
+			return nil, err
+		}
+		return snapshot, nil
+	}
+	if account.IsTokenRhythm() {
+		result, err := s.accountTestService.FetchTokenRhythmBalance(ctx, account.ID)
+		if err != nil {
+			return s.persistProbeFailure(ctx, account, intervalMinutes, now, 0, "tokenrhythm_balance_failed", 0)
+		}
+		data := map[string]any{
+			"provider":              PlatformTokenRhythm,
+			"balance_cny":           result.BalanceCNY,
+			"available_balance_cny": result.AvailableBalanceCNY,
+			"frozen_balance_cny":    result.FrozenBalanceCNY,
+			"expiring_balance_cny":  result.ExpiringBalanceCNY,
+			"cost_cny":              result.CostCNY,
+			"currency":              result.Currency,
+			"calls":                 result.Calls,
+			"success_calls":         result.SuccessCalls,
+			"error_calls":           result.ErrorCalls,
+			"aborted_calls":         result.AbortedCalls,
+			"input_tokens":          result.InputTokens,
+			"output_tokens":         result.OutputTokens,
+			"fetched_at":            result.FetchedAt,
+		}
+		if result.NextExpiryAt != "" {
+			data["next_expiry_at"] = result.NextExpiryAt
+		}
+		snapshot := &UpstreamBillingProbeSnapshot{
+			Status:        UpstreamBillingProbeStatusOK,
+			Data:          data,
+			ReceivedAt:    probeTimePtr(now),
+			FreshUntil:    probeTimePtr(now.Add(2 * time.Duration(intervalMinutes) * time.Minute)),
+			LastAttemptAt: now,
+			NextProbeAt:   now.Add(nextProbeDelay(intervalMinutes, 0)),
+			HTTPStatus:    result.StatusCode,
+		}
+		if err := s.updateSnapshot(ctx, account, snapshot, nil, BillingGroupInfo{}); err != nil {
+			return nil, err
+		}
+		return snapshot, nil
+	}
 	groupSync, _ := account.Extra[UpstreamBillingGroupSyncEnabledExtraKey].(bool)
 	includeGroup := groupSync && upstreamBillingProbeEnabled(account)
 	reply, err := s.fetchBilling(ctx, account, includeGroup, now)

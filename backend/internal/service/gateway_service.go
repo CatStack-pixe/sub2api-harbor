@@ -837,6 +837,10 @@ func (s *GatewayService) TempUnscheduleRetryableError(ctx context.Context, accou
 	}
 }
 
+func cloneStringSlice(src []string) []string {
+	return append([]string(nil), src...)
+}
+
 // GatewayService handles API gateway operations
 type GatewayService struct {
 	accountRepo           AccountRepository

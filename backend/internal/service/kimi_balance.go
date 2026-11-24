@@ -100,7 +100,7 @@ func (s *AccountTestService) FetchKimiBalance(ctx context.Context, accountID int
 	}
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("Authorization", "Bearer "+strings.TrimSpace(account.GetOpenAIApiKey()))
-	account.ApplyHeaderOverrides(req.Header)
+	account.ApplyHeaderOverrides(withoutHeaderOverrideRequestScope(req.Context()), req.Header)
 
 	proxyURL := upstreamModelsProxyURL(account)
 	var resp *http.Response

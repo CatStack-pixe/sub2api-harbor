@@ -646,6 +646,7 @@ streamLoop:
 			UpstreamResponseServiceTier:   observedUpstreamResponseServiceTier(c),
 			ReasoningEffort:               reasoningEffort,
 			ServiceTier:                   resolvedOpenAIUpstreamServiceTier(c, serviceTier),
+			RequestedServiceTier:          serviceTier,
 			Stream:                        true,
 			Duration:                      time.Since(startTime),
 			FirstTokenMs:                  firstTokenMs,
@@ -849,6 +850,7 @@ func (s *OpenAIGatewayService) bufferRawChatCompletions(
 		UpstreamResponseServiceTier:   observedUpstreamResponseServiceTier(c),
 		ReasoningEffort:               reasoningEffort,
 		ServiceTier:                   resolvedOpenAIUpstreamServiceTier(c, serviceTier),
+		RequestedServiceTier:          serviceTier,
 		Stream:                        false,
 		Duration:                      time.Since(startTime),
 	}, nil

@@ -148,7 +148,11 @@ func TestCNProviderQuotaService_QueryUsageForAccount_TeamMetadata(t *testing.T) 
 			account.Credentials["zhipu_organization"] = tc.organization
 			account.Credentials["zhipu_project"] = tc.project
 			repo := &senseNovaQuotaTestRepo{account: account}
-			upstream := &senseNovaQuotaTestUpstream{statusCode: http.StatusOK, body: "{}"}
+			body := `{"data":{"limits":[{"type":"TOKENS_LIMIT","unit":3,"percentage":0}]}}`
+			if tc.platform == PlatformMiniMax {
+				body = `{"model_remains":[{"model_name":"general","current_interval_remaining_percent":100}]}`
+			}
+			upstream := &senseNovaQuotaTestUpstream{statusCode: http.StatusOK, body: body}
 			svc := NewCNProviderQuotaService(repo, nil, upstream, nil)
 
 			result, err := svc.QueryUsageForAccount(context.Background(), account)

@@ -559,6 +559,9 @@ func TestOpenAIImageSizeTierUnsupported(t *testing.T) {
 	lowOnly := newOpenAIImageSizeTestAccount(81091, 0, "1K", "2K")
 	highOnly := newOpenAIImageSizeTestAccount(81092, 0, "4K")
 	textOnly := newOpenAIImageSizeTestAccount(81093, 0)
+	lowOnly.GroupIDs = []int64{groupID}
+	highOnly.GroupIDs = []int64{groupID}
+	textOnly.GroupIDs = []int64{groupID}
 	textOnly.Credentials = map[string]any{"model_mapping": map[string]any{"gpt-5.4": "gpt-5.4"}}
 
 	svc := &OpenAIGatewayService{accountRepo: schedulerTestOpenAIAccountRepo{accounts: []Account{lowOnly, textOnly}}}
@@ -580,6 +583,7 @@ func TestOpenAIImageSizeTierUnsupported(t *testing.T) {
 	require.False(t, unsupported, "no account serves the model: leave classification to model_not_found")
 
 	chatOnly := newOpenAIImageSizeTestAccount(81094, 0)
+	chatOnly.GroupIDs = []int64{groupID}
 	chatOnly.Extra["openai_responses_supported"] = false
 	svc.accountRepo = schedulerTestOpenAIAccountRepo{accounts: []Account{chatOnly, lowOnly}}
 	_, unsupported = svc.OpenAIImageSizeTierUnsupported(context.Background(), &groupID, "gpt-5.4", "3840x2160", OpenAIEndpointCapabilityResponses, "")

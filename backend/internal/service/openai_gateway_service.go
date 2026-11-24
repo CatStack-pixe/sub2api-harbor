@@ -266,6 +266,8 @@ type OpenAIForwardResult struct {
 	// ServiceTier 优先取上游实际响应回显的 tier；缺失时回退到最终出站 body 的
 	// tier。nil 表示两者都无识别 tier。
 	ServiceTier *string
+	// RequestedServiceTier is the tier sent upstream before applying any response echo.
+	RequestedServiceTier *string
 	// ReasoningEffort is extracted from request body (reasoning.effort) or derived from model suffix
 	// after group policy rewriting and model-family remapping.
 	// Stored for usage records display; nil means not provided / not applicable.

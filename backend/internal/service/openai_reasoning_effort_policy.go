@@ -446,21 +446,6 @@ func RequestedReasoningEffortFromContext(ctx context.Context) *string {
 	return &value
 }
 
-// WithOpenAIReasoningEffortPolicy binds a group policy to a request after its
-// concrete target platform has been resolved to OpenAI. The policy is copied so
-// retries and asynchronous forwarding cannot observe later slice mutations.
-func WithOpenAIReasoningEffortPolicy(ctx context.Context, maxEffort string, mappings []ReasoningEffortMapping, overLimit string) context.Context {
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	policy := openAIReasoningEffortPolicy{
-		maxEffort: maxEffort,
-		overLimit: overLimit,
-		mappings:  append([]ReasoningEffortMapping(nil), mappings...),
-	}
-	return context.WithValue(ctx, openAIReasoningEffortPolicyContextKey{}, policy)
-}
-
 // WithOpenAIReasoningEffortPolicyForMessages preserves ordinary bridge defaults,
 // but retains ceilings and none mappings for explicitly disabled thinking.
 func WithOpenAIReasoningEffortPolicyForMessages(ctx context.Context, body []byte, maxEffort string, mappings []ReasoningEffortMapping, overLimit string) context.Context {

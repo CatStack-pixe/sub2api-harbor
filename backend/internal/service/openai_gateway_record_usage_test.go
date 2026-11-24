@@ -3086,12 +3086,14 @@ func TestOpenAIGatewayServiceRecordUsage_CodexDefaultEchoKeepsFastBilling(t *tes
 				nil,
 			)
 			serviceTier := "priority"
+			observedTier := "default"
 			tokens := UsageTokens{InputTokens: 100, OutputTokens: 50}
 
 			err := svc.RecordUsage(context.Background(), &OpenAIRecordUsageInput{
 				Result: &OpenAIForwardResult{
 					RequestID:                   "resp_codex_default_echo",
-					ServiceTier:                 &serviceTier,
+					ServiceTier:                 &observedTier,
+					RequestedServiceTier:        &serviceTier,
 					UpstreamResponseServiceTier: "default",
 					Usage:                       OpenAIUsage{InputTokens: tokens.InputTokens, OutputTokens: tokens.OutputTokens},
 					Model:                       "gpt-5.6-sol",
@@ -3128,12 +3130,14 @@ func TestOpenAIGatewayServiceRecordUsage_ShadowUsesParentCredentialTierContract(
 	}}
 	svc.accountRepo = accountRepo
 	serviceTier := "priority"
+	observedTier := "default"
 	tokens := UsageTokens{InputTokens: 100, OutputTokens: 50}
 
 	err := svc.RecordUsage(context.Background(), &OpenAIRecordUsageInput{
 		Result: &OpenAIForwardResult{
 			RequestID:                   "resp_shadow_codex_default_echo",
-			ServiceTier:                 &serviceTier,
+			ServiceTier:                 &observedTier,
+			RequestedServiceTier:        &serviceTier,
 			UpstreamResponseServiceTier: "default",
 			Usage:                       OpenAIUsage{InputTokens: tokens.InputTokens, OutputTokens: tokens.OutputTokens},
 			Model:                       "gpt-5.6-sol",
@@ -3169,6 +3173,7 @@ func TestOpenAIGatewayServiceRecordUsage_FreeOpenAIFastChargesStandard(t *testin
 	svc.resolver = NewModelPricingResolver(nil, svc.billingService)
 	groupID := int64(77)
 	serviceTier := "priority"
+	observedTier := "default"
 	tokens := UsageTokens{InputTokens: 100, OutputTokens: 50}
 	inputPrice := 0.001
 	outputPrice := 0.002
@@ -3192,7 +3197,8 @@ func TestOpenAIGatewayServiceRecordUsage_FreeOpenAIFastChargesStandard(t *testin
 	err := svc.RecordUsage(context.Background(), &OpenAIRecordUsageInput{
 		Result: &OpenAIForwardResult{
 			RequestID:                   "resp_free_fast",
-			ServiceTier:                 &serviceTier,
+			ServiceTier:                 &observedTier,
+			RequestedServiceTier:        &serviceTier,
 			UpstreamResponseServiceTier: "default",
 			Usage:                       OpenAIUsage{InputTokens: tokens.InputTokens, OutputTokens: tokens.OutputTokens},
 			Model:                       "gpt-5.6-sol",

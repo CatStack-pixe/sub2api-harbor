@@ -74,3 +74,43 @@ func TestApplyServiceTierBillingResolutionOnlyRewritesDowngrades(t *testing.T) {
 		require.False(t, ApplyForwardServiceTierBillingResolution(nil).Downgraded)
 	})
 }
+
+func TestApplyOpenAIServiceTierBillingResolutionForCodexOAuthDefaultEcho(t *testing.T) {
+	requested := "priority"
+	observed := "default"
+	result := &OpenAIForwardResult{
+		ServiceTier:                 &observed,
+		RequestedServiceTier:        &requested,
+		UpstreamResponseServiceTier: observed,
+	}
+
+	resolution := applyOpenAIServiceTierBillingResolutionForAccount(
+		&Account{Platform: PlatformOpenAI, Type: AccountTypeOAuth},
+		result,
+	)
+
+	require.False(t, resolution.Downgraded)
+	require.Equal(t, "priority", resolution.Requested)
+	require.Equal(t, "default", resolution.Observed)
+	require.Equal(t, "priority", resolution.Billing)
+	require.Equal(t, "priority", *result.ServiceTier)
+}
+
+func TestApplyOpenAIServiceTierBillingResolutionForNonOAuthDefaultEcho(t *testing.T) {
+	requested := "priority"
+	observed := "default"
+	result := &OpenAIForwardResult{
+		ServiceTier:                 &observed,
+		RequestedServiceTier:        &requested,
+		UpstreamResponseServiceTier: observed,
+	}
+
+	resolution := applyOpenAIServiceTierBillingResolutionForAccount(
+		&Account{Platform: PlatformOpenAI, Type: AccountTypeAPIKey},
+		result,
+	)
+
+	require.False(t, resolution.Downgraded)
+	require.Equal(t, "default", resolution.Billing)
+	require.Equal(t, "default", *result.ServiceTier)
+}

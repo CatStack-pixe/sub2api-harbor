@@ -194,7 +194,6 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 	if !isGrokVideoUsageResult(result, nil) {
 		ApplyOpenAIImageBillingResolution(result)
 	}
-	logServiceTierBillingDowngrade("service.openai_gateway", account, result.RequestID, ApplyOpenAIServiceTierBillingResolution(result))
 
 	// OpenAI input_tokens 是总输入，包含缓存读取和缓存写入明细。
 	// 将三类 token 拆成互斥桶，避免缓存写入同时按普通输入和 cache_write 重复计费。
@@ -238,16 +237,18 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 		result.Model,
 	)
 	billingModels = s.filterCNProviderBillingModelCandidates(ctx, account, apiKey, billingModels)
-	serviceTier := ""
-	if result.ServiceTier != nil {
-		serviceTier = strings.TrimSpace(*result.ServiceTier)
-	}
 	billingAccount = account
 	if account.IsShadow() {
 		billingAccount, err = resolveCredentialAccount(ctx, s.accountRepo, account)
 		if err != nil {
 			return err
 		}
+	}
+	logServiceTierBillingDowngrade("service.openai_gateway", billingAccount, result.RequestID,
+		applyOpenAIServiceTierBillingResolutionForAccount(billingAccount, result))
+	serviceTier := ""
+	if result.ServiceTier != nil {
+		serviceTier = strings.TrimSpace(*result.ServiceTier)
 	}
 	accountLongContextBillingGate := openAILongContextBillingGate(billingAccount)
 	longContextBillingGate := accountLongContextBillingGate

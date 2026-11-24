@@ -43,7 +43,7 @@ data: {"type":"response.completed","response":{"id":"resp_reasoning","model":"re
 			if path == "/v1/messages" {
 				handle = svc.handleAnthropicBufferedStreamingResponse
 			}
-			result, err := handle(resp, c, account, "reasoning-model", "reasoning-model", "reasoning-model", time.Now())
+			result, err := handle(resp, c, account, "reasoning-model", "reasoning-model", "reasoning-model", time.Now(), nil)
 			require.NoError(t, err)
 			require.NotNil(t, result)
 			require.Equal(t, http.StatusOK, rec.Code)

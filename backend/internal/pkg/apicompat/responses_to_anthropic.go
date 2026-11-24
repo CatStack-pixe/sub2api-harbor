@@ -237,6 +237,11 @@ type ResponsesEventToAnthropicState struct {
 	CurrentToolName     string
 	CurrentToolArgs     string
 	CurrentToolHadDelta bool
+	// These mirrors preserve the legacy active-tool accumulation state. They
+	// are also the copy-on-write boundary when callers shallow-copy the stream
+	// state while a Read tool is being validated.
+	currentToolArgsBuffer     *strings.Builder
+	currentToolArgsValidation *streamStringBytes
 	// PendingThinkingSignature is filled from reasoning.encrypted_content and
 	// emitted as signature_delta before the thinking block is closed.
 	PendingThinkingSignature string
@@ -630,18 +635,27 @@ func resToAnthHandleFuncArgsDelta(evt *ResponsesStreamEvent, state *ResponsesEve
 		return nil
 	}
 
-	tool := state.findOrCreateLegacyToolBlock(evt)
+	tool := state.writableToolBlock(evt)
 	if tool == nil || !tool.Open || tool.StopSent {
 		return nil
 	}
 
 	previousArgs := tool.Arguments
-	tool.Arguments = appendStreamString(&tool.ArgumentsBuffer, tool.Arguments, evt.Delta)
+	if state.isMirroredToolBlock(tool) {
+		previousArgs = state.CurrentToolArgs
+		tool.ArgumentsBuffer = state.currentToolArgsBuffer
+		tool.ArgumentsValidation = state.currentToolArgsValidation
+	}
+	tool.Arguments = appendStreamString(&tool.ArgumentsBuffer, previousArgs, evt.Delta)
 	state.mirrorToolBlock(tool)
 
 	if tool.Name == "Read" {
+		if tool.HadDelta {
+			return nil
+		}
 		validatedArgs := appendStreamStringBytes(&tool.ArgumentsValidation, previousArgs, tool.Arguments, evt.Delta)
-		if tool.HadDelta || !json.Valid(validatedArgs) {
+		state.mirrorToolValidation(tool)
+		if !json.Valid(validatedArgs) {
 			return nil
 		}
 
@@ -672,7 +686,7 @@ func resToAnthHandleFuncArgsDelta(evt *ResponsesStreamEvent, state *ResponsesEve
 }
 
 func resToAnthHandleFuncArgsDone(evt *ResponsesStreamEvent, state *ResponsesEventToAnthropicState) []AnthropicStreamEvent {
-	tool := state.findOrCreateLegacyToolBlock(evt)
+	tool := state.writableToolBlock(evt)
 	if tool == nil || !tool.Open || tool.StopSent {
 		return nil
 	}
@@ -732,7 +746,7 @@ func resToAnthHandleOutputItemDone(evt *ResponsesStreamEvent, state *ResponsesEv
 
 	switch evt.Item.Type {
 	case "function_call", "custom_tool_call":
-		tool := state.findOrCreateLegacyToolBlock(evt)
+		tool := state.writableToolBlock(evt)
 		if tool == nil || !tool.Open || tool.StopSent {
 			return nil
 		}
@@ -906,7 +920,7 @@ func closeCurrentBlock(state *ResponsesEventToAnthropicState) []AnthropicStreamE
 		return nil
 	}
 	if state.CurrentBlockType == "tool_use" {
-		tool := state.findOrCreateLegacyToolBlock(&ResponsesStreamEvent{OutputIndex: state.CurrentOutputIndex})
+		tool := state.writableToolBlock(&ResponsesStreamEvent{OutputIndex: state.CurrentOutputIndex})
 		return closeToolBlock(state, tool)
 	}
 
@@ -1017,23 +1031,74 @@ func (state *ResponsesEventToAnthropicState) findOrCreateLegacyToolBlock(evt *Re
 	}
 
 	tool := &responsesAnthropicToolBlockState{
-		OutputIndex: evt.OutputIndex,
-		BlockIndex:  blockIdx,
-		CallID:      callID,
-		Name:        name,
-		Arguments:   state.CurrentToolArgs,
-		HadDelta:    state.CurrentToolHadDelta,
-		Open:        true,
+		OutputIndex:         evt.OutputIndex,
+		BlockIndex:          blockIdx,
+		CallID:              callID,
+		Name:                name,
+		Arguments:           state.CurrentToolArgs,
+		ArgumentsBuffer:     state.currentToolArgsBuffer,
+		ArgumentsValidation: state.currentToolArgsValidation,
+		HadDelta:            state.CurrentToolHadDelta,
+		Open:                true,
 	}
-	state.toolBlocksByOutput[evt.OutputIndex] = tool
-	state.OutputIndexToBlockIdx[evt.OutputIndex] = blockIdx
+	blocks := make(map[int]*responsesAnthropicToolBlockState, len(state.toolBlocksByOutput)+1)
+	for outputIndex, existing := range state.toolBlocksByOutput {
+		blocks[outputIndex] = existing
+	}
+	blocks[evt.OutputIndex] = tool
+	state.toolBlocksByOutput = blocks
+
+	blockIndices := make(map[int]int, len(state.OutputIndexToBlockIdx)+1)
+	for outputIndex, existing := range state.OutputIndexToBlockIdx {
+		blockIndices[outputIndex] = existing
+	}
+	blockIndices[evt.OutputIndex] = blockIdx
+	state.OutputIndexToBlockIdx = blockIndices
 	if callID != "" {
-		state.toolOutputByCallID[callID] = evt.OutputIndex
+		outputByCallID := make(map[string]int, len(state.toolOutputByCallID)+1)
+		for existingCallID, outputIndex := range state.toolOutputByCallID {
+			outputByCallID[existingCallID] = outputIndex
+		}
+		outputByCallID[callID] = evt.OutputIndex
+		state.toolOutputByCallID = outputByCallID
 	}
 	if state.ContentBlockIndex <= blockIdx {
 		state.ContentBlockIndex = blockIdx + 1
 	}
 	return tool
+}
+
+// writableToolBlock gives this state its own tool record and map before a
+// mutation. A shallow copy may share the maps and records, while its public
+// active-tool fields remain independent and are the source of truth for the
+// currently mirrored tool.
+func (state *ResponsesEventToAnthropicState) writableToolBlock(evt *ResponsesStreamEvent) *responsesAnthropicToolBlockState {
+	tool := state.findOrCreateLegacyToolBlock(evt)
+	if tool == nil {
+		return nil
+	}
+
+	copyOfTool := *tool
+	if state.isMirroredToolBlock(tool) {
+		copyOfTool.Arguments = state.CurrentToolArgs
+		copyOfTool.ArgumentsBuffer = state.currentToolArgsBuffer
+		copyOfTool.ArgumentsValidation = state.currentToolArgsValidation
+		copyOfTool.HadDelta = state.CurrentToolHadDelta
+	}
+	blocks := make(map[int]*responsesAnthropicToolBlockState, len(state.toolBlocksByOutput))
+	for outputIndex, existing := range state.toolBlocksByOutput {
+		blocks[outputIndex] = existing
+	}
+	blocks[copyOfTool.OutputIndex] = &copyOfTool
+	state.toolBlocksByOutput = blocks
+	return &copyOfTool
+}
+
+func (state *ResponsesEventToAnthropicState) isMirroredToolBlock(tool *responsesAnthropicToolBlockState) bool {
+	return tool != nil &&
+		state.CurrentBlockType == "tool_use" &&
+		state.CurrentBlockIndex == tool.BlockIndex &&
+		state.CurrentOutputIndex == tool.OutputIndex
 }
 
 func (state *ResponsesEventToAnthropicState) mirrorToolBlock(tool *responsesAnthropicToolBlockState) {
@@ -1047,6 +1112,15 @@ func (state *ResponsesEventToAnthropicState) mirrorToolBlock(tool *responsesAnth
 	state.CurrentToolName = tool.Name
 	state.CurrentToolArgs = tool.Arguments
 	state.CurrentToolHadDelta = tool.HadDelta
+	state.currentToolArgsBuffer = tool.ArgumentsBuffer
+	state.currentToolArgsValidation = tool.ArgumentsValidation
+}
+
+func (state *ResponsesEventToAnthropicState) mirrorToolValidation(tool *responsesAnthropicToolBlockState) {
+	if !state.isMirroredToolBlock(tool) {
+		return
+	}
+	state.currentToolArgsValidation = tool.ArgumentsValidation
 }
 
 func emitToolArgumentsAndClose(
@@ -1074,6 +1148,7 @@ func emitToolArgumentsAndClose(
 			})
 			tool.Arguments = raw
 			tool.HadDelta = true
+			state.mirrorToolBlock(tool)
 		}
 	} else if tool.HadDelta && tool.Name != "Read" && strings.HasPrefix(raw, tool.Arguments) && len(raw) > len(tool.Arguments) {
 		remaining := raw[len(tool.Arguments):]
@@ -1106,6 +1181,8 @@ func closeToolBlock(state *ResponsesEventToAnthropicState, tool *responsesAnthro
 		state.CurrentToolName = ""
 		state.CurrentToolArgs = ""
 		state.CurrentToolHadDelta = false
+		state.currentToolArgsBuffer = nil
+		state.currentToolArgsValidation = nil
 	}
 	tool.ArgumentsBuffer = nil
 	tool.ArgumentsValidation = nil
@@ -1120,21 +1197,38 @@ func closeAllOpenBlocks(state *ResponsesEventToAnthropicState) []AnthropicStream
 	}
 
 	type openBlock struct {
-		index  int
-		tool   *responsesAnthropicToolBlockState
-		serial bool
+		index       int
+		outputIndex int
+		callID      string
+		tool        *responsesAnthropicToolBlockState
+		serial      bool
 	}
 	blocks := make([]openBlock, 0, len(state.toolBlocksByOutput)+1)
+	seenTools := make(map[*responsesAnthropicToolBlockState]bool)
 	if state.ContentBlockOpen && state.CurrentBlockType != "tool_use" {
 		blocks = append(blocks, openBlock{index: state.CurrentBlockIndex, serial: true})
+	} else if state.ContentBlockOpen && state.CurrentBlockType == "tool_use" {
+		if tool := state.writableToolBlock(&ResponsesStreamEvent{OutputIndex: state.CurrentOutputIndex}); tool != nil {
+			seenTools[tool] = true
+			blocks = append(blocks, openBlock{
+				index:       tool.BlockIndex,
+				outputIndex: tool.OutputIndex,
+				callID:      tool.CallID,
+				tool:        tool,
+			})
+		}
 	}
-	seenTools := make(map[*responsesAnthropicToolBlockState]bool)
 	for _, tool := range state.toolBlocksByOutput {
 		if tool == nil || !tool.Open || tool.StopSent || seenTools[tool] {
 			continue
 		}
 		seenTools[tool] = true
-		blocks = append(blocks, openBlock{index: tool.BlockIndex, tool: tool})
+		blocks = append(blocks, openBlock{
+			index:       tool.BlockIndex,
+			outputIndex: tool.OutputIndex,
+			callID:      tool.CallID,
+			tool:        tool,
+		})
 	}
 	sort.Slice(blocks, func(i, j int) bool { return blocks[i].index < blocks[j].index })
 
@@ -1144,7 +1238,11 @@ func closeAllOpenBlocks(state *ResponsesEventToAnthropicState) []AnthropicStream
 			events = append(events, closeCurrentBlock(state)...)
 			continue
 		}
-		events = append(events, closeToolBlock(state, block.tool)...)
+		tool := state.writableToolBlock(&ResponsesStreamEvent{
+			OutputIndex: block.outputIndex,
+			CallID:      block.callID,
+		})
+		events = append(events, closeToolBlock(state, tool)...)
 	}
 	return events
 }

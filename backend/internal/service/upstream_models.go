@@ -1120,7 +1120,7 @@ func (s *AccountTestService) buildDeepSeekUpstreamModelsRequest(ctx context.Cont
 	}
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("Authorization", "Bearer "+apiKey)
-	account.ApplyHeaderOverrides(req.Header)
+	account.ApplyHeaderOverrides(withoutHeaderOverrideRequestScope(req.Context()), req.Header)
 	return req, nil
 }
 

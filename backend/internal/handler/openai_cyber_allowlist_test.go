@@ -86,7 +86,11 @@ func TestCyberAllowlistedUserBypassesExistingBlocksAndContinuesWebSocket(t *test
 	logs := harness.moderationRepo.logSnapshot()
 	require.Len(t, logs, 1, "the completed follow-up must not inherit the previous turn's cyber mark")
 	require.Equal(t, service.ContentModerationModeCyberLogOnly, logs[0].Mode)
-	matched, err = store.FindCyberSessionBlocked(ctx, service.CyberSessionTranscriptBlockKeys(harness.apiKey.ID, payload))
+	transcriptKeys = transcriptKeys[:0]
+	for _, transcript := range service.CyberSessionTranscriptBlocks(harness.apiKey.ID, payload) {
+		transcriptKeys = append(transcriptKeys, transcript.Key)
+	}
+	matched, err = store.FindCyberSessionBlocked(ctx, transcriptKeys)
 	require.NoError(t, err)
 	require.Empty(t, matched, "no turn on an allowlisted connection may write transcript blocks")
 }

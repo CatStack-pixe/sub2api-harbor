@@ -195,6 +195,7 @@ func (s *OpenAIGatewayService) bufferChatCompletionsAsAnthropic(
 		UpstreamResponseModelConflict: observedUpstreamResponseModelConflict(c),
 		UpstreamResponseServiceTier:   firstNonEmpty(ccResp.ServiceTier, observedUpstreamResponseServiceTier(c)),
 		ServiceTier:                   resolvedOpenAIUpstreamServiceTier(c, serviceTier),
+		RequestedServiceTier:          serviceTier,
 		Stream:                        false,
 		Duration:                      time.Since(startTime),
 	}, nil
@@ -259,6 +260,7 @@ func (s *OpenAIGatewayService) streamChatCompletionsAsAnthropic(
 			UpstreamResponseModelConflict: observedUpstreamResponseModelConflict(c),
 			UpstreamResponseServiceTier:   observedUpstreamResponseServiceTier(c),
 			ServiceTier:                   resolvedOpenAIUpstreamServiceTier(c, serviceTier),
+			RequestedServiceTier:          serviceTier,
 			Stream:                        true,
 			Duration:                      time.Since(startTime),
 			FirstTokenMs:                  scan.FirstTokenMs,
@@ -298,6 +300,7 @@ func (s *OpenAIGatewayService) streamChatCompletionsAsAnthropic(
 		UpstreamResponseModelConflict: observedUpstreamResponseModelConflict(c),
 		UpstreamResponseServiceTier:   observedUpstreamResponseServiceTier(c),
 		ServiceTier:                   resolvedOpenAIUpstreamServiceTier(c, serviceTier),
+		RequestedServiceTier:          serviceTier,
 		Stream:                        true,
 		Duration:                      time.Since(startTime),
 		FirstTokenMs:                  scan.FirstTokenMs,
